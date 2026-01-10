@@ -37,6 +37,8 @@ app.include_router(capture.router, prefix="/api/capture", tags=["Quick Capture"]
 
 # Serve static files (PWA, manifest, etc.)
 static_dir = Path(__file__).parent.parent / "static"
+# Serve static files (PWA, manifest, etc.)
+static_dir = Path(__file__).parent.parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
@@ -48,6 +50,11 @@ async def root():
         "service": "MetaPM",
         "version": "0.1.0",
         "status": "healthy",
+        "docs": "/docs",
+    }
+
+
+@app.get("/health")
 async def health_check():
     """Health check endpoint for Cloud Run"""
     return {"status": "healthy"}
