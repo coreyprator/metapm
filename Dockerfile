@@ -6,6 +6,8 @@ FROM python:3.11-slim
 # Install minimal system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
+    unixodbc \
+    unixodbc-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
