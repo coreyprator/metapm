@@ -1,9 +1,9 @@
 """
 MetaPM Database Connection
-SQL Server connection management via pymssql
+SQL Server connection management via pyodbc with UTF-16LE encoding
 """
 
-import pymssql
+import pyodbc
 from contextlib import contextmanager
 from typing import Generator, Any, List, Dict, Optional
 import logging
@@ -14,8 +14,8 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-def get_connection() -> pymssql.Connection:
-    """Create a new database connection"""
+def get_connection() -> pyodbc.Connection:
+    """Create a new database connection with UTF-16LE encoding for Unicode support"""
     try:
         # Parse Cloud SQL socket connection or direct connection
         if settings.DB_SERVER.startswith("/cloudsql/"):
@@ -25,16 +25,25 @@ def get_connection() -> pymssql.Connection:
         else:
             server = settings.DB_SERVER
         
-        conn = pymssql.connect(
-            server=server,
-            port=1433,
-            user=settings.DB_USER,
-            password=settings.DB_PASSWORD,
-            database=settings.DB_NAME,
-            timeout=30
+        # Build connection string for pyodbc
+        conn_str = (
+            f"DRIVER={{{settings.DB_DRIVER}}};"
+            f"SERVER={server},1433;"
+            f"DATABASE={settings.DB_NAME};"
+            f"UID={settings.DB_USER};"
+            f"PWD={settings.DB_PASSWORD};"
+            "TrustServerCertificate=yes;"
         )
+        
+        conn = pyodbc.connect(conn_str, timeout=30)
+        
+        # CRITICAL: SQL Server uses UTF-16LE for NVARCHAR columns
+        # This is required for proper Greek Unicode handling
+        conn.setdecoding(pyodbc.SQL_WCHAR, encoding='utf-16-le')
+        conn.setencoding(encoding='utf-16-le')
+        
         return conn
-    except pymssql.Error as e:
+    except pyodbc.Error as e:
         logger.error(f"Database connection failed: {e}")
         logger.warning("Falling back to mock database mode - using in-memory data")
         # For demo purposes when driver is unavailable, return mock data
@@ -42,7 +51,7 @@ def get_connection() -> pymssql.Connection:
 
 
 @contextmanager
-def get_db() -> Generator[pymssql.Connection, None, None]:
+def get_db() -> Generator[pyodbc.Connection, None, None]:
     """Context manager for database connections"""
     conn = get_connection()
     try:

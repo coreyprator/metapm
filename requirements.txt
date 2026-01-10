@@ -7,16 +7,7 @@ pydantic==2.6.1
 pydantic-settings==2.1.0
 
 # Database
-pymssql==2.2.11
-
-# HTTP Client (for future integrations)
-httpx==0.26.0
-
-# GCP Integration
-google-cloud-storage==2.14.0
-google-cloud-secret-manager==2.16.4
-
-# Development & Testing (optional for production)
+pyodbc==5.0.1
 # python-dotenv==1.0.1
 # pytest==8.0.0
 # pytest-asyncio==0.23.4
