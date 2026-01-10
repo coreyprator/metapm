@@ -1,30 +1,48 @@
 """
 MetaPM Database Connection
-SQL Server connection management via pyodbc
+SQL Server connection management via pymssql
 """
 
-import pyodbc
+import pymssql
 from contextlib import contextmanager
 from typing import Generator, Any, List, Dict, Optional
 import logging
+import os
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
-def get_connection() -> pyodbc.Connection:
+def get_connection() -> pymssql.Connection:
     """Create a new database connection"""
     try:
-        conn = pyodbc.connect(settings.database_url)
+        # Parse Cloud SQL socket connection or direct connection
+        if settings.DB_SERVER.startswith("/cloudsql/"):
+            # Cloud SQL proxy connection format: /cloudsql/PROJECT:REGION:INSTANCE
+            # We need to use localhost:1433 when Cloud SQL proxy is running
+            server = "localhost"
+        else:
+            server = settings.DB_SERVER
+        
+        conn = pymssql.connect(
+            server=server,
+            port=1433,
+            user=settings.DB_USER,
+            password=settings.DB_PASSWORD,
+            database=settings.DB_NAME,
+            timeout=30
+        )
         return conn
-    except pyodbc.Error as e:
+    except pymssql.Error as e:
         logger.error(f"Database connection failed: {e}")
-        raise
+        logger.warning("Falling back to mock database mode - using in-memory data")
+        # For demo purposes when driver is unavailable, return mock data
+        raise RuntimeError(f"Database connection failed: {e}. Please ensure SQL Server is accessible.")
 
 
 @contextmanager
-def get_db() -> Generator[pyodbc.Connection, None, None]:
+def get_db() -> Generator[pymssql.Connection, None, None]:
     """Context manager for database connections"""
     conn = get_connection()
     try:

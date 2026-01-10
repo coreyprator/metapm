@@ -7,7 +7,7 @@ pydantic==2.6.1
 pydantic-settings==2.1.0
 
 # Database
-pyodbc==5.1.0
+pymssql==2.2.11
 
 # HTTP Client (for future integrations)
 httpx==0.26.0
