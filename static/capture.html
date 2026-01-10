@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2c3e50">
+    <meta name="description" content="MetaPM Voice Capture - AI-powered task management">
+    <title>MetaPM - Voice Capture</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='75' fill='%232c3e50'>🎤</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .mic-button {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            font-size: 50px;
+            cursor: pointer;
+            margin: 20px auto;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .mic-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.6);
+        }
+        
+        .mic-button:active {
+            transform: scale(0.95);
+        }
+        
+        .status {
+            min-height: 30px;
+            margin: 20px 0;
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+        
+        .status.recording {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .status.processing {
+            color: #f39c12;
+            font-weight: bold;
+        }
+        
+        .status.success {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        
+        .transcript {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+            min-height: 60px;
+            max-height: 200px;
+            overflow-y: auto;
+            border-left: 4px solid #667eea;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        
+        .btn-secondary {
+            background: #e8e8e8;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #d8d8d8;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 MetaPM</h1>
+        <p class="subtitle">Voice Capture for Task Management</p>
+        
+        <button class="mic-button" id="micButton" title="Click to start recording">
+            🎙️
+        </button>
+        
+        <div class="status" id="status"></div>
+        
+        <div class="transcript" id="transcript">
+            <em>Transcript will appear here...</em>
+        </div>
+        
+        <div class="controls">
+            <button class="btn btn-primary" id="submitBtn" disabled>Submit</button>
+            <button class="btn btn-secondary" id="clearBtn">Clear</button>
+        </div>
+    </div>
+    
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        
+        const micButton = document.getElementById('micButton');
+        const statusDiv = document.getElementById('status');
+        const transcriptDiv = document.getElementById('transcript');
+        const submitBtn = document.getElementById('submitBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        
+        // Register service worker for PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js').catch(err => {
+                console.log('Service Worker registration failed:', err);
+            });
+        }
+        
+        micButton.addEventListener('click', toggleRecording);
+        submitBtn.addEventListener('click', submitTask);
+        clearBtn.addEventListener('click', clearTranscript);
+        
+        async function toggleRecording() {
+            if (!isRecording) {
+                // Start recording
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    
+                    mediaRecorder.addEventListener('dataavailable', (event) => {
+                        audioChunks.push(event.data);
+                    });
+                    
+                    mediaRecorder.addEventListener('stop', async () => {
+                        await processAudio();
+                    });
+                    
+                    mediaRecorder.start();
+                    isRecording = true;
+                    micButton.style.background = '#e74c3c';
+                    statusDiv.textContent = '🔴 Recording...';
+                    statusDiv.className = 'status recording';
+                } catch (err) {
+                    statusDiv.textContent = '❌ Microphone access denied';
+                    statusDiv.className = 'status';
+                }
+            } else {
+                // Stop recording
+                mediaRecorder.stop();
+                isRecording = false;
+                micButton.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                statusDiv.textContent = '⏳ Processing audio...';
+                statusDiv.className = 'status processing';
+            }
+        }
+        
+        async function processAudio() {
+            try {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.wav');
+                
+                // Send to voice capture endpoint
+                const response = await fetch('/api/capture/voice', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    transcriptDiv.textContent = result.transcript || result.understanding || 'Processing complete';
+                    submitBtn.disabled = false;
+                    statusDiv.textContent = '✅ Transcript ready';
+                    statusDiv.className = 'status success';
+                } else {
+                    statusDiv.textContent = '❌ Error processing audio';
+                    statusDiv.className = 'status';
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                statusDiv.textContent = '❌ Error: ' + err.message;
+                statusDiv.className = 'status';
+            }
+        }
+        
+        async function submitTask() {
+            if (!transcriptDiv.textContent) return;
+            
+            try {
+                const response = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title: transcriptDiv.textContent,
+                        description: 'Captured via voice',
+                        project_id: null
+                    })
+                });
+                
+                if (response.ok) {
+                    statusDiv.textContent = '✅ Task created!';
+                    statusDiv.className = 'status success';
+                    setTimeout(clearTranscript, 2000);
+                } else {
+                    statusDiv.textContent = '❌ Error creating task';
+                    statusDiv.className = 'status';
+                }
+            } catch (err) {
+                statusDiv.textContent = '❌ Error: ' + err.message;
+                statusDiv.className = 'status';
+            }
+        }
+        
+        function clearTranscript() {
+            transcriptDiv.textContent = 'Transcript will appear here...';
+            transcriptDiv.style.fontStyle = 'italic';
+            submitBtn.disabled = true;
+            statusDiv.textContent = '';
+            statusDiv.className = 'status';
+        }
+    </script>
+</body>
+</html>

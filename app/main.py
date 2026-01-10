@@ -3,7 +3,10 @@ MetaPM - Meta Project Manager
 FastAPI Application Entry Point
 """
 
+import os
+from pathlib import Path
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import tasks, projects, categories, methodology, capture
@@ -33,10 +36,10 @@ app.include_router(categories.router, prefix="/api/categories", tags=["Categorie
 app.include_router(methodology.router, prefix="/api/methodology", tags=["Methodology"])
 app.include_router(capture.router, prefix="/api/capture", tags=["Quick Capture"])
 
-
-@app.get("/")
-async def root():
-    """Health check and API info"""
+# Serve static files (PWA, manifest, etc.)
+static_dir = Path(__file__).parent.parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
     return {
         "service": "MetaPM",
         "version": "0.1.0",
