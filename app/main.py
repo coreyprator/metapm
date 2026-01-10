@@ -3,7 +3,6 @@ MetaPM - Meta Project Manager
 FastAPI Application Entry Point
 """
 
-import os
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -45,11 +44,10 @@ if static_dir.exists():
 @app.get("/")
 async def root():
     """Health check and API info"""
-        "docs": "/docs",
-    }
-
-
-@app.get("/health")
+    return {
+        "service": "MetaPM",
+        "version": "0.1.0",
+        "status": "healthy",
 async def health_check():
     """Health check endpoint for Cloud Run"""
     return {"status": "healthy"}
