@@ -40,10 +40,11 @@ app.include_router(capture.router, prefix="/api/capture", tags=["Quick Capture"]
 static_dir = Path(__file__).parent.parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-    return {
-        "service": "MetaPM",
-        "version": "0.1.0",
-        "status": "healthy",
+
+
+@app.get("/")
+async def root():
+    """Health check and API info"""
         "docs": "/docs",
     }
 
