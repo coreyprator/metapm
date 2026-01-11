@@ -43,6 +43,17 @@ if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
+@app.get("/capture.html")
+async def capture_page():
+    """Serve the voice capture PWA"""
+    from fastapi.responses import FileResponse
+    capture_file = static_dir / "capture.html"
+    if capture_file.exists():
+        return FileResponse(str(capture_file), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Capture page not found")
+
+
 @app.get("/")
 async def root():
     """Health check and API info"""
