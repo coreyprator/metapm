@@ -239,7 +239,7 @@
                 
                 if (response.ok) {
                     const result = await response.json();
-                    transcriptDiv.textContent = result.transcript || result.understanding || 'Processing complete';
+                    transcriptDiv.textContent = result.transcription || result.transcript || result.understanding || 'Processing complete';
                     submitBtn.disabled = false;
                     statusDiv.textContent = '✅ Transcript ready';
                     statusDiv.className = 'status success';
