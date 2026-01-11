@@ -51,3 +51,79 @@ class TextCaptureResponse(BaseModel):
     extractedProjectCode: Optional[str] = None
     taskCreated: Optional[dict] = None
     processingTimeMs: int
+
+
+class ConversationCreate(BaseModel):
+    """Create a new conversation"""
+    source: str
+    project_code: Optional[str] = None
+    title: Optional[str] = None
+    device_info: Optional[str] = None
+    location: Optional[str] = None
+
+
+class ConversationResponse(BaseModel):
+    """Conversation details response"""
+    conversationId: int
+    conversationGuid: str
+    title: Optional[str] = None
+    source: str
+    projectCode: Optional[str] = None
+    projectName: Optional[str] = None
+    status: str
+    createdAt: datetime
+    updatedAt: datetime
+    transactionCount: int
+
+
+class TransactionResponse(BaseModel):
+    """Transaction details response"""
+    transactionId: int
+    transactionGuid: str
+    conversationGuid: str
+    prompt: str
+    response: str
+    transcription: Optional[str] = None
+    processingTimeMs: int
+    createdAt: datetime
+
+
+class SearchResult(BaseModel):
+    """Single search result"""
+    conversationGuid: str
+    source: str
+    transcription: Optional[str] = None
+    prompt: str
+    response: str
+    createdAt: datetime
+
+
+class SearchRequest(BaseModel):
+    """Search request"""
+    query: str
+    project_code: Optional[str] = None
+    limit: int = 20
+
+
+class SearchResponse(BaseModel):
+    """Search results response"""
+    query: str
+    resultCount: int
+    results: List[SearchResult]
+
+
+class CostSummary(BaseModel):
+    """Cost summary by project/model"""
+    projectCode: str
+    totalCost: float
+    gpt4Cost: float
+    gpt35Cost: float
+    claudeCost: float
+    transactionCount: int
+
+
+class UsagePattern(BaseModel):
+    """Usage pattern analysis"""
+    intentType: str
+    count: int
+    percentage: float
