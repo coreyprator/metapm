@@ -89,6 +89,9 @@ def get_calendar_credentials() -> Optional[Credentials]:
         logger.warning("Google Calendar credentials not configured")
         return None
     
+    # Debug logging
+    logger.info(f"Calendar OAuth - Client ID length: {len(client_id) if client_id else 0}, starts with: {client_id[:20] if client_id else 'None'}")
+    
     try:
         credentials = Credentials(
             token=None,  # Will be refreshed automatically
