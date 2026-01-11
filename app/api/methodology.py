@@ -123,12 +123,12 @@ async def create_rule(rule: RuleCreate):
     query = """
         INSERT INTO MethodologyRules (RuleCode, RuleName, Description, Category, Severity)
         OUTPUT INSERTED.RuleID, INSERTED.RuleCode, INSERTED.RuleName
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?)
     """
     
     result = execute_query(
         query,
-        (rule.ruleCode, rule.ruleName, rule.description, rule.rule.category, rule.severity),
+        (rule.ruleCode, rule.ruleName, rule.description, rule.category, rule.severity),
         fetch="one"
     )
     
@@ -151,7 +151,23 @@ async def update_rule(rule_id: int, rule: RuleUpdate):
     if rule.description is not None:
         updates.append("Description = ?")
         params.append(rule.description)
-     WHERE RuleID = ?"
+    if rule.category is not None:
+        updates.append("Category = ?")
+        params.append(rule.category)
+    if rule.severity is not None:
+        updates.append("Severity = ?")
+        params.append(rule.severity)
+    if rule.isActive is not None:
+        updates.append("IsActive = ?")
+        params.append(1 if rule.isActive else 0)
+    
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    updates.append("UpdatedAt = GETUTCDATE()")
+    params.append(rule_id)
+    
+    query = f"UPDATE MethodologyRules SET {', '.join(updates)} WHERE RuleID = ?"
     execute_query(query, tuple(params), fetch="none")
     
     return {"message": "Rule updated", "ruleId": rule_id}
@@ -328,5 +344,3 @@ async def methodology_analytics():
         "byProject": by_project,
         "stats": stats
     }
-
-
