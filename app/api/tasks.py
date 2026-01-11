@@ -86,7 +86,7 @@ async def list_tasks(
     
     # Main query with pagination
     offset = (page - 1) * page_size
-    params_with_pagination = params + [page_size, offset]
+    params_with_pagination = params + [offset, page_size]
     
     query = f"""
         SELECT 
