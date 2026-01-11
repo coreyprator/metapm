@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from app.api import tasks, projects, categories, methodology, capture, calendar
 from app.core.config import settings
@@ -19,6 +20,11 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Redirect root to dashboard
+@app.get("/")
+async def root_redirect():
+    return RedirectResponse(url="/static/dashboard.html")
 
 # CORS middleware for mobile/web access
 app.add_middleware(
