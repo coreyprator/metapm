@@ -33,22 +33,11 @@
         .status-BLOCKED { background: rgba(239, 68, 68, 0.2); }
         .status-DONE { background: rgba(34, 197, 94, 0.2); }
         
-        .task-item, .project-item, .capture-item {
-            transition: all 0.2s ease;
-        }
-        .task-item:hover, .project-item:hover, .capture-item:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: translateX(4px);
-        }
+        .item-row { transition: all 0.2s ease; }
+        .item-row:hover { background: rgba(255, 255, 255, 0.08); }
         
-        .loading {
-            animation: pulse 1.5s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 0.5; }
-            50% { opacity: 1; }
-        }
+        .loading { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
         
         .fab {
             position: fixed;
@@ -65,110 +54,179 @@
             transition: transform 0.2s, box-shadow 0.2s;
             z-index: 100;
         }
+        .fab:hover { transform: scale(1.1); }
         
-        .fab:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 24px rgba(233, 69, 96, 0.5);
+        .tab-active { background: rgba(255, 255, 255, 0.1); border-bottom: 2px solid #e94560; }
+        
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            padding: 16px;
+        }
+        .modal-content {
+            background: #1e293b;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
         }
         
-        .tab-active {
-            background: rgba(255, 255, 255, 0.1);
-            border-bottom: 2px solid #e94560;
+        .btn { padding: 8px 16px; border-radius: 8px; font-size: 14px; transition: all 0.2s; }
+        .btn-primary { background: #e94560; color: white; }
+        .btn-primary:hover { background: #d63447; }
+        .btn-secondary { background: rgba(255,255,255,0.1); color: white; }
+        .btn-secondary:hover { background: rgba(255,255,255,0.2); }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-danger:hover { background: #b91c1c; }
+        
+        .form-input {
+            width: 100%;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
         }
+        .form-input:focus { outline: none; border-color: #e94560; }
+        .form-input::placeholder { color: rgba(255,255,255,0.4); }
+        
+        select.form-input { appearance: none; cursor: pointer; }
+        
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 16px;
+            font-size: 12px;
+            background: rgba(255,255,255,0.1);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .chip.selected { background: #e94560; }
+        .chip:hover { background: rgba(255,255,255,0.2); }
+        .chip.selected:hover { background: #d63447; }
+        
+        .expand-btn { transition: transform 0.2s; }
+        .expand-btn.expanded { transform: rotate(90deg); }
+        
+        .project-tasks { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+        .project-tasks.expanded { max-height: 1000px; }
         
         .icon-btn {
-            padding: 4px;
-            border-radius: 4px;
+            padding: 6px;
+            border-radius: 6px;
             transition: background 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
-        .icon-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
+        .icon-btn:hover { background: rgba(255,255,255,0.1); }
         
-        /* Project colors */
-        .theme-Creation { --accent: #ec4899; }
-        .theme-Learning { --accent: #8b5cf6; }
-        .theme-Adventure { --accent: #06b6d4; }
-        .theme-Relationships { --accent: #f59e0b; }
-        .theme-Meta, .theme-CROSS-CUTTING { --accent: #6366f1; }
-        
-        .project-badge {
+        .badge {
             font-size: 10px;
             padding: 2px 6px;
             border-radius: 4px;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255,255,255,0.1);
         }
+        
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            border-radius: 8px;
+            background: #1e293b;
+            border: 1px solid rgba(255,255,255,0.1);
+            z-index: 300;
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp { from { opacity: 0; transform: translateX(-50%) translateY(20px); } }
+        
+        .toast.success { border-color: #22c55e; }
+        .toast.error { border-color: #ef4444; }
     </style>
 </head>
 <body class="text-white">
     <div id="app" class="min-h-screen pb-24">
         <!-- Header -->
-        <header class="px-4 py-4 flex items-center justify-between border-b border-white/10 sticky top-0 bg-[#1a1a2e]/90 backdrop-blur z-50">
-            <div>
-                <h1 class="text-xl font-semibold">MetaPM</h1>
-                <p id="currentDate" class="text-sm text-gray-400"></p>
+        <header class="px-4 py-3 flex items-center justify-between border-b border-white/10 sticky top-0 bg-[#1a1a2e]/95 backdrop-blur z-50">
+            <div class="flex items-center gap-3">
+                <a href="/static/dashboard.html" class="text-xl font-semibold hover:text-pink-400 transition">MetaPM</a>
             </div>
-            <div class="flex gap-2">
-                <button id="refreshBtn" class="p-2 rounded-full hover:bg-white/10" title="Refresh">
+            <div class="flex items-center gap-2">
+                <span id="currentDate" class="text-xs text-gray-400 hidden sm:block"></span>
+                <button id="refreshBtn" class="icon-btn" title="Refresh">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                     </svg>
                 </button>
-                <a href="/docs" class="p-2 rounded-full hover:bg-white/10" title="API Docs">
+                <a href="/docs" class="icon-btn" title="API Docs">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
                 </a>
             </div>
         </header>
         
         <!-- Tab Navigation -->
-        <nav class="flex border-b border-white/10 px-4">
-            <button class="tab-btn tab-active px-4 py-3 text-sm font-medium" data-tab="tasks">
-                Tasks
-            </button>
-            <button class="tab-btn px-4 py-3 text-sm font-medium text-gray-400" data-tab="projects">
-                Projects
-            </button>
-            <button class="tab-btn px-4 py-3 text-sm font-medium text-gray-400" data-tab="captures">
-                Captures
-            </button>
+        <nav class="flex border-b border-white/10 px-2 overflow-x-auto">
+            <button class="tab-btn tab-active px-4 py-3 text-sm font-medium whitespace-nowrap" data-tab="tasks">Tasks</button>
+            <button class="tab-btn px-4 py-3 text-sm font-medium text-gray-400 whitespace-nowrap" data-tab="projects">Projects</button>
+            <button class="tab-btn px-4 py-3 text-sm font-medium text-gray-400 whitespace-nowrap" data-tab="history">AI History</button>
+            <button class="tab-btn px-4 py-3 text-sm font-medium text-gray-400 whitespace-nowrap" data-tab="methodology">Methodology</button>
         </nav>
         
         <!-- Main Content -->
         <main class="px-4 py-4">
             
-            <!-- Tasks Tab -->
+            <!-- ==================== TASKS TAB ==================== -->
             <section id="tab-tasks" class="tab-content space-y-4">
-                <!-- Quick Stats -->
+                <!-- Stats -->
                 <div class="grid grid-cols-4 gap-2">
-                    <div class="glass-card rounded-xl p-3 text-center">
-                        <p id="statNew" class="text-xl font-bold text-blue-400">-</p>
+                    <div class="glass-card rounded-xl p-2 text-center">
+                        <p id="statNew" class="text-lg font-bold text-blue-400">-</p>
                         <p class="text-xs text-gray-400">New</p>
                     </div>
-                    <div class="glass-card rounded-xl p-3 text-center">
-                        <p id="statStarted" class="text-xl font-bold text-yellow-400">-</p>
+                    <div class="glass-card rounded-xl p-2 text-center">
+                        <p id="statStarted" class="text-lg font-bold text-yellow-400">-</p>
                         <p class="text-xs text-gray-400">Active</p>
                     </div>
-                    <div class="glass-card rounded-xl p-3 text-center">
-                        <p id="statBlocked" class="text-xl font-bold text-red-400">-</p>
+                    <div class="glass-card rounded-xl p-2 text-center">
+                        <p id="statBlocked" class="text-lg font-bold text-red-400">-</p>
                         <p class="text-xs text-gray-400">Blocked</p>
                     </div>
-                    <div class="glass-card rounded-xl p-3 text-center">
-                        <p id="statDone" class="text-xl font-bold text-green-400">-</p>
+                    <div class="glass-card rounded-xl p-2 text-center">
+                        <p id="statDone" class="text-lg font-bold text-green-400">-</p>
                         <p class="text-xs text-gray-400">Done</p>
                     </div>
                 </div>
                 
-                <!-- Filter Chips -->
-                <div class="flex gap-2 overflow-x-auto pb-2">
-                    <button class="filter-chip active px-3 py-1 rounded-full text-sm bg-white/10" data-filter="all">All</button>
-                    <button class="filter-chip px-3 py-1 rounded-full text-sm bg-white/5 text-gray-400" data-filter="NEW">New</button>
-                    <button class="filter-chip px-3 py-1 rounded-full text-sm bg-white/5 text-gray-400" data-filter="STARTED">Active</button>
-                    <button class="filter-chip px-3 py-1 rounded-full text-sm bg-white/5 text-gray-400" data-filter="BLOCKED">Blocked</button>
+                <!-- Filters -->
+                <div class="flex flex-wrap gap-2">
+                    <button class="filter-chip chip selected" data-filter="all">All</button>
+                    <button class="filter-chip chip" data-filter="NEW">New</button>
+                    <button class="filter-chip chip" data-filter="STARTED">Active</button>
+                    <button class="filter-chip chip" data-filter="BLOCKED">Blocked</button>
+                    <select id="projectFilter" class="form-input w-auto text-sm">
+                        <option value="">All Projects</option>
+                    </select>
                 </div>
+                
+                <!-- Add Task Button -->
+                <button id="addTaskBtn" class="w-full glass-card rounded-xl p-3 text-left flex items-center gap-3 hover:bg-white/10 transition">
+                    <svg class="w-5 h-5 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    <span class="text-gray-400">Add new task...</span>
+                </button>
                 
                 <!-- Task List -->
                 <div class="glass-card rounded-2xl overflow-hidden">
@@ -178,334 +236,1105 @@
                 </div>
             </section>
             
-            <!-- Projects Tab -->
+            <!-- ==================== PROJECTS TAB ==================== -->
             <section id="tab-projects" class="tab-content space-y-4 hidden">
+                <!-- Theme Filter -->
+                <div class="flex flex-wrap gap-2 items-center">
+                    <span class="text-sm text-gray-400">Theme:</span>
+                    <select id="themeFilter" class="form-input w-auto text-sm">
+                        <option value="">All Themes</option>
+                    </select>
+                    <select id="statusFilter" class="form-input w-auto text-sm">
+                        <option value="">All Status</option>
+                        <option value="ACTIVE">Active</option>
+                        <option value="BLOCKED">Blocked</option>
+                        <option value="PLANNED">Planned</option>
+                    </select>
+                </div>
+                
+                <!-- Project List -->
+                <div id="projectList" class="space-y-2">
+                    <div class="loading text-gray-400 text-sm p-4">Loading projects...</div>
+                </div>
+            </section>
+            
+            <!-- ==================== AI HISTORY TAB ==================== -->
+            <section id="tab-history" class="tab-content space-y-4 hidden">
+                <!-- Filters -->
+                <div class="flex flex-wrap gap-2 items-center">
+                    <select id="historyProjectFilter" class="form-input w-auto text-sm">
+                        <option value="">All Projects</option>
+                    </select>
+                    <select id="historySourceFilter" class="form-input w-auto text-sm">
+                        <option value="">All Sources</option>
+                        <option value="VOICE">Voice</option>
+                        <option value="WEB">Web</option>
+                        <option value="MOBILE">Mobile</option>
+                    </select>
+                    <select id="historySortFilter" class="form-input w-auto text-sm">
+                        <option value="desc">Newest First</option>
+                        <option value="asc">Oldest First</option>
+                    </select>
+                </div>
+                
+                <!-- History List -->
                 <div class="glass-card rounded-2xl overflow-hidden">
-                    <div id="projectList" class="divide-y divide-white/5">
-                        <div class="loading text-gray-400 text-sm p-4">Loading projects...</div>
+                    <div id="historyList" class="divide-y divide-white/5">
+                        <div class="loading text-gray-400 text-sm p-4">Loading history...</div>
                     </div>
                 </div>
             </section>
             
-            <!-- Captures Tab -->
-            <section id="tab-captures" class="tab-content space-y-4 hidden">
-                <div class="glass-card rounded-2xl overflow-hidden">
-                    <div id="captureList" class="divide-y divide-white/5">
-                        <div class="loading text-gray-400 text-sm p-4">Loading captures...</div>
+            <!-- ==================== METHODOLOGY TAB ==================== -->
+            <section id="tab-methodology" class="tab-content space-y-4 hidden">
+                <!-- Sub-tabs -->
+                <div class="flex gap-2">
+                    <button class="method-tab chip selected" data-subtab="rules">Rules</button>
+                    <button class="method-tab chip" data-subtab="violations">Violations</button>
+                </div>
+                
+                <!-- Rules Section -->
+                <div id="subtab-rules" class="space-y-3">
+                    <button id="addRuleBtn" class="w-full glass-card rounded-xl p-3 text-left flex items-center gap-3 hover:bg-white/10 transition">
+                        <svg class="w-5 h-5 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        <span class="text-gray-400">Add methodology rule...</span>
+                    </button>
+                    <div class="glass-card rounded-2xl overflow-hidden">
+                        <div id="rulesList" class="divide-y divide-white/5">
+                            <div class="loading text-gray-400 text-sm p-4">Loading rules...</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Violations Section -->
+                <div id="subtab-violations" class="space-y-3 hidden">
+                    <button id="addViolationBtn" class="w-full glass-card rounded-xl p-3 text-left flex items-center gap-3 hover:bg-white/10 transition">
+                        <svg class="w-5 h-5 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        <span class="text-gray-400">Log a violation...</span>
+                    </button>
+                    <div class="glass-card rounded-2xl overflow-hidden">
+                        <div id="violationsList" class="divide-y divide-white/5">
+                            <div class="loading text-gray-400 text-sm p-4">Loading violations...</div>
+                        </div>
                     </div>
                 </div>
             </section>
-            
         </main>
         
-        <!-- Floating Action Button -->
-        <a href="/static/capture.html" class="fab" title="Voice Capture">
+        <!-- FAB: Voice Capture -->
+        <button id="fabCapture" class="fab" title="Voice Capture">
             <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1 1.93c-3.94-.49-7-3.85-7-7.93h2c0 3.31 2.69 6 6 6s6-2.69 6-6h2c0 4.08-3.06 7.44-7 7.93V20h4v2H8v-2h4v-4.07z"/>
             </svg>
-        </a>
+        </button>
     </div>
     
+    <!-- ==================== MODALS ==================== -->
+    
+    <!-- Task Modal -->
+    <div id="taskModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="p-4 border-b border-white/10 flex items-center justify-between">
+                <h2 id="taskModalTitle" class="font-semibold">Add Task</h2>
+                <button id="closeTaskModal" class="icon-btn">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="taskForm" class="p-4 space-y-4">
+                <input type="hidden" id="taskId">
+                <div>
+                    <label class="text-sm text-gray-400">Title *</label>
+                    <input type="text" id="taskTitle" class="form-input mt-1" required placeholder="Task title...">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Description</label>
+                    <textarea id="taskDescription" class="form-input mt-1" rows="3" placeholder="Details..."></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-sm text-gray-400">Priority</label>
+                        <select id="taskPriority" class="form-input mt-1">
+                            <option value="1">1 - Critical</option>
+                            <option value="2">2 - High</option>
+                            <option value="3" selected>3 - Medium</option>
+                            <option value="4">4 - Low</option>
+                            <option value="5">5 - Someday</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-400">Status</label>
+                        <select id="taskStatus" class="form-input mt-1">
+                            <option value="NEW">New</option>
+                            <option value="STARTED">Started</option>
+                            <option value="BLOCKED">Blocked</option>
+                            <option value="DONE">Done</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Due Date</label>
+                    <input type="date" id="taskDueDate" class="form-input mt-1">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Projects</label>
+                    <div id="taskProjects" class="flex flex-wrap gap-2 mt-2"></div>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Categories</label>
+                    <div id="taskCategories" class="flex flex-wrap gap-2 mt-2"></div>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" class="btn btn-primary flex-1">Save Task</button>
+                    <button type="button" id="deleteTaskBtn" class="btn btn-danger hidden">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Capture Modal -->
+    <div id="captureModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="p-4 border-b border-white/10 flex items-center justify-between">
+                <h2 class="font-semibold">Quick Capture</h2>
+                <button id="closeCaptureModal" class="icon-btn">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div>
+                    <label class="text-sm text-gray-400">What's on your mind?</label>
+                    <textarea id="captureText" class="form-input mt-1" rows="4" placeholder="Type or use voice..."></textarea>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Project (optional)</label>
+                    <select id="captureProject" class="form-input mt-1">
+                        <option value="">Auto-detect</option>
+                    </select>
+                </div>
+                <div class="flex gap-2">
+                    <button id="voiceRecordBtn" class="btn btn-secondary flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                        </svg>
+                        Record
+                    </button>
+                    <button id="submitCapture" class="btn btn-primary flex-1">Submit</button>
+                </div>
+                <p id="captureStatus" class="text-sm text-gray-400 text-center"></p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Rule Modal -->
+    <div id="ruleModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="p-4 border-b border-white/10 flex items-center justify-between">
+                <h2 id="ruleModalTitle" class="font-semibold">Add Rule</h2>
+                <button id="closeRuleModal" class="icon-btn">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="ruleForm" class="p-4 space-y-4">
+                <input type="hidden" id="ruleId">
+                <div>
+                    <label class="text-sm text-gray-400">Rule Code *</label>
+                    <input type="text" id="ruleCode" class="form-input mt-1" required placeholder="LL-038">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Rule Name *</label>
+                    <input type="text" id="ruleName" class="form-input mt-1" required placeholder="Short name...">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Description *</label>
+                    <textarea id="ruleDescription" class="form-input mt-1" rows="3" required placeholder="What is this rule about?"></textarea>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Rationale</label>
+                    <textarea id="ruleRationale" class="form-input mt-1" rows="2" placeholder="Why is this important?"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-sm text-gray-400">Category</label>
+                        <select id="ruleCategory" class="form-input mt-1">
+                            <option value="DEVELOPMENT">Development</option>
+                            <option value="TESTING">Testing</option>
+                            <option value="DEPLOYMENT">Deployment</option>
+                            <option value="DOCUMENTATION">Documentation</option>
+                            <option value="PROCESS">Process</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-400">Severity</label>
+                        <select id="ruleSeverity" class="form-input mt-1">
+                            <option value="CRITICAL">Critical</option>
+                            <option value="HIGH">High</option>
+                            <option value="MEDIUM" selected>Medium</option>
+                            <option value="LOW">Low</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" class="btn btn-primary flex-1">Save Rule</button>
+                    <button type="button" id="deleteRuleBtn" class="btn btn-danger hidden">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Violation Modal -->
+    <div id="violationModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="p-4 border-b border-white/10 flex items-center justify-between">
+                <h2 class="font-semibold">Log Violation</h2>
+                <button id="closeViolationModal" class="icon-btn">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="violationForm" class="p-4 space-y-4">
+                <div>
+                    <label class="text-sm text-gray-400">Rule Violated *</label>
+                    <select id="violationRule" class="form-input mt-1" required></select>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Project *</label>
+                    <select id="violationProject" class="form-input mt-1" required></select>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Context / What happened</label>
+                    <textarea id="violationContext" class="form-input mt-1" rows="3" placeholder="Describe the violation..."></textarea>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Copilot Session URL (optional)</label>
+                    <input type="url" id="violationCopilotRef" class="form-input mt-1" placeholder="https://...">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Resolution</label>
+                    <textarea id="violationResolution" class="form-input mt-1" rows="2" placeholder="How was it fixed?"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary w-full">Log Violation</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Transaction Detail Modal -->
+    <div id="transactionModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="p-4 border-b border-white/10 flex items-center justify-between">
+                <h2 class="font-semibold">Transaction Details</h2>
+                <button id="closeTransactionModal" class="icon-btn">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="transactionDetail" class="p-4 space-y-4">
+                <!-- Filled dynamically -->
+            </div>
+        </div>
+    </div>
+
     <script>
-        const API_BASE = window.location.origin;
-        
-        // Project metadata (VS Code and GitHub links)
-        const PROJECT_LINKS = {
-            'META': {
-                vscode: 'vscode://file/G:/My%20Drive/Code/Python/metapm',
-                github: 'https://github.com/coreyprator/metapm'
-            },
-            'EM': {
-                vscode: 'vscode://file/G:/My%20Drive/Code/Python/etymython',
-                github: 'https://github.com/coreyprator/etymython'
-            },
-            'HL': {
-                vscode: 'vscode://file/G:/My%20Drive/Code/Python/harmonylab',
-                github: 'https://github.com/coreyprator/harmonylab'
-            },
-            'SF': {
-                vscode: 'vscode://file/G:/My%20Drive/Code/Python/super-flashcards',
-                github: 'https://github.com/coreyprator/super-flashcards'
-            },
-            'AF': {
-                vscode: 'vscode://file/G:/My%20Drive/Code/Python/artforge',
-                github: 'https://github.com/coreyprator/artforge'
-            },
-            'CUBIST': {
-                vscode: 'vscode://file/G:/My%20Drive/Code/Python/cubist',
-                github: 'https://github.com/coreyprator/cubist'
-            },
-            'PROMPTFORGE': {
-                vscode: 'vscode://file/G:/My%20Drive/Code/Python/promptforge',
-                github: 'https://github.com/coreyprator/promptforge'
-            }
-            // Add more projects as needed
-        };
-        
-        // Set current date
-        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
+        const API = window.location.origin;
         
         // State
         let allTasks = [];
         let allProjects = [];
-        let currentFilter = 'all';
+        let allCategories = [];
+        let allRules = [];
+        let taskFilter = 'all';
+        let projectFilterValue = '';
         
-        // Tab switching
+        // Project links
+        const PROJECT_LINKS = {
+            'META': { vscode: 'vscode://file/G:/My%20Drive/Code/Python/metapm', github: 'https://github.com/coreyprator/metapm' },
+            'EM': { vscode: 'vscode://file/G:/My%20Drive/Code/Python/etymython', github: 'https://github.com/coreyprator/etymython' },
+            'HL': { vscode: 'vscode://file/G:/My%20Drive/Code/Python/harmonylab', github: 'https://github.com/coreyprator/harmonylab' },
+            'SF': { vscode: 'vscode://file/G:/My%20Drive/Code/Python/super-flashcards', github: 'https://github.com/coreyprator/super-flashcards' },
+            'AF': { vscode: 'vscode://file/G:/My%20Drive/Code/Python/artforge', github: 'https://github.com/coreyprator/artforge' },
+            'CUBIST': { vscode: 'vscode://file/G:/My%20Drive/Code/Python/cubist', github: 'https://github.com/coreyprator/cubist' },
+            'PROMPTFORGE': { vscode: 'vscode://file/G:/My%20Drive/Code/Python/promptforge', github: 'https://github.com/coreyprator/promptforge' }
+        };
+        
+        // Utility: Show toast
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+        
+        // Date
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', {
+            weekday: 'short', month: 'short', day: 'numeric'
+        });
+        
+        // ==================== TAB NAVIGATION ====================
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                // Update tab buttons
                 document.querySelectorAll('.tab-btn').forEach(b => {
                     b.classList.remove('tab-active');
                     b.classList.add('text-gray-400');
                 });
                 btn.classList.add('tab-active');
                 btn.classList.remove('text-gray-400');
-                
-                // Show/hide content
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
                 document.getElementById(`tab-${btn.dataset.tab}`).classList.remove('hidden');
             });
         });
         
-        // Filter chips
-        document.querySelectorAll('.filter-chip').forEach(chip => {
-            chip.addEventListener('click', () => {
-                document.querySelectorAll('.filter-chip').forEach(c => {
-                    c.classList.remove('active', 'bg-white/10');
-                    c.classList.add('bg-white/5', 'text-gray-400');
-                });
-                chip.classList.add('active', 'bg-white/10');
-                chip.classList.remove('bg-white/5', 'text-gray-400');
-                currentFilter = chip.dataset.filter;
-                renderTasks();
+        // Methodology sub-tabs
+        document.querySelectorAll('.method-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.method-tab').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                document.getElementById('subtab-rules').classList.toggle('hidden', btn.dataset.subtab !== 'rules');
+                document.getElementById('subtab-violations').classList.toggle('hidden', btn.dataset.subtab !== 'violations');
             });
         });
         
-        // Render functions
-        function renderTasks() {
-            const container = document.getElementById('taskList');
-            let tasks = allTasks;
-            
-            if (currentFilter !== 'all') {
-                tasks = allTasks.filter(t => t.status === currentFilter);
+        // ==================== TASK CRUD ====================
+        async function loadTasks() {
+            try {
+                const res = await fetch(`${API}/api/tasks?pageSize=200`);
+                const data = await res.json();
+                allTasks = data.tasks || [];
+                updateTaskStats();
+                renderTasks();
+            } catch (e) {
+                console.error('Load tasks failed:', e);
             }
+        }
+        
+        function updateTaskStats() {
+            const counts = { NEW: 0, STARTED: 0, BLOCKED: 0, DONE: 0 };
+            allTasks.forEach(t => { if (counts[t.status] !== undefined) counts[t.status]++; });
+            document.getElementById('statNew').textContent = counts.NEW;
+            document.getElementById('statStarted').textContent = counts.STARTED;
+            document.getElementById('statBlocked').textContent = counts.BLOCKED;
+            document.getElementById('statDone').textContent = counts.DONE;
+        }
+        
+        function renderTasks() {
+            let tasks = allTasks;
+            if (taskFilter !== 'all') tasks = tasks.filter(t => t.status === taskFilter);
+            if (projectFilterValue) tasks = tasks.filter(t => t.projectCode === projectFilterValue || (t.projects && t.projects.includes(projectFilterValue)));
             
-            if (tasks.length === 0) {
+            const container = document.getElementById('taskList');
+            if (!tasks.length) {
                 container.innerHTML = '<p class="text-gray-400 text-sm p-4">No tasks found</p>';
                 return;
             }
             
-            container.innerHTML = tasks.map(task => {
-                const priorityClass = `priority-${task.priority || 3}`;
-                const statusClass = `status-${task.status || 'NEW'}`;
-                const projectCode = task.projectCode || task.projects?.[0] || '';
-                const links = PROJECT_LINKS[projectCode] || {};
-                
-                return `
-                    <div class="task-item ${priorityClass} p-3 ${statusClass}">
-                        <div class="flex items-start justify-between gap-2">
-                            <div class="flex-1 min-w-0">
-                                <p class="font-medium text-sm truncate">${task.title}</p>
-                                <div class="flex items-center gap-2 mt-1">
-                                    ${projectCode ? `<span class="project-badge">${projectCode}</span>` : ''}
-                                    <span class="text-xs text-gray-400">P${task.priority || 3}</span>
-                                    <span class="text-xs text-gray-500">${task.status || 'NEW'}</span>
-                                </div>
-                            </div>
-                            <div class="flex gap-1">
-                                ${links.vscode ? `
-                                    <a href="${links.vscode}" class="icon-btn" title="Open in VS Code">
-                                        <svg class="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M17.583 2.322l-5.575 5.065L6.75 3.14 3 5.88v12.24l3.75 2.74 5.258-4.247 5.575 5.065L24 18.158V5.842l-6.417-3.52zM6.75 14.78V9.22l3.75 2.78-3.75 2.78zm10.833 2.978l-4.166-3.78 4.166-3.78v7.56z"/>
-                                        </svg>
-                                    </a>
-                                ` : ''}
-                                ${links.github ? `
-                                    <a href="${links.github}" target="_blank" class="icon-btn" title="Open GitHub">
-                                        <svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-                                        </svg>
-                                    </a>
-                                ` : ''}
+            container.innerHTML = tasks.map(t => `
+                <div class="item-row priority-${t.priority || 3} status-${t.status || 'NEW'} p-3 cursor-pointer" onclick="openTaskModal(${t.taskId})">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-sm">${t.title}</p>
+                            <div class="flex flex-wrap items-center gap-2 mt-1">
+                                ${t.projectCode ? `<span class="badge">${t.projectCode}</span>` : ''}
+                                <span class="text-xs text-gray-500">${t.status || 'NEW'}</span>
+                                ${t.dueDate ? `<span class="text-xs text-gray-500">Due: ${new Date(t.dueDate).toLocaleDateString()}</span>` : ''}
                             </div>
                         </div>
-                        ${task.description ? `<p class="text-xs text-gray-400 mt-2 line-clamp-2">${task.description}</p>` : ''}
-                    </div>
-                `;
-            }).join('');
-        }
-        
-        function renderProjects() {
-            const container = document.getElementById('projectList');
-            
-            if (allProjects.length === 0) {
-                container.innerHTML = '<p class="text-gray-400 text-sm p-4">No projects found</p>';
-                return;
-            }
-            
-            // Group by theme
-            const byTheme = {};
-            allProjects.forEach(p => {
-                const theme = p.theme || 'Other';
-                if (!byTheme[theme]) byTheme[theme] = [];
-                byTheme[theme].push(p);
-            });
-            
-            container.innerHTML = Object.entries(byTheme).map(([theme, projects]) => `
-                <div class="p-3">
-                    <h3 class="text-xs font-semibold text-gray-400 uppercase mb-2">${theme}</h3>
-                    <div class="space-y-2">
-                        ${projects.map(project => {
-                            const links = PROJECT_LINKS[project.projectCode] || {};
-                            const taskCount = allTasks.filter(t => 
-                                t.projectCode === project.projectCode || 
-                                (t.projects && t.projects.includes(project.projectCode))
-                            ).length;
-                            
-                            return `
-                                <div class="project-item flex items-center justify-between p-2 rounded-lg theme-${theme.replace(/[^a-zA-Z]/g, '')}">
-                                    <div class="flex-1">
-                                        <div class="flex items-center gap-2">
-                                            <span class="font-medium text-sm">${project.projectName}</span>
-                                            <span class="project-badge">${project.projectCode}</span>
-                                        </div>
-                                        <p class="text-xs text-gray-400">${taskCount} tasks · ${project.status}</p>
-                                    </div>
-                                    <div class="flex gap-1">
-                                        ${links.vscode ? `
-                                            <a href="${links.vscode}" class="icon-btn" title="Open in VS Code">
-                                                <svg class="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
-                                                    <path d="M17.583 2.322l-5.575 5.065L6.75 3.14 3 5.88v12.24l3.75 2.74 5.258-4.247 5.575 5.065L24 18.158V5.842l-6.417-3.52zM6.75 14.78V9.22l3.75 2.78-3.75 2.78zm10.833 2.978l-4.166-3.78 4.166-3.78v7.56z"/>
-                                                </svg>
-                                            </a>
-                                        ` : ''}
-                                        ${links.github ? `
-                                            <a href="${links.github}" target="_blank" class="icon-btn" title="Open GitHub">
-                                                <svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
-                                                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-                                                </svg>
-                                            </a>
-                                        ` : ''}
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
+                        <span class="text-xs text-gray-500">P${t.priority || 3}</span>
                     </div>
                 </div>
             `).join('');
         }
         
-        function renderCaptures() {
-            const container = document.getElementById('captureList');
-            
-            fetch(`${API_BASE}/api/transactions/conversations?n=20`)
-                .then(r => r.json())
-                .then(data => {
-                    const captures = data.conversations || [];
-                    
-                    if (captures.length === 0) {
-                        container.innerHTML = `
-                            <div class="p-4 text-center">
-                                <p class="text-gray-400 text-sm">No captures yet</p>
-                                <a href="/static/capture.html" class="text-blue-400 text-sm hover:underline">Record your first voice note →</a>
-                            </div>
-                        `;
-                        return;
-                    }
-                    
-                    container.innerHTML = captures.map(conv => {
-                        const time = new Date(conv.createdAt).toLocaleString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit'
-                        });
-                        
-                        const sourceIcon = conv.source === 'VOICE' ? '🎤' : 
-                                          conv.source === 'MOBILE' ? '📱' : '💬';
-                        
-                        return `
-                            <div class="capture-item p-3">
-                                <div class="flex items-start gap-3">
-                                    <span class="text-lg">${sourceIcon}</span>
-                                    <div class="flex-1 min-w-0">
-                                        <p class="text-sm font-medium truncate">${conv.title || 'Voice capture'}</p>
-                                        <p class="text-xs text-gray-400">${time}</p>
-                                        ${conv.projectCode ? `<span class="project-badge mt-1 inline-block">${conv.projectCode}</span>` : ''}
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
-                })
-                .catch(err => {
-                    console.error('Failed to load captures:', err);
-                    container.innerHTML = '<p class="text-red-400 text-sm p-4">Failed to load captures</p>';
-                });
-        }
-        
-        // Load data
-        async function loadTasks() {
-            try {
-                const response = await fetch(`${API_BASE}/api/tasks?pageSize=100`);
-                const data = await response.json();
-                allTasks = data.tasks || [];
-                
-                // Update stats
-                const counts = {NEW: 0, STARTED: 0, BLOCKED: 0, DONE: 0};
-                allTasks.forEach(t => {
-                    const status = t.status || 'NEW';
-                    if (counts[status] !== undefined) counts[status]++;
-                });
-                
-                document.getElementById('statNew').textContent = counts.NEW;
-                document.getElementById('statStarted').textContent = counts.STARTED;
-                document.getElementById('statBlocked').textContent = counts.BLOCKED;
-                document.getElementById('statDone').textContent = counts.DONE;
-                
+        // Task filter chips
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('selected'));
+                chip.classList.add('selected');
+                taskFilter = chip.dataset.filter;
                 renderTasks();
-            } catch (error) {
-                console.error('Failed to load tasks:', error);
-                document.getElementById('taskList').innerHTML = 
-                    '<p class="text-red-400 text-sm p-4">Failed to load tasks</p>';
+            });
+        });
+        
+        document.getElementById('projectFilter').addEventListener('change', e => {
+            projectFilterValue = e.target.value;
+            renderTasks();
+        });
+        
+        // Task Modal
+        function openTaskModal(taskId = null) {
+            const modal = document.getElementById('taskModal');
+            const form = document.getElementById('taskForm');
+            const title = document.getElementById('taskModalTitle');
+            const deleteBtn = document.getElementById('deleteTaskBtn');
+            
+            form.reset();
+            document.getElementById('taskId').value = '';
+            
+            // Populate project chips
+            const projContainer = document.getElementById('taskProjects');
+            projContainer.innerHTML = allProjects.map(p => 
+                `<button type="button" class="chip project-chip" data-code="${p.projectCode}">${p.projectCode}</button>`
+            ).join('');
+            
+            // Populate category chips
+            const catContainer = document.getElementById('taskCategories');
+            catContainer.innerHTML = allCategories.map(c => 
+                `<button type="button" class="chip category-chip" data-code="${c.categoryCode}">${c.categoryCode}</button>`
+            ).join('');
+            
+            // Chip toggle
+            document.querySelectorAll('.project-chip, .category-chip').forEach(chip => {
+                chip.addEventListener('click', () => chip.classList.toggle('selected'));
+            });
+            
+            if (taskId) {
+                const task = allTasks.find(t => t.taskId === taskId);
+                if (task) {
+                    title.textContent = 'Edit Task';
+                    document.getElementById('taskId').value = task.taskId;
+                    document.getElementById('taskTitle').value = task.title || '';
+                    document.getElementById('taskDescription').value = task.description || '';
+                    document.getElementById('taskPriority').value = task.priority || 3;
+                    document.getElementById('taskStatus').value = task.status || 'NEW';
+                    document.getElementById('taskDueDate').value = task.dueDate ? task.dueDate.split('T')[0] : '';
+                    
+                    // Select associated projects
+                    (task.projects || []).forEach(code => {
+                        const chip = projContainer.querySelector(`[data-code="${code}"]`);
+                        if (chip) chip.classList.add('selected');
+                    });
+                    
+                    // Select associated categories
+                    (task.categories || []).forEach(code => {
+                        const chip = catContainer.querySelector(`[data-code="${code}"]`);
+                        if (chip) chip.classList.add('selected');
+                    });
+                    
+                    deleteBtn.classList.remove('hidden');
+                }
+            } else {
+                title.textContent = 'Add Task';
+                deleteBtn.classList.add('hidden');
             }
+            
+            modal.classList.remove('hidden');
         }
         
+        document.getElementById('addTaskBtn').addEventListener('click', () => openTaskModal());
+        document.getElementById('closeTaskModal').addEventListener('click', () => {
+            document.getElementById('taskModal').classList.add('hidden');
+        });
+        
+        document.getElementById('taskForm').addEventListener('submit', async e => {
+            e.preventDefault();
+            const taskId = document.getElementById('taskId').value;
+            const projects = Array.from(document.querySelectorAll('.project-chip.selected')).map(c => c.dataset.code);
+            const categories = Array.from(document.querySelectorAll('.category-chip.selected')).map(c => c.dataset.code);
+            
+            const payload = {
+                title: document.getElementById('taskTitle').value,
+                description: document.getElementById('taskDescription').value,
+                priority: parseInt(document.getElementById('taskPriority').value),
+                status: document.getElementById('taskStatus').value,
+                dueDate: document.getElementById('taskDueDate').value || null,
+                projects,
+                categories
+            };
+            
+            try {
+                const url = taskId ? `${API}/api/tasks/${taskId}` : `${API}/api/tasks`;
+                const method = taskId ? 'PUT' : 'POST';
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!res.ok) throw new Error(await res.text());
+                
+                showToast(taskId ? 'Task updated!' : 'Task created!');
+                document.getElementById('taskModal').classList.add('hidden');
+                loadTasks();
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        });
+        
+        document.getElementById('deleteTaskBtn').addEventListener('click', async () => {
+            if (!confirm('Delete this task?')) return;
+            const taskId = document.getElementById('taskId').value;
+            try {
+                await fetch(`${API}/api/tasks/${taskId}`, { method: 'DELETE' });
+                showToast('Task deleted');
+                document.getElementById('taskModal').classList.add('hidden');
+                loadTasks();
+            } catch (err) {
+                showToast('Delete failed', 'error');
+            }
+        });
+        
+        // ==================== PROJECTS ====================
         async function loadProjects() {
             try {
-                const response = await fetch(`${API_BASE}/api/projects`);
-                const data = await response.json();
+                const res = await fetch(`${API}/api/projects`);
+                const data = await res.json();
                 allProjects = data.projects || [];
+                populateProjectFilters();
                 renderProjects();
-            } catch (error) {
-                console.error('Failed to load projects:', error);
-                document.getElementById('projectList').innerHTML = 
-                    '<p class="text-red-400 text-sm p-4">Failed to load projects</p>';
+            } catch (e) {
+                console.error('Load projects failed:', e);
             }
         }
         
-        // Refresh all
-        async function refreshAll() {
-            await Promise.all([
-                loadTasks(),
-                loadProjects()
-            ]);
-            renderCaptures();
+        function populateProjectFilters() {
+            const themes = [...new Set(allProjects.map(p => p.theme).filter(Boolean))];
+            document.getElementById('themeFilter').innerHTML = '<option value="">All Themes</option>' +
+                themes.map(t => `<option value="${t}">${t}</option>`).join('');
+            
+            const projSelect = [
+                document.getElementById('projectFilter'),
+                document.getElementById('historyProjectFilter'),
+                document.getElementById('captureProject')
+            ];
+            projSelect.forEach(sel => {
+                if (sel) {
+                    const first = sel.options[0].outerHTML;
+                    sel.innerHTML = first + allProjects.map(p => `<option value="${p.projectCode}">${p.projectCode} - ${p.projectName}</option>`).join('');
+                }
+            });
         }
         
-        // Event listeners
-        document.getElementById('refreshBtn').addEventListener('click', refreshAll);
+        function renderProjects() {
+            const themeVal = document.getElementById('themeFilter').value;
+            const statusVal = document.getElementById('statusFilter').value;
+            
+            let projects = allProjects;
+            if (themeVal) projects = projects.filter(p => p.theme === themeVal);
+            if (statusVal) projects = projects.filter(p => p.status === statusVal);
+            
+            const container = document.getElementById('projectList');
+            if (!projects.length) {
+                container.innerHTML = '<p class="text-gray-400 text-sm p-4">No projects found</p>';
+                return;
+            }
+            
+            container.innerHTML = projects.map(p => {
+                const links = PROJECT_LINKS[p.projectCode] || {};
+                const projectTasks = allTasks.filter(t => t.projectCode === p.projectCode || (t.projects && t.projects.includes(p.projectCode)));
+                
+                return `
+                <div class="glass-card rounded-xl overflow-hidden mb-2">
+                    <div class="p-3 flex items-center gap-3 cursor-pointer" onclick="toggleProjectTasks('${p.projectCode}')">
+                        <svg class="expand-btn w-4 h-4 text-gray-400" id="expand-${p.projectCode}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium">${p.projectName}</span>
+                                <span class="badge">${p.projectCode}</span>
+                                <span class="text-xs text-gray-500">${p.status}</span>
+                            </div>
+                            <p class="text-xs text-gray-400">${projectTasks.length} tasks · ${p.theme || 'No theme'}</p>
+                        </div>
+                        <div class="flex gap-1">
+                            ${p.currentAIThreadURL ? `<a href="${p.currentAIThreadURL}" target="_blank" class="icon-btn" title="AI Chat" onclick="event.stopPropagation()">🤖</a>` : ''}
+                            ${links.vscode ? `<a href="${links.vscode}" class="icon-btn" title="VS Code" onclick="event.stopPropagation()">💻</a>` : ''}
+                            ${links.github ? `<a href="${links.github}" target="_blank" class="icon-btn" title="GitHub" onclick="event.stopPropagation()">📂</a>` : ''}
+                        </div>
+                    </div>
+                    <div class="project-tasks bg-black/20" id="tasks-${p.projectCode}">
+                        <div class="p-2 border-t border-white/5">
+                            <button onclick="openTaskModalForProject('${p.projectCode}')" class="w-full text-left text-sm text-gray-400 hover:text-white p-2 rounded hover:bg-white/5">
+                                + Add task to ${p.projectCode}
+                            </button>
+                            ${projectTasks.map(t => `
+                                <div class="item-row p-2 rounded text-sm cursor-pointer" onclick="openTaskModal(${t.taskId})">
+                                    <span class="text-gray-${t.status === 'DONE' ? '500 line-through' : '300'}">${t.title}</span>
+                                    <span class="badge ml-2">${t.status}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+        
+        function toggleProjectTasks(code) {
+            const tasksEl = document.getElementById(`tasks-${code}`);
+            const expandBtn = document.getElementById(`expand-${code}`);
+            tasksEl.classList.toggle('expanded');
+            expandBtn.classList.toggle('expanded');
+        }
+        
+        function openTaskModalForProject(projectCode) {
+            openTaskModal();
+            setTimeout(() => {
+                const chip = document.querySelector(`.project-chip[data-code="${projectCode}"]`);
+                if (chip) chip.classList.add('selected');
+            }, 100);
+        }
+        
+        document.getElementById('themeFilter').addEventListener('change', renderProjects);
+        document.getElementById('statusFilter').addEventListener('change', renderProjects);
+        
+        // ==================== AI HISTORY ====================
+        async function loadHistory() {
+            const projFilter = document.getElementById('historyProjectFilter').value;
+            const sourceFilter = document.getElementById('historySourceFilter').value;
+            const sort = document.getElementById('historySortFilter').value;
+            
+            try {
+                let url = `${API}/api/transactions/conversations?n=50&sort_order=${sort}`;
+                if (projFilter) url += `&project_code=${projFilter}`;
+                if (sourceFilter) url += `&source=${sourceFilter}`;
+                
+                const res = await fetch(url);
+                const data = await res.json();
+                renderHistory(data.conversations || []);
+            } catch (e) {
+                console.error('Load history failed:', e);
+            }
+        }
+        
+        function renderHistory(conversations) {
+            const container = document.getElementById('historyList');
+            if (!conversations.length) {
+                container.innerHTML = '<p class="text-gray-400 text-sm p-4">No history found</p>';
+                return;
+            }
+            
+            container.innerHTML = conversations.map(c => {
+                const date = new Date(c.createdAt).toLocaleString();
+                const icon = c.source === 'VOICE' ? '🎤' : c.source === 'MOBILE' ? '📱' : '💬';
+                
+                return `
+                <div class="item-row p-3 cursor-pointer" onclick="openTransactionDetail('${c.conversationGuid}')">
+                    <div class="flex items-start gap-3">
+                        <span class="text-lg">${icon}</span>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-sm truncate">${c.title || 'Conversation'}</p>
+                            <p class="text-xs text-gray-400">${date}</p>
+                            <div class="flex gap-2 mt-1">
+                                ${c.projectCode ? `<span class="badge">${c.projectCode}</span>` : ''}
+                                <span class="badge">${c.source}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+        
+        async function openTransactionDetail(guid) {
+            try {
+                const res = await fetch(`${API}/api/transactions/conversations/${guid}/full`);
+                const data = await res.json();
+                
+                const detail = document.getElementById('transactionDetail');
+                detail.innerHTML = `
+                    <div class="space-y-4">
+                        <div>
+                            <p class="text-xs text-gray-400">Conversation</p>
+                            <p class="font-medium">${data.conversation?.title || 'Untitled'}</p>
+                            <p class="text-sm text-gray-400">${new Date(data.conversation?.createdAt).toLocaleString()}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-400 mb-2">Transactions</p>
+                            ${(data.transactions || []).map(t => `
+                                <div class="glass-card rounded-lg p-3 mb-2">
+                                    <p class="text-xs text-gray-400">${t.promptType} → ${t.responseModel || 'N/A'}</p>
+                                    <p class="text-sm mt-1"><strong>Prompt:</strong> ${t.promptText?.substring(0, 200) || 'N/A'}...</p>
+                                    <p class="text-sm mt-1"><strong>Response:</strong> ${t.responseText?.substring(0, 200) || 'N/A'}...</p>
+                                    ${t.extractedIntent ? `<span class="badge mt-2">${t.extractedIntent}</span>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                        ${data.media?.length ? `
+                        <div>
+                            <p class="text-xs text-gray-400 mb-2">Media Files</p>
+                            ${data.media.map(m => `
+                                <div class="flex items-center justify-between p-2 glass-card rounded mb-1">
+                                    <span class="text-sm">${m.fileName}</span>
+                                    <a href="${m.gcsUrl}" target="_blank" class="btn btn-secondary text-xs">Download</a>
+                                </div>
+                            `).join('')}
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                document.getElementById('transactionModal').classList.remove('hidden');
+            } catch (e) {
+                showToast('Failed to load details', 'error');
+            }
+        }
+        
+        document.getElementById('closeTransactionModal').addEventListener('click', () => {
+            document.getElementById('transactionModal').classList.add('hidden');
+        });
+        
+        document.getElementById('historyProjectFilter').addEventListener('change', loadHistory);
+        document.getElementById('historySourceFilter').addEventListener('change', loadHistory);
+        document.getElementById('historySortFilter').addEventListener('change', loadHistory);
+        
+        // ==================== METHODOLOGY ====================
+        async function loadRules() {
+            try {
+                const res = await fetch(`${API}/api/methodology/rules`);
+                const data = await res.json();
+                allRules = data.rules || [];
+                renderRules();
+                populateRuleSelect();
+            } catch (e) {
+                console.error('Load rules failed:', e);
+            }
+        }
+        
+        function renderRules() {
+            const container = document.getElementById('rulesList');
+            if (!allRules.length) {
+                container.innerHTML = '<p class="text-gray-400 text-sm p-4">No rules defined</p>';
+                return;
+            }
+            
+            container.innerHTML = allRules.map(r => `
+                <div class="item-row p-3 cursor-pointer" onclick="openRuleModal(${r.ruleId})">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <span class="badge mr-2">${r.ruleCode}</span>
+                            <span class="font-medium text-sm">${r.ruleName}</span>
+                        </div>
+                        <span class="badge">${r.severity || 'MEDIUM'}</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1 line-clamp-2">${r.description}</p>
+                </div>
+            `).join('');
+        }
+        
+        function populateRuleSelect() {
+            const sel = document.getElementById('violationRule');
+            sel.innerHTML = '<option value="">Select rule...</option>' +
+                allRules.map(r => `<option value="${r.ruleId}">${r.ruleCode} - ${r.ruleName}</option>`).join('');
+        }
+        
+        function openRuleModal(ruleId = null) {
+            const modal = document.getElementById('ruleModal');
+            const form = document.getElementById('ruleForm');
+            const title = document.getElementById('ruleModalTitle');
+            const deleteBtn = document.getElementById('deleteRuleBtn');
+            
+            form.reset();
+            document.getElementById('ruleId').value = '';
+            
+            if (ruleId) {
+                const rule = allRules.find(r => r.ruleId === ruleId);
+                if (rule) {
+                    title.textContent = 'Edit Rule';
+                    document.getElementById('ruleId').value = rule.ruleId;
+                    document.getElementById('ruleCode').value = rule.ruleCode;
+                    document.getElementById('ruleName').value = rule.ruleName;
+                    document.getElementById('ruleDescription').value = rule.description || '';
+                    document.getElementById('ruleRationale').value = rule.rationale || '';
+                    document.getElementById('ruleCategory').value = rule.category || 'DEVELOPMENT';
+                    document.getElementById('ruleSeverity').value = rule.severity || 'MEDIUM';
+                    deleteBtn.classList.remove('hidden');
+                }
+            } else {
+                title.textContent = 'Add Rule';
+                deleteBtn.classList.add('hidden');
+                // Auto-generate next rule code
+                const lastCode = allRules.length ? allRules[allRules.length - 1].ruleCode : 'LL-000';
+                const nextNum = parseInt(lastCode.split('-')[1] || 0) + 1;
+                document.getElementById('ruleCode').value = `LL-${String(nextNum).padStart(3, '0')}`;
+            }
+            
+            modal.classList.remove('hidden');
+        }
+        
+        document.getElementById('addRuleBtn').addEventListener('click', () => openRuleModal());
+        document.getElementById('closeRuleModal').addEventListener('click', () => {
+            document.getElementById('ruleModal').classList.add('hidden');
+        });
+        
+        document.getElementById('ruleForm').addEventListener('submit', async e => {
+            e.preventDefault();
+            const ruleId = document.getElementById('ruleId').value;
+            
+            const payload = {
+                ruleCode: document.getElementById('ruleCode').value,
+                ruleName: document.getElementById('ruleName').value,
+                description: document.getElementById('ruleDescription').value,
+                rationale: document.getElementById('ruleRationale').value,
+                category: document.getElementById('ruleCategory').value,
+                severity: document.getElementById('ruleSeverity').value
+            };
+            
+            try {
+                const url = ruleId ? `${API}/api/methodology/rules/${ruleId}` : `${API}/api/methodology/rules`;
+                const method = ruleId ? 'PUT' : 'POST';
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!res.ok) throw new Error(await res.text());
+                
+                showToast(ruleId ? 'Rule updated!' : 'Rule created!');
+                document.getElementById('ruleModal').classList.add('hidden');
+                loadRules();
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        });
+        
+        document.getElementById('deleteRuleBtn').addEventListener('click', async () => {
+            if (!confirm('Delete this rule?')) return;
+            const ruleId = document.getElementById('ruleId').value;
+            try {
+                await fetch(`${API}/api/methodology/rules/${ruleId}`, { method: 'DELETE' });
+                showToast('Rule deleted');
+                document.getElementById('ruleModal').classList.add('hidden');
+                loadRules();
+            } catch (err) {
+                showToast('Delete failed', 'error');
+            }
+        });
+        
+        // Violations
+        async function loadViolations() {
+            try {
+                const res = await fetch(`${API}/api/methodology/violations`);
+                const data = await res.json();
+                renderViolations(data.violations || []);
+            } catch (e) {
+                console.error('Load violations failed:', e);
+            }
+        }
+        
+        function renderViolations(violations) {
+            const container = document.getElementById('violationsList');
+            if (!violations.length) {
+                container.innerHTML = '<p class="text-gray-400 text-sm p-4">No violations logged 🎉</p>';
+                return;
+            }
+            
+            container.innerHTML = violations.map(v => {
+                const rule = allRules.find(r => r.ruleId === v.ruleId);
+                const project = allProjects.find(p => p.projectId === v.projectId);
+                
+                return `
+                <div class="item-row p-3">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <span class="badge mr-2">${rule?.ruleCode || 'N/A'}</span>
+                            <span class="badge">${project?.projectCode || 'N/A'}</span>
+                        </div>
+                        <span class="text-xs text-gray-400">${new Date(v.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <p class="text-sm mt-1">${v.context || 'No context'}</p>
+                    ${v.resolution ? `<p class="text-xs text-green-400 mt-1">✓ ${v.resolution}</p>` : ''}
+                    ${v.copilotSessionRef ? `<a href="${v.copilotSessionRef}" target="_blank" class="text-xs text-blue-400 hover:underline">View Copilot Session</a>` : ''}
+                </div>
+                `;
+            }).join('');
+        }
+        
+        document.getElementById('addViolationBtn').addEventListener('click', () => {
+            document.getElementById('violationForm').reset();
+            // Populate project select
+            document.getElementById('violationProject').innerHTML = '<option value="">Select project...</option>' +
+                allProjects.map(p => `<option value="${p.projectId}">${p.projectCode} - ${p.projectName}</option>`).join('');
+            document.getElementById('violationModal').classList.remove('hidden');
+        });
+        
+        document.getElementById('closeViolationModal').addEventListener('click', () => {
+            document.getElementById('violationModal').classList.add('hidden');
+        });
+        
+        document.getElementById('violationForm').addEventListener('submit', async e => {
+            e.preventDefault();
+            
+            const payload = {
+                ruleId: parseInt(document.getElementById('violationRule').value),
+                projectId: parseInt(document.getElementById('violationProject').value),
+                context: document.getElementById('violationContext').value,
+                copilotSessionRef: document.getElementById('violationCopilotRef').value || null,
+                resolution: document.getElementById('violationResolution').value || null
+            };
+            
+            try {
+                const res = await fetch(`${API}/api/methodology/violations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!res.ok) throw new Error(await res.text());
+                
+                showToast('Violation logged');
+                document.getElementById('violationModal').classList.add('hidden');
+                loadViolations();
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        });
+        
+        // ==================== CAPTURE MODAL ====================
+        document.getElementById('fabCapture').addEventListener('click', () => {
+            document.getElementById('captureText').value = '';
+            document.getElementById('captureStatus').textContent = '';
+            document.getElementById('captureModal').classList.remove('hidden');
+        });
+        
+        document.getElementById('closeCaptureModal').addEventListener('click', () => {
+            document.getElementById('captureModal').classList.add('hidden');
+        });
+        
+        document.getElementById('submitCapture').addEventListener('click', async () => {
+            const text = document.getElementById('captureText').value.trim();
+            const project = document.getElementById('captureProject').value;
+            const status = document.getElementById('captureStatus');
+            
+            if (!text) {
+                status.textContent = 'Please enter some text';
+                return;
+            }
+            
+            status.textContent = 'Processing...';
+            
+            try {
+                const res = await fetch(`${API}/api/capture/text`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, projectCode: project || null })
+                });
+                
+                if (!res.ok) throw new Error(await res.text());
+                
+                const data = await res.json();
+                status.textContent = data.message || 'Captured!';
+                showToast('Captured successfully!');
+                
+                setTimeout(() => {
+                    document.getElementById('captureModal').classList.add('hidden');
+                    loadTasks();
+                    loadHistory();
+                }, 1000);
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message;
+                showToast('Capture failed', 'error');
+            }
+        });
+        
+        // Voice recording
+        let mediaRecorder = null;
+        let audioChunks = [];
+        
+        document.getElementById('voiceRecordBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('voiceRecordBtn');
+            const status = document.getElementById('captureStatus');
+            
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                btn.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/></svg> Record';
+                btn.classList.remove('btn-danger');
+                return;
+            }
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                
+                mediaRecorder.onstop = async () => {
+                    stream.getTracks().forEach(t => t.stop());
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    
+                    status.textContent = 'Uploading...';
+                    
+                    const formData = new FormData();
+                    formData.append('audio', audioBlob, 'recording.webm');
+                    
+                    const project = document.getElementById('captureProject').value;
+                    if (project) formData.append('projectCode', project);
+                    
+                    try {
+                        const res = await fetch(`${API}/api/capture/voice`, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (!res.ok) throw new Error(await res.text());
+                        
+                        const data = await res.json();
+                        document.getElementById('captureText').value = data.transcript || '';
+                        status.textContent = data.message || 'Transcribed!';
+                        showToast('Voice captured!');
+                    } catch (err) {
+                        status.textContent = 'Error: ' + err.message;
+                    }
+                };
+                
+                mediaRecorder.start();
+                btn.innerHTML = '⏹ Stop';
+                btn.classList.add('btn-danger');
+                status.textContent = 'Recording...';
+                
+            } catch (err) {
+                status.textContent = 'Microphone access denied';
+            }
+        });
+        
+        // ==================== LOAD CATEGORIES ====================
+        async function loadCategories() {
+            try {
+                const res = await fetch(`${API}/api/categories`);
+                const data = await res.json();
+                allCategories = data.categories || [];
+            } catch (e) {
+                console.error('Load categories failed:', e);
+            }
+        }
+        
+        // ==================== INIT ====================
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            loadTasks();
+            loadProjects();
+            loadHistory();
+            loadRules();
+            loadViolations();
+        });
+        
+        // Close modals on overlay click
+        document.querySelectorAll('.modal-overlay').forEach(modal => {
+            modal.addEventListener('click', e => {
+                if (e.target === modal) modal.classList.add('hidden');
+            });
+        });
         
         // Initial load
-        refreshAll();
-        
-        // Auto-refresh every 2 minutes
-        setInterval(refreshAll, 2 * 60 * 1000);
+        (async () => {
+            await loadCategories();
+            await loadProjects();
+            await loadTasks();
+            loadHistory();
+            loadRules();
+            loadViolations();
+        })();
     </script>
 </body>
 </html>

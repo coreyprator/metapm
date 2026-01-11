@@ -1,361 +1,353 @@
 """
 MetaPM Methodology API
-Methodology rules and violation tracking
+======================
+
+CRUD operations for:
+- MethodologyRules (lessons learned)
+- MethodologyViolations (tracked violations)
 """
 
-from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
-
-from app.models.methodology import (
-    MethodologyRuleCreate, MethodologyRuleUpdate, MethodologyRuleResponse,
-    MethodologyRuleListResponse, ViolationCreate, ViolationResponse,
-    ViolationListResponse, ViolationSummary, ViolationSummaryResponse
-)
-from app.core.database import execute_query
+from pydantic import BaseModel
+from typing import Optional, List
+from datetime import datetime
+from app.core.database import execute_query, execute_procedure
 
 router = APIRouter()
+
+
+# ============================================
+# MODELS
+# ============================================
+
+class RuleCreate(BaseModel):
+    ruleCode: str
+    ruleName: str
+    description: str
+    rationale: Optional[str] = None
+    category: Optional[str] = "DEVELOPMENT"
+    severity: Optional[str] = "MEDIUM"
+
+
+class RuleUpdate(BaseModel):
+    ruleCode: Optional[str] = None
+    ruleName: Optional[str] = None
+    description: Optional[str] = None
+    rationale: Optional[str] = None
+    category: Optional[str] = None
+    severity: Optional[str] = None
+    isActive: Optional[bool] = None
+
+
+class ViolationCreate(BaseModel):
+    ruleId: int
+    projectId: int
+    context: Optional[str] = None
+    copilotSessionRef: Optional[str] = None
+    resolution: Optional[str] = None
 
 
 # ============================================
 # RULES ENDPOINTS
 # ============================================
 
-@router.get("/rules", response_model=MethodologyRuleListResponse)
+@router.get("/rules")
 async def list_rules(
-    category: Optional[str] = Query(None, description="Filter by category"),
-    severity: Optional[str] = Query(None, pattern="^(LOW|MEDIUM|HIGH|CRITICAL)$"),
-    active_only: bool = Query(True, alias="activeOnly"),
+    category: Optional[str] = None,
+    severity: Optional[str] = None,
+    active_only: bool = True
 ):
-    """List all methodology rules"""
-    conditions = []
-    params = []
-    
-    if category:
-        conditions.append("mr.Category = ?")
-        params.append(category)
-    
-    if severity:
-        conditions.append("mr.Severity = ?")
-        params.append(severity)
-    
-    if active_only:
-        conditions.append("mr.IsActive = 1")
-    
-    where_clause = " AND ".join(conditions) if conditions else "1=1"
-    
-    query = f"""
-        SELECT 
-            mr.RuleID as ruleId,
-            mr.RuleCode as ruleCode,
-            mr.RuleName as ruleName,
-            mr.Category as category,
-            mr.Description as description,
-            mr.ViolationPrompt as violationPrompt,
-            mr.Severity as severity,
-            mr.IsActive as isActive,
-            mr.CreatedAt as createdAt,
-            (SELECT COUNT(*) FROM MethodologyViolations mv WHERE mv.RuleID = mr.RuleID) as totalViolations,
-            (SELECT COUNT(*) FROM MethodologyViolations mv WHERE mv.RuleID = mr.RuleID AND mv.ResolvedAt IS NULL) as openViolations
-        FROM MethodologyRules mr
-        WHERE {where_clause}
-        ORDER BY 
-            CASE mr.Severity 
-                WHEN 'CRITICAL' THEN 1 
-                WHEN 'HIGH' THEN 2 
-                WHEN 'MEDIUM' THEN 3 
-                WHEN 'LOW' THEN 4 
-            END,
-            mr.RuleName
-    """
-    
-    rows = execute_query(query, tuple(params) if params else None, fetch="all") or []
-    rules = [MethodologyRuleResponse(**row) for row in rows]
-    
-    return MethodologyRuleListResponse(rules=rules, total=len(rules))
-
-
-@router.get("/rules/{rule_code}", response_model=MethodologyRuleResponse)
-async def get_rule(rule_code: str):
-    """
-    Get a single rule with its violation prompt.
-    
-    Use this to get the pre-written prompt to paste into VS Code Copilot
-    when a methodology violation occurs.
-    """
+    """List all methodology rules."""
     query = """
         SELECT 
-            mr.RuleID as ruleId,
-            mr.RuleCode as ruleCode,
-            mr.RuleName as ruleName,
-            mr.Category as category,
-            mr.Description as description,
-            mr.ViolationPrompt as violationPrompt,
-            mr.Severity as severity,
-            mr.IsActive as isActive,
-            mr.CreatedAt as createdAt,
-            (SELECT COUNT(*) FROM MethodologyViolations mv WHERE mv.RuleID = mr.RuleID) as totalViolations,
-            (SELECT COUNT(*) FROM MethodologyViolations mv WHERE mv.RuleID = mr.RuleID AND mv.ResolvedAt IS NULL) as openViolations
-        FROM MethodologyRules mr
-        WHERE mr.RuleCode = ?
+            RuleID as ruleId,
+            RuleCode as ruleCode,
+            RuleName as ruleName,
+            Description as description,
+            Rationale as rationale,
+            Category as category,
+            Severity as severity,
+            IsActive as isActive,
+            CreatedAt as createdAt,
+            UpdatedAt as updatedAt
+        FROM MethodologyRules
+        WHERE 1=1
     """
     
-    row = execute_query(query, (rule_code,), fetch="one")
+    if active_only:
+        query += " AND IsActive = 1"
+    if category:
+        query += f" AND Category = '{category}'"
+    if severity:
+        query += f" AND Severity = '{severity}'"
     
-    if not row:
-        raise HTTPException(status_code=404, detail=f"Rule {rule_code} not found")
+    query += " ORDER BY RuleCode"
     
-    return MethodologyRuleResponse(**row)
+    rules = execute_query(query)
+    return {"rules": rules, "count": len(rules)}
 
 
-@router.post("/rules", response_model=MethodologyRuleResponse, status_code=201)
-async def create_rule(rule: MethodologyRuleCreate):
-    """Create a new methodology rule"""
+@router.get("/rules/{rule_id}")
+async def get_rule(rule_id: int):
+    """Get a specific rule by ID."""
+    query = """
+        SELECT 
+            RuleID as ruleId,
+            RuleCode as ruleCode,
+            RuleName as ruleName,
+            Description as description,
+            Rationale as rationale,
+            Category as category,
+            Severity as severity,
+            IsActive as isActive,
+            CreatedAt as createdAt,
+            UpdatedAt as updatedAt
+        FROM MethodologyRules
+        WHERE RuleID = ?
+    """
+    
+    result = execute_query(query, (rule_id,), fetch="one")
+    if not result:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    return result
+
+
+@router.post("/rules")
+async def create_rule(rule: RuleCreate):
+    """Create a new methodology rule."""
+    # Check for duplicate code
     existing = execute_query(
         "SELECT RuleID FROM MethodologyRules WHERE RuleCode = ?",
-        (rule.rule_code,),
+        (rule.ruleCode,),
         fetch="one"
     )
     if existing:
-        raise HTTPException(status_code=400, detail=f"Rule code {rule.rule_code} already exists")
+        raise HTTPException(status_code=400, detail=f"Rule code {rule.ruleCode} already exists")
     
     query = """
-        INSERT INTO MethodologyRules (RuleCode, RuleName, Category, Description, ViolationPrompt, Severity, IsActive)
-        OUTPUT INSERTED.RuleID
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO MethodologyRules (RuleCode, RuleName, Description, Rationale, Category, Severity)
+        OUTPUT INSERTED.RuleID, INSERTED.RuleCode, INSERTED.RuleName
+        VALUES (?, ?, ?, ?, ?, ?)
     """
     
-    result = execute_query(query, (
-        rule.rule_code,
-        rule.rule_name,
-        rule.category,
-        rule.description,
-        rule.violation_prompt,
-        rule.severity,
-        1 if rule.is_active else 0
-    ), fetch="one")
-    
-    if not result:
-        raise HTTPException(status_code=500, detail="Failed to create rule")
-    
-    return await get_rule(rule.rule_code)
-
-
-@router.put("/rules/{rule_code}", response_model=MethodologyRuleResponse)
-async def update_rule(rule_code: str, rule: MethodologyRuleUpdate):
-    """Update a methodology rule"""
-    existing = execute_query(
-        "SELECT RuleID FROM MethodologyRules WHERE RuleCode = ?",
-        (rule_code,),
+    result = execute_query(
+        query,
+        (rule.ruleCode, rule.ruleName, rule.description, rule.rationale, rule.category, rule.severity),
         fetch="one"
     )
-    if not existing:
-        raise HTTPException(status_code=404, detail=f"Rule {rule_code} not found")
     
+    return {"message": "Rule created", "rule": result}
+
+
+@router.put("/rules/{rule_id}")
+async def update_rule(rule_id: int, rule: RuleUpdate):
+    """Update a methodology rule."""
+    # Build dynamic update
     updates = []
     params = []
     
-    if rule.rule_name is not None:
+    if rule.ruleCode is not None:
+        updates.append("RuleCode = ?")
+        params.append(rule.ruleCode)
+    if rule.ruleName is not None:
         updates.append("RuleName = ?")
-        params.append(rule.rule_name)
-    if rule.category is not None:
-        updates.append("Category = ?")
-        params.append(rule.category)
+        params.append(rule.ruleName)
     if rule.description is not None:
         updates.append("Description = ?")
         params.append(rule.description)
-    if rule.violation_prompt is not None:
-        updates.append("ViolationPrompt = ?")
-        params.append(rule.violation_prompt)
+    if rule.rationale is not None:
+        updates.append("Rationale = ?")
+        params.append(rule.rationale)
+    if rule.category is not None:
+        updates.append("Category = ?")
+        params.append(rule.category)
     if rule.severity is not None:
         updates.append("Severity = ?")
         params.append(rule.severity)
-    if rule.is_active is not None:
+    if rule.isActive is not None:
         updates.append("IsActive = ?")
-        params.append(1 if rule.is_active else 0)
+        params.append(1 if rule.isActive else 0)
     
-    if updates:
-        params.append(rule_code)
-        query = f"UPDATE MethodologyRules SET {', '.join(updates)} WHERE RuleCode = ?"
-        execute_query(query, tuple(params), fetch="none")
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
     
-    return await get_rule(rule_code)
+    updates.append("UpdatedAt = GETUTCDATE()")
+    params.append(rule_id)
+    
+    query = f"UPDATE MethodologyRules SET {', '.join(updates)} WHERE RuleID = ?"
+    execute_query(query, tuple(params), fetch="none")
+    
+    return {"message": "Rule updated", "ruleId": rule_id}
+
+
+@router.delete("/rules/{rule_id}")
+async def delete_rule(rule_id: int, hard_delete: bool = False):
+    """Delete a methodology rule (soft delete by default)."""
+    if hard_delete:
+        execute_query("DELETE FROM MethodologyRules WHERE RuleID = ?", (rule_id,), fetch="none")
+        return {"message": "Rule permanently deleted"}
+    else:
+        execute_query(
+            "UPDATE MethodologyRules SET IsActive = 0, UpdatedAt = GETUTCDATE() WHERE RuleID = ?",
+            (rule_id,),
+            fetch="none"
+        )
+        return {"message": "Rule deactivated"}
 
 
 # ============================================
 # VIOLATIONS ENDPOINTS
 # ============================================
 
-@router.get("/violations", response_model=ViolationListResponse)
+@router.get("/violations")
 async def list_violations(
-    project: Optional[str] = Query(None, description="Filter by project code"),
-    rule: Optional[str] = Query(None, description="Filter by rule code"),
-    open_only: bool = Query(False, alias="openOnly"),
-    limit: int = Query(50, ge=1, le=200),
+    project_id: Optional[int] = None,
+    rule_id: Optional[int] = None,
+    resolved: Optional[bool] = None,
+    limit: int = Query(default=50, le=200)
 ):
-    """List methodology violations"""
-    conditions = []
-    params = []
-    
-    if project:
-        conditions.append("p.ProjectCode = ?")
-        params.append(project)
-    
-    if rule:
-        conditions.append("mr.RuleCode = ?")
-        params.append(rule)
-    
-    if open_only:
-        conditions.append("mv.ResolvedAt IS NULL")
-    
-    where_clause = " AND ".join(conditions) if conditions else "1=1"
-    
-    query = f"""
-        SELECT TOP (?)
-            mv.ViolationID as violationId,
-            mr.RuleCode as ruleCode,
-            mr.RuleName as ruleName,
+    """List methodology violations."""
+    query = """
+        SELECT 
+            v.ViolationID as violationId,
+            v.RuleID as ruleId,
+            r.RuleCode as ruleCode,
+            r.RuleName as ruleName,
+            v.ProjectID as projectId,
             p.ProjectCode as projectCode,
-            mv.TaskID as taskId,
-            mv.Description as description,
-            mv.CopilotSessionRef as copilotSessionRef,
-            mv.Resolution as resolution,
-            mv.CreatedAt as createdAt,
-            mv.ResolvedAt as resolvedAt
-        FROM MethodologyViolations mv
-        JOIN MethodologyRules mr ON mv.RuleID = mr.RuleID
-        LEFT JOIN Projects p ON mv.ProjectID = p.ProjectID
-        WHERE {where_clause}
-        ORDER BY mv.CreatedAt DESC
+            p.ProjectName as projectName,
+            v.Context as context,
+            v.CopilotSessionRef as copilotSessionRef,
+            v.Resolution as resolution,
+            v.ResolvedAt as resolvedAt,
+            v.CreatedAt as createdAt
+        FROM MethodologyViolations v
+        JOIN MethodologyRules r ON v.RuleID = r.RuleID
+        LEFT JOIN Projects p ON v.ProjectID = p.ProjectID
+        WHERE 1=1
     """
     
-    all_params = [limit] + params
-    rows = execute_query(query, tuple(all_params), fetch="all") or []
-    violations = [ViolationResponse(**row) for row in rows]
+    if project_id:
+        query += f" AND v.ProjectID = {project_id}"
+    if rule_id:
+        query += f" AND v.RuleID = {rule_id}"
+    if resolved is not None:
+        if resolved:
+            query += " AND v.Resolution IS NOT NULL"
+        else:
+            query += " AND v.Resolution IS NULL"
     
-    return ViolationListResponse(violations=violations, total=len(violations))
+    query += f" ORDER BY v.CreatedAt DESC OFFSET 0 ROWS FETCH NEXT {limit} ROWS ONLY"
+    
+    violations = execute_query(query)
+    return {"violations": violations, "count": len(violations)}
 
 
-@router.post("/violations", response_model=ViolationResponse, status_code=201)
-async def log_violation(violation: ViolationCreate):
-    """Log a methodology violation"""
-    # Verify rule exists
-    rule = execute_query(
-        "SELECT RuleID FROM MethodologyRules WHERE RuleCode = ?",
-        (violation.rule_code,),
-        fetch="one"
-    )
-    if not rule:
-        raise HTTPException(status_code=404, detail=f"Rule {violation.rule_code} not found")
-    
-    # Verify project exists
-    project = execute_query(
-        "SELECT ProjectID FROM Projects WHERE ProjectCode = ?",
-        (violation.project_code,),
-        fetch="one"
-    )
-    if not project:
-        raise HTTPException(status_code=404, detail=f"Project {violation.project_code} not found")
-    
+@router.get("/violations/by-project/{project_code}")
+async def get_violations_by_project(project_code: str):
+    """Get all violations for a project."""
     query = """
-        INSERT INTO MethodologyViolations (RuleID, ProjectID, TaskID, Description, CopilotSessionRef)
+        SELECT 
+            v.ViolationID as violationId,
+            v.RuleID as ruleId,
+            r.RuleCode as ruleCode,
+            r.RuleName as ruleName,
+            v.Context as context,
+            v.CopilotSessionRef as copilotSessionRef,
+            v.Resolution as resolution,
+            v.ResolvedAt as resolvedAt,
+            v.CreatedAt as createdAt
+        FROM MethodologyViolations v
+        JOIN MethodologyRules r ON v.RuleID = r.RuleID
+        JOIN Projects p ON v.ProjectID = p.ProjectID
+        WHERE p.ProjectCode = ?
+        ORDER BY v.CreatedAt DESC
+    """
+    
+    violations = execute_query(query, (project_code,))
+    return {"projectCode": project_code, "violations": violations, "count": len(violations)}
+
+
+@router.post("/violations")
+async def create_violation(violation: ViolationCreate):
+    """Log a new methodology violation."""
+    query = """
+        INSERT INTO MethodologyViolations (RuleID, ProjectID, Context, CopilotSessionRef, Resolution)
         OUTPUT INSERTED.ViolationID
         VALUES (?, ?, ?, ?, ?)
     """
     
-    result = execute_query(query, (
-        rule["RuleID"],
-        project["ProjectID"],
-        violation.task_id,
-        violation.description,
-        violation.copilot_session_ref
-    ), fetch="one")
+    result = execute_query(
+        query,
+        (violation.ruleId, violation.projectId, violation.context, violation.copilotSessionRef, violation.resolution),
+        fetch="one"
+    )
     
-    if not result:
-        raise HTTPException(status_code=500, detail="Failed to log violation")
+    # If resolution provided, set resolved timestamp
+    if violation.resolution:
+        execute_query(
+            "UPDATE MethodologyViolations SET ResolvedAt = GETUTCDATE() WHERE ViolationID = ?",
+            (result['ViolationID'],),
+            fetch="none"
+        )
     
-    # Fetch and return
-    return await get_violation(result["ViolationID"])
-
-
-async def get_violation(violation_id: int) -> ViolationResponse:
-    """Get a single violation"""
-    query = """
-        SELECT 
-            mv.ViolationID as violationId,
-            mr.RuleCode as ruleCode,
-            mr.RuleName as ruleName,
-            p.ProjectCode as projectCode,
-            mv.TaskID as taskId,
-            mv.Description as description,
-            mv.CopilotSessionRef as copilotSessionRef,
-            mv.Resolution as resolution,
-            mv.CreatedAt as createdAt,
-            mv.ResolvedAt as resolvedAt
-        FROM MethodologyViolations mv
-        JOIN MethodologyRules mr ON mv.RuleID = mr.RuleID
-        LEFT JOIN Projects p ON mv.ProjectID = p.ProjectID
-        WHERE mv.ViolationID = ?
-    """
-    
-    row = execute_query(query, (violation_id,), fetch="one")
-    if not row:
-        raise HTTPException(status_code=404, detail=f"Violation {violation_id} not found")
-    
-    return ViolationResponse(**row)
+    return {"message": "Violation logged", "violationId": result['ViolationID']}
 
 
 @router.put("/violations/{violation_id}/resolve")
 async def resolve_violation(violation_id: int, resolution: str):
-    """Mark a violation as resolved"""
-    existing = execute_query(
-        "SELECT ViolationID FROM MethodologyViolations WHERE ViolationID = ?",
-        (violation_id,),
-        fetch="one"
+    """Mark a violation as resolved."""
+    execute_query(
+        "UPDATE MethodologyViolations SET Resolution = ?, ResolvedAt = GETUTCDATE() WHERE ViolationID = ?",
+        (resolution, violation_id),
+        fetch="none"
     )
-    if not existing:
-        raise HTTPException(status_code=404, detail=f"Violation {violation_id} not found")
-    
-    execute_query("""
-        UPDATE MethodologyViolations 
-        SET Resolution = ?, ResolvedAt = GETUTCDATE()
-        WHERE ViolationID = ?
-    """, (resolution, violation_id), fetch="none")
-    
-    return await get_violation(violation_id)
+    return {"message": "Violation resolved", "violationId": violation_id}
 
 
-@router.get("/violations/summary", response_model=ViolationSummaryResponse)
-async def get_violation_summary():
-    """Get violation statistics by rule"""
-    query = """
+@router.delete("/violations/{violation_id}")
+async def delete_violation(violation_id: int):
+    """Delete a violation record."""
+    execute_query("DELETE FROM MethodologyViolations WHERE ViolationID = ?", (violation_id,), fetch="none")
+    return {"message": "Violation deleted"}
+
+
+# ============================================
+# ANALYTICS
+# ============================================
+
+@router.get("/analytics")
+async def methodology_analytics():
+    """Get methodology analytics."""
+    # Violations by rule
+    by_rule = execute_query("""
+        SELECT r.RuleCode, r.RuleName, COUNT(*) as violationCount
+        FROM MethodologyViolations v
+        JOIN MethodologyRules r ON v.RuleID = r.RuleID
+        GROUP BY r.RuleID, r.RuleCode, r.RuleName
+        ORDER BY violationCount DESC
+    """)
+    
+    # Violations by project
+    by_project = execute_query("""
+        SELECT p.ProjectCode, p.ProjectName, COUNT(*) as violationCount
+        FROM MethodologyViolations v
+        JOIN Projects p ON v.ProjectID = p.ProjectID
+        GROUP BY p.ProjectID, p.ProjectCode, p.ProjectName
+        ORDER BY violationCount DESC
+    """)
+    
+    # Resolution rate
+    stats = execute_query("""
         SELECT 
-            mr.RuleCode as ruleCode,
-            mr.RuleName as ruleName,
-            mr.Severity as severity,
-            COUNT(mv.ViolationID) as totalViolations,
-            SUM(CASE WHEN mv.ResolvedAt IS NULL THEN 1 ELSE 0 END) as openViolations,
-            MAX(mv.CreatedAt) as lastViolation
-        FROM MethodologyRules mr
-        LEFT JOIN MethodologyViolations mv ON mr.RuleID = mv.RuleID
-        GROUP BY mr.RuleCode, mr.RuleName, mr.Severity
-        ORDER BY 
-            CASE mr.Severity 
-                WHEN 'CRITICAL' THEN 1 
-                WHEN 'HIGH' THEN 2 
-                WHEN 'MEDIUM' THEN 3 
-                WHEN 'LOW' THEN 4 
-            END,
-            totalViolations DESC
-    """
+            COUNT(*) as totalViolations,
+            SUM(CASE WHEN Resolution IS NOT NULL THEN 1 ELSE 0 END) as resolvedCount,
+            AVG(CASE WHEN Resolution IS NOT NULL THEN DATEDIFF(HOUR, CreatedAt, ResolvedAt) END) as avgResolutionHours
+        FROM MethodologyViolations
+    """, fetch="one")
     
-    rows = execute_query(query, fetch="all") or []
-    summaries = [ViolationSummary(**row) for row in rows]
-    
-    total_open = sum(s.open_violations for s in summaries)
-    total_all = sum(s.total_violations for s in summaries)
-    
-    return ViolationSummaryResponse(
-        summaries=summaries,
-        totalOpen=total_open,
-        totalAllTime=total_all
-    )
+    return {
+        "byRule": by_rule,
+        "byProject": by_project,
+        "stats": stats
+    }

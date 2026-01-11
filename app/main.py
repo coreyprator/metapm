@@ -46,8 +46,6 @@ app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"])
 
 # Serve static files (PWA, manifest, etc.)
 static_dir = Path(__file__).parent.parent / "static"
-# Serve static files (PWA, manifest, etc.)
-static_dir = Path(__file__).parent.parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
@@ -61,17 +59,6 @@ async def capture_page():
         return FileResponse(str(capture_file), media_type="text/html")
     from fastapi import HTTPException
     raise HTTPException(status_code=404, detail="Capture page not found")
-
-
-@app.get("/")
-async def root():
-    """Health check and API info"""
-    return {
-        "service": "MetaPM",
-        "version": "0.1.0",
-        "status": "healthy",
-        "docs": "/docs",
-    }
 
 
 @app.get("/health")

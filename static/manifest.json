@@ -1,7 +1,7 @@
 {
-    "name": "MetaPM - Project Manager",
+    "name": "MetaPM Dashboard",
     "short_name": "MetaPM",
-    "description": "Cross-project task management with voice capture and calendar",
+    "description": "Cross-project task management with voice capture",
     "start_url": "/static/dashboard.html",
     "display": "standalone",
     "background_color": "#1a1a2e",
