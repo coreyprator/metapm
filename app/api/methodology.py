@@ -64,7 +64,6 @@ async def list_rules(
             RuleCode as ruleCode,
             RuleName as ruleName,
             Description as description,
-            Rationale as rationale,
             Category as category,
             Severity as severity,
             IsActive as isActive,
@@ -96,7 +95,6 @@ async def get_rule(rule_id: int):
             RuleCode as ruleCode,
             RuleName as ruleName,
             Description as description,
-            Rationale as rationale,
             Category as category,
             Severity as severity,
             IsActive as isActive,
@@ -351,3 +349,4 @@ async def methodology_analytics():
         "byProject": by_project,
         "stats": stats
     }
+
