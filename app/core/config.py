@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     # GCP
     GCP_PROJECT_ID: str = ""
     CLOUD_SQL_INSTANCE: str = ""
+    GCS_MEDIA_BUCKET: str = "metapm-media"
+    
+    # AI APIs
+    OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
     
     # Security
     API_KEY: str = ""
