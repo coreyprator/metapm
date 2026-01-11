@@ -2,294 +2,421 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#2c3e50">
-    <meta name="description" content="MetaPM Voice Capture - AI-powered task management">
-    <title>MetaPM - Voice Capture</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>MetaPM - Quick Capture</title>
+    
+    <!-- PWA Manifest -->
     <link rel="manifest" href="/static/manifest.json">
-    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='75' fill='%232c3e50'>🎤</text></svg>">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+        /* Custom styles for mobile-first design */
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #333;
+            overflow-x: hidden;
         }
         
-        .container {
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            max-width: 500px;
-            width: 90%;
-            text-align: center;
-        }
-        
-        h1 {
-            color: #2c3e50;
-            margin-bottom: 10px;
-            font-size: 32px;
-        }
-        
-        .subtitle {
-            color: #7f8c8d;
-            margin-bottom: 30px;
-            font-size: 16px;
-        }
-        
-        .mic-button {
+        .record-button {
             width: 120px;
             height: 120px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            color: white;
-            font-size: 50px;
-            cursor: pointer;
-            margin: 20px auto;
+            background: linear-gradient(145deg, #e94560, #d63447);
+            box-shadow: 0 8px 32px rgba(233, 69, 96, 0.4);
             transition: all 0.3s ease;
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
         
-        .mic-button:hover {
-            transform: scale(1.1);
-            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.6);
-        }
-        
-        .mic-button:active {
+        .record-button:active {
             transform: scale(0.95);
         }
         
-        .status {
-            min-height: 30px;
-            margin: 20px 0;
-            font-size: 14px;
-            color: #7f8c8d;
+        .record-button.recording {
+            animation: pulse 1.5s infinite;
+            background: linear-gradient(145deg, #ff6b6b, #e94560);
         }
         
-        .status.recording {
-            color: #e74c3c;
-            font-weight: bold;
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(233, 69, 96, 0.7); }
+            50% { box-shadow: 0 0 0 20px rgba(233, 69, 96, 0); }
         }
         
-        .status.processing {
-            color: #f39c12;
-            font-weight: bold;
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
         
-        .status.success {
-            color: #27ae60;
-            font-weight: bold;
+        .project-chip {
+            transition: all 0.2s ease;
         }
         
-        .transcript {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 15px;
-            margin: 20px 0;
-            text-align: left;
-            min-height: 60px;
-            max-height: 200px;
-            overflow-y: auto;
-            border-left: 4px solid #667eea;
+        .project-chip:hover {
+            transform: translateY(-2px);
         }
         
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-            justify-content: center;
+        .project-chip.selected {
+            background: #e94560;
+            border-color: #e94560;
         }
         
-        .btn {
-            padding: 10px 20px;
-            border-radius: 8px;
-            border: none;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-primary {
-            background: #667eea;
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background: #5568d3;
-        }
-        
-        .btn-secondary {
-            background: #e8e8e8;
-            color: #333;
-        }
-        
-        .btn-secondary:hover {
-            background: #d8d8d8;
-        }
-        
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        /* Safe area for iOS */
+        .safe-area-bottom {
+            padding-bottom: env(safe-area-inset-bottom, 20px);
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>🎤 MetaPM</h1>
-        <p class="subtitle">Voice Capture for Task Management</p>
+<body class="text-white">
+    <div id="app" class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="px-4 py-3 flex items-center justify-between">
+            <h1 class="text-xl font-semibold">MetaPM</h1>
+            <button id="historyBtn" class="p-2 rounded-full hover:bg-white/10">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </button>
+        </header>
         
-        <button class="mic-button" id="micButton" title="Click to start recording">
-            🎙️
-        </button>
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col items-center justify-center px-4 pb-8">
+            <!-- Status Display -->
+            <div id="statusArea" class="w-full max-w-md mb-8 text-center">
+                <p id="statusText" class="text-gray-400 text-lg">Tap to capture a thought</p>
+            </div>
+            
+            <!-- Record Button -->
+            <button id="recordBtn" class="record-button flex items-center justify-center mb-8">
+                <svg id="micIcon" class="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1 1.93c-3.94-.49-7-3.85-7-7.93h2c0 3.31 2.69 6 6 6s6-2.69 6-6h2c0 4.08-3.06 7.44-7 7.93V20h4v2H8v-2h4v-4.07z"/>
+                </svg>
+                <svg id="stopIcon" class="w-12 h-12 text-white hidden" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 6h12v12H6z"/>
+                </svg>
+            </button>
+            
+            <!-- Transcription Result (hidden initially) -->
+            <div id="resultCard" class="w-full max-w-md glass-card rounded-2xl p-4 hidden">
+                <div class="mb-4">
+                    <label class="text-sm text-gray-400 mb-1 block">What I heard:</label>
+                    <p id="transcriptionText" class="text-lg"></p>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="text-sm text-gray-400 mb-1 block">AI understood:</label>
+                    <p id="aiResponseText" class="text-sm text-gray-300"></p>
+                </div>
+                
+                <!-- Project Selection -->
+                <div class="mb-4">
+                    <label class="text-sm text-gray-400 mb-2 block">Project:</label>
+                    <div id="projectChips" class="flex flex-wrap gap-2">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="flex gap-3">
+                    <button id="confirmBtn" class="flex-1 bg-green-600 hover:bg-green-700 py-3 rounded-xl font-medium transition">
+                        Create Task
+                    </button>
+                    <button id="cancelBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 py-3 rounded-xl font-medium transition">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Text Input Alternative -->
+            <div class="w-full max-w-md mt-6">
+                <div class="flex gap-2">
+                    <input id="textInput" type="text" 
+                           placeholder="Or type your thought..."
+                           class="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-white/40">
+                    <button id="sendTextBtn" class="bg-blue-600 hover:bg-blue-700 px-4 rounded-xl transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </main>
         
-        <div class="status" id="status"></div>
-        
-        <div class="transcript" id="transcript">
-            <em>Transcript will appear here...</em>
+        <!-- Toast Notification -->
+        <div id="toast" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-green-600 px-6 py-3 rounded-xl shadow-lg hidden transition-opacity">
+            <span id="toastText">Task created!</span>
         </div>
         
-        <div class="controls">
-            <button class="btn btn-primary" id="submitBtn" disabled>Submit</button>
-            <button class="btn btn-secondary" id="clearBtn">Clear</button>
-        </div>
+        <!-- Bottom Safe Area -->
+        <div class="safe-area-bottom"></div>
     </div>
     
     <script>
-        let mediaRecorder;
+        // Configuration
+        const API_BASE = window.location.origin;
+        
+        // DOM Elements
+        const recordBtn = document.getElementById('recordBtn');
+        const micIcon = document.getElementById('micIcon');
+        const stopIcon = document.getElementById('stopIcon');
+        const statusText = document.getElementById('statusText');
+        const resultCard = document.getElementById('resultCard');
+        const transcriptionText = document.getElementById('transcriptionText');
+        const aiResponseText = document.getElementById('aiResponseText');
+        const projectChips = document.getElementById('projectChips');
+        const confirmBtn = document.getElementById('confirmBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const textInput = document.getElementById('textInput');
+        const sendTextBtn = document.getElementById('sendTextBtn');
+        const toast = document.getElementById('toast');
+        const toastText = document.getElementById('toastText');
+        
+        // State
+        let mediaRecorder = null;
         let audioChunks = [];
         let isRecording = false;
+        let currentResult = null;
+        let selectedProject = null;
         
-        const micButton = document.getElementById('micButton');
-        const statusDiv = document.getElementById('status');
-        const transcriptDiv = document.getElementById('transcript');
-        const submitBtn = document.getElementById('submitBtn');
-        const clearBtn = document.getElementById('clearBtn');
+        // Common projects for quick selection
+        const PROJECTS = [
+            { code: 'META', name: 'MetaPM', color: 'blue' },
+            { code: 'EM', name: 'Etymython', color: 'purple' },
+            { code: 'SF', name: 'Flashcards', color: 'green' },
+            { code: 'AF', name: 'ArtForge', color: 'red' },
+            { code: 'HL', name: 'HarmonyLab', color: 'yellow' },
+        ];
         
-        // Register service worker for PWA
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/static/sw.js').catch(err => {
-                console.log('Service Worker registration failed:', err);
+        // Initialize project chips
+        function initProjectChips() {
+            projectChips.innerHTML = PROJECTS.map(p => `
+                <button class="project-chip px-3 py-1 rounded-full border border-white/30 text-sm"
+                        data-code="${p.code}">
+                    ${p.name}
+                </button>
+            `).join('');
+            
+            // Add click handlers
+            projectChips.querySelectorAll('.project-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    // Deselect all
+                    projectChips.querySelectorAll('.project-chip').forEach(c => c.classList.remove('selected'));
+                    // Select this one
+                    chip.classList.add('selected');
+                    selectedProject = chip.dataset.code;
+                });
             });
         }
         
-        micButton.addEventListener('click', toggleRecording);
-        submitBtn.addEventListener('click', submitTask);
-        clearBtn.addEventListener('click', clearTranscript);
+        // Show toast notification
+        function showToast(message, duration = 3000) {
+            toastText.textContent = message;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), duration);
+        }
         
-        async function toggleRecording() {
-            if (!isRecording) {
-                // Start recording
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
-                    audioChunks = [];
+        // Start recording
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) {
+                        audioChunks.push(e.data);
+                    }
+                };
+                
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    await processAudio(audioBlob);
                     
-                    mediaRecorder.addEventListener('dataavailable', (event) => {
-                        audioChunks.push(event.data);
-                    });
-                    
-                    mediaRecorder.addEventListener('stop', async () => {
-                        await processAudio();
-                    });
-                    
-                    mediaRecorder.start();
-                    isRecording = true;
-                    micButton.style.background = '#e74c3c';
-                    statusDiv.textContent = '🔴 Recording...';
-                    statusDiv.className = 'status recording';
-                } catch (err) {
-                    statusDiv.textContent = '❌ Microphone access denied';
-                    statusDiv.className = 'status';
-                }
-            } else {
-                // Stop recording
-                mediaRecorder.stop();
-                isRecording = false;
-                micButton.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                statusDiv.textContent = '⏳ Processing audio...';
-                statusDiv.className = 'status processing';
+                    // Stop all tracks
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                mediaRecorder.start();
+                isRecording = true;
+                
+                // Update UI
+                recordBtn.classList.add('recording');
+                micIcon.classList.add('hidden');
+                stopIcon.classList.remove('hidden');
+                statusText.textContent = 'Recording... Tap to stop';
+                
+            } catch (err) {
+                console.error('Error starting recording:', err);
+                statusText.textContent = 'Microphone access denied';
             }
         }
         
-        async function processAudio() {
-            try {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                const formData = new FormData();
-                formData.append('audio', audioBlob, 'recording.wav');
+        // Stop recording
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
                 
-                // Send to voice capture endpoint
-                const response = await fetch('/api/capture/voice', {
+                // Update UI
+                recordBtn.classList.remove('recording');
+                micIcon.classList.remove('hidden');
+                stopIcon.classList.add('hidden');
+                statusText.textContent = 'Processing...';
+            }
+        }
+        
+        // Process audio through API
+        async function processAudio(audioBlob) {
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'recording.webm');
+            
+            if (selectedProject) {
+                formData.append('projectCode', selectedProject);
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/voice/voice`, {
                     method: 'POST',
                     body: formData
                 });
                 
-                if (response.ok) {
-                    const result = await response.json();
-                    transcriptDiv.textContent = result.transcription || result.transcript || result.understanding || 'Processing complete';
-                    submitBtn.disabled = false;
-                    statusDiv.textContent = '✅ Transcript ready';
-                    statusDiv.className = 'status success';
-                } else {
-                    statusDiv.textContent = '❌ Error processing audio';
-                    statusDiv.className = 'status';
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
                 }
+                
+                currentResult = await response.json();
+                showResult(currentResult);
+                
             } catch (err) {
-                console.error('Error:', err);
-                statusDiv.textContent = '❌ Error: ' + err.message;
-                statusDiv.className = 'status';
+                console.error('Error processing audio:', err);
+                statusText.textContent = 'Error processing. Try again.';
             }
         }
         
-        async function submitTask() {
-            if (!transcriptDiv.textContent) return;
+        // Process text input
+        async function processText(text) {
+            statusText.textContent = 'Processing...';
             
             try {
-                const response = await fetch('/api/tasks', {
+                const response = await fetch(`${API_BASE}/api/voice/text`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        title: transcriptDiv.textContent,
-                        description: 'Captured via voice',
-                        project_id: null
+                        text: text,
+                        project_code: selectedProject,
+                        source: 'MOBILE'
                     })
                 });
                 
-                if (response.ok) {
-                    statusDiv.textContent = '✅ Task created!';
-                    statusDiv.className = 'status success';
-                    setTimeout(clearTranscript, 2000);
-                } else {
-                    statusDiv.textContent = '❌ Error creating task';
-                    statusDiv.className = 'status';
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
                 }
+                
+                currentResult = await response.json();
+                
+                // If task was auto-created, show toast
+                if (currentResult.taskCreated) {
+                    showToast(`Task #${currentResult.taskCreated.taskId} created!`);
+                    resetUI();
+                } else {
+                    showResult(currentResult);
+                }
+                
             } catch (err) {
-                statusDiv.textContent = '❌ Error: ' + err.message;
-                statusDiv.className = 'status';
+                console.error('Error processing text:', err);
+                statusText.textContent = 'Error processing. Try again.';
             }
         }
         
-        function clearTranscript() {
-            transcriptDiv.textContent = 'Transcript will appear here...';
-            transcriptDiv.style.fontStyle = 'italic';
-            submitBtn.disabled = true;
-            statusDiv.textContent = '';
-            statusDiv.className = 'status';
+        // Show result card
+        function showResult(result) {
+            transcriptionText.textContent = result.transcription || result.promptText || textInput.value;
+            aiResponseText.textContent = result.aiResponse || 'Task will be created';
+            
+            // Pre-select detected project
+            if (result.extractedProjectCode) {
+                selectedProject = result.extractedProjectCode;
+                projectChips.querySelectorAll('.project-chip').forEach(chip => {
+                    if (chip.dataset.code === result.extractedProjectCode) {
+                        chip.classList.add('selected');
+                    }
+                });
+            }
+            
+            resultCard.classList.remove('hidden');
+            statusText.textContent = 'Review and confirm';
+            
+            // If task was already created
+            if (result.taskCreated) {
+                showToast(`Task #${result.taskCreated.taskId} created!`);
+                confirmBtn.textContent = 'Done';
+            }
+        }
+        
+        // Reset UI
+        function resetUI() {
+            resultCard.classList.add('hidden');
+            textInput.value = '';
+            currentResult = null;
+            selectedProject = null;
+            projectChips.querySelectorAll('.project-chip').forEach(c => c.classList.remove('selected'));
+            statusText.textContent = 'Tap to capture a thought';
+            confirmBtn.textContent = 'Create Task';
+        }
+        
+        // Event Listeners
+        recordBtn.addEventListener('click', () => {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        });
+        
+        sendTextBtn.addEventListener('click', () => {
+            const text = textInput.value.trim();
+            if (text) {
+                processText(text);
+            }
+        });
+        
+        textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const text = textInput.value.trim();
+                if (text) {
+                    processText(text);
+                }
+            }
+        });
+        
+        confirmBtn.addEventListener('click', () => {
+            if (currentResult?.taskCreated) {
+                // Task already created, just reset
+                resetUI();
+            } else {
+                // TODO: Create task via API if not auto-created
+                showToast('Task confirmed!');
+                resetUI();
+            }
+        });
+        
+        cancelBtn.addEventListener('click', resetUI);
+        
+        // Initialize
+        initProjectChips();
+        
+        // Register service worker for PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js')
+                .then(reg => console.log('Service worker registered'))
+                .catch(err => console.error('Service worker error:', err));
         }
     </script>
 </body>
