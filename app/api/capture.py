@@ -275,6 +275,9 @@ async def voice_capture(
         source
     ), fetch="one")
     
+    if not media_result:
+        raise HTTPException(status_code=500, detail="Failed to create media record - MediaFiles table may not exist")
+    
     media_id = media_result["MediaID"]
     
     # 3. Transcribe with Whisper
@@ -320,6 +323,8 @@ async def voice_capture(
             "DeviceInfo": None,
             "Location": None
         })
+        if not conv_result:
+            raise HTTPException(status_code=500, detail="Failed to start conversation - sp_StartConversation may not exist")
         conv_guid = conv_result[0]["ConversationGUID"]
     
     # 6. Create task if intent is CREATE_TASK
@@ -366,6 +371,9 @@ async def voice_capture(
         "ExtractedProjectCode": claude_result.get("project_code"),
         "ExtractedCategories": ",".join(claude_result.get("categories", []))
     })
+    
+    if not trans_result:
+        raise HTTPException(status_code=500, detail="Failed to record transaction - sp_RecordTransaction may not exist")
     
     trans_guid = trans_result[0]["TransactionGUID"]
     
