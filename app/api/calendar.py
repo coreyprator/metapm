@@ -169,6 +169,19 @@ async def get_today_events(timezone: str = Query(default="America/Chicago")):
             orderBy='startTime',
             timeZone=timezone
         ).execute()
+    except Exception as e:
+        logger.error(f"Calendar API error: {e}")
+        # Return graceful error instead of 500
+        return {
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "timezone": timezone,
+            "events": [],
+            "configured": False,
+            "error": "OAuth credentials invalid. Please recreate as Desktop app type.",
+            "message": str(e)
+        }
+    
+    try:
         
         events = []
         for e in events_result.get('items', []):
