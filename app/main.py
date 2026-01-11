@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import tasks, projects, categories, methodology, capture
 from app.core.config import settings
+from transactions import router as transactions_router
 
 app = FastAPI(
     title="MetaPM",
@@ -34,6 +35,7 @@ app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
 app.include_router(categories.router, prefix="/api/categories", tags=["Categories"])
 app.include_router(methodology.router, prefix="/api/methodology", tags=["Methodology"])
 app.include_router(capture.router, prefix="/api/capture", tags=["Quick Capture"])
+app.include_router(transactions_router, prefix="/api/transactions", tags=["Transactions & Analytics"])
 
 # Serve static files (PWA, manifest, etc.)
 static_dir = Path(__file__).parent.parent / "static"
