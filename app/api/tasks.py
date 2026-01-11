@@ -6,7 +6,7 @@ Full CRUD operations for tasks with project/category linking.
 """
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 from typing import Optional, List
 from datetime import datetime, date
 from app.core.database import execute_query
@@ -19,13 +19,19 @@ router = APIRouter()
 # ============================================
 
 class TaskCreate(BaseModel):
-    title: str
+    title: str = Field(..., max_length=500)
     description: Optional[str] = None
-    priority: int = 3
+    priority: int = Field(default=3, ge=1, le=5)
     status: str = "NEW"
     dueDate: Optional[str] = None
     projects: List[str] = []  # Project codes
     categories: List[str] = []  # Category codes
+    
+    @validator('title')
+    def title_must_not_be_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Title cannot be empty')
+        return v.strip()[:500]  # Truncate to 500 chars
 
 
 class TaskUpdate(BaseModel):
