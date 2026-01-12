@@ -64,14 +64,27 @@ async def call_claude(text: str, project_code: Optional[str] = None) -> dict:
     if not api_key:
         raise HTTPException(status_code=503, detail="Anthropic API key not configured")
     
-    system_prompt = """You are a task management assistant. Analyze the user's input and extract:
+    # Get available projects for context
+    available_projects = []
+    try:
+        projects = execute_query("SELECT ProjectCode, ProjectName FROM Projects WHERE Status = 'ACTIVE' OR Status = 'NOT_STARTED' ORDER BY ProjectCode")
+        available_projects = [f"{p['ProjectCode']} ({p['ProjectName']})" for p in projects[:20]]  # Limit to 20 for prompt size
+    except Exception as e:
+        logger.warning(f"Could not fetch projects for Claude context: {e}")
+    
+    projects_context = ""
+    if available_projects:
+        projects_context = f"\n\nAvailable projects:\n" + "\n".join(f"- {p}" for p in available_projects)
+    
+    system_prompt = f"""You are a task management assistant. Analyze the user's input and extract:
 1. Intent: CREATE_TASK, UPDATE_TASK, QUERY, NOTE, or OTHER
 2. If CREATE_TASK:
    - title: A concise task title
    - description: Additional details
    - priority: 1-5 (1=critical, 5=someday). Default 3.
-   - projectCode: If mentioned or inferable
+   - projectCode: If mentioned or inferable from available projects
    - categories: Any applicable categories
+{projects_context}
 
 Respond with JSON only:
 {
