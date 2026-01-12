@@ -10,8 +10,10 @@ from pydantic import BaseModel, Field, validator
 from typing import Optional, List
 from datetime import datetime, date
 from app.core.database import execute_query
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # ============================================
@@ -220,6 +222,18 @@ async def get_task(task_id: int):
 @router.post("")
 async def create_task(task: TaskCreate):
     """Create a new task."""
+    # Log incoming request for debugging
+    logger.info("=" * 80)
+    logger.info("CREATE TASK REQUEST:")
+    logger.info(f"Title: '{task.title}' (length: {len(task.title)})")
+    logger.info(f"Description: '{task.description[:100] if task.description else None}...' (length: {len(task.description) if task.description else 0})")
+    logger.info(f"Priority: {task.priority}")
+    logger.info(f"Status: {task.status}")
+    logger.info(f"DueDate: {task.dueDate}")
+    logger.info(f"Projects: {task.projects}")
+    logger.info(f"Categories: {task.categories}")
+    logger.info("=" * 80)
+    
     # Insert task
     query = """
         INSERT INTO Tasks (Title, Description, Priority, Status, DueDate)
