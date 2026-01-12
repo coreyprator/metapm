@@ -613,6 +613,7 @@
                 allTasks = data.tasks || [];
                 updateTaskStats();
                 renderTasks();
+                renderProjects(); // Re-render projects to update task counts
             } catch (e) {
                 console.error('Load tasks failed:', e);
             }
