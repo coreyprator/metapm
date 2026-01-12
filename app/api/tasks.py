@@ -163,7 +163,7 @@ async def list_tasks(
         LEFT JOIN Projects p ON tpl.ProjectID = p.ProjectID
         LEFT JOIN TaskCategoryLinks tcl ON t.TaskID = tcl.TaskID
         LEFT JOIN Categories c ON tcl.CategoryID = c.CategoryID
-        WHERE 1=1
+        WHERE t.Status != 'DELETED'
     """
     
     if status:
