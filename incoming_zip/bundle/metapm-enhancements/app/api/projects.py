@@ -397,3 +397,24 @@ async def delete_project(project_code: str, hard_delete: bool = Query(default=Fa
             fetch="none"
         )
         return {"message": "Project deleted", "projectCode": project_code}
+
+
+# ============================================
+# STATISTICS
+# ============================================
+
+@router.get("/stats/by-theme")
+async def projects_by_theme():
+    """Get project counts by theme."""
+    stats = execute_query("""
+        SELECT 
+            Theme,
+            COUNT(*) as projectCount,
+            SUM(CASE WHEN Status = 'ACTIVE' THEN 1 ELSE 0 END) as activeCount,
+            SUM(CASE WHEN Status = 'BLOCKED' THEN 1 ELSE 0 END) as blockedCount
+        FROM Projects
+        WHERE Status != 'DELETED'
+        GROUP BY Theme
+        ORDER BY projectCount DESC
+    """)
+    return {"byTheme": stats}

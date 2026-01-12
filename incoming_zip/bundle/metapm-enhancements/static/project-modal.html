@@ -1,0 +1,367 @@
+<!-- 
+    Project Modal Component
+    Add this to the dashboard.html inside the modals section
+    Provides full CRUD for projects with rich text editing
+-->
+
+<!-- Project Modal -->
+<div id="projectModal" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 700px;">
+        <div class="p-4 border-b border-white/10 flex items-center justify-between">
+            <h2 id="projectModalTitle" class="font-semibold">Project Details</h2>
+            <button id="closeProjectModal" class="icon-btn">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        
+        <!-- Tabs within modal -->
+        <div class="flex border-b border-white/10 px-4">
+            <button class="project-tab px-4 py-2 text-sm tab-active" data-ptab="details">Details</button>
+            <button class="project-tab px-4 py-2 text-sm text-gray-400" data-ptab="content">Content</button>
+            <button class="project-tab px-4 py-2 text-sm text-gray-400" data-ptab="tasks">Tasks</button>
+        </div>
+        
+        <!-- Details Tab -->
+        <form id="projectForm" class="p-4 space-y-4 project-tab-content" data-ptab="details">
+            <input type="hidden" id="projectId">
+            <input type="hidden" id="originalProjectCode">
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-sm text-gray-400">Project Code *</label>
+                    <input type="text" id="projectCode" class="form-input mt-1" required placeholder="META">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Status</label>
+                    <select id="projectStatus" class="form-input mt-1">
+                        <option value="ACTIVE">Active</option>
+                        <option value="BLOCKED">Blocked</option>
+                        <option value="PLANNED">Planned</option>
+                        <option value="COMPLETED">Completed</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div>
+                <label class="text-sm text-gray-400">Project Name *</label>
+                <input type="text" id="projectName" class="form-input mt-1" required placeholder="Project name">
+            </div>
+            
+            <div>
+                <label class="text-sm text-gray-400">Description</label>
+                <textarea id="projectDescription" class="form-input mt-1" rows="2" placeholder="Brief description"></textarea>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-sm text-gray-400">Theme</label>
+                    <select id="projectTheme" class="form-input mt-1">
+                        <option value="">Select theme...</option>
+                        <option value="Creation">Creation</option>
+                        <option value="Learning">Learning</option>
+                        <option value="Adventure">Adventure</option>
+                        <option value="Relationships">Relationships</option>
+                        <option value="Meta">Meta</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Tech Stack</label>
+                    <input type="text" id="projectTechStack" class="form-input mt-1" placeholder="Python, FastAPI, etc.">
+                </div>
+            </div>
+            
+            <div>
+                <label class="text-sm text-gray-400">Goal Statement</label>
+                <input type="text" id="projectGoal" class="form-input mt-1" placeholder="What success looks like">
+            </div>
+            
+            <div>
+                <label class="text-sm text-gray-400">Priority Next Steps</label>
+                <textarea id="projectNextSteps" class="form-input mt-1" rows="3" placeholder="1. First step&#10;2. Second step"></textarea>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-sm text-gray-400">Production URL</label>
+                    <input type="url" id="projectProdURL" class="form-input mt-1" placeholder="https://...">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">GitHub URL</label>
+                    <input type="url" id="projectGitHubURL" class="form-input mt-1" placeholder="https://github.com/...">
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-sm text-gray-400">VS Code Path</label>
+                    <input type="text" id="projectVSCodePath" class="form-input mt-1" placeholder="G:\My Drive\Code\...">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Current AI Thread URL</label>
+                    <input type="url" id="projectAIThreadURL" class="form-input mt-1" placeholder="https://claude.ai/chat/...">
+                </div>
+            </div>
+            
+            <div class="flex gap-2 pt-2">
+                <button type="submit" class="btn btn-primary flex-1">Save Project</button>
+                <button type="button" id="deleteProjectBtn" class="btn btn-danger hidden">Delete</button>
+            </div>
+        </form>
+        
+        <!-- Content Tab -->
+        <div class="p-4 project-tab-content hidden" data-ptab="content">
+            <div class="mb-3 flex justify-between items-center">
+                <label class="text-sm text-gray-400">Rich Text Content (HTML)</label>
+                <button id="toggleContentPreview" class="btn btn-secondary text-xs">Preview</button>
+            </div>
+            
+            <!-- Editor -->
+            <div id="contentEditor">
+                <textarea id="projectContentHTML" class="form-input font-mono text-sm" rows="15" 
+                          placeholder="<div class='project-content'>&#10;  <h2>Section Title</h2>&#10;  <p>Content here...</p>&#10;</div>"></textarea>
+                <button id="saveContentBtn" class="btn btn-primary mt-3">Save Content</button>
+            </div>
+            
+            <!-- Preview -->
+            <div id="contentPreview" class="hidden">
+                <div id="contentPreviewArea" class="glass-card p-4 rounded-lg prose prose-invert max-w-none" style="min-height: 200px;">
+                    <!-- Rendered HTML will appear here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tasks Tab -->
+        <div class="p-4 project-tab-content hidden" data-ptab="tasks">
+            <div class="flex justify-between items-center mb-3">
+                <span class="text-sm text-gray-400">Tasks for this project</span>
+                <button id="addProjectTaskBtn" class="btn btn-secondary text-xs">+ Add Task</button>
+            </div>
+            <div id="projectTasksList" class="space-y-2 max-h-80 overflow-y-auto">
+                <!-- Tasks loaded dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Rich text preview styles */
+    .prose h2 { font-size: 1.25rem; font-weight: 600; margin-top: 1rem; margin-bottom: 0.5rem; color: #fff; }
+    .prose h3 { font-size: 1.1rem; font-weight: 600; margin-top: 0.75rem; margin-bottom: 0.5rem; color: #e5e7eb; }
+    .prose p { margin-bottom: 0.5rem; color: #d1d5db; }
+    .prose ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.5rem; }
+    .prose li { margin-bottom: 0.25rem; color: #d1d5db; }
+    .prose strong { color: #fff; }
+    .prose table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; }
+    .prose th, .prose td { border: 1px solid rgba(255,255,255,0.1); padding: 0.5rem; text-align: left; }
+    .prose th { background: rgba(255,255,255,0.05); }
+</style>
+
+<script>
+// ==================== PROJECT MODAL LOGIC ====================
+// Add this to the existing dashboard.html script section
+
+// Project modal tab switching
+document.querySelectorAll('.project-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.project-tab').forEach(t => {
+            t.classList.remove('tab-active');
+            t.classList.add('text-gray-400');
+        });
+        tab.classList.add('tab-active');
+        tab.classList.remove('text-gray-400');
+        
+        document.querySelectorAll('.project-tab-content').forEach(c => c.classList.add('hidden'));
+        document.querySelector(`.project-tab-content[data-ptab="${tab.dataset.ptab}"]`).classList.remove('hidden');
+    });
+});
+
+// Content preview toggle
+document.getElementById('toggleContentPreview').addEventListener('click', () => {
+    const editor = document.getElementById('contentEditor');
+    const preview = document.getElementById('contentPreview');
+    const btn = document.getElementById('toggleContentPreview');
+    
+    if (preview.classList.contains('hidden')) {
+        const html = document.getElementById('projectContentHTML').value;
+        document.getElementById('contentPreviewArea').innerHTML = html || '<p class="text-gray-400">No content yet</p>';
+        preview.classList.remove('hidden');
+        editor.classList.add('hidden');
+        btn.textContent = 'Edit';
+    } else {
+        preview.classList.add('hidden');
+        editor.classList.remove('hidden');
+        btn.textContent = 'Preview';
+    }
+});
+
+// Open project modal
+async function openProjectModal(projectCode = null) {
+    const modal = document.getElementById('projectModal');
+    const form = document.getElementById('projectForm');
+    const title = document.getElementById('projectModalTitle');
+    const deleteBtn = document.getElementById('deleteProjectBtn');
+    
+    // Reset form and tabs
+    form.reset();
+    document.getElementById('projectId').value = '';
+    document.getElementById('originalProjectCode').value = '';
+    document.getElementById('projectContentHTML').value = '';
+    document.getElementById('projectTasksList').innerHTML = '';
+    
+    // Reset to first tab
+    document.querySelectorAll('.project-tab').forEach((t, i) => {
+        t.classList.toggle('tab-active', i === 0);
+        t.classList.toggle('text-gray-400', i !== 0);
+    });
+    document.querySelectorAll('.project-tab-content').forEach((c, i) => c.classList.toggle('hidden', i !== 0));
+    
+    if (projectCode) {
+        title.textContent = 'Edit Project';
+        deleteBtn.classList.remove('hidden');
+        
+        try {
+            const res = await fetch(`${API}/api/projects/${projectCode}`);
+            const project = await res.json();
+            
+            document.getElementById('projectId').value = project.projectId;
+            document.getElementById('originalProjectCode').value = project.projectCode;
+            document.getElementById('projectCode').value = project.projectCode;
+            document.getElementById('projectName').value = project.projectName || '';
+            document.getElementById('projectDescription').value = project.description || '';
+            document.getElementById('projectTheme').value = project.theme || '';
+            document.getElementById('projectStatus').value = project.status || 'ACTIVE';
+            document.getElementById('projectGoal').value = project.goalStatement || '';
+            document.getElementById('projectTechStack').value = project.techStack || '';
+            document.getElementById('projectNextSteps').value = project.priorityNextSteps || '';
+            document.getElementById('projectProdURL').value = project.productionURL || '';
+            document.getElementById('projectGitHubURL').value = project.gitHubURL || '';
+            document.getElementById('projectVSCodePath').value = project.vsCodePath || '';
+            document.getElementById('projectAIThreadURL').value = project.currentAIThreadURL || '';
+            document.getElementById('projectContentHTML').value = project.contentHTML || '';
+            
+            // Load tasks
+            renderProjectTasks(project.recentTasks || []);
+        } catch (e) {
+            console.error('Failed to load project:', e);
+            showToast('Failed to load project', 'error');
+        }
+    } else {
+        title.textContent = 'Create Project';
+        deleteBtn.classList.add('hidden');
+    }
+    
+    modal.classList.remove('hidden');
+}
+
+function renderProjectTasks(tasks) {
+    const container = document.getElementById('projectTasksList');
+    if (!tasks.length) {
+        container.innerHTML = '<p class="text-gray-400 text-sm">No tasks yet</p>';
+        return;
+    }
+    
+    container.innerHTML = tasks.map(t => `
+        <div class="item-row p-2 rounded flex justify-between items-center cursor-pointer" onclick="openTaskModal(${t.taskId})">
+            <div>
+                <span class="text-sm">${t.title}</span>
+                <span class="badge ml-2">${t.status}</span>
+            </div>
+            <span class="text-xs text-gray-400">P${t.priority}</span>
+        </div>
+    `).join('');
+}
+
+// Close project modal
+document.getElementById('closeProjectModal').addEventListener('click', () => {
+    document.getElementById('projectModal').classList.add('hidden');
+});
+
+// Save project form
+document.getElementById('projectForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const originalCode = document.getElementById('originalProjectCode').value;
+    const isEdit = !!originalCode;
+    
+    const payload = {
+        projectCode: document.getElementById('projectCode').value,
+        projectName: document.getElementById('projectName').value,
+        description: document.getElementById('projectDescription').value,
+        theme: document.getElementById('projectTheme').value || null,
+        status: document.getElementById('projectStatus').value,
+        goalStatement: document.getElementById('projectGoal').value || null,
+        techStack: document.getElementById('projectTechStack').value || null,
+        priorityNextSteps: document.getElementById('projectNextSteps').value || null,
+        productionURL: document.getElementById('projectProdURL').value || null,
+        gitHubURL: document.getElementById('projectGitHubURL').value || null,
+        vsCodePath: document.getElementById('projectVSCodePath').value || null,
+        currentAIThreadURL: document.getElementById('projectAIThreadURL').value || null
+    };
+    
+    try {
+        const url = isEdit ? `${API}/api/projects/${originalCode}` : `${API}/api/projects`;
+        const method = isEdit ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!res.ok) throw new Error(await res.text());
+        
+        showToast(isEdit ? 'Project updated!' : 'Project created!');
+        document.getElementById('projectModal').classList.add('hidden');
+        loadProjects();
+    } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+    }
+});
+
+// Save content
+document.getElementById('saveContentBtn').addEventListener('click', async () => {
+    const projectCode = document.getElementById('originalProjectCode').value;
+    if (!projectCode) {
+        showToast('Save project first before adding content', 'error');
+        return;
+    }
+    
+    const contentHTML = document.getElementById('projectContentHTML').value;
+    
+    try {
+        const res = await fetch(`${API}/api/projects/${projectCode}/content`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contentHTML })
+        });
+        
+        if (!res.ok) throw new Error(await res.text());
+        showToast('Content saved!');
+    } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+    }
+});
+
+// Delete project
+document.getElementById('deleteProjectBtn').addEventListener('click', async () => {
+    if (!confirm('Delete this project? This cannot be undone.')) return;
+    
+    const projectCode = document.getElementById('originalProjectCode').value;
+    
+    try {
+        await fetch(`${API}/api/projects/${projectCode}`, { method: 'DELETE' });
+        showToast('Project deleted');
+        document.getElementById('projectModal').classList.add('hidden');
+        loadProjects();
+    } catch (err) {
+        showToast('Delete failed', 'error');
+    }
+});
+
+// Add task for this project
+document.getElementById('addProjectTaskBtn').addEventListener('click', () => {
+    const projectCode = document.getElementById('originalProjectCode').value;
+    document.getElementById('projectModal').classList.add('hidden');
+    openTaskModalForProject(projectCode);
+});
+</script>
