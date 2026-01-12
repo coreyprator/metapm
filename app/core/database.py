@@ -81,29 +81,51 @@ def execute_query(
     Returns:
         List of dicts for "all", single dict for "one", None for "none"
     """
-    with get_db() as conn:
-        cursor = conn.cursor()
-        
-        if params:
-            cursor.execute(query, params)
-        else:
-            cursor.execute(query)
-        
-        if fetch == "none":
-            return None
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
             
-        # Get column names from cursor description
-        columns = [column[0] for column in cursor.description] if cursor.description else []
-        
-        if fetch == "one":
-            row = cursor.fetchone()
-            if row:
-                return dict(zip(columns, row))
-            return None
-        
-        # fetch == "all"
-        rows = cursor.fetchall()
-        return [dict(zip(columns, row)) for row in rows]
+            # Log query for debugging
+            logger.debug(f"Executing query: {query[:200]}...")
+            if params:
+                logger.debug(f"Parameters: {params}")
+            
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            
+            if fetch == "none":
+                return None
+                
+            # Get column names from cursor description
+            columns = [column[0] for column in cursor.description] if cursor.description else []
+            
+            if fetch == "one":
+                row = cursor.fetchone()
+                if row:
+                    return dict(zip(columns, row))
+                return None
+            
+            # fetch == "all"
+            rows = cursor.fetchall()
+            return [dict(zip(columns, row)) for row in rows]
+    except pyodbc.Error as e:
+        # Enhanced error logging
+        logger.error("=" * 80)
+        logger.error("DATABASE ERROR DETAILS:")
+        logger.error(f"Error Code: {e.args[0] if e.args else 'Unknown'}")
+        logger.error(f"Error Message: {e.args[1] if len(e.args) > 1 else str(e)}")
+        logger.error(f"Query (first 500 chars): {query[:500]}")
+        if params:
+            logger.error(f"Parameters ({len(params)} total):")
+            for i, param in enumerate(params):
+                param_type = type(param).__name__
+                param_len = len(str(param)) if param is not None else 0
+                param_preview = str(param)[:100] if param is not None else 'None'
+                logger.error(f"  [{i}] {param_type} (len={param_len}): {param_preview}")
+        logger.error("=" * 80)
+        raise
 
 
 def execute_procedure(

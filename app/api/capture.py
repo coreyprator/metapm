@@ -74,9 +74,9 @@ async def call_claude(text: str, project_code: Optional[str] = None) -> dict:
     
     projects_context = ""
     if available_projects:
-        projects_context = f"\n\nAvailable projects:\n" + "\n".join(f"- {p}" for p in available_projects)
+        projects_context = "\n\nAvailable projects:\n" + "\n".join(f"- {p}" for p in available_projects)
     
-    system_prompt = f"""You are a task management assistant. Analyze the user's input and extract:
+    system_prompt = """You are a task management assistant. Analyze the user's input and extract:
 1. Intent: CREATE_TASK, UPDATE_TASK, QUERY, NOTE, or OTHER
 2. If CREATE_TASK:
    - title: A concise task title
@@ -84,7 +84,7 @@ async def call_claude(text: str, project_code: Optional[str] = None) -> dict:
    - priority: 1-5 (1=critical, 5=someday). Default 3.
    - projectCode: If mentioned or inferable from available projects
    - categories: Any applicable categories
-{projects_context}
+""" + projects_context + """
 
 Respond with JSON only:
 {
