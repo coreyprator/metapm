@@ -64,9 +64,7 @@ async def list_rules(
             Description as description,
             Category as category,
             Severity as severity,
-            IsActive as isActive,
-            CreatedAt as createdAt,
-            UpdatedAt as updatedAt
+            IsActive as isActive
         FROM MethodologyRules
         WHERE 1=1
     """
@@ -95,9 +93,7 @@ async def get_rule(rule_id: int):
             Description as description,
             Category as category,
             Severity as severity,
-            IsActive as isActive,
-            CreatedAt as createdAt,
-            UpdatedAt as updatedAt
+            IsActive as isActive
         FROM MethodologyRules
         WHERE RuleID = ?
     """
