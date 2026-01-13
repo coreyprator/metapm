@@ -219,6 +219,9 @@
                     </div>
                 </div>
                 
+                <!-- Search Box -->
+                <input type="text" id="taskSearch" class="form-input w-full text-sm" placeholder="🔍 Search tasks by title or description...">
+                
                 <!-- Filters -->
                 <div class="flex flex-wrap gap-2">
                     <button class="filter-chip chip selected" data-filter="all">All</button>
@@ -248,6 +251,9 @@
             
             <!-- ==================== PROJECTS TAB ==================== -->
             <section id="tab-projects" class="tab-content space-y-4 hidden">
+                <!-- Search Box -->
+                <input type="text" id="projectSearch" class="form-input w-full text-sm" placeholder="🔍 Search projects by name, code, or description...">
+                
                 <!-- Theme Filter -->
                 <div class="flex flex-wrap gap-2 items-center">
                     <span class="text-sm text-gray-400">Theme:</span>
@@ -280,6 +286,9 @@
             
             <!-- ==================== AI HISTORY TAB ==================== -->
             <section id="tab-history" class="tab-content space-y-4 hidden">
+                <!-- Search Box -->
+                <input type="text" id="historySearch" class="form-input w-full text-sm" placeholder="🔍 Search conversations by title or content...">
+                
                 <!-- Filters -->
                 <div class="flex flex-wrap gap-2 items-center">
                     <select id="historyProjectFilter" class="form-input w-auto text-sm">
@@ -313,6 +322,9 @@
             
             <!-- ==================== METHODOLOGY TAB ==================== -->
             <section id="tab-methodology" class="tab-content space-y-4 hidden">
+                <!-- Search Box -->
+                <input type="text" id="methodologySearch" class="form-input w-full text-sm" placeholder="🔍 Search rules by code, name, or description...">
+                
                 <!-- Sub-tabs -->
                 <div class="flex gap-2">
                     <button class="method-tab chip selected" data-subtab="rules">Rules</button>
@@ -722,6 +734,23 @@
         let allRules = [];
         let taskFilter = 'all';
         let projectFilterValue = '';
+        let taskSearchValue = '';
+        let projectSearchValue = '';
+        let historySearchValue = '';
+        let methodologySearchValue = '';
+        
+        // Debounce utility
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
         
         // Project links
         const PROJECT_LINKS = {
@@ -807,6 +836,13 @@
             let tasks = allTasks;
             if (taskFilter !== 'all') tasks = tasks.filter(t => t.status === taskFilter);
             if (projectFilterValue) tasks = tasks.filter(t => t.projectCode === projectFilterValue || (t.projects && t.projects.includes(projectFilterValue)));
+            if (taskSearchValue) {
+                const search = taskSearchValue.toLowerCase();
+                tasks = tasks.filter(t => 
+                    (t.title && t.title.toLowerCase().includes(search)) ||
+                    (t.description && t.description.toLowerCase().includes(search))
+                );
+            }
             
             const container = document.getElementById('taskList');
             if (!tasks.length) {
@@ -845,6 +881,27 @@
             projectFilterValue = e.target.value;
             renderTasks();
         });
+        
+        // Search event listeners
+        document.getElementById('taskSearch').addEventListener('input', debounce(e => {
+            taskSearchValue = e.target.value;
+            renderTasks();
+        }, 300));
+        
+        document.getElementById('projectSearch').addEventListener('input', debounce(e => {
+            projectSearchValue = e.target.value;
+            renderProjects();
+        }, 300));
+        
+        document.getElementById('historySearch').addEventListener('input', debounce(e => {
+            historySearchValue = e.target.value;
+            loadHistory(); // Reload from API for server-side search
+        }, 300));
+        
+        document.getElementById('methodologySearch').addEventListener('input', debounce(e => {
+            methodologySearchValue = e.target.value;
+            renderRules();
+        }, 300));
         
         // Task Modal
         function openTaskModal(taskId = null) {
@@ -913,6 +970,13 @@
         
         document.getElementById('taskForm').addEventListener('submit', async e => {
             e.preventDefault();
+            e.stopPropagation(); // Prevent event bubbling
+            
+            // Prevent double-submit
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            if (submitBtn.disabled) return;
+            submitBtn.disabled = true;
+            
             const taskId = document.getElementById('taskId').value;
             const projects = Array.from(document.querySelectorAll('.project-chip.selected')).map(c => c.dataset.code);
             const categories = Array.from(document.querySelectorAll('.category-chip.selected')).map(c => c.dataset.code);
@@ -940,9 +1004,11 @@
                 
                 showToast(taskId ? 'Task updated!' : 'Task created!');
                 document.getElementById('taskModal').classList.add('hidden');
-                loadTasks();
+                await loadTasks(); // Await to prevent race conditions
             } catch (err) {
                 showToast('Error: ' + err.message, 'error');
+            } finally {
+                submitBtn.disabled = false;
             }
         });
         
@@ -963,12 +1029,18 @@
         async function loadProjects() {
             try {
                 const res = await fetch(`${API}/api/projects`);
+                if (!res.ok) {
+                    console.error('Projects API failed:', res.status, await res.text());
+                    return;
+                }
                 const data = await res.json();
                 allProjects = data.projects || [];
+                console.log('Loaded projects:', allProjects.length);
                 populateProjectFilters(data.themes || []);
                 renderProjects();
             } catch (e) {
                 console.error('Load projects failed:', e);
+                showToast('Failed to load projects', 'error');
             }
         }
         
@@ -984,8 +1056,13 @@
             ];
             projSelect.forEach(sel => {
                 if (sel) {
-                    const first = sel.options[0].outerHTML;
-                    sel.innerHTML = first + allProjects.map(p => `<option value="${p.projectCode}">${p.projectCode} - ${p.projectName}</option>`).join('');
+                    const first = sel.options[0] ? sel.options[0].outerHTML : '<option value="">All Projects</option>';
+                    if (allProjects.length > 0) {
+                        sel.innerHTML = first + allProjects.map(p => `<option value="${p.projectCode}">${p.projectCode} - ${p.projectName}</option>`).join('');
+                        console.log(`Populated ${sel.id} with ${allProjects.length} projects`);
+                    } else {
+                        console.warn(`No projects to populate in ${sel.id}`);
+                    }
                 }
             });
         }
@@ -998,6 +1075,14 @@
             let projects = allProjects;
             if (themeVal) projects = projects.filter(p => p.theme === themeVal);
             if (statusVal) projects = projects.filter(p => p.status === statusVal);
+            if (projectSearchValue) {
+                const search = projectSearchValue.toLowerCase();
+                projects = projects.filter(p => 
+                    (p.projectName && p.projectName.toLowerCase().includes(search)) ||
+                    (p.projectCode && p.projectCode.toLowerCase().includes(search)) ||
+                    (p.description && p.description.toLowerCase().includes(search))
+                );
+            }
             if (openTasksOnly) {
                 projects = projects.filter(p => {
                     const projectTasks = allTasks.filter(t => 
@@ -1293,13 +1378,22 @@
         }
         
         function renderHistory(conversations) {
+            let filtered = conversations;
+            if (historySearchValue) {
+                const search = historySearchValue.toLowerCase();
+                filtered = conversations.filter(c => 
+                    (c.title && c.title.toLowerCase().includes(search)) ||
+                    (c.prompt && c.prompt.toLowerCase().includes(search))
+                );
+            }
+            
             const container = document.getElementById('historyList');
-            if (!conversations.length) {
+            if (!filtered.length) {
                 container.innerHTML = '<p class="text-gray-400 text-sm p-4">No history found</p>';
                 return;
             }
             
-            container.innerHTML = conversations.map(c => {
+            container.innerHTML = filtered.map(c => {
                 const date = new Date(c.createdAt).toLocaleString();
                 const icon = c.source === 'VOICE' ? '🎤' : c.source === 'MOBILE' ? '📱' : '💬';
                 
@@ -1388,13 +1482,23 @@
         }
         
         function renderRules() {
+            let rules = allRules;
+            if (methodologySearchValue) {
+                const search = methodologySearchValue.toLowerCase();
+                rules = allRules.filter(r => 
+                    (r.ruleCode && r.ruleCode.toLowerCase().includes(search)) ||
+                    (r.ruleName && r.ruleName.toLowerCase().includes(search)) ||
+                    (r.description && r.description.toLowerCase().includes(search))
+                );
+            }
+            
             const container = document.getElementById('rulesList');
-            if (!allRules.length) {
-                container.innerHTML = '<p class="text-gray-400 text-sm p-4">No rules defined</p>';
+            if (!rules.length) {
+                container.innerHTML = '<p class="text-gray-400 text-sm p-4">No rules found</p>';
                 return;
             }
             
-            container.innerHTML = allRules.map(r => `
+            container.innerHTML = rules.map(r => `
                 <div class="item-row p-3 cursor-pointer" onclick="openRuleModal(${r.ruleId})">
                     <div class="flex items-start justify-between">
                         <div>
