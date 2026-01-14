@@ -99,6 +99,12 @@
         
         select.form-input { appearance: none; cursor: pointer; }
         
+        /* Fix dropdown option contrast - CRITICAL */
+        select option {
+            background-color: #1e293b;
+            color: #ffffff;
+        }
+        
         .chip {
             display: inline-flex;
             align-items: center;
@@ -224,10 +230,10 @@
                 
                 <!-- Filters -->
                 <div class="flex flex-wrap gap-2">
-                    <button class="filter-chip chip selected" data-filter="all">All</button>
+                    <button class="filter-chip chip selected" data-filter="STARTED">Active</button>
                     <button class="filter-chip chip" data-filter="NEW">New</button>
-                    <button class="filter-chip chip" data-filter="STARTED">Active</button>
                     <button class="filter-chip chip" data-filter="BLOCKED">Blocked</button>
+                    <button class="filter-chip chip" data-filter="all">All</button>
                     <select id="projectFilter" class="form-input w-auto text-sm">
                         <option value="">All Projects</option>
                     </select>
@@ -732,7 +738,7 @@
         let allProjects = [];
         let allCategories = [];
         let allRules = [];
-        let taskFilter = 'all';
+        let taskFilter = 'STARTED';
         let projectFilterValue = '';
         let taskSearchValue = '';
         let projectSearchValue = '';

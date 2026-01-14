@@ -206,9 +206,6 @@ async def list_violations(
             p.ProjectCode as projectCode,
             p.ProjectName as projectName,
             v.Context as context,
-            v.CopilotSessionRef as copilotSessionRef,
-            v.Resolution as resolution,
-            v.ResolvedAt as resolvedAt,
             v.CreatedAt as createdAt
         FROM MethodologyViolations v
         JOIN MethodologyRules r ON v.RuleID = r.RuleID
@@ -220,11 +217,7 @@ async def list_violations(
         query += f" AND v.ProjectID = {project_id}"
     if rule_id:
         query += f" AND v.RuleID = {rule_id}"
-    if resolved is not None:
-        if resolved:
-            query += " AND v.Resolution IS NOT NULL"
-        else:
-            query += " AND v.Resolution IS NULL"
+    # Note: resolved parameter ignored until Resolution column added to schema
     
     query += f" ORDER BY v.CreatedAt DESC OFFSET 0 ROWS FETCH NEXT {limit} ROWS ONLY"
     
