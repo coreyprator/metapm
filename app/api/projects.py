@@ -27,14 +27,10 @@ class ProjectCreate(BaseModel):
     description: Optional[str] = None
     theme: Optional[str] = None
     status: str = "ACTIVE"
-    goalStatement: Optional[str] = None
-    techStack: Optional[str] = None
-    productionURL: Optional[str] = None
-    vsCodePath: Optional[str] = None
-    gitHubURL: Optional[str] = None
-    currentAIThreadURL: Optional[str] = None
-    priorityNextSteps: Optional[str] = None
-    contentHTML: Optional[str] = None
+    projectURL: Optional[str] = None
+    gitHubRepo: Optional[str] = None
+    vscodeWorkspace: Optional[str] = None
+    priority: Optional[int] = 3
 
 
 class ProjectUpdate(BaseModel):
@@ -42,19 +38,10 @@ class ProjectUpdate(BaseModel):
     description: Optional[str] = None
     theme: Optional[str] = None
     status: Optional[str] = None
-    goalStatement: Optional[str] = None
-    techStack: Optional[str] = None
-    productionURL: Optional[str] = None
-    vsCodePath: Optional[str] = None
-    gitHubURL: Optional[str] = None
-    currentAIThreadURL: Optional[str] = None
-    priorityNextSteps: Optional[str] = None
-    contentHTML: Optional[str] = None
-
-
-class ContentUpdate(BaseModel):
-    contentHTML: str
-
+    projectURL: Optional[str] = None
+    gitHubRepo: Optional[str] = None
+    vscodeWorkspace: Optional[str] = None
+    priority: Optional[int] = None
 
 # ============================================
 # ENDPOINTS
@@ -250,19 +237,17 @@ async def create_project(project: ProjectCreate):
     query = """
         INSERT INTO Projects (
             ProjectCode, ProjectName, Description, Theme, Status,
-            GoalStatement, TechStack, ProductionURL, VSCodePath, GitHubURL,
-            CurrentAIThreadURL, PriorityNextSteps, ContentHTML
+            ProjectURL, GitHubRepo, VSCodeWorkspace, Priority
         )
         OUTPUT INSERTED.ProjectID, INSERTED.ProjectCode
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     
     result = execute_query(
         query,
         (project.projectCode, project.projectName, project.description,
-         project.theme, project.status, project.goalStatement, project.techStack,
-         project.productionURL, project.vsCodePath, project.gitHubURL,
-         project.currentAIThreadURL, project.priorityNextSteps, project.contentHTML),
+         project.theme, project.status, project.projectURL, project.gitHubRepo,
+         project.vscodeWorkspace, project.priority),
         fetch="one"
     )
     
@@ -289,14 +274,10 @@ async def update_project(project_code: str, project: ProjectUpdate):
         'description': 'Description',
         'theme': 'Theme',
         'status': 'Status',
-        'goalStatement': 'GoalStatement',
-        'techStack': 'TechStack',
-        'productionURL': 'ProductionURL',
-        'vsCodePath': 'VSCodePath',
-        'gitHubURL': 'GitHubURL',
-        'currentAIThreadURL': 'CurrentAIThreadURL',
-        'priorityNextSteps': 'PriorityNextSteps',
-        'contentHTML': 'ContentHTML'
+        'projectURL': 'ProjectURL',
+        'gitHubRepo': 'GitHubRepo',
+        'vscodeWorkspace': 'VSCodeWorkspace',
+        'priority': 'Priority'
     }
     
     for py_field, sql_field in field_map.items():
@@ -317,35 +298,6 @@ async def update_project(project_code: str, project: ProjectUpdate):
     return {"message": "Project updated", "projectCode": project_code}
 
 
-@router.put("/{project_code}/content")
-async def update_project_content(project_code: str, content: ContentUpdate):
-    """Update just the rich text content for a project."""
-    existing = execute_query(
-        "SELECT ProjectID FROM Projects WHERE ProjectCode = ?",
-        (project_code,),
-        fetch="one"
-    )
-    if not existing:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    execute_query(
-        "UPDATE Projects SET ContentHTML = ?, UpdatedAt = GETUTCDATE() WHERE ProjectCode = ?",
-        (content.contentHTML, project_code),
-        fetch="none"
-    )
-    
-    return {"message": "Content updated", "projectCode": project_code}
-
-
-@router.put("/{project_code}/ai-thread")
-async def update_ai_thread(project_code: str, url: str):
-    """Quick update for AI thread URL."""
-    execute_query(
-        "UPDATE Projects SET CurrentAIThreadURL = ?, UpdatedAt = GETUTCDATE() WHERE ProjectCode = ?",
-        (url, project_code),
-        fetch="none"
-    )
-    return {"message": "AI thread URL updated", "projectCode": project_code, "url": url}
 
 
 @router.delete("/{project_code}")
