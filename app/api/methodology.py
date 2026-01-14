@@ -205,7 +205,7 @@ async def list_violations(
             v.ProjectID as projectId,
             p.ProjectCode as projectCode,
             p.ProjectName as projectName,
-            v.Context as context,
+            v.Description as description,
             v.CreatedAt as createdAt
         FROM MethodologyViolations v
         JOIN MethodologyRules r ON v.RuleID = r.RuleID
