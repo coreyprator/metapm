@@ -75,19 +75,13 @@ async def list_projects(
         Description as description,
         Theme as theme,
         Status as status,
-        GoalStatement as goalStatement,
-        TechStack as techStack,
-        ProductionURL as productionURL,
-        VSCodePath as vsCodePath,
-        GitHubURL as gitHubURL,
-        CurrentAIThreadURL as currentAIThreadURL,
-        PriorityNextSteps as priorityNextSteps,
+        ProjectURL as productionURL,
+        GitHubRepo as gitHubURL,
+        VSCodeWorkspace as vsCodePath,
+        Priority as priority,
         CreatedAt as createdAt,
         UpdatedAt as updatedAt
     """
-    
-    if include_content:
-        columns += ", ContentHTML as contentHTML"
     
     query = f"SELECT {columns} FROM Projects WHERE 1=1"
     
@@ -139,14 +133,10 @@ async def get_project(project_code: str):
             Description as description,
             Theme as theme,
             Status as status,
-            GoalStatement as goalStatement,
-            TechStack as techStack,
-            ProductionURL as productionURL,
-            VSCodePath as vsCodePath,
-            GitHubURL as gitHubURL,
-            CurrentAIThreadURL as currentAIThreadURL,
-            PriorityNextSteps as priorityNextSteps,
-            ContentHTML as contentHTML,
+            ProjectURL as productionURL,
+            GitHubRepo as gitHubURL,
+            VSCodeWorkspace as vsCodePath,
+            Priority as priority,
             CreatedAt as createdAt,
             UpdatedAt as updatedAt
         FROM Projects
@@ -179,8 +169,7 @@ async def get_project(project_code: str):
             v.ViolationID as violationId,
             r.RuleCode as ruleCode,
             r.RuleName as ruleName,
-            v.Context as context,
-            v.Resolution as resolution,
+            v.Description as description,
             v.CreatedAt as createdAt
         FROM MethodologyViolations v
         JOIN MethodologyRules r ON v.RuleID = r.RuleID

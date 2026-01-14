@@ -230,7 +230,7 @@
                 
                 <!-- Filters -->
                 <div class="flex flex-wrap gap-2">
-                    <button class="filter-chip chip selected" data-filter="STARTED">Active</button>
+                    <button class="filter-chip chip selected" data-filter="active">Active</button>
                     <button class="filter-chip chip" data-filter="NEW">New</button>
                     <button class="filter-chip chip" data-filter="BLOCKED">Blocked</button>
                     <button class="filter-chip chip" data-filter="all">All</button>
@@ -738,7 +738,7 @@
         let allProjects = [];
         let allCategories = [];
         let allRules = [];
-        let taskFilter = 'STARTED';
+        let taskFilter = 'active';
         let projectFilterValue = '';
         let taskSearchValue = '';
         let projectSearchValue = '';
@@ -840,7 +840,12 @@
         
         function renderTasks() {
             let tasks = allTasks;
-            if (taskFilter !== 'all') tasks = tasks.filter(t => t.status === taskFilter);
+            // Handle filters
+            if (taskFilter === 'active') {
+                tasks = tasks.filter(t => t.status !== 'DONE');
+            } else if (taskFilter !== 'all') {
+                tasks = tasks.filter(t => t.status === taskFilter);
+            }
             if (projectFilterValue) tasks = tasks.filter(t => t.projectCode === projectFilterValue || (t.projects && t.projects.includes(projectFilterValue)));
             if (taskSearchValue) {
                 const search = taskSearchValue.toLowerCase();

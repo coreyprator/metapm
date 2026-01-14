@@ -40,7 +40,8 @@ class RuleUpdate(BaseModel):
 class ViolationCreate(BaseModel):
     ruleId: int
     projectId: int
-    context: Optional[str] = None
+    taskId: Optional[int] = None
+    description: Optional[str] = None
     copilotSessionRef: Optional[str] = None
     resolution: Optional[str] = None
 
@@ -234,7 +235,7 @@ async def get_violations_by_project(project_code: str):
             v.RuleID as ruleId,
             r.RuleCode as ruleCode,
             r.RuleName as ruleName,
-            v.Context as context,
+            v.Description as description,
             v.CopilotSessionRef as copilotSessionRef,
             v.Resolution as resolution,
             v.ResolvedAt as resolvedAt,
@@ -254,14 +255,14 @@ async def get_violations_by_project(project_code: str):
 async def create_violation(violation: ViolationCreate):
     """Log a new methodology violation."""
     query = """
-        INSERT INTO MethodologyViolations (RuleID, ProjectID, Context, CopilotSessionRef, Resolution)
+        INSERT INTO MethodologyViolations (RuleID, ProjectID, TaskID, Description, CopilotSessionRef, Resolution)
         OUTPUT INSERTED.ViolationID
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?)
     """
     
     result = execute_query(
         query,
-        (violation.ruleId, violation.projectId, violation.context, violation.copilotSessionRef, violation.resolution),
+        (violation.ruleId, violation.projectId, violation.taskId, violation.description, violation.copilotSessionRef, violation.resolution),
         fetch="one"
     )
     
