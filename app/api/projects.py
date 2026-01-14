@@ -174,9 +174,9 @@ async def get_project(project_code: str):
             Source as source,
             CreatedAt as createdAt
         FROM Conversations
-        WHERE ProjectCode = ?
+        WHERE ProjectID = ?
         ORDER BY CreatedAt DESC
-    """, (project_code,))
+    """, (project['projectId'],))
     project['recentConversations'] = conversations
     
     return project
