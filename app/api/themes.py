@@ -9,9 +9,9 @@ from pydantic import BaseModel
 from typing import Optional, List
 
 # Import the execute_query function but DON'T call it at module level
-from app.database import execute_query
+from app.core.database import execute_query
 
-router = APIRouter(prefix="/api/themes", tags=["themes"])
+router = APIRouter()
 
 
 # Pydantic models - these are safe, no DB calls
