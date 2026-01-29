@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "1.4.0"  # FIX: Move static mount AFTER route definitions
+    VERSION: str = "1.4.1"  # FIX: Define static_dir before using it in routes
     
     # Database
     DB_SERVER: str = "localhost"

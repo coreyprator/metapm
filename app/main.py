@@ -46,6 +46,10 @@ app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"])
 # app.include_router(themes.router, prefix="/api/themes", tags=["Themes"])  # Disabled for debugging
 
 
+# Define static_dir early for use in routes
+static_dir = Path(__file__).parent.parent / "static"
+
+
 # Define direct routes BEFORE mounting static files
 @app.get("/health")
 async def health_check():
@@ -83,7 +87,6 @@ async def capture_page():
     raise HTTPException(status_code=404, detail="Capture page not found")
 
 
-# Serve static files (PWA, manifest, etc.) - MUST BE LAST
-static_dir = Path(__file__).parent.parent / "static"
+# Mount static files LAST (after all route definitions)
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
