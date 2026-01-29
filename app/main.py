@@ -9,8 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from app.api import tasks, projects, categories, methodology, capture, calendar
-# TEMPORARILY DISABLED: from app.api import themes
+from app.api import tasks, projects, categories, methodology, capture, calendar, themes
 from app.core.config import settings
 from transactions import router as transactions_router
 
@@ -26,11 +25,6 @@ app = FastAPI(
 @app.get("/")
 async def root_redirect():
     return RedirectResponse(url="/static/dashboard.html")
-
-# Version endpoint
-@app.get("/api/version")
-async def get_version():
-    return {"version": settings.VERSION, "name": "MetaPM"}
 
 # CORS middleware for mobile/web access
 app.add_middleware(
@@ -49,7 +43,7 @@ app.include_router(methodology.router, prefix="/api/methodology", tags=["Methodo
 app.include_router(capture.router, prefix="/api/capture", tags=["Quick Capture"])
 app.include_router(transactions_router, prefix="/api/transactions", tags=["Transactions & Analytics"])
 app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"])
-# TEMPORARILY DISABLED: app.include_router(themes.router, prefix="/api/themes", tags=["Themes"])
+app.include_router(themes.router, prefix="/api/themes", tags=["Themes"])
 
 # Serve static files (PWA, manifest, etc.)
 static_dir = Path(__file__).parent.parent / "static"
@@ -72,3 +66,9 @@ async def capture_page():
 async def health_check():
     """Health check endpoint for Cloud Run"""
     return {"status": "healthy"}
+
+
+@app.get("/api/version")
+async def get_version():
+    """API version information"""
+    return {"version": settings.VERSION, "name": "MetaPM"}
