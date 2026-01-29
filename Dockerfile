@@ -26,6 +26,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Clear Python cache to prevent stale bytecode
+RUN find . -type d -name __pycache__ -exec rm -r {} + 2>/dev/null || true
+RUN find . -type f -name '*.pyc' -delete 2>/dev/null || true
+
 # Create non-root user for security
 RUN useradd -m appuser && chown -R appuser:appuser /app
 USER appuser
