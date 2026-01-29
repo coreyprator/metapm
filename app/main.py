@@ -12,6 +12,9 @@ from fastapi.responses import RedirectResponse
 from app.api import tasks, projects, categories, methodology, capture, calendar  # , themes
 from app.core.config import settings
 from transactions import router as transactions_router
+import logging
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="MetaPM",
@@ -20,6 +23,12 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Log startup to verify deployment
+logger.info(f"=" * 80)
+logger.info(f"MetaPM v{settings.VERSION} STARTING UP")
+logger.info(f"This log message added to verify code deployment")
+logger.info(f"=" * 80)
 
 # Redirect root to dashboard
 @app.get("/")

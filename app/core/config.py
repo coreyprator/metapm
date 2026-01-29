@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "1.4.1"  # FIX: Define static_dir before using it in routes
+    VERSION: str = "1.4.2"  # Testing: Added startup logging to verify deployment
     
     # Database
     DB_SERVER: str = "localhost"
