@@ -58,7 +58,7 @@ steps:
       - '--set-env-vars'
       - 'DB_SERVER=/cloudsql/${_CLOUD_SQL_INSTANCE},DB_NAME=MetaPM,DB_USER=sqlserver,ENVIRONMENT=production'
       - '--set-secrets'
-      - 'DB_PASSWORD=metapm-db-password:latest'
+      - 'DB_PASSWORD=db-password:latest'
       - '--memory'
       - '512Mi'
       - '--cpu'
