@@ -31,6 +31,7 @@ class ProjectCreate(BaseModel):
     gitHubRepo: Optional[str] = None
     vscodeWorkspace: Optional[str] = None
     priority: Optional[int] = 3
+    colorCode: Optional[str] = None
 
 
 class ProjectUpdate(BaseModel):
@@ -42,6 +43,7 @@ class ProjectUpdate(BaseModel):
     gitHubRepo: Optional[str] = None
     vscodeWorkspace: Optional[str] = None
     priority: Optional[int] = None
+    colorCode: Optional[str] = None
 
 # ============================================
 # ENDPOINTS
@@ -66,6 +68,7 @@ async def list_projects(
         GitHubRepo as gitHubURL,
         VSCodeWorkspace as vsCodePath,
         Priority as priority,
+        ColorCode as colorCode,
         CreatedAt as createdAt,
         UpdatedAt as updatedAt
     """
@@ -124,6 +127,7 @@ async def get_project(project_code: str):
             GitHubRepo as gitHubURL,
             VSCodeWorkspace as vsCodePath,
             Priority as priority,
+            ColorCode as colorCode,
             CreatedAt as createdAt,
             UpdatedAt as updatedAt
         FROM Projects
@@ -237,17 +241,17 @@ async def create_project(project: ProjectCreate):
     query = """
         INSERT INTO Projects (
             ProjectCode, ProjectName, Description, Theme, Status,
-            ProjectURL, GitHubRepo, VSCodeWorkspace, Priority
+            ProjectURL, GitHubRepo, VSCodeWorkspace, Priority, ColorCode
         )
         OUTPUT INSERTED.ProjectID, INSERTED.ProjectCode
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     
     result = execute_query(
         query,
         (project.projectCode, project.projectName, project.description,
          project.theme, project.status, project.projectURL, project.gitHubRepo,
-         project.vscodeWorkspace, project.priority),
+         project.vscodeWorkspace, project.priority, project.colorCode),
         fetch="one"
     )
     
@@ -277,7 +281,8 @@ async def update_project(project_code: str, project: ProjectUpdate):
         'projectURL': 'ProjectURL',
         'gitHubRepo': 'GitHubRepo',
         'vscodeWorkspace': 'VSCodeWorkspace',
-        'priority': 'Priority'
+        'priority': 'Priority',
+        'colorCode': 'ColorCode'
     }
     
     for py_field, sql_field in field_map.items():
