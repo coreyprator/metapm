@@ -29,7 +29,7 @@ async def root_redirect():
 # Version endpoint
 @app.get("/api/version")
 async def get_version():
-    return {"version": settings.VERSION, "name": "MetaPM", "build": "fbb3194"}
+    return {"version": settings.VERSION, "name": "MetaPM"}
 
 # CORS middleware for mobile/web access
 app.add_middleware(
