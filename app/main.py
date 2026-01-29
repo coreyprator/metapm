@@ -68,6 +68,19 @@ async def health_check():
     return {"status": "healthy"}
 
 
+@app.get("/debug/routes")
+async def list_routes():
+    """Debug: List all registered routes"""
+    routes = []
+    for route in app.routes:
+        if hasattr(route, 'path'):
+            routes.append({
+                "path": route.path,
+                "methods": list(route.methods) if hasattr(route, 'methods') else []
+            })
+    return {"routes": routes, "count": len(routes)}
+
+
 @app.get("/api/version")
 async def get_version():
     """API version information"""

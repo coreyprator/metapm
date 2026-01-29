@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "1.3.8"  # Debugging: Temporarily disabled themes to test
+    VERSION: str = "1.3.9"  # Debug: Added /debug/routes endpoint
     
     # Database
     DB_SERVER: str = "localhost"
