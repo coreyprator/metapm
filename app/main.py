@@ -16,7 +16,7 @@ from transactions import router as transactions_router
 app = FastAPI(
     title="MetaPM",
     description="Cross-project task management system for Corey's 2026 projects",
-    version="0.1.0",
+    version=settings.VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -25,6 +25,11 @@ app = FastAPI(
 @app.get("/")
 async def root_redirect():
     return RedirectResponse(url="/static/dashboard.html")
+
+# Version endpoint
+@app.get("/api/version")
+async def get_version():
+    return {"version": settings.VERSION, "name": "MetaPM", "build": "fbb3194"}
 
 # CORS middleware for mobile/web access
 app.add_middleware(

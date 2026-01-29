@@ -181,7 +181,7 @@
         <!-- Header -->
         <header class="px-4 py-3 flex items-center justify-between border-b border-white/10 sticky top-0 bg-[#1a1a2e]/95 backdrop-blur z-50">
             <div class="flex items-center gap-3">
-                <a href="/static/dashboard.html" class="text-xl font-semibold hover:text-pink-400 transition">MetaPM</a>
+                <a href="/static/dashboard.html" class="text-xl font-semibold hover:text-pink-400 transition">MetaPM <span id="versionBadge" class="text-xs text-gray-500 font-normal"></span></a>
             </div>
             <div class="flex items-center gap-2">
                 <span id="currentDate" class="text-xs text-gray-400 hidden sm:block"></span>
@@ -1962,6 +1962,16 @@
         
         // Initial load
         (async () => {
+            // Load version
+            try {
+                const versionRes = await fetch('/api/version');
+                const versionData = await versionRes.json();
+                document.getElementById('versionBadge').textContent = `v${versionData.version} (${versionData.build})`;
+                console.log('MetaPM Version:', versionData.version, 'Build:', versionData.build);
+            } catch (error) {
+                console.error('Failed to load version:', error);
+            }
+            
             setDefaultTab();
             await loadCategories();
             await loadProjects();

@@ -11,6 +11,9 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
+    # Application Version
+    VERSION: str = "1.3.0"  # Sprint 3: Colors, Sorting, Themes, Favicon
+    
     # Database
     DB_SERVER: str = "localhost"
     DB_NAME: str = "MetaPM"
