@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "1.3.4"  # Sprint 3: Colors, Sorting, Themes, Favicon (Fixed Gunicorn timeout)
+    VERSION: str = "1.3.6"  # Sprint 3: Fixed import-time DB calls (LL-039)
     
     # Database
     DB_SERVER: str = "localhost"
