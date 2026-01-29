@@ -17,7 +17,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
-      - '--no-cache'
+      # REMOVED --no-cache for faster builds with layer caching
       - '-t'
       - 'gcr.io/$PROJECT_ID/metapm:$COMMIT_SHA'
       - '-t'
