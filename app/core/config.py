@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "1.3.7"  # Sprint 3: Fixed themes.py import path (app.core.database)
+    VERSION: str = "1.3.8"  # Debugging: Temporarily disabled themes to test
     
     # Database
     DB_SERVER: str = "localhost"
