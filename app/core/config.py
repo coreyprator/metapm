@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "1.4.2"  # Testing: Added startup logging to verify deployment
+    VERSION: str = "1.4.3"  # DIAGNOSTIC: Testing if code actually deploys
     
     # Database
     DB_SERVER: str = "localhost"

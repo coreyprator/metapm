@@ -63,7 +63,7 @@ static_dir = Path(__file__).parent.parent / "static"
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Cloud Run"""
-    return {"status": "healthy"}
+    return {"status": "healthy", "test": "PINEAPPLE-99999", "version": "1.4.3"}
 
 
 @app.get("/debug/routes")
