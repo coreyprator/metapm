@@ -260,6 +260,7 @@
         .prose th, .prose td { border: 1px solid rgba(255,255,255,0.1); padding: 0.5rem; text-align: left; }
         .prose th { background: rgba(255,255,255,0.05); }
     </style>
+    <script src="/static/js/offline-data.js"></script>
 </head>
 <body class="text-white">
     <div id="app" class="min-h-screen pb-24">
@@ -270,6 +271,9 @@
             </div>
             <div class="flex items-center gap-2">
                 <span id="currentDate" class="text-xs text-gray-400 hidden sm:block"></span>
+                <div id="syncStatus" class="text-xs px-2 py-1 rounded text-green-400" title="Sync status">
+                    ✓ Synced
+                </div>
                 <div class="theme-toggle">
                     <button id="themeLight" title="Light theme">☀️</button>
                     <button id="themeDark" class="active" title="Dark theme">🌙</button>
@@ -1008,6 +1012,58 @@
             }
         }
         
+        // ==================== SYNC STATUS ====================
+        function initSyncStatus() {
+            const statusEl = document.getElementById('syncStatus');
+            
+            // Handle online/offline changes
+            OnlineStatus.onChange(async (online) => {
+                if (online) {
+                    statusEl.textContent = '🔄 Syncing...';
+                    statusEl.style.color = 'var(--text-secondary)';
+                    await SyncEngine.syncAll();
+                } else {
+                    statusEl.textContent = '🔴 Offline';
+                    statusEl.style.color = '#ef4444';
+                }
+            });
+            
+            // Handle sync completion
+            window.addEventListener('syncComplete', async () => {
+                const pending = await OfflineDB.getPendingOperations();
+                if (pending.length === 0) {
+                    statusEl.textContent = '✓ Synced';
+                    statusEl.style.color = '#22c55e';
+                    // Reload data after sync
+                    await loadTasks();
+                    await loadProjects();
+                } else {
+                    statusEl.textContent = `⏳ Pending (${pending.length})`;
+                    statusEl.style.color = '#f59e0b';
+                }
+            });
+            
+            // Initial status
+            updateSyncStatus();
+        }
+        
+        async function updateSyncStatus() {
+            const statusEl = document.getElementById('syncStatus');
+            if (!OnlineStatus.isOnline) {
+                statusEl.textContent = '🔴 Offline';
+                statusEl.style.color = '#ef4444';
+            } else {
+                const pending = await OfflineDB.getPendingOperations();
+                if (pending.length === 0) {
+                    statusEl.textContent = '✓ Synced';
+                    statusEl.style.color = '#22c55e';
+                } else {
+                    statusEl.textContent = `⏳ Pending (${pending.length})`;
+                    statusEl.style.color = '#f59e0b';
+                }
+            }
+        }
+        
         // Methodology sub-tabs
         document.querySelectorAll('.method-tab').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -1021,14 +1077,30 @@
         // ==================== TASK CRUD ====================
         async function loadTasks() {
             try {
+                // Try network first
                 const res = await fetch(`${API}/api/tasks?pageSize=200`);
-                const data = await res.json();
-                allTasks = data.tasks || [];
+                if (res.ok) {
+                    const data = await res.json();
+                    allTasks = data.tasks || [];
+                    // Save to IndexedDB for offline
+                    await OfflineDB.bulkSaveTasks(allTasks);
+                } else if (OnlineStatus.isOnline) {
+                    throw new Error(`API error: ${res.status}`);
+                } else {
+                    // Offline: load from IndexedDB
+                    allTasks = await OfflineDB.getTasks();
+                }
                 updateTaskStats();
                 renderTasks();
                 renderProjects(); // Re-render projects to update task counts
             } catch (e) {
                 console.error('Load tasks failed:', e);
+                // Last resort: load from IndexedDB
+                if (allTasks.length === 0) {
+                    allTasks = await OfflineDB.getTasks();
+                    renderTasks();
+                    renderProjects();
+                }
             }
         }
         
@@ -1220,19 +1292,42 @@
             };
             
             try {
-                const url = taskId ? `${API}/api/tasks/${taskId}` : `${API}/api/tasks`;
-                const method = taskId ? 'PUT' : 'POST';
-                const res = await fetch(url, {
-                    method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                if (OnlineStatus.isOnline) {
+                    // Online: save to server
+                    const url = taskId ? `${API}/api/tasks/${taskId}` : `${API}/api/tasks`;
+                    const method = taskId ? 'PUT' : 'POST';
+                    const res = await fetch(url, {
+                        method,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!res.ok) throw new Error(await res.text());
+                    
+                    const result = await res.json();
+                    const newTaskId = taskId || result.taskId;
+                    
+                    // Save to IndexedDB as well
+                    const fullTask = { ...payload, taskId: newTaskId };
+                    await OfflineDB.saveTask(fullTask);
+                    showToast(taskId ? 'Task updated!' : 'Task created!');
+                } else {
+                    // Offline: save locally and queue for sync
+                    const newId = taskId || Math.max(...allTasks.map(t => t.taskId || 0), 0) + 1;
+                    const fullTask = { ...payload, taskId: newId, createdAt: new Date().toISOString() };
+                    
+                    await OfflineDB.saveTask(fullTask);
+                    await OfflineDB.queueOperation(
+                        taskId ? 'UPDATE_TASK' : 'CREATE_TASK',
+                        { ...fullTask, taskId: newId }
+                    );
+                    
+                    showToast((taskId ? 'Task updated' : 'Task created') + ' (pending sync)');
+                }
                 
-                if (!res.ok) throw new Error(await res.text());
-                
-                showToast(taskId ? 'Task updated!' : 'Task created!');
                 document.getElementById('taskModal').classList.add('hidden');
-                await loadTasks(); // Await to prevent race conditions
+                await loadTasks();
+                await updateSyncStatus();
             } catch (err) {
                 showToast('Error: ' + err.message, 'error');
             } finally {
@@ -1244,10 +1339,18 @@
             if (!confirm('Delete this task?')) return;
             const taskId = document.getElementById('taskId').value;
             try {
-                await fetch(`${API}/api/tasks/${taskId}`, { method: 'DELETE' });
+                if (OnlineStatus.isOnline) {
+                    await fetch(`${API}/api/tasks/${taskId}`, { method: 'DELETE' });
+                    await OfflineDB.deleteTask(taskId);
+                } else {
+                    await OfflineDB.deleteTask(taskId);
+                    await OfflineDB.queueOperation('DELETE_TASK', { taskId });
+                    showToast('Task deleted (pending sync)');
+                }
                 showToast('Task deleted');
                 document.getElementById('taskModal').classList.add('hidden');
                 loadTasks();
+                await updateSyncStatus();
             } catch (err) {
                 showToast('Delete failed', 'error');
             }
@@ -1257,14 +1360,20 @@
         async function loadProjects() {
             try {
                 const res = await fetch(`${API}/api/projects`);
-                if (!res.ok) {
+                if (res.ok) {
+                    const data = await res.json();
+                    allProjects = data.projects || [];
+                    await OfflineDB.bulkSaveProjects(allProjects);
+                    console.log('Loaded projects:', allProjects.length);
+                    populateProjectFilters(data.themes || []);
+                } else if (OnlineStatus.isOnline) {
                     console.error('Projects API failed:', res.status, await res.text());
                     return;
+                } else {
+                    // Offline: load from IndexedDB
+                    allProjects = await OfflineDB.getProjects();
+                    console.log('Loaded projects from cache:', allProjects.length);
                 }
-                const data = await res.json();
-                allProjects = data.projects || [];
-                console.log('Loaded projects:', allProjects.length);
-                populateProjectFilters(data.themes || []);
                 renderProjects();
             } catch (e) {
                 console.error('Load projects failed:', e);
@@ -2134,6 +2243,7 @@
             }
             
             initTheme();
+            initSyncStatus();
             setDefaultTab();
             await loadCategories();
             await loadProjects();
