@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a2e">
     <title>MetaPM Dashboard</title>
@@ -15,7 +16,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
     
     <link rel="manifest" href="/static/manifest.json">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css">
     
     <style>
         body {
@@ -1966,8 +1967,9 @@
             try {
                 const versionRes = await fetch('/api/version');
                 const versionData = await versionRes.json();
-                document.getElementById('versionBadge').textContent = `v${versionData.version} (${versionData.build})`;
-                console.log('MetaPM Version:', versionData.version, 'Build:', versionData.build);
+                const buildLabel = versionData.build ? ` (${versionData.build})` : '';
+                document.getElementById('versionBadge').textContent = `v${versionData.version}${buildLabel}`;
+                console.log('MetaPM Version:', versionData.version, 'Build:', versionData.build || 'n/a');
             } catch (error) {
                 console.error('Failed to load version:', error);
             }

@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     
     # Application Version
     VERSION: str = "1.4.3"  # DIAGNOSTIC: Testing if code actually deploys
+    BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
     DB_SERVER: str = "localhost"

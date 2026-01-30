@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from app.api import tasks, projects, categories, methodology, capture, calendar  # , themes
+from app.api import tasks, projects, categories, methodology, capture, calendar, themes
 from app.core.config import settings
 from transactions import router as transactions_router
 import logging
@@ -52,7 +52,7 @@ app.include_router(methodology.router, prefix="/api/methodology", tags=["Methodo
 app.include_router(capture.router, prefix="/api/capture", tags=["Quick Capture"])
 app.include_router(transactions_router, prefix="/api/transactions", tags=["Transactions & Analytics"])
 app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"])
-# app.include_router(themes.router, prefix="/api/themes", tags=["Themes"])  # Disabled for debugging
+app.include_router(themes.router, prefix="/api/themes", tags=["Themes"])
 
 
 # Define static_dir early for use in routes
@@ -63,7 +63,12 @@ static_dir = Path(__file__).parent.parent / "static"
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Cloud Run"""
-    return {"status": "healthy", "test": "PINEAPPLE-99999", "version": "1.4.3"}
+    return {
+        "status": "healthy",
+        "test": "PINEAPPLE-99999",
+        "version": settings.VERSION,
+        "build": settings.BUILD,
+    }
 
 
 @app.get("/debug/routes")
@@ -82,7 +87,7 @@ async def list_routes():
 @app.get("/api/version")
 async def get_version():
     """API version information"""
-    return {"version": settings.VERSION, "name": "MetaPM"}
+    return {"version": settings.VERSION, "build": settings.BUILD, "name": "MetaPM"}
 
 
 @app.get("/capture.html")
