@@ -36,7 +36,12 @@ def get_connection() -> pyodbc.Connection:
             "TrustServerCertificate=yes;"
         )
         
+        # Log connection attempt (mask password)
+        safe_conn_str = conn_str.replace(settings.DB_PASSWORD, "***")
+        logger.info(f"Attempting DB connection: {safe_conn_str}")
+        
         conn = pyodbc.connect(conn_str, timeout=30)
+        logger.info("Database connection successful!")
         
         # CRITICAL: SQL Server uses UTF-16LE for NVARCHAR columns
         # This is required for proper Greek Unicode handling
