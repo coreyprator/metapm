@@ -104,12 +104,18 @@
         }
         .modal-overlay.hidden { display: none; }
         .modal-content {
-            background: #1e293b;
+            background: var(--bg-tertiary);
             border-radius: 16px;
             width: 100%;
             max-width: 500px;
             max-height: 90vh;
             overflow-y: auto;
+            color: var(--text-primary);
+        }
+        
+        body.theme-light .modal-content {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
         }
         
         .btn { padding: 8px 16px; border-radius: 8px; font-size: 14px; transition: all 0.2s; }
@@ -158,12 +164,23 @@
             border-radius: 16px;
             font-size: 12px;
             background: rgba(255,255,255,0.1);
+            color: var(--text-primary);
             cursor: pointer;
             transition: all 0.2s;
         }
-        .chip.selected { background: #e94560; }
+        .project-chip {
+            background: var(--chip-bg, rgba(255,255,255,0.1));
+            color: var(--chip-text, var(--text-primary));
+        }
+        .chip.selected { 
+            background: #e94560 !important; 
+            color: white !important;
+        }
         .chip:hover { background: rgba(255,255,255,0.2); }
-        .chip.selected:hover { background: #d63447; }
+        .chip.selected:hover { background: #d63447 !important; }
+        .project-chip:not(.selected):hover {
+            filter: brightness(1.2);
+        }
         
         .expand-btn { transition: transform 0.2s; }
         .expand-btn.expanded { transform: rotate(90deg); }
@@ -1121,9 +1138,14 @@
             
             // Populate project chips
             const projContainer = document.getElementById('taskProjects');
-            projContainer.innerHTML = allProjects.map(p => 
-                `<button type="button" class="chip project-chip" data-code="${p.projectCode}">${p.projectCode}</button>`
-            ).join('');
+            projContainer.innerHTML = allProjects.map(p => {
+                const bgColor = p.colorCode || 'rgba(255,255,255,0.1)';
+                const textColor = p.colorCode ? getContrastColor(p.colorCode) : 'var(--text-primary)';
+                return `<button type="button" class="chip project-chip" data-code="${p.projectCode}" 
+                        style="--chip-bg: ${bgColor}; --chip-text: ${textColor}">
+                        ${p.projectCode}
+                    </button>`;
+            }).join('');
             
             // Populate category chips
             const catContainer = document.getElementById('taskCategories');
@@ -1307,32 +1329,68 @@
             
             container.innerHTML = projects.map(p => {
                 const links = PROJECT_LINKS[p.projectCode] || {};
-                const projectTasks = allTasks.filter(t => t.projectCode === p.projectCode || (t.projects && t.projects.includes(p.projectCode)));
-                const taskCount = p.taskCount !== undefined ? p.taskCount : projectTasks.length;
+                const projectTasks = allTasks.filter(t => 
+                    (t.projectCode === p.projectCode || (t.projects && t.projects.includes(p.projectCode))) &&
+                    t.status !== 'DONE'
+                );
+                const taskCount = projectTasks.length;
                 const nextSteps = (p.priorityNextSteps || '').split('\n').filter(Boolean)[0] || p.description || '';
                 const borderColor = p.colorCode || '#6b7280';
                 const badgeBg = p.colorCode || 'rgba(255,255,255,0.1)';
                 const badgeText = p.colorCode ? getContrastColor(p.colorCode) : '#ffffff';
                 
-                return `
-                <div class="glass-card rounded-xl p-3 flex items-start gap-3 hover:bg-white/5 transition cursor-pointer" onclick="openProjectModal('${p.projectCode}')" style="border-left: 4px solid ${borderColor}">
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2">
-                            <span class="font-medium truncate">${p.projectName}</span>
-                            <span class="badge" style="background-color: ${badgeBg}; color: ${badgeText}">${p.projectCode}</span>
-                            <span class="text-xs text-gray-500">${p.status}</span>
+                const tasksList = projectTasks.length > 0 ? `
+                    <div class="project-tasks mt-2" id="tasks-${p.projectCode}">
+                        <div class="space-y-1">
+                            ${projectTasks.slice(0, 5).map(t => `
+                                <div class="text-xs p-2 rounded" style="background: rgba(255,255,255,0.03)">
+                                    <div class="flex items-center gap-2">
+                                        <span class="status-badge status-${t.status}">${t.status}</span>
+                                        <span class="flex-1 truncate">${t.title}</span>
+                                        <button onclick="event.stopPropagation(); openTaskModal(${t.taskId})" class="text-gray-400 hover:text-white">✏️</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                            ${projectTasks.length > 5 ? `<div class="text-xs text-gray-500 p-2">...and ${projectTasks.length - 5} more</div>` : ''}
                         </div>
-                        <p class="text-xs text-gray-400">${p.theme || 'No theme'} · ${taskCount} tasks · ${p.violationCount || 0} violations</p>
-                        ${nextSteps ? `<p class="text-xs text-gray-300 mt-1 line-clamp-2">${nextSteps}</p>` : ''}
                     </div>
-                    <div class="flex gap-1">
-                        ${p.currentAIThreadURL ? `<a href="${p.currentAIThreadURL}" target="_blank" class="icon-btn" title="AI Chat" onclick="event.stopPropagation()">🤖</a>` : ''}
-                        ${links.vscode ? `<a href="${links.vscode}" class="icon-btn" title="VS Code" onclick="event.stopPropagation()">💻</a>` : ''}
-                        ${links.github ? `<a href="${links.github}" target="_blank" class="icon-btn" title="GitHub" onclick="event.stopPropagation()">📂</a>` : ''}
+                ` : '';
+                
+                return `
+                <div class="glass-card rounded-xl p-3">
+                    <div class="flex items-start gap-3 hover:bg-white/5 transition cursor-pointer" onclick="openProjectModal('${p.projectCode}')" style="border-left: 4px solid ${borderColor}; margin-left: -12px; padding-left: 12px;">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                ${taskCount > 0 ? `<button onclick="event.stopPropagation(); toggleProjectTasks('${p.projectCode}')" class="expand-btn text-gray-400 hover:text-white">▶</button>` : '<span style="width:16px"></span>'}
+                                <span class="font-medium truncate">${p.projectName}</span>
+                                <span class="badge" style="background-color: ${badgeBg}; color: ${badgeText}">${p.projectCode}</span>
+                                <span class="text-xs text-gray-500">${p.status}</span>
+                            </div>
+                            <p class="text-xs text-gray-400 ml-6">${p.theme || 'No theme'} · ${taskCount} tasks · ${p.violationCount || 0} violations</p>
+                            ${nextSteps ? `<p class="text-xs text-gray-300 mt-1 line-clamp-2 ml-6">${nextSteps}</p>` : ''}
+                        </div>
+                        <div class="flex gap-1">
+                            ${p.currentAIThreadURL ? `<a href="${p.currentAIThreadURL}" target="_blank" class="icon-btn" title="AI Chat" onclick="event.stopPropagation()">🤖</a>` : ''}
+                            ${links.vscode ? `<a href="${links.vscode}" class="icon-btn" title="VS Code" onclick="event.stopPropagation()">💻</a>` : ''}
+                            ${links.github ? `<a href="${links.github}" target="_blank" class="icon-btn" title="GitHub" onclick="event.stopPropagation()">📂</a>` : ''}
+                        </div>
                     </div>
+                    ${tasksList}
                 </div>
                 `;
             }).join('');
+        }
+        
+        function toggleProjectTasks(projectCode) {
+            const container = document.getElementById(`tasks-${projectCode}`);
+            const btn = event.currentTarget;
+            if (container.classList.contains('expanded')) {
+                container.classList.remove('expanded');
+                btn.classList.remove('expanded');
+            } else {
+                container.classList.add('expanded');
+                btn.classList.add('expanded');
+            }
         }
         
         function openTaskModalForProject(projectCode) {
