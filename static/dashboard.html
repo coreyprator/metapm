@@ -19,16 +19,42 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css">
     
     <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #1e293b;
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-muted: #9ca3af;
+            --border-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        body.theme-light {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #f1f5f9;
+            --bg-tertiary: #e2e8f0;
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --border-color: rgba(0, 0, 0, 0.1);
+        }
+        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
             min-height: 100vh;
+            color: var(--text-primary);
         }
         
         .glass-card {
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border-color);
+        }
+        
+        body.theme-light .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid var(--border-color);
         }
         
         .priority-1, .priority-2 { border-left: 4px solid #ef4444; }
@@ -98,20 +124,31 @@
             width: 100%;
             padding: 10px 12px;
             background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
-            color: white;
+            color: var(--text-primary);
             font-size: 14px;
         }
         .form-input:focus { outline: none; border-color: #e94560; }
-        .form-input::placeholder { color: rgba(255,255,255,0.4); }
+        .form-input::placeholder { color: var(--text-muted); }
+        
+        body.theme-light .form-input {
+            background: rgba(0,0,0,0.05);
+            color: var(--text-primary);
+        }
+        body.theme-light .form-input::placeholder { color: var(--text-muted); }
         
         select.form-input { appearance: none; cursor: pointer; }
         
         /* Fix dropdown option contrast - CRITICAL */
         select option {
-            background-color: #1e293b;
-            color: #ffffff;
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        
+        body.theme-light select option {
+            background-color: #ffffff;
+            color: var(--text-primary);
         }
         
         .chip {
@@ -130,6 +167,34 @@
         
         .expand-btn { transition: transform 0.2s; }
         .expand-btn.expanded { transform: rotate(90deg); }
+        
+        .theme-toggle {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .theme-toggle button {
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .theme-toggle button.active {
+            background: #e94560;
+            color: white;
+            border-color: #e94560;
+        }
+        .theme-toggle button:hover {
+            border-color: #e94560;
+            background: rgba(233, 69, 96, 0.2);
+        }
+        .theme-toggle button.active:hover {
+            background: #e94560;
+        }
         
         .project-tasks { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
         .project-tasks.expanded { max-height: 1000px; }
@@ -188,6 +253,11 @@
             </div>
             <div class="flex items-center gap-2">
                 <span id="currentDate" class="text-xs text-gray-400 hidden sm:block"></span>
+                <div class="theme-toggle">
+                    <button id="themeLight" title="Light theme">☀️</button>
+                    <button id="themeDark" class="active" title="Dark theme">🌙</button>
+                    <button id="themeAuto" title="Auto theme">💻</button>
+                </div>
                 <button id="refreshBtn" class="icon-btn" title="Refresh">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
@@ -766,6 +836,35 @@
 
     <script>
         const API = window.location.origin;
+        
+        // ==================== THEME MANAGEMENT ====================
+        function initTheme() {
+            const savedTheme = localStorage.getItem('metapm-theme') || 'dark';
+            applyTheme(savedTheme);
+        }
+        
+        function applyTheme(theme) {
+            document.body.classList.remove('theme-light', 'theme-auto');
+            document.querySelectorAll('.theme-toggle button').forEach(btn => btn.classList.remove('active'));
+            
+            if (theme === 'light') {
+                document.body.classList.add('theme-light');
+                document.getElementById('themeLight').classList.add('active');
+            } else if (theme === 'auto') {
+                document.body.classList.add('theme-auto');
+                document.getElementById('themeAuto').classList.add('active');
+                if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+                    document.body.classList.add('theme-light');
+                }
+            } else {
+                document.getElementById('themeDark').classList.add('active');
+            }
+            localStorage.setItem('metapm-theme', theme);
+        }
+        
+        document.getElementById('themeLight').addEventListener('click', () => applyTheme('light'));
+        document.getElementById('themeDark').addEventListener('click', () => applyTheme('dark'));
+        document.getElementById('themeAuto').addEventListener('click', () => applyTheme('auto'));
         
         // State
         let allTasks = [];
@@ -1976,6 +2075,7 @@
                 console.error('Failed to load version:', error);
             }
             
+            initTheme();
             setDefaultTab();
             await loadCategories();
             await loadProjects();
