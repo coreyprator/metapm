@@ -17,18 +17,19 @@ logger = logging.getLogger(__name__)
 def get_connection() -> pyodbc.Connection:
     """Create a new database connection with UTF-16LE encoding for Unicode support"""
     try:
-        # Parse Cloud SQL socket connection or direct connection
+        # For Cloud SQL, use the public IP address or Private IP
+        # Cloud SQL Proxy makes the instance available at 127.0.0.1:1433
         if settings.DB_SERVER.startswith("/cloudsql/"):
-            # Cloud SQL proxy connection format: /cloudsql/PROJECT:REGION:INSTANCE
-            # We need to use localhost:1433 when Cloud SQL proxy is running
-            server = "localhost"
+            # When using Cloud SQL Proxy on Cloud Run, it makes the database
+            # available at localhost on port 1433
+            server = "127.0.0.1,1433"
         else:
-            server = settings.DB_SERVER
+            server = f"{settings.DB_SERVER},1433"
         
         # Build connection string for pyodbc
         conn_str = (
             f"DRIVER={{{settings.DB_DRIVER}}};"
-            f"SERVER={server},1433;"
+            f"SERVER={server};"
             f"DATABASE={settings.DB_NAME};"
             f"UID={settings.DB_USER};"
             f"PWD={settings.DB_PASSWORD};"
