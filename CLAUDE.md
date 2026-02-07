@@ -80,16 +80,30 @@ pytest tests/test_ui_smoke.py -v
 ALL tests must pass. Include test output in your report.
 
 ### 4. Version Numbers
-Every deploy must update the version in `app/core/config.py`.  
+Every deploy must update the version in `app/core/config.py`.
 Report: "Deployed v1.4.5"
 
-### 5. Handoff Format (REQUIRED)
+### 5. Git Commit Policy (MANDATORY)
+**THE RULE**: Every task = git commit before handoff. No exceptions.
+
+Before ANY handoff:
+```powershell
+git status                    # Check uncommitted changes
+git add [specific-files]      # Stage files (NOT git add -A)
+git commit -m "feat/fix/chore: description"
+git push origin main
+```
+
+**Definition of Done**: A task is NOT done until committed AND pushed.
+
+### 7. Handoff Format (REQUIRED)
 ```markdown
 ## Handoff: [Feature]
 
 **Version**: v1.4.5
 **Revision**: metapm-v2-00012-xyz
 **Deployed to**: https://metapm.rentyourcio.com
+**Git Status**: Committed and pushed ✓
 
 **Tests Run**:
 pytest tests/ -v
