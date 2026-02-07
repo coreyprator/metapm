@@ -5,7 +5,7 @@
 
 const OfflineDB = {
     dbName: 'MetaPM',
-    version: 1,
+    version: 2,
     db: null,
     
     // Initialize IndexedDB
@@ -45,11 +45,25 @@ const OfflineDB = {
                     db.createObjectStore('syncQueue', { keyPath: 'id', autoIncrement: true });
                 }
                 
+                // Bugs store
+                if (!db.objectStoreNames.contains('bugs')) {
+                    const bugsStore = db.createObjectStore('bugs', { keyPath: 'bugId' });
+                    bugsStore.createIndex('projectId', 'projectId', { unique: false });
+                    bugsStore.createIndex('status', 'status', { unique: false });
+                }
+
+                // Requirements store
+                if (!db.objectStoreNames.contains('requirements')) {
+                    const reqsStore = db.createObjectStore('requirements', { keyPath: 'requirementId' });
+                    reqsStore.createIndex('projectId', 'projectId', { unique: false });
+                    reqsStore.createIndex('status', 'status', { unique: false });
+                }
+
                 // Metadata (last sync, etc)
                 if (!db.objectStoreNames.contains('metadata')) {
                     db.createObjectStore('metadata', { keyPath: 'key' });
                 }
-                
+
                 console.log('IndexedDB stores created');
             };
         });
@@ -239,12 +253,90 @@ const OfflineDB = {
         });
     },
     
+    // ==================== BUGS ====================
+    async getBugs() {
+        const store = this.db.transaction('bugs', 'readonly').objectStore('bugs');
+        return new Promise((resolve, reject) => {
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async saveBug(bug) {
+        const store = this.db.transaction('bugs', 'readwrite').objectStore('bugs');
+        return new Promise((resolve, reject) => {
+            const request = store.put({ ...bug, localUpdatedAt: new Date().toISOString() });
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async deleteBug(bugId) {
+        const store = this.db.transaction('bugs', 'readwrite').objectStore('bugs');
+        return new Promise((resolve, reject) => {
+            const request = store.delete(bugId);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async bulkSaveBugs(bugs) {
+        const store = this.db.transaction('bugs', 'readwrite').objectStore('bugs');
+        bugs.forEach(bug => store.put({ ...bug, localUpdatedAt: new Date().toISOString() }));
+        return new Promise((resolve, reject) => {
+            const req = store.count();
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    // ==================== REQUIREMENTS ====================
+    async getRequirements() {
+        const store = this.db.transaction('requirements', 'readonly').objectStore('requirements');
+        return new Promise((resolve, reject) => {
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async saveRequirement(req) {
+        const store = this.db.transaction('requirements', 'readwrite').objectStore('requirements');
+        return new Promise((resolve, reject) => {
+            const request = store.put({ ...req, localUpdatedAt: new Date().toISOString() });
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async deleteRequirement(reqId) {
+        const store = this.db.transaction('requirements', 'readwrite').objectStore('requirements');
+        return new Promise((resolve, reject) => {
+            const request = store.delete(reqId);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    async bulkSaveRequirements(reqs) {
+        const store = this.db.transaction('requirements', 'readwrite').objectStore('requirements');
+        reqs.forEach(r => store.put({ ...r, localUpdatedAt: new Date().toISOString() }));
+        return new Promise((resolve, reject) => {
+            const req = store.count();
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
     async clearAllData() {
-        const tx = this.db.transaction(['tasks', 'projects', 'syncQueue'], 'readwrite');
+        const tx = this.db.transaction(['tasks', 'projects', 'bugs', 'requirements', 'syncQueue'], 'readwrite');
         tx.objectStore('tasks').clear();
         tx.objectStore('projects').clear();
+        tx.objectStore('bugs').clear();
+        tx.objectStore('requirements').clear();
         tx.objectStore('syncQueue').clear();
-        
+
         return new Promise((resolve, reject) => {
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
@@ -368,7 +460,45 @@ const SyncEngine = {
                 return fetch(`/api/projects/${data.projectCode}`, {
                     method: 'DELETE'
                 }).then(r => r.json());
-            
+
+            case 'CREATE_BUG':
+                return fetch('/api/backlog/bugs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                }).then(r => r.json());
+
+            case 'UPDATE_BUG':
+                return fetch(`/api/backlog/bugs/${data.bugId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                }).then(r => r.json());
+
+            case 'DELETE_BUG':
+                return fetch(`/api/backlog/bugs/${data.bugId}`, {
+                    method: 'DELETE'
+                }).then(r => r.json());
+
+            case 'CREATE_REQUIREMENT':
+                return fetch('/api/backlog/requirements', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                }).then(r => r.json());
+
+            case 'UPDATE_REQUIREMENT':
+                return fetch(`/api/backlog/requirements/${data.requirementId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                }).then(r => r.json());
+
+            case 'DELETE_REQUIREMENT':
+                return fetch(`/api/backlog/requirements/${data.requirementId}`, {
+                    method: 'DELETE'
+                }).then(r => r.json());
+
             default:
                 throw new Error(`Unknown operation: ${op}`);
         }

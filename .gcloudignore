@@ -1,0 +1,15 @@
+.git
+.gitignore
+__pycache__
+*.pyc
+.env
+nul
+.gcloudignore
+.vscode
+*.md
+tests/
+scripts/
+.venv/
+venv/
+incoming_zip/
+project-methodology/

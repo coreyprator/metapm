@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔴 MetaPM v1.6.1 UAT Checklist</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 950px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #e5e5e5;
+            line-height: 1.6;
+            padding-bottom: 100px;
+        }
+        
+        h1 {
+            color: #f87171;
+            border-bottom: 2px solid #f87171;
+            padding-bottom: 10px;
+        }
+        
+        h2 {
+            color: #60a5fa;
+            margin-top: 30px;
+            border-left: 4px solid #60a5fa;
+            padding-left: 12px;
+        }
+        
+        .info-box {
+            background: #2d2d44;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .info-box strong {
+            color: #4ade80;
+        }
+        
+        .test-section {
+            background: #252538;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .test-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 10px 0;
+            border-bottom: 1px solid #3a3a52;
+            gap: 12px;
+        }
+        
+        .test-item:last-child {
+            border-bottom: none;
+        }
+        
+        .test-content {
+            flex: 1;
+        }
+        
+        .test-label {
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .test-item.passed .test-label {
+            color: #4ade80;
+        }
+        
+        .test-item.failed .test-label {
+            color: #f87171;
+        }
+        
+        .expected {
+            color: #fbbf24;
+            font-size: 0.85em;
+            display: block;
+        }
+        
+        .test-buttons {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        
+        .btn-pass, .btn-fail, .btn-reset-item {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 600;
+            transition: all 0.15s;
+        }
+        
+        .btn-pass {
+            background: #166534;
+            color: #bbf7d0;
+        }
+        
+        .btn-pass:hover {
+            background: #22c55e;
+            color: white;
+        }
+        
+        .btn-pass.active {
+            background: #22c55e;
+            color: white;
+            box-shadow: 0 0 8px #22c55e;
+        }
+        
+        .btn-fail {
+            background: #991b1b;
+            color: #fecaca;
+        }
+        
+        .btn-fail:hover {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-fail.active {
+            background: #ef4444;
+            color: white;
+            box-shadow: 0 0 8px #ef4444;
+        }
+        
+        .btn-reset-item {
+            background: #374151;
+            color: #9ca3af;
+            padding: 6px 10px;
+        }
+        
+        .btn-reset-item:hover {
+            background: #4b5563;
+            color: white;
+        }
+        
+        .summary {
+            position: sticky;
+            top: 0;
+            background: #1e1e32;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            z-index: 100;
+            border: 2px solid #4ade80;
+        }
+        
+        .summary h3 {
+            margin-top: 0;
+            margin-bottom: 12px;
+        }
+        
+        .summary-stats {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        
+        .stat {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        
+        .stat.total { background: #3b82f6; }
+        .stat.passed { background: #22c55e; }
+        .stat.failed { background: #ef4444; }
+        .stat.remaining { background: #6b7280; }
+        
+        .summary-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .summary-actions button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+        
+        .btn-reset-all {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .btn-reset-all:hover {
+            background: #9ca3af;
+        }
+        
+        .btn-export {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .btn-export:hover {
+            background: #60a5fa;
+        }
+        
+        .btn-pass-all {
+            background: #166534;
+            color: #bbf7d0;
+        }
+        
+        .btn-pass-all:hover {
+            background: #22c55e;
+            color: white;
+        }
+        
+        .priority-tag {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        
+        .p1 { background: #fecaca; color: #991b1b; }
+        .p2 { background: #fef3c7; color: #92400e; }
+        .p3 { background: #d1fae5; color: #065f46; }
+        
+        .new-tag {
+            background: #c084fc;
+            color: #1e1b4b;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        
+        .notes-section {
+            margin-top: 30px;
+        }
+        
+        .notes-area {
+            width: 100%;
+            min-height: 100px;
+            background: #2d2d44;
+            border: 1px solid #4a4a6a;
+            border-radius: 6px;
+            color: #e5e5e5;
+            padding: 12px;
+            margin-top: 8px;
+            font-family: inherit;
+            resize: vertical;
+        }
+        
+        a {
+            color: #60a5fa;
+        }
+        
+        code {
+            background: #3a3a52;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4b5563;
+            flex-shrink: 0;
+            margin-top: 4px;
+        }
+        
+        .test-item.passed .status-indicator {
+            background: #22c55e;
+        }
+        
+        .test-item.failed .status-indicator {
+            background: #ef4444;
+        }
+        
+        .section-summary {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px dashed #4a4a6a;
+            font-size: 0.85em;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔴 MetaPM v1.6.1 UAT Checklist</h1>
+    
+    <div class="info-box">
+        <strong>Test URL:</strong> <a href="https://metapm.rentyourcio.com" target="_blank">https://metapm.rentyourcio.com</a><br>
+        <strong>Version:</strong> 1.6.1<br>
+        <strong>Revision:</strong> metapm-v2-00026-w96<br>
+        <strong>Date:</strong> <span id="test-date"></span><br>
+        <strong>⚠️ Remember:</strong> Hard refresh (Ctrl+Shift+R) to clear cached CSS/JS
+    </div>
+    
+    <div class="summary">
+        <h3>📊 Test Progress</h3>
+        <div class="summary-stats">
+            <span class="stat total">Total: <span id="total-count">0</span></span>
+            <span class="stat passed">✓ Passed: <span id="passed-count">0</span></span>
+            <span class="stat failed">✗ Failed: <span id="failed-count">0</span></span>
+            <span class="stat remaining">○ Remaining: <span id="remaining-count">0</span></span>
+        </div>
+        <div class="summary-actions">
+            <button class="btn-reset-all" onclick="resetAll()">🔄 Reset All</button>
+            <button class="btn-pass-all" onclick="passAllRemaining()">✓ Pass Remaining</button>
+            <button class="btn-export" onclick="exportResults()">📋 Copy Results</button>
+        </div>
+    </div>
+    
+    <!-- PRE-FLIGHT -->
+    <h2>0. Pre-Flight</h2>
+    <div class="test-section" data-section="preflight">
+        <div class="test-item" data-test="pf1">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Hard refresh (Ctrl+Shift+R) on metapm.rentyourcio.com</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="pf2">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Check version badge shows <code>v1.6.1</code></span>
+                <span class="expected">→ Green badge, high contrast, clearly visible</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="pf3">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">No "(unknown)" build suffix in version</span>
+                <span class="expected">→ Just "v1.6.1", nothing after</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="section-summary">Section: <span class="section-passed">0</span> passed, <span class="section-failed">0</span> failed</div>
+    </div>
+    
+    <!-- TITLE BAR -->
+    <h2>1. Title Bar <span class="priority-tag p1">P1</span> <span class="new-tag">FIXED</span></h2>
+    <div class="test-section" data-section="titlebar">
+        <div class="test-item" data-test="t1">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Header is single horizontal line (no wrapping)</span>
+                <span class="expected">→ All elements on ONE line, even on narrower screens</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="t2">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Resize browser window narrower — header should NOT wrap</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="t3">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Find MetaPM name on left</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="t4">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Find sync status indicator</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="t5">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Find theme toggle buttons</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="t6">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Find view dropdown selector</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="t7">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Find "+ Add" button</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="section-summary">Section: <span class="section-passed">0</span> passed, <span class="section-failed">0</span> failed</div>
+    </div>
+    
+    <!-- VERSION BADGE -->
+    <h2>2. Version Badge <span class="priority-tag p2">P2</span> <span class="new-tag">FIXED</span></h2>
+    <div class="test-section" data-section="version">
+        <div class="test-item" data-test="v1">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Version badge has GREEN background (#4ade80)</span>
+                <span class="expected">→ Bright green, easy to see</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="v2">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Version text is BLACK (high contrast)</span>
+                <span class="expected">→ Black text on green = easy to read</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="v3">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">No "(unknown)" suffix after version number</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="section-summary">Section: <span class="section-passed">0</span> passed, <span class="section-failed">0</span> failed</div>
+    </div>
+    
+    <!-- COLUMN ORDER -->
+    <h2>3. Column Order <span class="priority-tag p2">P2</span> <span class="new-tag">CHANGED</span></h2>
+    <div class="test-section" data-section="columns">
+        <div class="test-item" data-test="c1">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Column 1: Checkbox (selection)</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="c2">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Column 2: Type icon (🐛 📋 ✓)</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="c3">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Column 3: Status badge (NEW, ACTIVE, BLOCKED, DONE)</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="c4">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Column 4: Priority badge (P1, P2, P3)</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="c5">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Column 5: Project badge</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="c6">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Column 6: Title (longest column, truncates with ellipsis)</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="c7">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Column 7: Actions (edit button visible on hover)</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="c8">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Hover over row → edit button appears</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="section-summary">Section: <span class="section-passed">0</span> passed, <span class="section-failed">0</span> failed</div>
+    </div>
+    
+    <!-- ROW STYLING -->
+    <h2>4. Row Styling <span class="priority-tag p3">P3</span> <span class="new-tag">IMPROVED</span></h2>
+    <div class="test-section" data-section="rows">
+        <div class="test-item" data-test="r1">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Rows are single-line (not multi-line cards)</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="r2">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Alternating row colors visible (more contrast than before)</span>
+                <span class="expected">→ Odd/even rows have clearly DIFFERENT backgrounds</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="r3">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Rows have tighter padding (more compact layout)</span>
+                <span class="expected">→ Should fit more rows on screen than before</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="r4">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Row hover effect works (row highlights)</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="section-summary">Section: <span class="section-passed">0</span> passed, <span class="section-failed">0</span> failed</div>
+    </div>
+    
+    <!-- BULK STATUS -->
+    <h2>5. Bulk Status Dropdown <span class="priority-tag p2">P2</span> <span class="new-tag">NEW</span></h2>
+    <div class="test-section" data-section="bulk">
+        <div class="test-item" data-test="b1">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Find "Set Status..." dropdown in bottom status bar</span>
+                <span class="expected">→ Should be near Delete/Clear buttons</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="b2">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Dropdown is DISABLED when nothing selected</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="b3">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Select 2+ tasks using checkboxes</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="b4">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Dropdown becomes ENABLED when tasks are selected</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="b5">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Click dropdown → see status options (New, Active, Blocked, Done)</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="b6">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Select "Active" → all selected tasks change to ACTIVE</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="b7">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Verify selected tasks show updated status badges immediately</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="b8">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Refresh page → status changes PERSISTED</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="section-summary">Section: <span class="section-passed">0</span> passed, <span class="section-failed">0</span> failed</div>
+    </div>
+    
+    <!-- AUTO-PREFIX -->
+    <h2>6. Auto-Prefix (BUG-XXX / REQ-XXX) <span class="priority-tag p1">P1</span></h2>
+    <div class="test-section" data-section="prefix">
+        <div class="test-item" data-test="ap1">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Click "+ Add Task" button</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="ap2">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Find Type dropdown in modal (Task / Bug / Requirement)</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="ap3">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Select Type = "Bug"</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="ap4">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Enter title: "UAT test bug"</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="ap5">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Fill other required fields and Save</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="ap6">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">New task shows auto-generated prefix: "BUG-XXX: UAT test bug"</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="ap7">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Type icon shows 🐛 for the new bug</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="ap8">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Create another with Type = Requirement → shows "REQ-XXX: ..."</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="ap9">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Delete the test tasks you created (cleanup)</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="section-summary">Section: <span class="section-passed">0</span> passed, <span class="section-failed">0</span> failed</div>
+    </div>
+    
+    <!-- FILTER BAR -->
+    <h2>7. Filter Bar</h2>
+    <div class="test-section" data-section="filters">
+        <div class="test-item" data-test="f1">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Status filter dropdown works</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="f2">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Priority filter dropdown works</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="f3">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Project filter dropdown works</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="f4">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Type filter works (filters Bug/Requirement/Task)</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="f5">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Sort dropdown works</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="f6">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Search field filters results as you type</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="section-summary">Section: <span class="section-passed">0</span> passed, <span class="section-failed">0</span> failed</div>
+    </div>
+    
+    <!-- STATUS BAR -->
+    <h2>8. Fixed Status Bar (Bottom)</h2>
+    <div class="test-section" data-section="statusbar">
+        <div class="test-item" data-test="s1">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Status bar visible at bottom of screen</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="s2">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Selection count shows (e.g., "0 selected")</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="s3">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Delete button visible</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="s4">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Clear button visible</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="s5">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Stats visible on right (X New, Y Active, Z Blocked, W Done)</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="s6">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Scroll task list → status bar STAYS FIXED at bottom</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="s7">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Select tasks → count updates live</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="s8">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Click Clear → selection cleared, count back to 0</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="section-summary">Section: <span class="section-passed">0</span> passed, <span class="section-failed">0</span> failed</div>
+    </div>
+    
+    <!-- VIEW DROPDOWN -->
+    <h2>9. View Selector & Context-Aware Add</h2>
+    <div class="test-section" data-section="views">
+        <div class="test-item" data-test="vw1">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">View dropdown has all options (Tasks, Projects, AI History, Methodology, Backlog)</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="vw2">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">With Tasks selected → Add button says "+ Add Task"</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="vw3">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Switch to Projects → Add button label changes</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="test-item" data-test="vw4">
+            <div class="status-indicator"></div>
+            <div class="test-content">
+                <span class="test-label">Switch to Backlog → Add button label changes</span>
+            </div>
+            <div class="test-buttons">
+                <button class="btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                <button class="btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                <button class="btn-reset-item" onclick="resetItem(this)">↺</button>
+            </div>
+        </div>
+        <div class="section-summary">Section: <span class="section-passed">0</span> passed, <span class="section-failed">0</span> failed</div>
+    </div>
+    
+    <!-- NOTES -->
+    <div class="notes-section">
+        <h2>📝 Notes & Issues Found</h2>
+        <div class="test-section">
+            <textarea class="notes-area" id="notes" placeholder="Document any issues, unexpected behavior, or suggestions here..."></textarea>
+        </div>
+    </div>
+    
+    <script>
+        // Set current date
+        document.getElementById('test-date').textContent = new Date().toLocaleDateString();
+        
+        // Count tests
+        const allTestItems = document.querySelectorAll('.test-item');
+        const totalCount = allTestItems.length;
+        document.getElementById('total-count').textContent = totalCount;
+        
+        // Set result for a test
+        function setResult(button, result) {
+            const testItem = button.closest('.test-item');
+            const passBtn = testItem.querySelector('.btn-pass');
+            const failBtn = testItem.querySelector('.btn-fail');
+            
+            // Remove existing classes
+            testItem.classList.remove('passed', 'failed');
+            passBtn.classList.remove('active');
+            failBtn.classList.remove('active');
+            
+            // Set new result
+            if (result === 'pass') {
+                testItem.classList.add('passed');
+                passBtn.classList.add('active');
+            } else if (result === 'fail') {
+                testItem.classList.add('failed');
+                failBtn.classList.add('active');
+            }
+            
+            updateCounts();
+        }
+        
+        // Reset individual item
+        function resetItem(button) {
+            const testItem = button.closest('.test-item');
+            testItem.classList.remove('passed', 'failed');
+            testItem.querySelector('.btn-pass').classList.remove('active');
+            testItem.querySelector('.btn-fail').classList.remove('active');
+            updateCounts();
+        }
+        
+        // Update all counts
+        function updateCounts() {
+            const passed = document.querySelectorAll('.test-item.passed').length;
+            const failed = document.querySelectorAll('.test-item.failed').length;
+            const remaining = totalCount - passed - failed;
+            
+            document.getElementById('passed-count').textContent = passed;
+            document.getElementById('failed-count').textContent = failed;
+            document.getElementById('remaining-count').textContent = remaining;
+            
+            // Update section summaries
+            document.querySelectorAll('.test-section').forEach(section => {
+                const sectionPassed = section.querySelectorAll('.test-item.passed').length;
+                const sectionFailed = section.querySelectorAll('.test-item.failed').length;
+                const passedSpan = section.querySelector('.section-passed');
+                const failedSpan = section.querySelector('.section-failed');
+                if (passedSpan) passedSpan.textContent = sectionPassed;
+                if (failedSpan) failedSpan.textContent = sectionFailed;
+            });
+            
+            saveState();
+        }
+        
+        // Reset all
+        function resetAll() {
+            if (confirm('Reset all test results and notes?')) {
+                allTestItems.forEach(item => {
+                    item.classList.remove('passed', 'failed');
+                    item.querySelector('.btn-pass').classList.remove('active');
+                    item.querySelector('.btn-fail').classList.remove('active');
+                });
+                document.getElementById('notes').value = '';
+                updateCounts();
+                localStorage.removeItem('metapm-uat-161-state');
+            }
+        }
+        
+        // Pass all remaining
+        function passAllRemaining() {
+            if (confirm('Mark all remaining (untested) items as PASSED?')) {
+                allTestItems.forEach(item => {
+                    if (!item.classList.contains('passed') && !item.classList.contains('failed')) {
+                        item.classList.add('passed');
+                        item.querySelector('.btn-pass').classList.add('active');
+                    }
+                });
+                updateCounts();
+            }
+        }
+        
+        // Export results
+        function exportResults() {
+            const passed = document.querySelectorAll('.test-item.passed').length;
+            const failed = document.querySelectorAll('.test-item.failed').length;
+            const notes = document.getElementById('notes').value;
+            
+            let results = `MetaPM v1.6.1 UAT Results\n`;
+            results += `========================\n`;
+            results += `Date: ${new Date().toLocaleString()}\n`;
+            results += `URL: https://metapm.rentyourcio.com\n\n`;
+            results += `Summary: ${passed} passed, ${failed} failed, ${totalCount - passed - failed} not tested\n`;
+            results += `=========================================\n\n`;
+            
+            // List each section
+            document.querySelectorAll('h2').forEach(h2 => {
+                const section = h2.nextElementSibling;
+                if (section && section.classList.contains('test-section')) {
+                    results += `${h2.textContent.trim()}\n`;
+                    results += '-'.repeat(40) + '\n';
+                    section.querySelectorAll('.test-item').forEach(item => {
+                        const label = item.querySelector('.test-label').textContent;
+                        let status = '○';
+                        if (item.classList.contains('passed')) status = '✓';
+                        if (item.classList.contains('failed')) status = '✗';
+                        results += `  ${status} ${label}\n`;
+                    });
+                    results += '\n';
+                }
+            });
+            
+            if (notes) {
+                results += `\nNotes:\n${'-'.repeat(40)}\n${notes}\n`;
+            }
+            
+            // Failed items summary
+            const failedItems = document.querySelectorAll('.test-item.failed');
+            if (failedItems.length > 0) {
+                results += `\n\nFAILED ITEMS:\n${'='.repeat(40)}\n`;
+                failedItems.forEach(item => {
+                    results += `✗ ${item.querySelector('.test-label').textContent}\n`;
+                });
+            }
+            
+            navigator.clipboard.writeText(results).then(() => {
+                alert('Results copied to clipboard!');
+            });
+        }
+        
+        // Save state to localStorage
+        function saveState() {
+            const state = {
+                tests: {},
+                notes: document.getElementById('notes').value
+            };
+            allTestItems.forEach(item => {
+                const testId = item.getAttribute('data-test');
+                if (item.classList.contains('passed')) {
+                    state.tests[testId] = 'passed';
+                } else if (item.classList.contains('failed')) {
+                    state.tests[testId] = 'failed';
+                }
+            });
+            localStorage.setItem('metapm-uat-161-state', JSON.stringify(state));
+        }
+        
+        // Load state from localStorage
+        function loadState() {
+            const saved = localStorage.getItem('metapm-uat-161-state');
+            if (saved) {
+                const state = JSON.parse(saved);
+                Object.keys(state.tests).forEach(testId => {
+                    const item = document.querySelector(`[data-test="${testId}"]`);
+                    if (item) {
+                        if (state.tests[testId] === 'passed') {
+                            item.classList.add('passed');
+                            item.querySelector('.btn-pass').classList.add('active');
+                        } else if (state.tests[testId] === 'failed') {
+                            item.classList.add('failed');
+                            item.querySelector('.btn-fail').classList.add('active');
+                        }
+                    }
+                });
+                document.getElementById('notes').value = state.notes || '';
+            }
+            updateCounts();
+        }
+        
+        // Auto-save notes
+        document.getElementById('notes').addEventListener('input', saveState);
+        
+        // Load on page load
+        loadState();
+    </script>
+</body>
+</html>

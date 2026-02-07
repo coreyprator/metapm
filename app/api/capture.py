@@ -38,7 +38,7 @@ class TextCaptureRequest(BaseModel):
 
 async def call_whisper(audio_data: bytes) -> dict:
     """Transcribe audio using OpenAI Whisper API."""
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
     if not api_key:
         raise HTTPException(status_code=503, detail="OpenAI API key not configured")
     
@@ -60,7 +60,7 @@ async def call_whisper(audio_data: bytes) -> dict:
 
 async def call_claude(text: str, project_code: Optional[str] = None) -> dict:
     """Use Claude to understand the capture and extract intent."""
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
     if not api_key:
         raise HTTPException(status_code=503, detail="Anthropic API key not configured")
     

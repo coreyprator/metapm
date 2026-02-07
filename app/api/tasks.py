@@ -26,9 +26,10 @@ class TaskCreate(BaseModel):
     priority: int = Field(default=3, ge=1, le=5)
     status: str = "NEW"
     dueDate: Optional[str] = None
+    taskType: str = Field(default="task")  # 'task', 'bug', 'requirement'
     projects: List[str] = []  # Project codes
     categories: List[str] = []  # Category codes
-    
+
     @validator('title')
     def title_must_not_be_empty(cls, v):
         if not v or not v.strip():
@@ -42,6 +43,7 @@ class TaskUpdate(BaseModel):
     priority: Optional[int] = None
     status: Optional[str] = None
     dueDate: Optional[str] = None
+    taskType: Optional[str] = None
     projects: Optional[List[str]] = None
     categories: Optional[List[str]] = None
 
@@ -53,13 +55,14 @@ class TaskUpdate(BaseModel):
 def get_task_with_links(task_id: int):
     """Get a task with its project and category links."""
     task = execute_query("""
-        SELECT 
+        SELECT
             t.TaskID as taskId,
             t.Title as title,
             t.Description as description,
             t.Priority as priority,
             t.Status as status,
             t.DueDate as dueDate,
+            t.TaskType as taskType,
             t.CreatedAt as createdAt,
             t.UpdatedAt as updatedAt
         FROM Tasks t
@@ -129,6 +132,22 @@ def link_task_to_categories(task_id: int, category_codes: List[str]):
             )
 
 
+def _get_next_prefix_number(prefix: str) -> int:
+    """Get next auto-increment number for BUG- or REQ- prefixed tasks."""
+    result = execute_query(f"""
+        SELECT MAX(
+            TRY_CAST(
+                SUBSTRING(Title, {len(prefix) + 1},
+                    CHARINDEX(':', Title + ':') - {len(prefix) + 1}
+                ) AS INT
+            )
+        ) as maxNum
+        FROM Tasks
+        WHERE Title LIKE '{prefix}%'
+    """, fetch="one")
+    return (result['maxNum'] or 0) + 1 if result else 1
+
+
 # ============================================
 # ENDPOINTS
 # ============================================
@@ -139,6 +158,7 @@ async def list_tasks(
     project: Optional[str] = None,
     category: Optional[str] = None,
     priority: Optional[int] = None,
+    taskType: Optional[str] = Query(default=None),
     page: int = Query(default=1, ge=1),
     pageSize: int = Query(default=50, le=200)
 ):
@@ -154,9 +174,10 @@ async def list_tasks(
             t.Priority as priority,
             t.Status as status,
             t.DueDate as dueDate,
+            t.TaskType as taskType,
             t.CreatedAt as createdAt,
-            (SELECT TOP 1 p.ProjectCode FROM TaskProjectLinks tpl 
-             JOIN Projects p ON tpl.ProjectID = p.ProjectID 
+            (SELECT TOP 1 p.ProjectCode FROM TaskProjectLinks tpl
+             JOIN Projects p ON tpl.ProjectID = p.ProjectID
              WHERE tpl.TaskID = t.TaskID) as projectCode
         FROM Tasks t
         LEFT JOIN TaskProjectLinks tpl ON t.TaskID = tpl.TaskID
@@ -175,7 +196,9 @@ async def list_tasks(
         query += f" AND c.CategoryCode = '{category}'"
     if priority:
         query += f" AND t.Priority = {priority}"
-    
+    if taskType:
+        query += f" AND t.TaskType = '{taskType}'"
+
     # Count total
     count_query = query.replace("SELECT DISTINCT", "SELECT COUNT(DISTINCT t.TaskID) as total FROM (SELECT")
     count_query = f"SELECT COUNT(*) as total FROM ({query}) as subq"
@@ -222,30 +245,30 @@ async def get_task(task_id: int):
 @router.post("")
 async def create_task(task: TaskCreate):
     """Create a new task."""
-    # Log incoming request for debugging
-    logger.info("=" * 80)
-    logger.info("CREATE TASK REQUEST:")
-    logger.info(f"Title: '{task.title}' (length: {len(task.title)})")
-    logger.info(f"Description: '{task.description[:100] if task.description else None}...' (length: {len(task.description) if task.description else 0})")
-    logger.info(f"Priority: {task.priority}")
-    logger.info(f"Status: {task.status}")
-    logger.info(f"DueDate: {task.dueDate}")
-    logger.info(f"Projects: {task.projects}")
-    logger.info(f"Categories: {task.categories}")
-    logger.info("=" * 80)
-    
+    # Auto-prefix title based on task type
+    title = task.title
+    task_type = task.taskType or 'task'
+    if task_type == 'bug' and not title.startswith('BUG-'):
+        next_num = _get_next_prefix_number('BUG-')
+        title = f"BUG-{next_num:03d}: {title}"
+    elif task_type == 'requirement' and not title.startswith('REQ-'):
+        next_num = _get_next_prefix_number('REQ-')
+        title = f"REQ-{next_num:03d}: {title}"
+
+    logger.info(f"CREATE TASK: type={task_type}, title='{title}', priority={task.priority}, projects={task.projects}")
+
     # Insert task
     query = """
-        INSERT INTO Tasks (Title, Description, Priority, Status, DueDate)
+        INSERT INTO Tasks (Title, Description, Priority, Status, DueDate, TaskType)
         OUTPUT INSERTED.TaskID
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?)
     """
-    
+
     due_date = task.dueDate if task.dueDate else None
-    
+
     result = execute_query(
         query,
-        (task.title, task.description, task.priority, task.status, due_date),
+        (title, task.description, task.priority, task.status, due_date, task_type),
         fetch="one"
     )
     
@@ -289,7 +312,10 @@ async def update_task(task_id: int, task: TaskUpdate):
     if task.dueDate is not None:
         updates.append("DueDate = ?")
         params.append(task.dueDate if task.dueDate else None)
-    
+    if task.taskType is not None:
+        updates.append("TaskType = ?")
+        params.append(task.taskType)
+
     if updates:
         updates.append("UpdatedAt = GETUTCDATE()")
         params.append(task_id)

@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UAT: MetaPM v1.6.2 - Mobile Responsive Task List</title>
+    <style>
+        :root {
+            --metapm-red: #DC2626;
+            --metapm-red-light: #FEE2E2;
+            --pass-green: #22C55E;
+            --fail-red: #EF4444;
+            --warning-amber: #F59E0B;
+            --bg-light: #F9FAFB;
+            --border-gray: #E5E7EB;
+            --text-dark: #111827;
+            --text-muted: #6B7280;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-dark);
+            background: var(--bg-light);
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--metapm-red), #991B1B);
+            color: white;
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+        
+        header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+        
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+            font-size: 0.875rem;
+        }
+        
+        .meta-item {
+            background: rgba(255,255,255,0.15);
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+        
+        .meta-label {
+            opacity: 0.8;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .meta-value {
+            font-weight: 600;
+        }
+        
+        section {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-gray);
+        }
+        
+        section h2 {
+            font-size: 1.125rem;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--metapm-red-light);
+            color: var(--metapm-red);
+        }
+        
+        .test-case {
+            border: 1px solid var(--border-gray);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+        
+        .test-header {
+            background: var(--bg-light);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-gray);
+        }
+        
+        .test-id {
+            font-weight: 700;
+            color: var(--metapm-red);
+        }
+        
+        .test-priority {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        
+        .priority-high {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+        
+        .priority-medium {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+        
+        .test-body {
+            padding: 16px;
+        }
+        
+        .test-title {
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        
+        .test-steps {
+            margin-bottom: 16px;
+        }
+        
+        .test-steps h4 {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        
+        .test-steps ol {
+            margin-left: 20px;
+        }
+        
+        .test-steps li {
+            margin-bottom: 6px;
+        }
+        
+        .expected {
+            background: #F0FDF4;
+            border-left: 3px solid var(--pass-green);
+            padding: 12px;
+            margin-bottom: 16px;
+            font-size: 0.875rem;
+        }
+        
+        .expected h4 {
+            color: #166534;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        
+        .result-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .result-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .result-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+        }
+        
+        .result-btn.pass {
+            border-color: var(--pass-green);
+            color: var(--pass-green);
+        }
+        
+        .result-btn.pass:hover, .result-btn.pass.selected {
+            background: var(--pass-green);
+            color: white;
+        }
+        
+        .result-btn.fail {
+            border-color: var(--fail-red);
+            color: var(--fail-red);
+        }
+        
+        .result-btn.fail:hover, .result-btn.fail.selected {
+            background: var(--fail-red);
+            color: white;
+        }
+        
+        .result-btn.blocked {
+            border-color: var(--warning-amber);
+            color: var(--warning-amber);
+        }
+        
+        .result-btn.blocked:hover, .result-btn.blocked.selected {
+            background: var(--warning-amber);
+            color: white;
+        }
+        
+        .notes-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-gray);
+            border-radius: 6px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 60px;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .summary-card {
+            text-align: center;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-gray);
+        }
+        
+        .summary-card.total { background: #F3F4F6; }
+        .summary-card.passed { background: #F0FDF4; border-color: var(--pass-green); }
+        .summary-card.failed { background: #FEF2F2; border-color: var(--fail-red); }
+        .summary-card.blocked { background: #FFFBEB; border-color: var(--warning-amber); }
+        
+        .summary-number {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        
+        .summary-label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+        
+        .device-info {
+            background: #EFF6FF;
+            border: 1px solid #BFDBFE;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .device-info h3 {
+            color: #1E40AF;
+            font-size: 0.875rem;
+            margin-bottom: 12px;
+        }
+        
+        .device-inputs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+        
+        .device-input label {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+        
+        .device-input input, .device-input select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-gray);
+            border-radius: 4px;
+        }
+        
+        .sign-off {
+            background: var(--bg-light);
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 24px;
+        }
+        
+        .sign-off-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+        
+        .sign-off input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-gray);
+            border-radius: 6px;
+            margin-top: 4px;
+        }
+        
+        .sign-off label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+        
+        .overall-result {
+            margin-top: 20px;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .overall-result.pending {
+            background: #F3F4F6;
+            border: 2px dashed var(--border-gray);
+        }
+        
+        .overall-result h3 {
+            margin-bottom: 12px;
+        }
+        
+        .overall-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        
+        .overall-btn {
+            padding: 12px 32px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        
+        .overall-btn.approve {
+            background: var(--pass-green);
+            color: white;
+        }
+        
+        .overall-btn.reject {
+            background: var(--fail-red);
+            color: white;
+        }
+        
+        @media print {
+            body { padding: 0; }
+            .result-btn, .overall-btn { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        }
+        
+        .url-link {
+            color: white;
+            text-decoration: underline;
+            word-break: break-all;
+        }
+        
+        .checklist {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .checklist li {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-gray);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .checklist li:last-child {
+            border-bottom: none;
+        }
+        
+        .checklist input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--pass-green);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🔴 MetaPM v1.6.2 — User Acceptance Testing</h1>
+        <p>Mobile Responsive Task List Layout</p>
+        <div class="meta-grid">
+            <div class="meta-item">
+                <div class="meta-label">Version</div>
+                <div class="meta-value">v1.6.2</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Revision</div>
+                <div class="meta-value">metapm-v2-00027-wbb</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Test Date</div>
+                <div class="meta-value">2025-02-06</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Tester</div>
+                <div class="meta-value">Corey (Project Lead)</div>
+            </div>
+            <div class="meta-item" style="grid-column: span 2;">
+                <div class="meta-label">Test URL</div>
+                <div class="meta-value"><a href="https://metapm.rentyourcio.com" target="_blank" class="url-link">https://metapm.rentyourcio.com</a></div>
+            </div>
+        </div>
+    </header>
+
+    <section>
+        <h2>📱 Test Device Information</h2>
+        <div class="device-info">
+            <h3>Record the device(s) used for testing</h3>
+            <div class="device-inputs">
+                <div class="device-input">
+                    <label>Primary Device</label>
+                    <input type="text" placeholder="e.g., iPhone 14 Pro">
+                </div>
+                <div class="device-input">
+                    <label>OS Version</label>
+                    <input type="text" placeholder="e.g., iOS 17.3">
+                </div>
+                <div class="device-input">
+                    <label>Browser</label>
+                    <select>
+                        <option value="">Select browser...</option>
+                        <option value="safari">Safari (iOS)</option>
+                        <option value="chrome">Chrome (Android)</option>
+                        <option value="chrome-ios">Chrome (iOS)</option>
+                        <option value="firefox">Firefox Mobile</option>
+                        <option value="edge">Edge Mobile</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="device-input">
+                    <label>Screen Width</label>
+                    <input type="text" placeholder="e.g., 390px">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>🧪 Test Cases — Mobile Layout (≤768px)</h2>
+
+        <!-- TC-001 -->
+        <div class="test-case">
+            <div class="test-header">
+                <span class="test-id">TC-001</span>
+                <span class="test-priority priority-high">HIGH</span>
+            </div>
+            <div class="test-body">
+                <div class="test-title">Task Title Fully Visible on Mobile</div>
+                <div class="test-steps">
+                    <h4>Steps</h4>
+                    <ol>
+                        <li>Open MetaPM dashboard on mobile device (or use browser DevTools mobile view ≤768px)</li>
+                        <li>Navigate to a project with tasks that have long titles</li>
+                        <li>Observe the task list layout</li>
+                    </ol>
+                </div>
+                <div class="expected">
+                    <h4>Expected Result</h4>
+                    <p>Task titles display on their own line (Line 1) with full text visible. No truncation with "..." — the entire task title should be readable without tapping or expanding.</p>
+                </div>
+                <div class="result-section">
+                    <div class="result-buttons">
+                        <button class="result-btn pass" onclick="selectResult(this, 'pass')">✓ PASS</button>
+                        <button class="result-btn fail" onclick="selectResult(this, 'fail')">✗ FAIL</button>
+                        <button class="result-btn blocked" onclick="selectResult(this, 'blocked')">⊘ BLOCKED</button>
+                    </div>
+                    <div>
+                        <textarea class="notes-input" placeholder="Notes (required if FAIL or BLOCKED)..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TC-002 -->
+        <div class="test-case">
+            <div class="test-header">
+                <span class="test-id">TC-002</span>
+                <span class="test-priority priority-high">HIGH</span>
+            </div>
+            <div class="test-body">
+                <div class="test-title">Two-Line Row Format</div>
+                <div class="test-steps">
+                    <h4>Steps</h4>
+                    <ol>
+                        <li>View any task row on mobile</li>
+                        <li>Observe the layout structure</li>
+                    </ol>
+                </div>
+                <div class="expected">
+                    <h4>Expected Result</h4>
+                    <p><strong>Line 1:</strong> Checkbox + Task Title (full width)<br>
+                    <strong>Line 2:</strong> Badges (Type, Status, Priority, Project) — indented ~30px to align under title</p>
+                </div>
+                <div class="result-section">
+                    <div class="result-buttons">
+                        <button class="result-btn pass" onclick="selectResult(this, 'pass')">✓ PASS</button>
+                        <button class="result-btn fail" onclick="selectResult(this, 'fail')">✗ FAIL</button>
+                        <button class="result-btn blocked" onclick="selectResult(this, 'blocked')">⊘ BLOCKED</button>
+                    </div>
+                    <div>
+                        <textarea class="notes-input" placeholder="Notes (required if FAIL or BLOCKED)..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TC-003 -->
+        <div class="test-case">
+            <div class="test-header">
+                <span class="test-id">TC-003</span>
+                <span class="test-priority priority-medium">MEDIUM</span>
+            </div>
+            <div class="test-body">
+                <div class="test-title">Touch Target Size</div>
+                <div class="test-steps">
+                    <h4>Steps</h4>
+                    <ol>
+                        <li>Attempt to tap the checkbox to toggle a task</li>
+                        <li>Attempt to tap on a task row to select/expand it</li>
+                    </ol>
+                </div>
+                <div class="expected">
+                    <h4>Expected Result</h4>
+                    <p>Tap targets are easy to hit without mis-taps. Minimum 44px row height for iOS compliance. Checkbox is easily tappable.</p>
+                </div>
+                <div class="result-section">
+                    <div class="result-buttons">
+                        <button class="result-btn pass" onclick="selectResult(this, 'pass')">✓ PASS</button>
+                        <button class="result-btn fail" onclick="selectResult(this, 'fail')">✗ FAIL</button>
+                        <button class="result-btn blocked" onclick="selectResult(this, 'blocked')">⊘ BLOCKED</button>
+                    </div>
+                    <div>
+                        <textarea class="notes-input" placeholder="Notes (required if FAIL or BLOCKED)..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TC-004 -->
+        <div class="test-case">
+            <div class="test-header">
+                <span class="test-id">TC-004</span>
+                <span class="test-priority priority-medium">MEDIUM</span>
+            </div>
+            <div class="test-body">
+                <div class="test-title">Badge Visibility</div>
+                <div class="test-steps">
+                    <h4>Steps</h4>
+                    <ol>
+                        <li>View tasks with different types (Bug, Feature, etc.)</li>
+                        <li>View tasks with different statuses and priorities</li>
+                        <li>Check if project badge is visible</li>
+                    </ol>
+                </div>
+                <div class="expected">
+                    <h4>Expected Result</h4>
+                    <p>All badges (Type, Status, Priority, Project) are visible on Line 2. Colors are distinguishable. Text is readable.</p>
+                </div>
+                <div class="result-section">
+                    <div class="result-buttons">
+                        <button class="result-btn pass" onclick="selectResult(this, 'pass')">✓ PASS</button>
+                        <button class="result-btn fail" onclick="selectResult(this, 'fail')">✗ FAIL</button>
+                        <button class="result-btn blocked" onclick="selectResult(this, 'blocked')">⊘ BLOCKED</button>
+                    </div>
+                    <div>
+                        <textarea class="notes-input" placeholder="Notes (required if FAIL or BLOCKED)..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TC-005 -->
+        <div class="test-case">
+            <div class="test-header">
+                <span class="test-id">TC-005</span>
+                <span class="test-priority priority-medium">MEDIUM</span>
+            </div>
+            <div class="test-body">
+                <div class="test-title">Actions Button Hidden</div>
+                <div class="test-steps">
+                    <h4>Steps</h4>
+                    <ol>
+                        <li>View task rows on mobile</li>
+                        <li>Check for presence of "Actions" or "⋮" button</li>
+                    </ol>
+                </div>
+                <div class="expected">
+                    <h4>Expected Result</h4>
+                    <p>Actions button (if present on desktop) is hidden on mobile to save horizontal space. Task row focuses on title and badges only.</p>
+                </div>
+                <div class="result-section">
+                    <div class="result-buttons">
+                        <button class="result-btn pass" onclick="selectResult(this, 'pass')">✓ PASS</button>
+                        <button class="result-btn fail" onclick="selectResult(this, 'fail')">✗ FAIL</button>
+                        <button class="result-btn blocked" onclick="selectResult(this, 'blocked')">⊘ BLOCKED</button>
+                    </div>
+                    <div>
+                        <textarea class="notes-input" placeholder="Notes (required if FAIL or BLOCKED)..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>🖥️ Test Cases — Desktop Regression (>768px)</h2>
+
+        <!-- TC-006 -->
+        <div class="test-case">
+            <div class="test-header">
+                <span class="test-id">TC-006</span>
+                <span class="test-priority priority-high">HIGH</span>
+            </div>
+            <div class="test-body">
+                <div class="test-title">Desktop Layout Unchanged</div>
+                <div class="test-steps">
+                    <h4>Steps</h4>
+                    <ol>
+                        <li>Open MetaPM dashboard on desktop browser (>768px width)</li>
+                        <li>View task list</li>
+                        <li>Compare to previous layout</li>
+                    </ol>
+                </div>
+                <div class="expected">
+                    <h4>Expected Result</h4>
+                    <p>Desktop layout is unchanged. Tasks display in single-line rows with all elements (checkbox, title, badges, actions) on the same line as before.</p>
+                </div>
+                <div class="result-section">
+                    <div class="result-buttons">
+                        <button class="result-btn pass" onclick="selectResult(this, 'pass')">✓ PASS</button>
+                        <button class="result-btn fail" onclick="selectResult(this, 'fail')">✗ FAIL</button>
+                        <button class="result-btn blocked" onclick="selectResult(this, 'blocked')">⊘ BLOCKED</button>
+                    </div>
+                    <div>
+                        <textarea class="notes-input" placeholder="Notes (required if FAIL or BLOCKED)..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TC-007 -->
+        <div class="test-case">
+            <div class="test-header">
+                <span class="test-id">TC-007</span>
+                <span class="test-priority priority-medium">MEDIUM</span>
+            </div>
+            <div class="test-body">
+                <div class="test-title">Responsive Breakpoint Transition</div>
+                <div class="test-steps">
+                    <h4>Steps</h4>
+                    <ol>
+                        <li>Open browser DevTools on desktop</li>
+                        <li>Slowly resize window from >768px to <768px</li>
+                        <li>Observe the transition</li>
+                    </ol>
+                </div>
+                <div class="expected">
+                    <h4>Expected Result</h4>
+                    <p>Clean transition at 768px breakpoint. No visual jank, jumping, or layout artifacts during resize.</p>
+                </div>
+                <div class="result-section">
+                    <div class="result-buttons">
+                        <button class="result-btn pass" onclick="selectResult(this, 'pass')">✓ PASS</button>
+                        <button class="result-btn fail" onclick="selectResult(this, 'fail')">✗ FAIL</button>
+                        <button class="result-btn blocked" onclick="selectResult(this, 'blocked')">⊘ BLOCKED</button>
+                    </div>
+                    <div>
+                        <textarea class="notes-input" placeholder="Notes (required if FAIL or BLOCKED)..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>✅ Pre-Test Verification Checklist</h2>
+        <ul class="checklist">
+            <li><input type="checkbox"> PINEAPPLE test confirmed (v1.6.2 deployed)</li>
+            <li><input type="checkbox"> Logged into MetaPM with test account</li>
+            <li><input type="checkbox"> Project with multiple tasks available for testing</li>
+            <li><input type="checkbox"> Mobile device connected to internet</li>
+            <li><input type="checkbox"> Browser cache cleared (or hard refresh)</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>📊 Test Summary</h2>
+        <div class="summary-grid">
+            <div class="summary-card total">
+                <div class="summary-number" id="total-count">7</div>
+                <div class="summary-label">Total Tests</div>
+            </div>
+            <div class="summary-card passed">
+                <div class="summary-number" id="pass-count">0</div>
+                <div class="summary-label">Passed</div>
+            </div>
+            <div class="summary-card failed">
+                <div class="summary-number" id="fail-count">0</div>
+                <div class="summary-label">Failed</div>
+            </div>
+            <div class="summary-card blocked">
+                <div class="summary-number" id="blocked-count">0</div>
+                <div class="summary-label">Blocked</div>
+            </div>
+        </div>
+
+        <div class="sign-off">
+            <h3 style="margin-bottom: 16px;">Sign-Off</h3>
+            <div class="sign-off-grid">
+                <div>
+                    <label>Tester Name</label>
+                    <input type="text" value="Corey">
+                </div>
+                <div>
+                    <label>Test Date</label>
+                    <input type="date" id="test-date">
+                </div>
+                <div>
+                    <label>Test Duration</label>
+                    <input type="text" placeholder="e.g., 15 minutes">
+                </div>
+            </div>
+            
+            <div class="overall-result pending">
+                <h3>Overall UAT Result</h3>
+                <div class="overall-buttons">
+                    <button class="overall-btn approve" onclick="setOverallResult('approved')">✓ APPROVED</button>
+                    <button class="overall-btn reject" onclick="setOverallResult('rejected')">✗ REJECTED</button>
+                </div>
+                <p style="margin-top: 12px; color: var(--text-muted); font-size: 0.875rem;">
+                    Approve only if all HIGH priority tests pass and no critical issues found.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>📝 Additional Notes / Issues Found</h2>
+        <textarea class="notes-input" style="min-height: 120px;" placeholder="Document any additional observations, edge cases, or issues discovered during testing..."></textarea>
+    </section>
+
+    <script>
+        // Set today's date
+        document.getElementById('test-date').valueAsDate = new Date();
+
+        function selectResult(btn, result) {
+            // Remove selected from siblings
+            const buttons = btn.parentElement.querySelectorAll('.result-btn');
+            buttons.forEach(b => b.classList.remove('selected'));
+            
+            // Add selected to clicked
+            btn.classList.add('selected');
+            
+            // Update counts
+            updateCounts();
+        }
+
+        function updateCounts() {
+            const passed = document.querySelectorAll('.result-btn.pass.selected').length;
+            const failed = document.querySelectorAll('.result-btn.fail.selected').length;
+            const blocked = document.querySelectorAll('.result-btn.blocked.selected').length;
+            
+            document.getElementById('pass-count').textContent = passed;
+            document.getElementById('fail-count').textContent = failed;
+            document.getElementById('blocked-count').textContent = blocked;
+        }
+
+        function setOverallResult(result) {
+            const container = document.querySelector('.overall-result');
+            container.classList.remove('pending');
+            
+            if (result === 'approved') {
+                container.style.background = '#F0FDF4';
+                container.style.border = '2px solid #22C55E';
+                container.innerHTML = '<h3 style="color: #166534;">✓ UAT APPROVED</h3><p>v1.6.2 Mobile Responsive Layout accepted for production.</p>';
+            } else {
+                container.style.background = '#FEF2F2';
+                container.style.border = '2px solid #EF4444';
+                container.innerHTML = '<h3 style="color: #991B1B;">✗ UAT REJECTED</h3><p>Issues must be resolved before approval. See failed tests above.</p>';
+            }
+        }
+    </script>
+</body>
+</html>

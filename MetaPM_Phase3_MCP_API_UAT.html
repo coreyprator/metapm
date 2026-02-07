@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔴 MetaPM Phase 3 MCP — API UAT</title>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #252538;
+            --accent-red: #ef4444;
+            --accent-success: #22c55e;
+            --accent-danger: #ef4444;
+            --text-primary: #e5e5e5;
+            --border-color: #3a3a52;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #dc2626, #991b1b);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+        
+        header h1 { font-size: 1.4rem; margin-bottom: 8px; }
+        header p { opacity: 0.9; font-size: 0.9rem; }
+        
+        .meta {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+            font-size: 0.85rem;
+        }
+        
+        .meta span {
+            background: rgba(255,255,255,0.15);
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+
+        .info-box {
+            background: #1e3a5f;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .info-box h3 { color: #60a5fa; margin-bottom: 10px; }
+        .info-box p { margin-bottom: 8px; }
+        .info-box code { 
+            background: #0f172a; 
+            padding: 2px 6px; 
+            border-radius: 3px; 
+            font-size: 0.9em;
+            word-break: break-all;
+        }
+
+        .warning-box {
+            background: #422006;
+            border: 2px solid #f59e0b;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .warning-box h3 { color: #fbbf24; margin-bottom: 10px; }
+        
+        section {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        
+        section h2 {
+            color: #f87171;
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #ef4444;
+        }
+        
+        .test-item {
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .test-item:last-child { border-bottom: none; }
+        
+        .test-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        
+        .test-content { flex: 1; }
+        
+        .test-label {
+            font-weight: 500;
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .expected {
+            color: #a78bfa;
+            font-size: 0.85rem;
+            font-style: italic;
+        }
+
+        .curl-example {
+            background: #0f172a;
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin: 8px 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.8rem;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        .test-buttons {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+        
+        .btn-pass {
+            background: #166534;
+            color: #bbf7d0;
+        }
+        
+        .btn-pass:hover, .btn-pass.selected {
+            background: var(--accent-success);
+            color: white;
+        }
+        
+        .btn-fail {
+            background: #991b1b;
+            color: #fecaca;
+        }
+        
+        .btn-fail:hover, .btn-fail.selected {
+            background: var(--accent-danger);
+            color: white;
+        }
+        
+        .test-item.passed .test-label { color: #4ade80; }
+        .test-item.failed .test-label { color: #f87171; }
+        
+        .notes-input {
+            width: 100%;
+            margin-top: 8px;
+            padding: 8px;
+            background: #1e1e32;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: vertical;
+            min-height: 50px;
+            display: none;
+        }
+        
+        .test-item.failed .notes-input { display: block; }
+        
+        .summary {
+            background: #1e1e32;
+            border: 2px solid var(--accent-red);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 24px;
+        }
+        
+        .summary h3 { margin-bottom: 16px; }
+        
+        .summary-stats {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .stat {
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .stat.total { background: #ef4444; }
+        .stat.passed { background: var(--accent-success); }
+        .stat.failed { background: var(--accent-danger); }
+        
+        .overall-result {
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 16px;
+        }
+        
+        .overall-result.pending {
+            background: #374151;
+            border: 2px dashed #6b7280;
+        }
+        
+        .overall-result.pass {
+            background: #166534;
+            border: 2px solid var(--accent-success);
+        }
+        
+        .overall-result.fail {
+            background: #991b1b;
+            border: 2px solid var(--accent-danger);
+        }
+        
+        .overall-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+        
+        .overall-btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .overall-btn.approve { background: var(--accent-success); color: white; }
+        .overall-btn.reject { background: var(--accent-danger); color: white; }
+        
+        .copy-btn {
+            background: var(--accent-red);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 16px;
+        }
+        
+        .copy-btn:hover { background: #dc2626; }
+
+        .skip-note {
+            background: #374151;
+            border: 1px solid #6b7280;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+        }
+
+        .skip-note strong { color: #fbbf24; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🔴 MetaPM Phase 3 MCP — API UAT</h1>
+        <p>Verify the new MCP REST API endpoints (no UI — API only)</p>
+        <div class="meta">
+            <span>Revision: metapm-v2-00028-vzx</span>
+            <span>Version: 1.7.0</span>
+            <span id="test-date"></span>
+        </div>
+    </header>
+
+    <div class="info-box">
+        <h3>ℹ️ What is Phase 3 MCP?</h3>
+        <p>This is <strong>backend infrastructure</strong> for the handoff bridge system. There's no UI to click — it's all REST API endpoints.</p>
+        <p><strong>Base URL:</strong> <code>https://metapm.rentyourcio.com</code></p>
+        <p><strong>API Docs:</strong> <code>https://metapm.rentyourcio.com/docs</code></p>
+    </div>
+
+    <div class="warning-box">
+        <h3>⚠️ API Key Required</h3>
+        <p>Most endpoints require the API key. Get it from Secret Manager:</p>
+        <div class="curl-example">gcloud secrets versions access latest --secret="metapm-mcp-api-key"</div>
+        <p>Then set: <code>export MCP_KEY="your-key-here"</code></p>
+    </div>
+
+    <div class="skip-note">
+        <strong>🎯 Shortcut Option:</strong> If you trust CC's verification and just want to confirm it works, you can skip to <strong>Section 3 (Claude.ai Integration)</strong> — that's the critical user-facing test.
+    </div>
+
+    <section>
+        <h2>1. Health & Authentication</h2>
+        
+        <div class="test-item" data-test="health1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">MCP Health endpoint (no auth required)</span>
+                    <span class="expected">→ Returns status, version 1.7.0, api_key_configured: true</span>
+                    <div class="curl-example">curl https://metapm.rentyourcio.com/mcp/health</div>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <textarea class="notes-input" placeholder="What response did you get?"></textarea>
+        </div>
+
+        <div class="test-item" data-test="auth1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Auth rejection without API key</span>
+                    <span class="expected">→ Returns 401 "API key required"</span>
+                    <div class="curl-example">curl https://metapm.rentyourcio.com/mcp/handoffs</div>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <textarea class="notes-input" placeholder="What response did you get?"></textarea>
+        </div>
+
+        <div class="test-item" data-test="auth2">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Auth success with API key</span>
+                    <span class="expected">→ Returns 200 with handoffs list (may be empty)</span>
+                    <div class="curl-example">curl -H "X-API-Key: $MCP_KEY" https://metapm.rentyourcio.com/mcp/handoffs</div>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <textarea class="notes-input" placeholder="What response did you get?"></textarea>
+        </div>
+    </section>
+
+    <section>
+        <h2>2. Handoff CRUD Operations</h2>
+        
+        <div class="test-item" data-test="handoff1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Create a test handoff</span>
+                    <span class="expected">→ Returns 201 with id, status "pending", public_url</span>
+                    <div class="curl-example">curl -X POST https://metapm.rentyourcio.com/mcp/handoffs \
+  -H "X-API-Key: $MCP_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"project":"MetaPM","task":"uat-test","direction":"cc_to_ai","content":"# UAT Test\n\nThis is a test handoff."}'</div>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <textarea class="notes-input" placeholder="What response did you get? Note the ID for next tests."></textarea>
+        </div>
+
+        <div class="test-item" data-test="handoff2">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Get handoff by ID (authenticated)</span>
+                    <span class="expected">→ Returns full handoff object with content</span>
+                    <div class="curl-example">curl -H "X-API-Key: $MCP_KEY" https://metapm.rentyourcio.com/mcp/handoffs/{ID}</div>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <textarea class="notes-input" placeholder="Replace {ID} with the ID from previous test"></textarea>
+        </div>
+
+        <div class="test-item" data-test="handoff3">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">List handoffs with filter</span>
+                    <span class="expected">→ Returns list filtered by project</span>
+                    <div class="curl-example">curl -H "X-API-Key: $MCP_KEY" "https://metapm.rentyourcio.com/mcp/handoffs?project=MetaPM"</div>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <textarea class="notes-input" placeholder="What response did you get?"></textarea>
+        </div>
+    </section>
+
+    <section>
+        <h2>3. Claude.ai Integration (CRITICAL)</h2>
+        
+        <div class="test-item" data-test="public1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Public content endpoint (NO auth required)</span>
+                    <span class="expected">→ Returns raw markdown content — THIS is what Claude.ai will fetch</span>
+                    <div class="curl-example">curl https://metapm.rentyourcio.com/mcp/handoffs/{ID}/content</div>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <textarea class="notes-input" placeholder="Should return raw markdown without auth"></textarea>
+        </div>
+
+        <div class="test-item" data-test="public2">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Test in browser (paste URL)</span>
+                    <span class="expected">→ Opens markdown content directly in browser</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <textarea class="notes-input" placeholder="Paste the /content URL in browser"></textarea>
+        </div>
+    </section>
+
+    <section>
+        <h2>4. Task CRUD Operations</h2>
+        
+        <div class="test-item" data-test="task1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Create a test task</span>
+                    <span class="expected">→ Returns 201 with task id, status "pending"</span>
+                    <div class="curl-example">curl -X POST https://metapm.rentyourcio.com/mcp/tasks \
+  -H "X-API-Key: $MCP_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"project":"MetaPM","title":"UAT Test Task","priority":"medium","assigned_to":"corey"}'</div>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <textarea class="notes-input" placeholder="Note the task ID"></textarea>
+        </div>
+
+        <div class="test-item" data-test="task2">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">List tasks</span>
+                    <span class="expected">→ Returns list including your test task</span>
+                    <div class="curl-example">curl -H "X-API-Key: $MCP_KEY" https://metapm.rentyourcio.com/mcp/tasks</div>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <textarea class="notes-input" placeholder="What tasks are listed?"></textarea>
+        </div>
+
+        <div class="test-item" data-test="task3">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Update task status</span>
+                    <span class="expected">→ Returns 200 with updated status</span>
+                    <div class="curl-example">curl -X PATCH https://metapm.rentyourcio.com/mcp/tasks/{ID} \
+  -H "X-API-Key: $MCP_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"done"}'</div>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <textarea class="notes-input" placeholder="Replace {ID} with task ID"></textarea>
+        </div>
+    </section>
+
+    <section>
+        <h2>5. Activity Log</h2>
+        
+        <div class="test-item" data-test="log1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Get activity log</span>
+                    <span class="expected">→ Returns entries for handoffs and tasks you created</span>
+                    <div class="curl-example">curl -H "X-API-Key: $MCP_KEY" https://metapm.rentyourcio.com/mcp/log</div>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <textarea class="notes-input" placeholder="What entries are shown?"></textarea>
+        </div>
+    </section>
+
+    <div class="summary">
+        <h3>📊 Results Summary</h3>
+        <div class="summary-stats">
+            <div class="stat total">Total: <span id="total-count">13</span></div>
+            <div class="stat passed">Pass: <span id="pass-count">0</span></div>
+            <div class="stat failed">Fail: <span id="fail-count">0</span></div>
+        </div>
+
+        <div class="overall-result pending" id="overall-result">
+            <h4>Overall Result</h4>
+            <p style="margin-bottom:12px;opacity:0.8;">Phase 3 MCP API working?</p>
+            <div class="overall-buttons">
+                <button class="overall-btn approve" onclick="setOverall('pass')">✓ APPROVE Phase 3</button>
+                <button class="overall-btn reject" onclick="setOverall('fail')">✗ REJECT</button>
+            </div>
+        </div>
+
+        <button class="copy-btn" onclick="copyResults()">📋 Copy Results</button>
+    </div>
+
+    <script>
+        document.getElementById('test-date').textContent = new Date().toLocaleDateString();
+
+        function setResult(btn, result) {
+            const item = btn.closest('.test-item');
+            const buttons = item.querySelectorAll('.btn');
+            buttons.forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            
+            item.classList.remove('passed', 'failed');
+            if (result === 'pass') {
+                item.classList.add('passed');
+            } else {
+                item.classList.add('failed');
+            }
+            
+            updateCounts();
+        }
+
+        function updateCounts() {
+            const passed = document.querySelectorAll('.test-item.passed').length;
+            const failed = document.querySelectorAll('.test-item.failed').length;
+            document.getElementById('pass-count').textContent = passed;
+            document.getElementById('fail-count').textContent = failed;
+        }
+
+        function setOverall(result) {
+            const container = document.getElementById('overall-result');
+            container.classList.remove('pending', 'pass', 'fail');
+            container.classList.add(result);
+            
+            if (result === 'pass') {
+                container.innerHTML = '<h4 style="color: #4ade80;">✓ Phase 3 MCP APPROVED</h4><p>API infrastructure complete. Ready for CC MCP registration.</p>';
+            } else {
+                container.innerHTML = '<h4 style="color: #f87171;">✗ Phase 3 MCP REJECTED</h4><p>See failed tests above.</p>';
+            }
+        }
+
+        function copyResults() {
+            const passed = document.querySelectorAll('.test-item.passed').length;
+            const failed = document.querySelectorAll('.test-item.failed').length;
+            
+            let results = `[MetaPM] 🔴 Phase 3 MCP API UAT Results\n${'='.repeat(50)}\n`;
+            results += `Date: ${new Date().toLocaleString()}\n`;
+            results += `Revision: metapm-v2-00028-vzx\n`;
+            results += `Version: 1.7.0\n`;
+            results += `Summary: ${passed} passed, ${failed} failed\n`;
+            results += `${'='.repeat(50)}\n\n`;
+
+            document.querySelectorAll('section').forEach(section => {
+                const h2 = section.querySelector('h2');
+                if (h2) {
+                    results += `${h2.textContent}\n${'-'.repeat(40)}\n`;
+                    section.querySelectorAll('.test-item').forEach(item => {
+                        const label = item.querySelector('.test-label').textContent;
+                        const notes = item.querySelector('.notes-input')?.value || '';
+                        let status = '○';
+                        if (item.classList.contains('passed')) status = '✓';
+                        if (item.classList.contains('failed')) status = '✗';
+                        results += `  ${status} ${label}\n`;
+                        if (notes.trim()) results += `      📝 ${notes}\n`;
+                    });
+                    results += '\n';
+                }
+            });
+
+            const overall = document.getElementById('overall-result');
+            if (overall.classList.contains('pass')) {
+                results += `OVERALL: ✓ Phase 3 MCP APPROVED\n`;
+            } else if (overall.classList.contains('fail')) {
+                results += `OVERALL: ✗ Phase 3 MCP REJECTED\n`;
+            }
+
+            navigator.clipboard.writeText(results).then(() => alert('Results copied to clipboard!'));
+        }
+    </script>
+</body>
+</html>
