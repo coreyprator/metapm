@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "1.4.3"  # DIAGNOSTIC: Testing if code actually deploys
+    VERSION: str = "1.8.0"  # Phase 4: Handoff Dashboard with GCS sync
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     
     # Security
     API_KEY: str = ""
+    MCP_API_KEY: str = ""  # API key for MCP endpoints
+
+    # GCS Handoff Bridge
+    GCS_HANDOFF_BUCKET: str = "corey-handoff-bridge"
     
     # Application
     ENVIRONMENT: str = "development"

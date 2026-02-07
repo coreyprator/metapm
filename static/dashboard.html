@@ -215,6 +215,94 @@
         
         .project-tasks { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
         .project-tasks.expanded { max-height: 1000px; }
+
+        /* ── Compact task rows (v1.6.1) ── */
+        .task-row {
+            display: grid;
+            /* checkbox, type, status, priority, project, title, actions */
+            grid-template-columns: 32px 28px 68px 40px 64px 1fr 32px;
+            align-items: center;
+            padding: 5px 10px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.15s;
+            font-size: 13px;
+        }
+        .task-row:hover { background: rgba(255,255,255,0.08); }
+        body.theme-light .task-row:hover { background: rgba(0,0,0,0.06); }
+        .task-row.row-odd { background: rgba(255,255,255,0.04); }
+        .task-row.row-even { background: transparent; }
+        body.theme-light .task-row.row-odd { background: #ffffff; }
+        body.theme-light .task-row.row-even { background: #f1f5f9; }
+        .task-row .task-title-cell {
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            font-size: 0.875rem;
+        }
+        .type-icon { font-size: 14px; text-align: center; }
+        .status-badge {
+            font-size: 0.65rem; padding: 2px 6px; border-radius: 4px;
+            font-weight: 600; text-transform: uppercase; text-align: center;
+            white-space: nowrap; display: inline-block;
+        }
+        .status-badge.s-new { background: #3b82f6; color: white; }
+        .status-badge.s-started { background: #f59e0b; color: white; }
+        .status-badge.s-blocked { background: #ef4444; color: white; }
+        .status-badge.s-done { background: #6b7280; color: white; }
+        .priority-pill {
+            font-size: 0.7rem; font-weight: 700; text-align: center;
+        }
+        .priority-pill.pp-1, .priority-pill.pp-2 { color: #ef4444; }
+        .priority-pill.pp-3 { color: #f59e0b; }
+        .priority-pill.pp-4, .priority-pill.pp-5 { color: #22c55e; }
+        .project-mini {
+            font-size: 0.65rem; padding: 1px 5px; border-radius: 3px;
+            display: inline-block; white-space: nowrap;
+        }
+        .task-row .task-actions-cell { text-align: center; }
+        .task-row .task-actions-cell button {
+            opacity: 0; transition: opacity 0.15s; background: none; border: none;
+            cursor: pointer; color: var(--text-muted); font-size: 16px; padding: 2px;
+        }
+        .task-row:hover .task-actions-cell button { opacity: 1; }
+
+        /* ── Filter bar (v1.6.0) ── */
+        .filter-bar {
+            display: flex; align-items: center; padding: 6px 12px;
+            gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--border-color);
+            font-size: 12px;
+        }
+        .filter-bar .fg { display: flex; align-items: center; gap: 4px; }
+        .filter-bar label { color: var(--text-muted); white-space: nowrap; font-size: 11px; }
+        .filter-bar select, .filter-bar input[type="text"] {
+            padding: 3px 6px; border-radius: 4px; border: 1px solid var(--border-color);
+            background: rgba(255,255,255,0.05); color: var(--text-primary);
+            font-size: 12px;
+        }
+        body.theme-light .filter-bar select,
+        body.theme-light .filter-bar input[type="text"] {
+            background: rgba(0,0,0,0.03);
+        }
+        .filter-bar .search-box { margin-left: auto; }
+        .filter-bar .search-box input { width: 180px; }
+
+        /* ── Status bar (v1.6.0) ── */
+        .bottom-status-bar {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 6px 16px; z-index: 50; font-size: 12px;
+            background: rgba(15, 15, 30, 0.97); border-top: 1px solid rgba(255,255,255,0.08);
+        }
+        body.theme-light .bottom-status-bar {
+            background: rgba(248,250,252,0.97); border-top: 1px solid rgba(0,0,0,0.08);
+        }
+        .bottom-status-bar .sel-info { display: flex; align-items: center; gap: 10px; }
+        .bottom-status-bar .sel-info button {
+            padding: 3px 10px; border-radius: 4px; font-size: 11px;
+            background: rgba(255,255,255,0.1); color: var(--text-secondary);
+            border: 1px solid var(--border-color); cursor: pointer;
+        }
+        .bottom-status-bar .sel-info button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .bottom-status-bar .stats-info { display: flex; gap: 16px; }
         
         .icon-btn {
             padding: 6px;
@@ -259,113 +347,241 @@
         .prose table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; }
         .prose th, .prose td { border: 1px solid rgba(255,255,255,0.1); padding: 0.5rem; text-align: left; }
         .prose th { background: rgba(255,255,255,0.05); }
+
+        /* ── Mobile Task List Layout (v1.6.2) ── */
+        @media (max-width: 768px) {
+            /* Switch to flexbox with wrapping for two-line layout */
+            .task-row {
+                display: flex;
+                flex-wrap: wrap;
+                padding: 10px 12px;
+                gap: 6px 8px;
+                align-items: center;
+            }
+
+            /* Checkbox: stays on line 1, left side */
+            .task-row > div:nth-child(1) {
+                order: 1;
+                flex: 0 0 28px;
+                align-self: flex-start;
+                margin-top: 2px;
+            }
+
+            .task-row input[type="checkbox"] {
+                min-width: 22px;
+                min-height: 22px;
+            }
+
+            /* Title: order 2, grows to fill line 1 */
+            .task-row > div:nth-child(6) {
+                order: 2;
+                flex: 1 1 calc(100% - 40px); /* Force to take most of line 1 */
+                min-width: 0;
+            }
+
+            .task-row .task-title-cell {
+                white-space: normal;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                font-size: 14px;
+                line-height: 1.4;
+            }
+
+            /* Type icon: order 10, wraps to line 2 with left margin for indent */
+            .task-row > div:nth-child(2) {
+                order: 10;
+                flex: 0 0 auto;
+                margin-left: 30px; /* Indent under title (past checkbox) */
+            }
+
+            /* Status: order 11 */
+            .task-row > div:nth-child(3) {
+                order: 11;
+                flex: 0 0 auto;
+            }
+
+            /* Priority: order 12 */
+            .task-row > div:nth-child(4) {
+                order: 12;
+                flex: 0 0 auto;
+            }
+
+            /* Project: order 13 */
+            .task-row > div:nth-child(5) {
+                order: 13;
+                flex: 0 0 auto;
+            }
+
+            /* Actions: hide on mobile to save space */
+            .task-row > div:nth-child(7) {
+                display: none;
+            }
+
+            /* Compact badge sizing for mobile */
+            .type-icon {
+                font-size: 12px;
+            }
+
+            .status-badge {
+                font-size: 11px;
+                padding: 2px 6px;
+                border-radius: 3px;
+            }
+
+            .priority-pill {
+                font-size: 11px;
+                font-weight: 700;
+            }
+
+            .project-mini {
+                font-size: 10px;
+                padding: 1px 4px;
+            }
+
+            /* Increase touch targets for mobile usability */
+            .task-row {
+                min-height: 44px; /* iOS minimum touch target */
+            }
+        }
     </style>
     <script src="/static/js/offline-data.js"></script>
 </head>
 <body class="text-white">
     <div id="app" class="min-h-screen pb-24">
-        <!-- Header -->
-        <header class="px-4 py-3 flex items-center justify-between border-b border-white/10 sticky top-0 bg-[#1a1a2e]/95 backdrop-blur z-50">
-            <div class="flex items-center gap-3">
-                <a href="/static/dashboard.html" class="text-xl font-semibold hover:text-pink-400 transition">MetaPM <span id="versionBadge" class="text-xs text-gray-500 font-normal"></span></a>
+        <!-- Header (single line, v1.6.1) -->
+        <header style="display:flex;flex-wrap:nowrap;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--border-color);position:sticky;top:0;background:var(--bg-primary);backdrop-filter:blur(10px);z-index:50;min-height:36px;overflow-x:auto;">
+            <a href="/static/dashboard.html" style="font-size:15px;font-weight:600;white-space:nowrap;color:var(--text-primary);text-decoration:none;">MetaPM</a>
+            <span id="versionBadge" style="font-size:11px;font-weight:600;background:#4ade80;color:#000;padding:1px 7px;border-radius:4px;white-space:nowrap;"></span>
+            <div id="syncStatus" style="font-size:11px;padding:1px 6px;border-radius:3px;color:#4ade80;white-space:nowrap;" title="Sync status">✓ Synced</div>
+            <span id="currentDate" style="font-size:11px;color:var(--text-muted);white-space:nowrap;"></span>
+            <div class="theme-toggle" style="margin-left:auto;gap:2px;">
+                <button id="themeLight" title="Light theme" style="padding:3px 6px;font-size:12px;">☀️</button>
+                <button id="themeDark" class="active" title="Dark theme" style="padding:3px 6px;font-size:12px;">🌙</button>
+                <button id="themeAuto" title="Auto theme" style="padding:3px 6px;font-size:12px;">💻</button>
             </div>
-            <div class="flex items-center gap-2">
-                <span id="currentDate" class="text-xs text-gray-400 hidden sm:block"></span>
-                <div id="syncStatus" class="text-xs px-2 py-1 rounded text-green-400" title="Sync status">
-                    ✓ Synced
-                </div>
-                <div class="theme-toggle">
-                    <button id="themeLight" title="Light theme">☀️</button>
-                    <button id="themeDark" class="active" title="Dark theme">🌙</button>
-                    <button id="themeAuto" title="Auto theme">💻</button>
-                </div>
-                <button id="refreshBtn" class="icon-btn" title="Refresh">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                    </svg>
-                </button>
-                <a href="/docs" class="icon-btn" title="API Docs">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
-                </a>
-            </div>
+            <select id="viewSelect" class="form-input" style="padding:2px 6px;width:auto;min-width:90px;font-size:12px;">
+                <option value="tasks">Tasks</option>
+                <option value="projects">Projects</option>
+                <option value="history">AI History</option>
+                <option value="methodology">Methodology</option>
+                <option value="backlog">Backlog</option>
+            </select>
+            <button id="addTaskBtn" class="btn btn-primary" style="padding:3px 10px;font-size:11px;white-space:nowrap;">+ Add Task</button>
+            <button id="refreshBtn" class="icon-btn" title="Refresh" style="padding:3px;">
+                <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+            </button>
+            <a href="/static/handoffs.html" class="icon-btn" title="Handoff Bridge" style="padding:3px;">
+                <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                </svg>
+            </a>
+            <a href="/docs" class="icon-btn" title="API Docs" style="padding:3px;">
+                <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+            </a>
         </header>
-        
-        <!-- Tab Navigation -->
-        <nav class="flex border-b border-white/10 px-2 overflow-x-auto">
-            <button class="tab-btn tab-active px-4 py-3 text-sm font-medium whitespace-nowrap" data-tab="tasks">Tasks</button>
-            <button class="tab-btn px-4 py-3 text-sm font-medium text-gray-400 whitespace-nowrap" data-tab="projects">Projects</button>
-            <button class="tab-btn px-4 py-3 text-sm font-medium text-gray-400 whitespace-nowrap" data-tab="history">AI History</button>
-            <button class="tab-btn px-4 py-3 text-sm font-medium text-gray-400 whitespace-nowrap" data-tab="methodology">Methodology</button>
+
+        <!-- Hidden tab buttons for backward compatibility -->
+        <nav class="hidden">
+            <button class="tab-btn tab-active" data-tab="tasks">Tasks</button>
+            <button class="tab-btn" data-tab="projects">Projects</button>
+            <button class="tab-btn" data-tab="history">AI History</button>
+            <button class="tab-btn" data-tab="methodology">Methodology</button>
+            <button class="tab-btn" data-tab="backlog">Backlog</button>
         </nav>
         
         <!-- Main Content -->
         <main class="px-4 py-4">
             
             <!-- ==================== TASKS TAB ==================== -->
-            <section id="tab-tasks" class="tab-content space-y-4">
-                <!-- Stats -->
-                <div class="grid grid-cols-4 gap-2">
-                    <div class="glass-card rounded-xl p-2 text-center">
-                        <p id="statNew" class="text-lg font-bold text-blue-400">-</p>
-                        <p class="text-xs text-gray-400">New</p>
+            <section id="tab-tasks" class="tab-content" style="padding-bottom: 48px;">
+                <!-- Filter bar -->
+                <div class="filter-bar">
+                    <div class="fg">
+                        <label>Status:</label>
+                        <select id="filterStatus">
+                            <option value="active">Active</option>
+                            <option value="">All</option>
+                            <option value="NEW">New</option>
+                            <option value="STARTED">Started</option>
+                            <option value="BLOCKED">Blocked</option>
+                            <option value="DONE">Done</option>
+                        </select>
                     </div>
-                    <div class="glass-card rounded-xl p-2 text-center">
-                        <p id="statStarted" class="text-lg font-bold text-yellow-400">-</p>
-                        <p class="text-xs text-gray-400">Active</p>
+                    <div class="fg">
+                        <label>Priority:</label>
+                        <select id="filterPriority">
+                            <option value="">All</option>
+                            <option value="1">P1</option>
+                            <option value="2">P2</option>
+                            <option value="3">P3</option>
+                            <option value="4">P4</option>
+                            <option value="5">P5</option>
+                        </select>
                     </div>
-                    <div class="glass-card rounded-xl p-2 text-center">
-                        <p id="statBlocked" class="text-lg font-bold text-red-400">-</p>
-                        <p class="text-xs text-gray-400">Blocked</p>
+                    <div class="fg">
+                        <label>Project:</label>
+                        <select id="projectFilter">
+                            <option value="">All</option>
+                        </select>
                     </div>
-                    <div class="glass-card rounded-xl p-2 text-center">
-                        <p id="statDone" class="text-lg font-bold text-green-400">-</p>
-                        <p class="text-xs text-gray-400">Done</p>
+                    <div class="fg">
+                        <label>Type:</label>
+                        <select id="filterType">
+                            <option value="">All</option>
+                            <option value="task">Task</option>
+                            <option value="bug">Bug</option>
+                            <option value="requirement">Req</option>
+                        </select>
+                    </div>
+                    <div class="fg">
+                        <label>Sort:</label>
+                        <select id="taskSortOrder">
+                            <option value="priority">Priority</option>
+                            <option value="created">Created</option>
+                            <option value="modified">Updated</option>
+                            <option value="title">Title</option>
+                        </select>
+                        <select id="taskSortDirection">
+                            <option value="asc">↑</option>
+                            <option value="desc">↓</option>
+                        </select>
+                    </div>
+                    <div class="fg search-box">
+                        <input type="text" id="taskSearch" placeholder="Search...">
                     </div>
                 </div>
-                
-                <!-- Search Box -->
-                <input type="text" id="taskSearch" class="form-input w-full text-sm" placeholder="🔍 Search tasks by title or description...">
-                
-                <!-- Filters -->
-                <div class="flex flex-wrap gap-2">
-                    <button class="filter-chip chip selected" data-filter="active">Active</button>
-                    <button class="filter-chip chip" data-filter="NEW">New</button>
-                    <button class="filter-chip chip" data-filter="BLOCKED">Blocked</button>
-                    <button class="filter-chip chip" data-filter="all">All</button>
-                    <select id="projectFilter" class="form-input w-auto text-sm">
-                        <option value="">All Projects</option>
-                    </select>
+
+                <!-- Task List (grid rows) -->
+                <div id="taskList" style="padding-bottom: 4px;">
+                    <div class="loading text-gray-400 text-sm p-4">Loading tasks...</div>
                 </div>
-                
-                <!-- Sort Controls -->
-                <div class="flex gap-2">
-                    <select id="taskSortOrder" class="form-input flex-1 text-sm">
-                        <option value="priority">Sort by Priority</option>
-                        <option value="dueDate">Sort by Due Date</option>
-                        <option value="modified">Sort by Modified Date</option>
-                        <option value="created">Sort by Created Date</option>
-                        <option value="title">Sort by Title</option>
-                    </select>
-                    <select id="taskSortDirection" class="form-input w-auto text-sm">
-                        <option value="asc">Oldest First</option>
-                        <option value="desc">Newest First</option>
-                    </select>
-                </div>
-                
-                <!-- Add Task Button -->
-                <button id="addTaskBtn" class="w-full glass-card rounded-xl p-3 text-left flex items-center gap-3 hover:bg-white/10 transition">
-                    <svg class="w-5 h-5 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                    </svg>
-                    <span class="text-gray-400">Add new task...</span>
-                </button>
-                
-                <!-- Task List -->
-                <div class="glass-card rounded-2xl overflow-hidden">
-                    <div id="taskList" class="divide-y divide-white/5">
-                        <div class="loading text-gray-400 text-sm p-4">Loading tasks...</div>
+
+                <!-- Status Bar (bottom) -->
+                <div id="taskStatusBar" class="bottom-status-bar">
+                    <div class="sel-info">
+                        <span id="selectionCount" style="color:var(--text-muted);">0 selected</span>
+                        <select id="bulkStatusSelect" disabled onchange="bulkUpdateStatus(this.value)" style="padding:2px 6px;border-radius:4px;font-size:11px;background:rgba(255,255,255,0.1);color:var(--text-secondary);border:1px solid var(--border-color);">
+                            <option value="">Set Status...</option>
+                            <option value="NEW">New</option>
+                            <option value="STARTED">Started</option>
+                            <option value="BLOCKED">Blocked</option>
+                            <option value="DONE">Done</option>
+                        </select>
+                        <button id="bulkDeleteBtn" disabled onclick="bulkDeleteSelected()">Delete</button>
+                        <button id="bulkClearBtn" disabled onclick="clearSelection()">Clear</button>
+                    </div>
+                    <div class="stats-info">
+                        <span><span id="statNew" class="font-bold text-blue-400">-</span> <span class="text-gray-500">New</span></span>
+                        <span><span id="statStarted" class="font-bold text-yellow-400">-</span> <span class="text-gray-500">Active</span></span>
+                        <span><span id="statBlocked" class="font-bold text-red-400">-</span> <span class="text-gray-500">Blocked</span></span>
+                        <span><span id="statDone" class="font-bold text-green-400">-</span> <span class="text-gray-500">Done</span></span>
                     </div>
                 </div>
             </section>
@@ -392,12 +608,20 @@
                         <span class="text-sm text-gray-400">Show only projects with open tasks</span>
                     </label>
                 </div>
-                <button onclick="openProjectModal()" class="w-full glass-card rounded-xl p-3 text-left flex items-center gap-3 hover:bg-white/10 transition">
-                    <svg class="w-5 h-5 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                    </svg>
-                    <span class="text-gray-400">Add new project...</span>
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="openProjectModal()" class="flex-1 glass-card rounded-xl p-3 text-left flex items-center gap-3 hover:bg-white/10 transition">
+                        <svg class="w-5 h-5 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        <span class="text-gray-400">Add new project...</span>
+                    </button>
+                    <button onclick="openThemeModal()" class="glass-card rounded-xl p-3 flex items-center gap-2 hover:bg-white/10 transition" title="Manage themes">
+                        <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+                        </svg>
+                        <span class="text-gray-400 text-sm">Themes</span>
+                    </button>
+                </div>
                 
                 <!-- Project List -->
                 <div id="projectList" class="space-y-2">
@@ -482,8 +706,95 @@
                     </div>
                 </div>
             </section>
+
+            <!-- ==================== BACKLOG TAB ==================== -->
+            <section id="tab-backlog" class="tab-content space-y-4 hidden">
+                <!-- Search -->
+                <div class="relative">
+                    <input type="text" id="backlogSearch" class="form-input w-full text-sm pr-8" placeholder="Search bugs & requirements...">
+                    <button id="clearSearch" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white hidden" title="Clear search">&times;</button>
+                </div>
+
+                <!-- Group By toggle -->
+                <div class="flex gap-2 flex-wrap items-center">
+                    <span class="text-xs text-gray-400">Group By:</span>
+                    <div class="inline-flex rounded-lg overflow-hidden border border-white/10">
+                        <button id="groupByProject" onclick="switchGroupBy('project')" class="px-3 py-1.5 text-xs font-medium bg-red-500 text-white">Project</button>
+                        <button id="groupByItem" onclick="switchGroupBy('item')" class="px-3 py-1.5 text-xs font-medium bg-white/5 text-gray-400 hover:bg-white/10">Item</button>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="flex gap-2 flex-wrap items-center">
+                    <select id="backlogProjectFilter" class="form-input text-sm" style="width:auto;min-width:120px;">
+                        <option value="">All Projects</option>
+                    </select>
+                    <select id="backlogStatusFilter" class="form-input text-sm" style="width:auto;min-width:100px;">
+                        <option value="">All Statuses</option>
+                        <option value="Open">Open</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Fixed">Fixed</option>
+                        <option value="Deferred">Deferred</option>
+                        <option value="Closed">Closed</option>
+                        <option value="Backlog">Backlog</option>
+                        <option value="Done">Done</option>
+                    </select>
+                    <select id="backlogPriorityFilter" class="form-input text-sm" style="width:auto;min-width:80px;">
+                        <option value="">All Priorities</option>
+                        <option value="P1">P1</option>
+                        <option value="P2">P2</option>
+                        <option value="P3">P3</option>
+                        <option value="P4">P4</option>
+                        <option value="P5">P5</option>
+                    </select>
+                    <select id="backlogSortFilter" class="form-input text-sm" style="width:auto;min-width:120px;">
+                        <option value="priority">Sort: Priority</option>
+                        <option value="project">Sort: Project</option>
+                        <option value="code">Sort: Code</option>
+                        <option value="updated-desc">Sort: Updated (newest)</option>
+                        <option value="updated-asc">Sort: Updated (oldest)</option>
+                    </select>
+                    <div class="flex-1"></div>
+                    <button id="addBugBtn" class="btn btn-primary text-sm">+ Bug</button>
+                    <button id="addReqBtn" class="btn btn-secondary text-sm">+ Requirement</button>
+                </div>
+
+                <!-- Project Grouped View -->
+                <div id="bltab-project" class="space-y-3">
+                    <div class="loading text-gray-400 text-sm p-4">Loading backlog...</div>
+                </div>
+
+                <!-- Item Flat View -->
+                <div id="bltab-item" class="space-y-3" style="display:none">
+                    <div class="glass-card rounded-2xl overflow-hidden">
+                        <div id="itemsList" class="divide-y divide-white/5">
+                            <div class="loading text-gray-400 text-sm p-4">Loading items...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bulk Action Bar (fixed at bottom when items selected) -->
+                <div id="bulkActions" class="hidden" style="position:sticky; bottom:0; z-index:40;">
+                    <div class="glass-card rounded-2xl p-3 flex items-center gap-3 border border-red-500/30" style="background: rgba(20,20,30,0.95);">
+                        <span id="bulkCount" class="text-sm font-medium text-white">0 selected</span>
+                        <div class="flex-1"></div>
+                        <select id="bulkStatusChange" class="form-input text-sm" style="width:auto;min-width:130px;">
+                            <option value="">Set Status...</option>
+                            <option value="Open">Open</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Fixed">Fixed</option>
+                            <option value="Deferred">Deferred</option>
+                            <option value="Closed">Closed</option>
+                            <option value="Backlog">Backlog</option>
+                            <option value="Done">Done</option>
+                        </select>
+                        <button id="bulkDeleteBtn" class="btn btn-danger text-sm">Delete Selected</button>
+                        <button id="bulkClearBtn" class="btn text-sm" style="background:rgba(255,255,255,0.1)">Clear Selection</button>
+                    </div>
+                </div>
+            </section>
         </main>
-        
+
         <!-- FAB: Voice Capture -->
         <button id="fabCapture" class="fab" title="Voice Capture">
             <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -509,13 +820,21 @@
                 <input type="hidden" id="taskId">
                 <div>
                     <label class="text-sm text-gray-400">Title *</label>
-                    <input type="text" id="taskTitle" class="form-input mt-1" required placeholder="Task title...">
+                    <textarea id="taskTitle" class="form-input mt-1" required placeholder="Task title..." rows="2" style="resize: vertical; min-height: 40px;"></textarea>
                 </div>
                 <div>
                     <label class="text-sm text-gray-400">Description</label>
                     <textarea id="taskDescription" class="form-input mt-1" rows="3" placeholder="Details..."></textarea>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="text-sm text-gray-400">Type</label>
+                        <select id="taskType" class="form-input mt-1">
+                            <option value="task">Task</option>
+                            <option value="bug">Bug</option>
+                            <option value="requirement">Requirement</option>
+                        </select>
+                    </div>
                     <div>
                         <label class="text-sm text-gray-400">Priority</label>
                         <select id="taskPriority" class="form-input mt-1">
@@ -837,7 +1156,184 @@
             </form>
         </div>
     </div>
+
+    <!-- Theme Management Modal -->
+    <div id="themeModal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="p-4 border-b border-white/10 flex items-center justify-between">
+                <h2 class="font-semibold">Manage Themes</h2>
+                <button id="closeThemeModal" class="icon-btn">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-4 space-y-4">
+                <!-- Existing Themes List -->
+                <div>
+                    <h3 class="text-sm font-medium text-gray-300 mb-2">Existing Themes</h3>
+                    <div id="themesList" class="space-y-2 max-h-64 overflow-y-auto">
+                        <div class="text-gray-400 text-sm p-2">Loading themes...</div>
+                    </div>
+                </div>
+
+                <!-- Create New Theme Form -->
+                <div class="pt-4 border-t border-white/10">
+                    <h3 class="text-sm font-medium text-gray-300 mb-3">Create New Theme</h3>
+                    <form id="themeCreateForm" class="space-y-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-xs text-gray-400">Code *</label>
+                                <input type="text" id="themeCreateCode" class="form-input mt-1 text-sm" placeholder="e.g., CUSTOM" maxlength="20" required>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-400">Name *</label>
+                                <input type="text" id="themeCreateName" class="form-input mt-1 text-sm" placeholder="e.g., Custom Theme" required>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400">Description</label>
+                            <input type="text" id="themeCreateDesc" class="form-input mt-1 text-sm" placeholder="Brief description">
+                        </div>
+                        <div class="flex gap-2 items-end">
+                            <div class="flex-1">
+                                <label class="text-xs text-gray-400">Color (Hex)</label>
+                                <input type="text" id="themeCreateColor" class="form-input mt-1 text-sm" placeholder="#6b7280" pattern="^#[0-9A-Fa-f]{6}$" maxlength="7">
+                            </div>
+                            <input type="color" id="themeCreateColorPicker" class="h-9 w-12 rounded cursor-pointer">
+                        </div>
+                        <button type="submit" class="btn btn-primary w-full text-sm">Create Theme</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
     
+    <!-- Bug Modal -->
+    <div id="bugModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="p-4 border-b border-white/10 flex items-center justify-between">
+                <h2 id="bugModalTitle" class="font-semibold">Add Bug</h2>
+                <button id="closeBugModal" class="icon-btn">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="bugForm" class="p-4 space-y-4">
+                <input type="hidden" id="bugId">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-sm text-gray-400">Project *</label>
+                        <select id="bugProject" class="form-input mt-1" required></select>
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-400">Code *</label>
+                        <input type="text" id="bugCode" class="form-input mt-1" required placeholder="BUG-001">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Title *</label>
+                    <input type="text" id="bugTitle" class="form-input mt-1" required placeholder="Brief description of the bug">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Description</label>
+                    <textarea id="bugDescription" class="form-input mt-1" rows="3" placeholder="Detailed description, steps to reproduce..."></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-sm text-gray-400">Status</label>
+                        <select id="bugStatus" class="form-input mt-1">
+                            <option value="Open">Open</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Fixed">Fixed</option>
+                            <option value="Deferred">Deferred</option>
+                            <option value="Closed">Closed</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-400">Priority</label>
+                        <select id="bugPriority" class="form-input mt-1">
+                            <option value="P1">P1 - Critical</option>
+                            <option value="P2">P2 - High</option>
+                            <option value="P3" selected>P3 - Medium</option>
+                            <option value="P4">P4 - Low</option>
+                            <option value="P5">P5 - Minimal</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" class="btn btn-primary flex-1">Save Bug</button>
+                    <button type="button" id="deleteBugBtn" class="btn btn-danger hidden">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Requirement Modal -->
+    <div id="reqModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="p-4 border-b border-white/10 flex items-center justify-between">
+                <h2 id="reqModalTitle" class="font-semibold">Add Requirement</h2>
+                <button id="closeReqModal" class="icon-btn">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="reqForm" class="p-4 space-y-4">
+                <input type="hidden" id="reqId">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-sm text-gray-400">Project *</label>
+                        <select id="reqProject" class="form-input mt-1" required></select>
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-400">Code *</label>
+                        <input type="text" id="reqCode" class="form-input mt-1" required placeholder="REQ-001">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Title *</label>
+                    <input type="text" id="reqTitle" class="form-input mt-1" required placeholder="Feature or capability needed">
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Description</label>
+                    <textarea id="reqDescription" class="form-input mt-1" rows="3" placeholder="Detailed requirements..."></textarea>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-400">Reference URL</label>
+                    <input type="url" id="reqReferenceURL" class="form-input mt-1" placeholder="https://...">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-sm text-gray-400">Status</label>
+                        <select id="reqStatus" class="form-input mt-1">
+                            <option value="Backlog">Backlog</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Done">Done</option>
+                            <option value="Deferred">Deferred</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-400">Priority</label>
+                        <select id="reqPriority" class="form-input mt-1">
+                            <option value="P1">P1 - Critical</option>
+                            <option value="P2">P2 - High</option>
+                            <option value="P3" selected>P3 - Medium</option>
+                            <option value="P4">P4 - Low</option>
+                            <option value="P5">P5 - Minimal</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" class="btn btn-primary flex-1">Save Requirement</button>
+                    <button type="button" id="deleteReqBtn" class="btn btn-danger hidden">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Transaction Detail Modal -->
     <div id="transactionModal" class="modal-overlay hidden">
         <div class="modal-content">
@@ -990,26 +1486,42 @@
             weekday: 'short', month: 'short', day: 'numeric'
         });
         
-        // ==================== TAB NAVIGATION ====================
+        // ==================== VIEW NAVIGATION (dropdown) ====================
+        const viewSelect = document.getElementById('viewSelect');
+        const addBtn = document.getElementById('addTaskBtn');
+        const addLabels = {
+            tasks: '+ Add Task', projects: '+ Add Project', history: '+ Add Entry',
+            methodology: '+ Add Rule', backlog: '+ Add Item'
+        };
+
+        function switchView(view) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            const section = document.getElementById(`tab-${view}`);
+            if (section) section.classList.remove('hidden');
+            // Also update hidden tab-btn states for backward compat
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('tab-active');
+                b.classList.add('text-gray-400');
+                if (b.dataset.tab === view) { b.classList.add('tab-active'); b.classList.remove('text-gray-400'); }
+            });
+            // Show status bar only on Tasks tab
+            const statusBar = document.getElementById('taskStatusBar');
+            if (statusBar) statusBar.style.display = view === 'tasks' ? 'flex' : 'none';
+            // Context-aware add button
+            addBtn.textContent = addLabels[view] || '+ Add';
+        }
+
+        viewSelect.addEventListener('change', e => switchView(e.target.value));
+        // Also keep tab-btn click working
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.tab-btn').forEach(b => {
-                    b.classList.remove('tab-active');
-                    b.classList.add('text-gray-400');
-                });
-                btn.classList.add('tab-active');
-                btn.classList.remove('text-gray-400');
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-                document.getElementById(`tab-${btn.dataset.tab}`).classList.remove('hidden');
+                viewSelect.value = btn.dataset.tab;
+                switchView(btn.dataset.tab);
             });
         });
-        
-        // Set Tasks tab as default on page load
+
         function setDefaultTab() {
-            const tasksTab = document.querySelector('.tab-btn[data-tab="tasks"]');
-            if (tasksTab && !tasksTab.classList.contains('tab-active')) {
-                tasksTab.click();
-            }
+            switchView('tasks');
         }
         
         // ==================== SYNC STATUS ====================
@@ -1113,72 +1625,156 @@
             document.getElementById('statDone').textContent = counts.DONE;
         }
         
+        // Selection state for bulk actions
+        const selectedTaskIds = new Set();
+
+        function getTypeIcon(taskType) {
+            if (taskType === 'bug') return '<span title="Bug" style="color:#ef4444;">&#128027;</span>';
+            if (taskType === 'requirement') return '<span title="Requirement" style="color:#a78bfa;">&#128203;</span>';
+            return '<span title="Task" style="color:#9ca3af;">&#10003;</span>';
+        }
+
+        function getStatusBadge(status) {
+            const s = (status || 'NEW').toUpperCase();
+            const cls = s === 'NEW' ? 's-new' : s === 'STARTED' ? 's-started' : s === 'BLOCKED' ? 's-blocked' : 's-done';
+            const label = s === 'STARTED' ? 'WIP' : s === 'COMPLETE' ? 'DONE' : s;
+            return `<span class="status-badge ${cls}">${label}</span>`;
+        }
+
         function renderTasks() {
             let tasks = allTasks;
-            // Handle filters
+            // Status filter
             if (taskFilter === 'active') {
-                tasks = tasks.filter(t => t.status !== 'DONE');
-            } else if (taskFilter !== 'all') {
+                tasks = tasks.filter(t => t.status !== 'DONE' && t.status !== 'COMPLETE');
+            } else if (taskFilter) {
                 tasks = tasks.filter(t => t.status === taskFilter);
             }
+            // Priority filter
+            if (priorityFilterValue) tasks = tasks.filter(t => t.priority == priorityFilterValue);
+            // Project filter
             if (projectFilterValue) tasks = tasks.filter(t => t.projectCode === projectFilterValue || (t.projects && t.projects.includes(projectFilterValue)));
+            // Type filter
+            if (typeFilterValue) tasks = tasks.filter(t => (t.taskType || 'task') === typeFilterValue);
+            // Search
             if (taskSearchValue) {
                 const search = taskSearchValue.toLowerCase();
-                tasks = tasks.filter(t => 
+                tasks = tasks.filter(t =>
                     (t.title && t.title.toLowerCase().includes(search)) ||
                     (t.description && t.description.toLowerCase().includes(search))
                 );
             }
-            
+
             // Apply sorting
             const sortBy = document.getElementById('taskSortOrder')?.value || 'priority';
             const direction = document.getElementById('taskSortDirection')?.value || 'asc';
             tasks = sortTasks(tasks, sortBy, direction);
-            
+
             const container = document.getElementById('taskList');
             if (!tasks.length) {
                 container.innerHTML = '<p class="text-gray-400 text-sm p-4">No tasks found</p>';
                 return;
             }
-            
-            container.innerHTML = tasks.map(t => `
-                <div class="item-row priority-${t.priority || 3} status-${t.status || 'NEW'} p-3 cursor-pointer" onclick="openTaskModal(${t.taskId})">
-                    <div class="flex items-start justify-between gap-2">
-                        <div class="flex-1 min-w-0">
-                            <p class="font-medium text-sm">${t.title}</p>
-                            <div class="flex flex-wrap items-center gap-2 mt-1">
-                                ${t.projectCode ? renderProjectBadge(t.projectCode) : ''}
-                                <span class="text-xs text-gray-500">${t.status || 'NEW'}</span>
-                                ${t.dueDate ? `<span class="text-xs text-gray-500">Due: ${new Date(t.dueDate).toLocaleDateString()}</span>` : ''}
-                            </div>
-                        </div>
-                        <span class="text-xs text-gray-500">P${t.priority || 3}</span>
+
+            container.innerHTML = tasks.map((t, i) => {
+                const p = allProjects.find(pr => pr.projectCode === t.projectCode);
+                const bgColor = p?.colorCode || '#6b7280';
+                const textColor = p ? getContrastColor(bgColor) : '#fff';
+                const pCode = t.projectCode || '';
+                const checked = selectedTaskIds.has(t.taskId) ? 'checked' : '';
+                return `<div class="task-row ${i % 2 === 0 ? 'row-even' : 'row-odd'}" data-task-id="${t.taskId}">
+                    <div style="text-align:center;">
+                        <input type="checkbox" ${checked} onchange="toggleTaskSelect(${t.taskId}, this.checked)" onclick="event.stopPropagation();" />
                     </div>
-                </div>
-            `).join('');
+                    <div class="type-icon">${getTypeIcon(t.taskType)}</div>
+                    <div>${getStatusBadge(t.status)}</div>
+                    <div class="priority-pill pp-${t.priority || 3}">P${t.priority || 3}</div>
+                    <div>${pCode ? `<span class="project-mini" style="background:${bgColor};color:${textColor};">${pCode}</span>` : ''}</div>
+                    <div class="task-title-cell" onclick="openTaskModal(${t.taskId})">${escHtml(t.title)}</div>
+                    <div class="task-actions-cell"><button onclick="event.stopPropagation();openTaskModal(${t.taskId})" title="Edit">&#9998;</button></div>
+                </div>`;
+            }).join('');
         }
-        
-        // Task filter chips
-        document.querySelectorAll('.filter-chip').forEach(chip => {
-            chip.addEventListener('click', () => {
-                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('selected'));
-                chip.classList.add('selected');
-                taskFilter = chip.dataset.filter;
-                renderTasks();
-            });
+
+        function escHtml(s) {
+            if (!s) return '';
+            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        function toggleTaskSelect(taskId, checked) {
+            if (checked) selectedTaskIds.add(taskId); else selectedTaskIds.delete(taskId);
+            updateSelectionUI();
+        }
+        function clearSelection() {
+            selectedTaskIds.clear();
+            updateSelectionUI();
+            renderTasks();
+        }
+        function updateSelectionUI() {
+            const n = selectedTaskIds.size;
+            document.getElementById('selectionCount').textContent = `${n} selected`;
+            document.getElementById('bulkDeleteBtn').disabled = n === 0;
+            document.getElementById('bulkClearBtn').disabled = n === 0;
+            document.getElementById('bulkStatusSelect').disabled = n === 0;
+        }
+        async function bulkUpdateStatus(newStatus) {
+            if (!newStatus || selectedTaskIds.size === 0) return;
+            if (!confirm(`Update ${selectedTaskIds.size} tasks to "${newStatus}"?`)) {
+                document.getElementById('bulkStatusSelect').value = '';
+                return;
+            }
+            for (const id of selectedTaskIds) {
+                try {
+                    await fetch(`${API}/api/tasks/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: newStatus })
+                    });
+                } catch(e) {}
+            }
+            document.getElementById('bulkStatusSelect').value = '';
+            selectedTaskIds.clear();
+            await loadTasks();
+            showToast(`${selectedTaskIds.size || 'Tasks'} updated to ${newStatus}`);
+        }
+        async function bulkDeleteSelected() {
+            if (!confirm(`Delete ${selectedTaskIds.size} tasks?`)) return;
+            for (const id of selectedTaskIds) {
+                try { await fetch(`${API}/api/tasks/${id}`, { method: 'DELETE' }); } catch(e) {}
+            }
+            selectedTaskIds.clear();
+            updateSelectionUI();
+            await loadTasks();
+            showToast('Tasks deleted');
+        }
+
+        // New filter variables
+        let priorityFilterValue = '';
+        let typeFilterValue = '';
+
+        // Filter event listeners
+        document.getElementById('filterStatus').addEventListener('change', e => {
+            taskFilter = e.target.value;
+            renderTasks();
         });
-        
+        document.getElementById('filterPriority').addEventListener('change', e => {
+            priorityFilterValue = e.target.value;
+            renderTasks();
+        });
         document.getElementById('projectFilter').addEventListener('change', e => {
             projectFilterValue = e.target.value;
             renderTasks();
         });
-        
+        document.getElementById('filterType').addEventListener('change', e => {
+            typeFilterValue = e.target.value;
+            renderTasks();
+        });
+
         // Search event listeners
         document.getElementById('taskSearch').addEventListener('input', debounce(e => {
             taskSearchValue = e.target.value;
             renderTasks();
         }, 300));
-        
+
         // Sort event listeners
         document.getElementById('taskSortOrder').addEventListener('change', renderTasks);
         document.getElementById('taskSortDirection').addEventListener('change', renderTasks);
@@ -1237,6 +1833,7 @@
                     document.getElementById('taskId').value = task.taskId;
                     document.getElementById('taskTitle').value = task.title || '';
                     document.getElementById('taskDescription').value = task.description || '';
+                    document.getElementById('taskType').value = task.taskType || 'task';
                     document.getElementById('taskPriority').value = task.priority || 3;
                     document.getElementById('taskStatus').value = task.status || 'NEW';
                     document.getElementById('taskDueDate').value = task.dueDate ? task.dueDate.split('T')[0] : '';
@@ -1263,7 +1860,12 @@
             modal.classList.remove('hidden');
         }
         
-        document.getElementById('addTaskBtn').addEventListener('click', () => openTaskModal());
+        document.getElementById('addTaskBtn').addEventListener('click', () => {
+            const view = viewSelect.value;
+            if (view === 'tasks' || view === 'backlog') openTaskModal();
+            else if (view === 'projects') openProjectModal();
+            else if (view === 'methodology') { const btn = document.getElementById('addRuleBtn'); if (btn) btn.click(); }
+        });
         document.getElementById('closeTaskModal').addEventListener('click', () => {
             document.getElementById('taskModal').classList.add('hidden');
         });
@@ -1284,6 +1886,7 @@
             const payload = {
                 title: document.getElementById('taskTitle').value,
                 description: document.getElementById('taskDescription').value,
+                taskType: document.getElementById('taskType').value,
                 priority: parseInt(document.getElementById('taskPriority').value),
                 status: document.getElementById('taskStatus').value,
                 dueDate: document.getElementById('taskDueDate').value || null,
@@ -1304,12 +1907,10 @@
                     
                     if (!res.ok) throw new Error(await res.text());
                     
-                    const result = await res.json();
-                    const newTaskId = taskId || result.taskId;
-                    
-                    // Save to IndexedDB as well
-                    const fullTask = { ...payload, taskId: newTaskId };
-                    await OfflineDB.saveTask(fullTask);
+                    await res.json();
+
+                    // Reload all tasks from server to guarantee sync
+                    await loadTasks();
                     showToast(taskId ? 'Task updated!' : 'Task created!');
                 } else {
                     // Offline: save locally and queue for sync
@@ -1322,14 +1923,24 @@
                         { ...fullTask, taskId: newId }
                     );
                     
-                    showToast((taskId ? 'Task updated' : 'Task created') + ' (pending sync)');
+                    // Update UI immediately
+                    if (taskId) {
+                        const idx = allTasks.findIndex(t => t.taskId === taskId);
+                        if (idx !== -1) allTasks[idx] = fullTask;
+                    } else {
+                        allTasks.push(fullTask);
+                    }
+                    updateTaskStats();
+                    renderTasks();
+                    renderProjects();
+                    
+                    showToast((taskId ? 'Task updated' : 'Task created') + ' offline. Will sync when connected.', 'info');
                 }
                 
                 document.getElementById('taskModal').classList.add('hidden');
-                await loadTasks();
                 await updateSyncStatus();
             } catch (err) {
-                showToast('Error: ' + err.message, 'error');
+                showToast('Error: ' + (err.message || 'Failed to save task'), 'error');
             } finally {
                 submitBtn.disabled = false;
             }
@@ -1337,22 +1948,30 @@
         
         document.getElementById('deleteTaskBtn').addEventListener('click', async () => {
             if (!confirm('Delete this task?')) return;
-            const taskId = document.getElementById('taskId').value;
+            const taskId = parseInt(document.getElementById('taskId').value);
             try {
                 if (OnlineStatus.isOnline) {
                     await fetch(`${API}/api/tasks/${taskId}`, { method: 'DELETE' });
                     await OfflineDB.deleteTask(taskId);
+                    // Reload all tasks from server to guarantee sync
+                    await loadTasks();
+                    showToast('Task deleted');
                 } else {
                     await OfflineDB.deleteTask(taskId);
                     await OfflineDB.queueOperation('DELETE_TASK', { taskId });
-                    showToast('Task deleted (pending sync)');
+                    
+                    // Update UI immediately
+                    allTasks = allTasks.filter(t => t.taskId !== taskId);
+                    updateTaskStats();
+                    renderTasks();
+                    renderProjects();
+                    
+                    showToast('Task deleted offline. Will sync when connected.', 'info');
                 }
-                showToast('Task deleted');
                 document.getElementById('taskModal').classList.add('hidden');
-                loadTasks();
                 await updateSyncStatus();
             } catch (err) {
-                showToast('Delete failed', 'error');
+                showToast('Delete failed: ' + (err.message || 'Unknown error'), 'error');
             }
         });
         
@@ -1455,7 +2074,7 @@
                                 <div class="text-xs p-2 rounded" style="background: rgba(255,255,255,0.03)">
                                     <div class="flex items-center gap-2">
                                         <span class="status-badge status-${t.status}">${t.status}</span>
-                                        <span class="flex-1 truncate">${t.title}</span>
+                                        <span class="flex-1" style="word-break: break-word;">${t.title}</span>
                                         <button onclick="event.stopPropagation(); openTaskModal(${t.taskId})" class="text-gray-400 hover:text-white">✏️</button>
                                     </div>
                                 </div>
@@ -1716,6 +2335,138 @@
             const projectCode = document.getElementById('originalProjectCode').value;
             document.getElementById('projectModal').classList.add('hidden');
             openTaskModalForProject(projectCode);
+        });
+
+        // ==================== THEME MANAGEMENT ====================
+        async function openThemeModal() {
+            const modal = document.getElementById('themeModal');
+            await loadThemesForModal();
+            modal.classList.remove('hidden');
+        }
+
+        async function loadThemesForModal() {
+            try {
+                const res = await fetch(`${API}/api/themes?include_inactive=true`);
+                const data = await res.json();
+                const themes = data.themes || [];
+
+                const container = document.getElementById('themesList');
+                if (!themes.length) {
+                    container.innerHTML = '<p class="text-gray-400 text-sm p-2">No themes found</p>';
+                    return;
+                }
+
+                container.innerHTML = themes.map(t => `
+                    <div class="glass-card rounded-lg p-3 flex items-center justify-between">
+                        <div class="flex items-center gap-3 flex-1">
+                            <div class="w-6 h-6 rounded border" style="background-color: ${t.colorCode || '#6b7280'}"></div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium">${t.themeName}</p>
+                                <p class="text-xs text-gray-400">${t.themeCode}</p>
+                            </div>
+                            ${!t.isActive ? '<span class="text-xs text-gray-500">Inactive</span>' : ''}
+                        </div>
+                        <div class="flex gap-1">
+                            <button class="icon-btn text-sm hover:text-yellow-400" onclick="editTheme(${t.themeId})">✏️</button>
+                            <button class="icon-btn text-sm hover:text-red-400" onclick="deleteThemeConfirm(${t.themeId})">🗑️</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Failed to load themes:', e);
+                showToast('Failed to load themes', 'error');
+            }
+        }
+
+        async function editTheme(themeId) {
+            const themeName = prompt('New theme name:');
+            if (!themeName) return;
+
+            try {
+                const res = await fetch(`${API}/api/themes/${themeId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ themeName })
+                });
+
+                if (!res.ok) throw new Error(await res.text());
+                showToast('Theme updated');
+                await loadThemesForModal();
+            } catch (err) {
+                showToast('Update failed: ' + err.message, 'error');
+            }
+        }
+
+        async function deleteThemeConfirm(themeId) {
+            if (!confirm('Delete this theme?')) return;
+
+            try {
+                const res = await fetch(`${API}/api/themes/${themeId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ hard_delete: false })
+                });
+
+                if (!res.ok) {
+                    const err = await res.text();
+                    if (err.includes('Cannot delete theme')) {
+                        showToast('Cannot delete: Projects use this theme', 'error');
+                    } else {
+                        throw new Error(err);
+                    }
+                } else {
+                    showToast('Theme deleted');
+                    await loadThemesForModal();
+                }
+            } catch (err) {
+                showToast('Delete failed: ' + err.message, 'error');
+            }
+        }
+
+        document.getElementById('closeThemeModal').addEventListener('click', () => {
+            document.getElementById('themeModal').classList.add('hidden');
+        });
+
+        // Color picker sync for theme creation
+        document.getElementById('themeCreateColorPicker').addEventListener('input', (e) => {
+            const color = e.target.value;
+            document.getElementById('themeCreateColor').value = color;
+        });
+
+        document.getElementById('themeCreateColor').addEventListener('input', (e) => {
+            const color = e.target.value;
+            if (/^#[0-9A-Fa-f]{6}$/.test(color)) {
+                document.getElementById('themeCreateColorPicker').value = color;
+            }
+        });
+
+        document.getElementById('themeCreateForm').addEventListener('submit', async e => {
+            e.preventDefault();
+
+            const payload = {
+                themeCode: document.getElementById('themeCreateCode').value,
+                themeName: document.getElementById('themeCreateName').value,
+                description: document.getElementById('themeCreateDesc').value || null,
+                colorCode: document.getElementById('themeCreateColor').value || null,
+                displayOrder: 999
+            };
+
+            try {
+                const res = await fetch(`${API}/api/themes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) throw new Error(await res.text());
+
+                showToast('Theme created!');
+                document.getElementById('themeCreateForm').reset();
+                await loadThemesForModal();
+                await loadProjects(); // Refresh projects to show new theme
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
         });
         
         // ==================== AI HISTORY ====================
@@ -2213,6 +2964,607 @@
             }
         }
         
+        // ==================== BACKLOG ====================
+        let allBugs = [];
+        let allRequirements = [];
+        let backlogSubTab = 'project';
+        let backlogSearchValue = '';
+        let lastBugProjectId = '';  // Persist project selection across bug adds
+        let selectedItems = new Set();  // For multi-select: "bug-123" or "req-456"
+
+        // Group By toggle (PM BUG-001) - called from inline onclick
+        function switchGroupBy(mode) {
+            console.log('switchGroupBy called:', mode);
+            backlogSubTab = mode;
+            // Update button styles
+            const projBtn = document.getElementById('groupByProject');
+            const itemBtn = document.getElementById('groupByItem');
+            if (mode === 'project') {
+                projBtn.className = 'px-3 py-1.5 text-xs font-medium bg-red-500 text-white';
+                itemBtn.className = 'px-3 py-1.5 text-xs font-medium bg-white/5 text-gray-400 hover:bg-white/10';
+            } else {
+                projBtn.className = 'px-3 py-1.5 text-xs font-medium bg-white/5 text-gray-400 hover:bg-white/10';
+                itemBtn.className = 'px-3 py-1.5 text-xs font-medium bg-red-500 text-white';
+            }
+            // Toggle view containers
+            document.getElementById('bltab-project').style.display = mode === 'project' ? '' : 'none';
+            document.getElementById('bltab-item').style.display = mode === 'item' ? '' : 'none';
+            saveBacklogState();
+            renderBacklog();
+        }
+
+        // Restore saved filter state from localStorage (BUG-003)
+        function restoreBacklogState() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('backlogFilters') || '{}');
+                if (saved.groupBy && (saved.groupBy === 'project' || saved.groupBy === 'item')) {
+                    switchGroupBy(saved.groupBy);
+                }
+                if (saved.status) document.getElementById('backlogStatusFilter').value = saved.status;
+                if (saved.priority) document.getElementById('backlogPriorityFilter').value = saved.priority;
+                if (saved.sort) document.getElementById('backlogSortFilter').value = saved.sort;
+                if (saved.search) {
+                    backlogSearchValue = saved.search;
+                    document.getElementById('backlogSearch').value = saved.search;
+                    document.getElementById('clearSearch').classList.toggle('hidden', !saved.search);
+                }
+                if (saved.projectId) {
+                    document.getElementById('backlogProjectFilter').dataset.savedValue = saved.projectId;
+                }
+            } catch (e) { console.error('restoreBacklogState error:', e); }
+        }
+
+        function saveBacklogState() {
+            const state = {
+                groupBy: backlogSubTab,
+                projectId: document.getElementById('backlogProjectFilter').value,
+                status: document.getElementById('backlogStatusFilter').value,
+                priority: document.getElementById('backlogPriorityFilter').value,
+                sort: document.getElementById('backlogSortFilter').value,
+                search: backlogSearchValue
+            };
+            localStorage.setItem('backlogFilters', JSON.stringify(state));
+        }
+
+        restoreBacklogState();
+
+        // Search clear button (BUG-010)
+        document.getElementById('clearSearch').addEventListener('click', () => {
+            document.getElementById('backlogSearch').value = '';
+            backlogSearchValue = '';
+            document.getElementById('clearSearch').classList.add('hidden');
+            saveBacklogState();
+            renderBacklog();
+        });
+
+        // Backlog filter + sort + search handlers
+        ['backlogProjectFilter', 'backlogStatusFilter', 'backlogPriorityFilter', 'backlogSortFilter'].forEach(id => {
+            document.getElementById(id).addEventListener('change', () => {
+                saveBacklogState();
+                renderBacklog();
+            });
+        });
+
+        document.getElementById('backlogSearch').addEventListener('input', debounce(e => {
+            backlogSearchValue = e.target.value;
+            document.getElementById('clearSearch').classList.toggle('hidden', !backlogSearchValue);
+            saveBacklogState();
+            renderBacklog();
+        }, 250));
+
+        // Bulk actions
+        function updateBulkUI() {
+            const bar = document.getElementById('bulkActions');
+            if (selectedItems.size > 0) {
+                bar.classList.remove('hidden');
+                document.getElementById('bulkCount').textContent = `${selectedItems.size} selected`;
+            } else {
+                bar.classList.add('hidden');
+            }
+        }
+
+        function toggleItemSelection(key, checkbox) {
+            if (checkbox.checked) {
+                selectedItems.add(key);
+            } else {
+                selectedItems.delete(key);
+            }
+            updateBulkUI();
+        }
+
+        document.getElementById('bulkClearBtn').addEventListener('click', () => {
+            selectedItems.clear();
+            document.querySelectorAll('.bulk-checkbox').forEach(cb => cb.checked = false);
+            updateBulkUI();
+        });
+
+        document.getElementById('bulkDeleteBtn').addEventListener('click', async () => {
+            if (!selectedItems.size || !confirm(`Delete ${selectedItems.size} items?`)) return;
+            try {
+                const promises = [];
+                for (const key of selectedItems) {
+                    const [type, id] = key.split('-', 2);
+                    const endpoint = type === 'bug' ? 'bugs' : 'requirements';
+                    promises.push(fetch(`${API}/api/backlog/${endpoint}/${id}`, { method: 'DELETE' }));
+                }
+                await Promise.all(promises);
+                selectedItems.clear();
+                updateBulkUI();
+                await loadBacklog();
+            } catch (err) {
+                console.error('Bulk delete failed:', err);
+                alert('Some deletes failed');
+            }
+        });
+
+        document.getElementById('bulkStatusChange').addEventListener('change', async (e) => {
+            const newStatus = e.target.value;
+            if (!newStatus || !selectedItems.size) return;
+            try {
+                const promises = [];
+                for (const key of selectedItems) {
+                    const [type, id] = key.split('-', 2);
+                    const endpoint = type === 'bug' ? 'bugs' : 'requirements';
+                    promises.push(fetch(`${API}/api/backlog/${endpoint}/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: newStatus })
+                    }));
+                }
+                await Promise.all(promises);
+                selectedItems.clear();
+                updateBulkUI();
+                e.target.value = '';
+                await loadBacklog();
+            } catch (err) {
+                console.error('Bulk status change failed:', err);
+                alert('Some updates failed');
+            }
+        });
+
+        function getBacklogFilters() {
+            return {
+                projectId: document.getElementById('backlogProjectFilter').value,
+                status: document.getElementById('backlogStatusFilter').value,
+                priority: document.getElementById('backlogPriorityFilter').value,
+                sort: document.getElementById('backlogSortFilter').value
+            };
+        }
+
+        function backlogProjectBadge(projectCode) {
+            const project = allProjects.find(p => p.projectCode === projectCode);
+            const bgColor = project?.colorCode || '#6b7280';
+            const textColor = getContrastColor(bgColor);
+            return `<span class="inline-block px-2 py-0.5 rounded text-xs font-medium" style="background-color: ${bgColor}; color: ${textColor}">${projectCode}</span>`;
+        }
+
+        async function loadBacklog() {
+            try {
+                const [bugsRes, reqsRes] = await Promise.all([
+                    fetch(`${API}/api/backlog/bugs`),
+                    fetch(`${API}/api/backlog/requirements`)
+                ]);
+                const bugsData = await bugsRes.json();
+                const reqsData = await reqsRes.json();
+                allBugs = bugsData.bugs || [];
+                allRequirements = reqsData.requirements || [];
+
+                // Populate project filter from allProjects (all projects, not just those with items)
+                const projFilter = document.getElementById('backlogProjectFilter');
+                const savedValue = projFilter.value || projFilter.dataset.savedValue || '';
+                const projectsWithItems = new Set([
+                    ...allBugs.map(b => b.projectId),
+                    ...allRequirements.map(r => r.projectId)
+                ]);
+                projFilter.innerHTML = '<option value="">All Projects</option>' +
+                    allProjects
+                        .filter(p => projectsWithItems.has(p.projectId))
+                        .map(p => `<option value="${p.projectId}">${p.projectCode} - ${p.projectName}</option>`)
+                        .join('');
+                if (savedValue) projFilter.value = savedValue;
+                delete projFilter.dataset.savedValue;
+
+                renderBacklog();
+            } catch (err) {
+                console.error('Failed to load backlog:', err);
+                document.getElementById('bltab-project').innerHTML = '<p class="text-red-400 p-4">Failed to load backlog data</p>';
+            }
+        }
+
+        function filterItem(item, f) {
+            if (f.projectId && String(item.projectId) !== String(f.projectId)) return false;
+            if (f.status && item.status !== f.status) return false;
+            if (f.priority && item.priority !== f.priority) return false;
+            if (backlogSearchValue) {
+                const search = backlogSearchValue.toLowerCase();
+                const fields = [item.code, item.title, item.description, item.projectCode, item.projectName].filter(Boolean);
+                if (!fields.some(field => field.toLowerCase().includes(search))) return false;
+            }
+            return true;
+        }
+
+        function sortItems(items, sortKey) {
+            const sorted = [...items];
+            switch (sortKey) {
+                case 'priority':
+                    sorted.sort((a, b) => (a.priority || 'P5').localeCompare(b.priority || 'P5'));
+                    break;
+                case 'project':
+                    sorted.sort((a, b) => (a.projectCode || '').localeCompare(b.projectCode || '') || (a.code || '').localeCompare(b.code || ''));
+                    break;
+                case 'code':
+                    sorted.sort((a, b) => (a.projectCode || '').localeCompare(b.projectCode || '') || (a.code || '').localeCompare(b.code || ''));
+                    break;
+                case 'updated-desc':
+                    sorted.sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+                    break;
+                case 'updated-asc':
+                    sorted.sort((a, b) => new Date(a.updatedAt || a.createdAt || 0) - new Date(b.updatedAt || b.createdAt || 0));
+                    break;
+            }
+            return sorted;
+        }
+
+        function renderBacklog() {
+            const f = getBacklogFilters();
+            const filteredBugs = sortItems(allBugs.filter(b => filterItem(b, f)), f.sort);
+            const filteredReqs = sortItems(allRequirements.filter(r => filterItem(r, f)), f.sort);
+
+            renderGroupedBacklog(filteredBugs, filteredReqs);
+            renderItemsList(filteredBugs, filteredReqs, f.sort);
+        }
+
+        function priorityClass(p) {
+            if (p === 'P1' || p === 'P2') return 'text-red-400';
+            if (p === 'P3') return 'text-yellow-400';
+            return 'text-green-400';
+        }
+
+        function statusBadge(status) {
+            const colors = {
+                'Open': 'bg-blue-500/20 text-blue-300',
+                'In Progress': 'bg-yellow-500/20 text-yellow-300',
+                'Fixed': 'bg-green-500/20 text-green-300',
+                'Closed': 'bg-gray-500/20 text-gray-400',
+                'Deferred': 'bg-orange-500/20 text-orange-300',
+                'Backlog': 'bg-purple-500/20 text-purple-300',
+                'Done': 'bg-green-500/20 text-green-300'
+            };
+            const cls = colors[status] || 'bg-gray-500/20 text-gray-300';
+            return `<span class="inline-block px-2 py-0.5 rounded text-xs ${cls}">${status}</span>`;
+        }
+
+        function renderGroupedBacklog(bugs, reqs) {
+            const container = document.getElementById('bltab-project');
+
+            // Group by project - use Map to preserve insertion order
+            const projects = new Map();
+            bugs.forEach(b => {
+                const key = String(b.projectId);
+                if (!projects.has(key)) projects.set(key, { id: b.projectId, code: b.projectCode, name: b.projectName, bugs: [], reqs: [] });
+                projects.get(key).bugs.push(b);
+            });
+            reqs.forEach(r => {
+                const key = String(r.projectId);
+                if (!projects.has(key)) projects.set(key, { id: r.projectId, code: r.projectCode, name: r.projectName, bugs: [], reqs: [] });
+                projects.get(key).reqs.push(r);
+            });
+
+            if (projects.size === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-sm p-4 text-center">No backlog items found</p>';
+                return;
+            }
+
+            // Sort project groups by code
+            const sortedProjects = [...projects.values()].sort((a, b) => a.code.localeCompare(b.code));
+
+            container.innerHTML = sortedProjects.map(proj => {
+                const projObj = allProjects.find(p => p.projectId === proj.id);
+                const borderColor = projObj?.colorCode || '#6b7280';
+                return `
+                <div class="glass-card rounded-2xl overflow-hidden" style="border-left: 4px solid ${borderColor}">
+                    <div class="p-3 border-b border-white/10 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            ${backlogProjectBadge(proj.code)}
+                            <h3 class="font-semibold">${proj.name}</h3>
+                        </div>
+                        <span class="text-xs text-gray-400">${proj.bugs.length} bugs, ${proj.reqs.length} reqs</span>
+                    </div>
+                    ${proj.bugs.length ? `
+                        <div class="px-3 pt-2 pb-1"><span class="text-xs text-gray-500 uppercase tracking-wider">Bugs</span></div>
+                        <div class="divide-y divide-white/5">
+                            ${proj.bugs.map(b => `
+                                <div class="item-row p-3 flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" class="bulk-checkbox" data-key="bug-${b.bugId}" onclick="event.stopPropagation(); toggleItemSelection('bug-${b.bugId}', this)" ${selectedItems.has('bug-'+b.bugId) ? 'checked' : ''}>
+                                    <span class="font-mono text-xs ${priorityClass(b.priority)}">${b.priority}</span>
+                                    <span class="font-mono text-xs text-gray-500">${b.code}</span>
+                                    <span class="flex-1 text-sm clickable-title" onclick="openBugModal(${b.bugId})">${b.title}</span>
+                                    ${statusBadge(b.status)}
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                    ${proj.reqs.length ? `
+                        <div class="px-3 pt-2 pb-1"><span class="text-xs text-gray-500 uppercase tracking-wider">Requirements</span></div>
+                        <div class="divide-y divide-white/5">
+                            ${proj.reqs.map(r => `
+                                <div class="item-row p-3 flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" class="bulk-checkbox" data-key="req-${r.requirementId}" onclick="event.stopPropagation(); toggleItemSelection('req-${r.requirementId}', this)" ${selectedItems.has('req-'+r.requirementId) ? 'checked' : ''}>
+                                    <span class="font-mono text-xs ${priorityClass(r.priority)}">${r.priority}</span>
+                                    <span class="font-mono text-xs text-gray-500">${r.code}</span>
+                                    <span class="flex-1 text-sm clickable-title" onclick="openReqModal(${r.requirementId})">${r.title}</span>
+                                    ${r.referenceURL ? `<a href="${r.referenceURL}" target="_blank" class="text-blue-400 hover:text-blue-300 text-xs" onclick="event.stopPropagation()">link</a>` : ''}
+                                    ${statusBadge(r.status)}
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `}).join('');
+        }
+
+        function renderItemsList(bugs, reqs, sortKey) {
+            const container = document.getElementById('itemsList');
+            // Merge bugs and reqs into a single list with type markers
+            const items = [
+                ...bugs.map(b => ({ ...b, _type: 'bug', _id: b.bugId, _sortDate: b.updatedAt || b.createdAt })),
+                ...reqs.map(r => ({ ...r, _type: 'req', _id: r.requirementId, _sortDate: r.updatedAt || r.createdAt }))
+            ];
+            // Re-sort the merged list
+            const sorted = sortItems(items, sortKey);
+
+            if (!sorted.length) {
+                container.innerHTML = '<p class="text-gray-400 text-sm p-4 text-center">No items found</p>';
+                return;
+            }
+            container.innerHTML = sorted.map(item => {
+                const key = `${item._type}-${item._id}`;
+                const typeLabel = item._type === 'bug'
+                    ? '<span class="text-xs px-1.5 py-0.5 rounded bg-red-500/20 text-red-300">BUG</span>'
+                    : '<span class="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">REQ</span>';
+                const onclick = item._type === 'bug' ? `openBugModal(${item._id})` : `openReqModal(${item._id})`;
+                return `
+                    <div class="item-row p-3 flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" class="bulk-checkbox" data-key="${key}" onclick="event.stopPropagation(); toggleItemSelection('${key}', this)" ${selectedItems.has(key) ? 'checked' : ''}>
+                        <span class="font-mono text-xs ${priorityClass(item.priority)}">${item.priority}</span>
+                        ${typeLabel}
+                        <span class="font-mono text-xs text-gray-500">${item.code}</span>
+                        ${backlogProjectBadge(item.projectCode)}
+                        <span class="flex-1 text-sm clickable-title" onclick="${onclick}">${item.title}</span>
+                        ${item._type === 'req' && item.referenceURL ? `<a href="${item.referenceURL}" target="_blank" class="text-blue-400 hover:text-blue-300 text-xs" onclick="event.stopPropagation()">link</a>` : ''}
+                        ${statusBadge(item.status)}
+                        <span class="text-xs text-gray-500">${item._sortDate ? new Date(item._sortDate).toLocaleDateString() : ''}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Bug modal
+        function populateBugProjectDropdown() {
+            const sel = document.getElementById('bugProject');
+            sel.innerHTML = allProjects.map(p => `<option value="${p.projectId}">${p.projectCode} - ${p.projectName}</option>`).join('');
+        }
+
+        async function openBugModal(bugId = null) {
+            populateBugProjectDropdown();
+            const modal = document.getElementById('bugModal');
+            const title = document.getElementById('bugModalTitle');
+            const deleteBtn = document.getElementById('deleteBugBtn');
+
+            if (bugId) {
+                title.textContent = 'Edit Bug';
+                deleteBtn.classList.remove('hidden');
+                try {
+                    const res = await fetch(`${API}/api/backlog/bugs/${bugId}`);
+                    const bug = await res.json();
+                    document.getElementById('bugId').value = bug.bugId;
+                    document.getElementById('bugProject').value = bug.projectId;
+                    document.getElementById('bugCode').value = bug.code;
+                    document.getElementById('bugTitle').value = bug.title;
+                    document.getElementById('bugDescription').value = bug.description || '';
+                    document.getElementById('bugStatus').value = bug.status;
+                    document.getElementById('bugPriority').value = bug.priority;
+                } catch (err) {
+                    console.error('Failed to load bug:', err);
+                    return;
+                }
+            } else {
+                title.textContent = 'Add Bug';
+                deleteBtn.classList.add('hidden');
+                document.getElementById('bugForm').reset();
+                document.getElementById('bugId').value = '';
+                // Restore last used project
+                if (lastBugProjectId) {
+                    document.getElementById('bugProject').value = lastBugProjectId;
+                }
+                const projId = document.getElementById('bugProject').value;
+                if (projId) {
+                    try {
+                        const codeRes = await fetch(`${API}/api/backlog/next-code/${projId}/bug`);
+                        const codeData = await codeRes.json();
+                        document.getElementById('bugCode').value = codeData.code;
+                    } catch (e) { /* ignore */ }
+                }
+            }
+            modal.classList.remove('hidden');
+        }
+
+        // Auto-generate bug code when project changes
+        document.getElementById('bugProject').addEventListener('change', async (e) => {
+            if (!document.getElementById('bugId').value) {
+                try {
+                    const codeRes = await fetch(`${API}/api/backlog/next-code/${e.target.value}/bug`);
+                    const codeData = await codeRes.json();
+                    document.getElementById('bugCode').value = codeData.code;
+                } catch (err) { /* ignore */ }
+            }
+        });
+
+        document.getElementById('bugForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const bugId = document.getElementById('bugId').value;
+            const projectId = parseInt(document.getElementById('bugProject').value);
+            lastBugProjectId = String(projectId);  // Persist selection
+            const payload = {
+                projectId: projectId,
+                code: document.getElementById('bugCode').value,
+                title: document.getElementById('bugTitle').value,
+                description: document.getElementById('bugDescription').value || null,
+                status: document.getElementById('bugStatus').value,
+                priority: document.getElementById('bugPriority').value
+            };
+
+            try {
+                if (bugId) {
+                    await fetch(`${API}/api/backlog/bugs/${bugId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    await fetch(`${API}/api/backlog/bugs`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+                document.getElementById('bugModal').classList.add('hidden');
+                await loadBacklog();
+            } catch (err) {
+                console.error('Failed to save bug:', err);
+                alert('Failed to save bug');
+            }
+        });
+
+        document.getElementById('deleteBugBtn').addEventListener('click', async () => {
+            const bugId = document.getElementById('bugId').value;
+            if (!bugId || !confirm('Delete this bug?')) return;
+            try {
+                await fetch(`${API}/api/backlog/bugs/${bugId}`, { method: 'DELETE' });
+                document.getElementById('bugModal').classList.add('hidden');
+                await loadBacklog();
+            } catch (err) {
+                console.error('Failed to delete bug:', err);
+            }
+        });
+
+        document.getElementById('closeBugModal').addEventListener('click', () => {
+            document.getElementById('bugModal').classList.add('hidden');
+        });
+
+        // Requirement modal
+        function populateReqProjectDropdown() {
+            const sel = document.getElementById('reqProject');
+            sel.innerHTML = allProjects.map(p => `<option value="${p.projectId}">${p.projectCode} - ${p.projectName}</option>`).join('');
+        }
+
+        async function openReqModal(reqId = null) {
+            populateReqProjectDropdown();
+            const modal = document.getElementById('reqModal');
+            const title = document.getElementById('reqModalTitle');
+            const deleteBtn = document.getElementById('deleteReqBtn');
+
+            if (reqId) {
+                title.textContent = 'Edit Requirement';
+                deleteBtn.classList.remove('hidden');
+                try {
+                    const res = await fetch(`${API}/api/backlog/requirements/${reqId}`);
+                    const req = await res.json();
+                    document.getElementById('reqId').value = req.requirementId;
+                    document.getElementById('reqProject').value = req.projectId;
+                    document.getElementById('reqCode').value = req.code;
+                    document.getElementById('reqTitle').value = req.title;
+                    document.getElementById('reqDescription').value = req.description || '';
+                    document.getElementById('reqReferenceURL').value = req.referenceURL || '';
+                    document.getElementById('reqStatus').value = req.status;
+                    document.getElementById('reqPriority').value = req.priority;
+                } catch (err) {
+                    console.error('Failed to load requirement:', err);
+                    return;
+                }
+            } else {
+                title.textContent = 'Add Requirement';
+                deleteBtn.classList.add('hidden');
+                document.getElementById('reqForm').reset();
+                document.getElementById('reqId').value = '';
+                const projId = document.getElementById('reqProject').value;
+                if (projId) {
+                    try {
+                        const codeRes = await fetch(`${API}/api/backlog/next-code/${projId}/requirement`);
+                        const codeData = await codeRes.json();
+                        document.getElementById('reqCode').value = codeData.code;
+                    } catch (e) { /* ignore */ }
+                }
+            }
+            modal.classList.remove('hidden');
+        }
+
+        // Auto-generate req code when project changes
+        document.getElementById('reqProject').addEventListener('change', async (e) => {
+            if (!document.getElementById('reqId').value) {
+                try {
+                    const codeRes = await fetch(`${API}/api/backlog/next-code/${e.target.value}/requirement`);
+                    const codeData = await codeRes.json();
+                    document.getElementById('reqCode').value = codeData.code;
+                } catch (err) { /* ignore */ }
+            }
+        });
+
+        document.getElementById('reqForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const reqId = document.getElementById('reqId').value;
+            const payload = {
+                projectId: parseInt(document.getElementById('reqProject').value),
+                code: document.getElementById('reqCode').value,
+                title: document.getElementById('reqTitle').value,
+                description: document.getElementById('reqDescription').value || null,
+                referenceURL: document.getElementById('reqReferenceURL').value || null,
+                status: document.getElementById('reqStatus').value,
+                priority: document.getElementById('reqPriority').value
+            };
+
+            try {
+                if (reqId) {
+                    await fetch(`${API}/api/backlog/requirements/${reqId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    await fetch(`${API}/api/backlog/requirements`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+                document.getElementById('reqModal').classList.add('hidden');
+                await loadBacklog();
+            } catch (err) {
+                console.error('Failed to save requirement:', err);
+                alert('Failed to save requirement');
+            }
+        });
+
+        document.getElementById('deleteReqBtn').addEventListener('click', async () => {
+            const reqId = document.getElementById('reqId').value;
+            if (!reqId || !confirm('Delete this requirement?')) return;
+            try {
+                await fetch(`${API}/api/backlog/requirements/${reqId}`, { method: 'DELETE' });
+                document.getElementById('reqModal').classList.add('hidden');
+                await loadBacklog();
+            } catch (err) {
+                console.error('Failed to delete requirement:', err);
+            }
+        });
+
+        document.getElementById('closeReqModal').addEventListener('click', () => {
+            document.getElementById('reqModal').classList.add('hidden');
+        });
+
+        // Add Bug / Add Requirement buttons
+        document.getElementById('addBugBtn').addEventListener('click', () => openBugModal());
+        document.getElementById('addReqBtn').addEventListener('click', () => openReqModal());
+
         // ==================== INIT ====================
         document.getElementById('refreshBtn').addEventListener('click', () => {
             loadTasks();
@@ -2220,6 +3572,7 @@
             loadHistory();
             loadRules();
             loadViolations();
+            loadBacklog();
         });
         
         // Close modals on overlay click
@@ -2235,7 +3588,7 @@
             try {
                 const versionRes = await fetch('/api/version');
                 const versionData = await versionRes.json();
-                const buildLabel = versionData.build ? ` (${versionData.build})` : '';
+                const buildLabel = (versionData.build && versionData.build !== 'unknown') ? ` (${versionData.build})` : '';
                 document.getElementById('versionBadge').textContent = `v${versionData.version}${buildLabel}`;
                 console.log('MetaPM Version:', versionData.version, 'Build:', versionData.build || 'n/a');
             } catch (error) {
@@ -2251,6 +3604,7 @@
             loadHistory();
             loadRules();
             loadViolations();
+            loadBacklog();
         })();
     </script>
 </body>

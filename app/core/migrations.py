@@ -1,0 +1,156 @@
+"""
+MetaPM Database Migrations
+Idempotent schema migrations run at startup.
+"""
+
+import logging
+from app.core.database import execute_query
+
+logger = logging.getLogger(__name__)
+
+
+def run_migrations():
+    """Run all idempotent migrations."""
+    logger.info("Running database migrations...")
+
+    # Migration 1: Add TaskType column to Tasks
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'Tasks' AND COLUMN_NAME = 'TaskType'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 1: Adding TaskType column to Tasks...")
+            execute_query(
+                "ALTER TABLE Tasks ADD TaskType NVARCHAR(20) DEFAULT 'task'",
+                fetch="none"
+            )
+            # Backfill existing tasks based on title prefix
+            execute_query(
+                "UPDATE Tasks SET TaskType = 'bug' WHERE Title LIKE 'BUG-%'",
+                fetch="none"
+            )
+            execute_query(
+                "UPDATE Tasks SET TaskType = 'requirement' WHERE Title LIKE 'REQ-%'",
+                fetch="none"
+            )
+            # Set remaining to 'task'
+            execute_query(
+                "UPDATE Tasks SET TaskType = 'task' WHERE TaskType IS NULL",
+                fetch="none"
+            )
+            logger.info("  Migration 1: TaskType column added and backfilled.")
+        else:
+            logger.info("  Migration 1: TaskType column already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 1 warning: {e}")
+
+    # Migration 2: Create mcp_handoffs table
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'mcp_handoffs'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 2: Creating mcp_handoffs table...")
+            execute_query("""
+                CREATE TABLE mcp_handoffs (
+                    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+                    project NVARCHAR(100) NOT NULL,
+                    task NVARCHAR(200) NOT NULL,
+                    direction NVARCHAR(20) NOT NULL CHECK (direction IN ('cc_to_ai', 'ai_to_cc')),
+                    status NVARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'read', 'processed', 'archived')),
+                    content NVARCHAR(MAX) NOT NULL,
+                    metadata NVARCHAR(MAX),
+                    response_to UNIQUEIDENTIFIER NULL,
+                    created_at DATETIME2 DEFAULT GETUTCDATE(),
+                    updated_at DATETIME2 DEFAULT GETUTCDATE(),
+                    CONSTRAINT FK_handoffs_response FOREIGN KEY (response_to) REFERENCES mcp_handoffs(id)
+                )
+            """, fetch="none")
+            # Create indexes
+            execute_query("CREATE INDEX idx_handoffs_project ON mcp_handoffs(project)", fetch="none")
+            execute_query("CREATE INDEX idx_handoffs_status ON mcp_handoffs(status)", fetch="none")
+            execute_query("CREATE INDEX idx_handoffs_direction ON mcp_handoffs(direction)", fetch="none")
+            execute_query("CREATE INDEX idx_handoffs_created ON mcp_handoffs(created_at DESC)", fetch="none")
+            logger.info("  Migration 2: mcp_handoffs table created.")
+        else:
+            logger.info("  Migration 2: mcp_handoffs table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 2 warning: {e}")
+
+    # Migration 3: Create mcp_tasks table
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'mcp_tasks'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 3: Creating mcp_tasks table...")
+            execute_query("""
+                CREATE TABLE mcp_tasks (
+                    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+                    project NVARCHAR(100) NOT NULL,
+                    title NVARCHAR(500) NOT NULL,
+                    description NVARCHAR(MAX),
+                    priority NVARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('critical', 'high', 'medium', 'low')),
+                    status NVARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'blocked', 'done', 'cancelled')),
+                    assigned_to NVARCHAR(50) CHECK (assigned_to IN ('cc', 'corey', 'claude_ai')),
+                    related_handoff_id UNIQUEIDENTIFIER NULL,
+                    tags NVARCHAR(MAX),
+                    notes NVARCHAR(MAX),
+                    due_date DATETIME2,
+                    created_at DATETIME2 DEFAULT GETUTCDATE(),
+                    updated_at DATETIME2 DEFAULT GETUTCDATE(),
+                    completed_at DATETIME2,
+                    CONSTRAINT FK_tasks_handoff FOREIGN KEY (related_handoff_id) REFERENCES mcp_handoffs(id)
+                )
+            """, fetch="none")
+            # Create indexes
+            execute_query("CREATE INDEX idx_mcp_tasks_project ON mcp_tasks(project)", fetch="none")
+            execute_query("CREATE INDEX idx_mcp_tasks_status ON mcp_tasks(status)", fetch="none")
+            execute_query("CREATE INDEX idx_mcp_tasks_assigned ON mcp_tasks(assigned_to)", fetch="none")
+            execute_query("CREATE INDEX idx_mcp_tasks_priority ON mcp_tasks(priority)", fetch="none")
+            logger.info("  Migration 3: mcp_tasks table created.")
+        else:
+            logger.info("  Migration 3: mcp_tasks table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 3 warning: {e}")
+
+    # Migration 4: Add source/gcs columns to mcp_handoffs for dashboard
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'source'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 4: Adding dashboard columns to mcp_handoffs...")
+            execute_query(
+                "ALTER TABLE mcp_handoffs ADD source NVARCHAR(20) DEFAULT 'api'",
+                fetch="none"
+            )
+            execute_query(
+                "ALTER TABLE mcp_handoffs ADD gcs_path NVARCHAR(500)",
+                fetch="none"
+            )
+            execute_query(
+                "ALTER TABLE mcp_handoffs ADD from_entity NVARCHAR(100)",
+                fetch="none"
+            )
+            execute_query(
+                "ALTER TABLE mcp_handoffs ADD to_entity NVARCHAR(100)",
+                fetch="none"
+            )
+            # Create index on gcs_path for deduplication
+            execute_query("CREATE INDEX idx_handoffs_gcs_path ON mcp_handoffs(gcs_path)", fetch="none")
+            logger.info("  Migration 4: Dashboard columns added.")
+        else:
+            logger.info("  Migration 4: Dashboard columns already exist.")
+    except Exception as e:
+        logger.warning(f"  Migration 4 warning: {e}")
+
+    logger.info("Migrations complete.")

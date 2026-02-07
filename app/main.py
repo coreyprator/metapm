@@ -9,8 +9,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from app.api import tasks, projects, categories, methodology, capture, calendar, themes
+from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp
 from app.core.config import settings
+from app.core.migrations import run_migrations
 from transactions import router as transactions_router
 import logging
 
@@ -27,8 +28,13 @@ app = FastAPI(
 # Log startup to verify deployment
 logger.info(f"=" * 80)
 logger.info(f"MetaPM v{settings.VERSION} STARTING UP")
-logger.info(f"This log message added to verify code deployment")
 logger.info(f"=" * 80)
+
+# Run database migrations
+try:
+    run_migrations()
+except Exception as e:
+    logger.warning(f"Migration warning (non-fatal): {e}")
 
 # Redirect root to dashboard
 @app.get("/")
@@ -53,6 +59,8 @@ app.include_router(capture.router, prefix="/api/capture", tags=["Quick Capture"]
 app.include_router(transactions_router, prefix="/api/transactions", tags=["Transactions & Analytics"])
 app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"])
 app.include_router(themes.router, prefix="/api/themes", tags=["Themes"])
+app.include_router(backlog.router, prefix="/api/backlog", tags=["Backlog"])
+app.include_router(mcp.router, prefix="/mcp", tags=["MCP"])
 
 
 # Define static_dir early for use in routes
@@ -61,6 +69,7 @@ static_dir = Path(__file__).parent.parent / "static"
 
 # Define direct routes BEFORE mounting static files
 @app.get("/health")
+@app.head("/health")
 async def health_check():
     """Health check endpoint for Cloud Run"""
     return {
@@ -99,6 +108,17 @@ async def capture_page():
         return FileResponse(str(capture_file), media_type="text/html")
     from fastapi import HTTPException
     raise HTTPException(status_code=404, detail="Capture page not found")
+
+
+@app.get("/handoffs.html")
+async def handoffs_page():
+    """Serve the Handoff Bridge dashboard"""
+    from fastapi.responses import FileResponse
+    handoffs_file = static_dir / "handoffs.html"
+    if handoffs_file.exists():
+        return FileResponse(str(handoffs_file), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Handoffs page not found")
 
 
 # Mount static files LAST (after all route definitions)

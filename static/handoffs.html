@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>Handoff Bridge | MetaPM</title>
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+
+    <link rel="manifest" href="/static/manifest.json">
+
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #1e293b;
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-muted: #9ca3af;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --accent: #e94560;
+        }
+
+        body.theme-light {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #f1f5f9;
+            --bg-tertiary: #e2e8f0;
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --border-color: rgba(0, 0, 0, 0.1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+        }
+
+        body.theme-light .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header nav {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .header nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .header nav a:hover { background: rgba(255,255,255,0.1); }
+        .header nav a.active { background: var(--accent); color: white; }
+
+        /* Stats bar */
+        .stats-bar {
+            display: flex;
+            gap: 24px;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+        .stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
+
+        /* Filters */
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            padding: 12px 24px;
+            gap: 16px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-group label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .filter-select, .filter-input {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: rgba(255,255,255,0.05);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+
+        body.theme-light .filter-select,
+        body.theme-light .filter-input {
+            background: rgba(0,0,0,0.03);
+        }
+
+        .filter-select option { background: var(--bg-tertiary); }
+        body.theme-light .filter-select option { background: white; }
+
+        .search-box {
+            margin-left: auto;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 200px;
+            padding: 6px 12px 6px 32px;
+        }
+
+        .search-box::before {
+            content: "\\1F50D";
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 14px;
+        }
+
+        /* Table */
+        .table-container {
+            margin: 16px 24px;
+            overflow-x: auto;
+        }
+
+        .handoffs-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .handoffs-table th {
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+
+        .handoffs-table th:hover { color: var(--text-primary); }
+        .handoffs-table th.sorted { color: var(--accent); }
+        .handoffs-table th.sorted::after { content: " \\25BC"; font-size: 0.6rem; }
+        .handoffs-table th.sorted.asc::after { content: " \\25B2"; }
+
+        .handoffs-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.875rem;
+        }
+
+        .handoffs-table tr:hover {
+            background: rgba(255,255,255,0.05);
+            cursor: pointer;
+        }
+
+        body.theme-light .handoffs-table tr:hover {
+            background: rgba(0,0,0,0.03);
+        }
+
+        /* Status badges */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-pending { background: #3b82f6; color: white; }
+        .status-read { background: #f59e0b; color: white; }
+        .status-processed { background: #22c55e; color: white; }
+        .status-archived { background: #6b7280; color: white; }
+
+        /* Direction badges */
+        .direction-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .direction-badge.to-cc { color: #3b82f6; }
+        .direction-badge.to-ai { color: #22c55e; }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .pagination-info { font-size: 0.875rem; color: var(--text-muted); }
+
+        .pagination-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .pagination-buttons button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: rgba(255,255,255,0.05);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pagination-buttons button:hover:not(:disabled) {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .pagination-buttons button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Detail panel */
+        .detail-panel {
+            position: fixed;
+            top: 0;
+            right: -500px;
+            width: 500px;
+            max-width: 100%;
+            height: 100vh;
+            background: var(--bg-tertiary);
+            border-left: 1px solid var(--border-color);
+            transition: right 0.3s ease;
+            z-index: 100;
+            overflow-y: auto;
+        }
+
+        .detail-panel.open { right: 0; }
+
+        .detail-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .detail-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .detail-body { padding: 20px; }
+
+        .detail-meta {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .detail-meta-item {
+            display: flex;
+            justify-content: space-between;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .detail-meta-label { color: var(--text-muted); font-size: 0.875rem; }
+        .detail-meta-value { font-weight: 500; }
+
+        .detail-preview {
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        body.theme-light .detail-preview {
+            background: rgba(0,0,0,0.05);
+        }
+
+        .detail-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { filter: brightness(1.1); }
+        .btn-secondary { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+        .btn-secondary:hover { background: rgba(255,255,255,0.2); }
+
+        /* Overlay */
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+            z-index: 90;
+        }
+
+        .overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Loading state */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        .loading::after {
+            content: "";
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .header { flex-direction: column; gap: 12px; }
+            .header nav { width: 100%; justify-content: center; }
+            .stats-bar { flex-wrap: wrap; }
+            .filter-bar { padding: 12px 16px; }
+            .search-box { width: 100%; margin-left: 0; margin-top: 8px; }
+            .search-box input { width: 100%; }
+            .table-container { margin: 12px; }
+            .handoffs-table td, .handoffs-table th { padding: 8px 12px; }
+            .detail-panel { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>Handoff Bridge</h1>
+        <nav>
+            <a href="/static/dashboard.html">Dashboard</a>
+            <a href="/static/handoffs.html" class="active">Handoffs</a>
+            <a href="/static/capture.html">Capture</a>
+        </nav>
+    </header>
+
+    <div class="stats-bar" id="statsBar">
+        <div class="stat-item">
+            <span class="stat-value" id="statTotal">-</span>
+            <span class="stat-label">Total Handoffs</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-value" id="statPending">-</span>
+            <span class="stat-label">Pending</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-value" id="statToCC">-</span>
+            <span class="stat-label">To CC</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-value" id="statToAI">-</span>
+            <span class="stat-label">To Claude.ai</span>
+        </div>
+    </div>
+
+    <div class="filter-bar">
+        <div class="filter-group">
+            <label>Project</label>
+            <select class="filter-select" id="filterProject">
+                <option value="">All Projects</option>
+                <option value="ArtForge">ArtForge</option>
+                <option value="harmonylab">HarmonyLab</option>
+                <option value="Super-Flashcards">Super-Flashcards</option>
+                <option value="metapm">MetaPM</option>
+                <option value="Etymython">Etymython</option>
+                <option value="project-methodology">project-methodology</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Status</label>
+            <select class="filter-select" id="filterStatus">
+                <option value="">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="read">Read</option>
+                <option value="processed">Processed</option>
+                <option value="archived">Archived</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Direction</label>
+            <select class="filter-select" id="filterDirection">
+                <option value="">All Directions</option>
+                <option value="ai_to_cc">To CC</option>
+                <option value="cc_to_ai">To Claude.ai</option>
+            </select>
+        </div>
+        <div class="filter-group search-box">
+            <input type="text" class="filter-input" id="filterSearch" placeholder="Search handoffs...">
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table class="handoffs-table">
+            <thead>
+                <tr>
+                    <th data-sort="project">Project</th>
+                    <th data-sort="task">Title</th>
+                    <th data-sort="status">Status</th>
+                    <th data-sort="direction">Direction</th>
+                    <th data-sort="created_at" class="sorted">Date</th>
+                </tr>
+            </thead>
+            <tbody id="handoffsBody">
+                <tr><td colspan="5" class="loading">Loading handoffs</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="pagination">
+        <span class="pagination-info" id="paginationInfo">Showing 0 of 0</span>
+        <div class="pagination-buttons">
+            <button id="prevBtn" disabled>Prev</button>
+            <button id="nextBtn" disabled>Next</button>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+
+    <div class="detail-panel" id="detailPanel">
+        <div class="detail-header">
+            <h2 id="detailTitle">Handoff Details</h2>
+            <button class="detail-close" id="detailClose">&times;</button>
+        </div>
+        <div class="detail-body">
+            <div class="detail-meta" id="detailMeta"></div>
+            <h3 style="margin-bottom: 12px; font-size: 0.875rem; color: var(--text-muted);">Preview</h3>
+            <div class="detail-preview" id="detailPreview"></div>
+            <div class="detail-actions">
+                <a class="btn btn-primary" id="viewFullBtn" href="#" target="_blank">View Full</a>
+                <button class="btn btn-secondary" id="markDoneBtn">Mark as Done</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let currentPage = 1;
+        let currentSort = 'created_at';
+        let currentOrder = 'desc';
+        let totalPages = 0;
+        let selectedHandoff = null;
+
+        // DOM elements
+        const handoffsBody = document.getElementById('handoffsBody');
+        const paginationInfo = document.getElementById('paginationInfo');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const detailPanel = document.getElementById('detailPanel');
+        const overlay = document.getElementById('overlay');
+        const detailClose = document.getElementById('detailClose');
+
+        // Format date
+        function formatDate(isoString) {
+            if (!isoString) return '-';
+            const d = new Date(isoString);
+            const month = d.getMonth() + 1;
+            const day = d.getDate();
+            const hours = d.getHours();
+            const mins = d.getMinutes().toString().padStart(2, '0');
+            const ampm = hours >= 12 ? 'pm' : 'am';
+            const h12 = hours % 12 || 12;
+            return `${month}/${day} ${h12}:${mins}${ampm}`;
+        }
+
+        // Load stats
+        async function loadStats() {
+            try {
+                const res = await fetch('/mcp/handoffs/stats');
+                const data = await res.json();
+                document.getElementById('statTotal').textContent = data.total || 0;
+                document.getElementById('statPending').textContent = data.by_status?.pending || 0;
+                document.getElementById('statToCC').textContent = data.by_direction?.ai_to_cc || 0;
+                document.getElementById('statToAI').textContent = data.by_direction?.cc_to_ai || 0;
+            } catch (e) {
+                console.error('Error loading stats:', e);
+            }
+        }
+
+        // Load handoffs
+        async function loadHandoffs() {
+            const project = document.getElementById('filterProject').value;
+            const status = document.getElementById('filterStatus').value;
+            const direction = document.getElementById('filterDirection').value;
+            const search = document.getElementById('filterSearch').value;
+
+            const params = new URLSearchParams({
+                page: currentPage,
+                limit: 10,
+                sort: currentSort,
+                order: currentOrder
+            });
+            if (project) params.append('project', project);
+            if (status) params.append('status', status);
+            if (direction) params.append('direction', direction);
+            if (search) params.append('search', search);
+
+            handoffsBody.innerHTML = '<tr><td colspan="5" class="loading">Loading handoffs</td></tr>';
+
+            try {
+                const res = await fetch(`/mcp/handoffs/dashboard?${params}`);
+                const data = await res.json();
+
+                totalPages = data.pages;
+
+                if (data.handoffs.length === 0) {
+                    handoffsBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-muted)">No handoffs found</td></tr>';
+                } else {
+                    handoffsBody.innerHTML = data.handoffs.map(h => `
+                        <tr onclick="showDetail('${h.id}', ${JSON.stringify(h).replace(/"/g, '&quot;')})">
+                            <td>${h.project_emoji} ${h.project}</td>
+                            <td>${h.task}</td>
+                            <td><span class="status-badge status-${h.status}">${h.status}</span></td>
+                            <td>
+                                <span class="direction-badge ${h.direction === 'ai_to_cc' ? 'to-cc' : 'to-ai'}">
+                                    ${h.direction === 'ai_to_cc' ? '&rarr; CC' : '&larr; Claude.ai'}
+                                </span>
+                            </td>
+                            <td>${formatDate(h.created_at)}</td>
+                        </tr>
+                    `).join('');
+                }
+
+                const start = (currentPage - 1) * 10 + 1;
+                const end = Math.min(currentPage * 10, data.total);
+                paginationInfo.textContent = `Showing ${start}-${end} of ${data.total}`;
+
+                prevBtn.disabled = currentPage <= 1;
+                nextBtn.disabled = currentPage >= totalPages;
+
+            } catch (e) {
+                console.error('Error loading handoffs:', e);
+                handoffsBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:#ef4444">Error loading handoffs</td></tr>';
+            }
+        }
+
+        // Show detail panel
+        function showDetail(id, handoff) {
+            selectedHandoff = handoff;
+
+            document.getElementById('detailTitle').textContent = `${handoff.project_emoji} ${handoff.task}`;
+
+            document.getElementById('detailMeta').innerHTML = `
+                <div class="detail-meta-item">
+                    <span class="detail-meta-label">From</span>
+                    <span class="detail-meta-value">${handoff.from_entity || '-'}</span>
+                </div>
+                <div class="detail-meta-item">
+                    <span class="detail-meta-label">To</span>
+                    <span class="detail-meta-value">${handoff.to_entity || '-'}</span>
+                </div>
+                <div class="detail-meta-item">
+                    <span class="detail-meta-label">Project</span>
+                    <span class="detail-meta-value">${handoff.project}</span>
+                </div>
+                <div class="detail-meta-item">
+                    <span class="detail-meta-label">Created</span>
+                    <span class="detail-meta-value">${formatDate(handoff.created_at)}</span>
+                </div>
+                <div class="detail-meta-item">
+                    <span class="detail-meta-label">Status</span>
+                    <span class="detail-meta-value"><span class="status-badge status-${handoff.status}">${handoff.status}</span></span>
+                </div>
+                <div class="detail-meta-item">
+                    <span class="detail-meta-label">Source</span>
+                    <span class="detail-meta-value">${handoff.source || 'api'}</span>
+                </div>
+            `;
+
+            document.getElementById('detailPreview').textContent = handoff.preview || 'No preview available';
+            document.getElementById('viewFullBtn').href = handoff.public_url;
+
+            detailPanel.classList.add('open');
+            overlay.classList.add('visible');
+        }
+
+        // Close detail panel
+        function closeDetail() {
+            detailPanel.classList.remove('open');
+            overlay.classList.remove('visible');
+            selectedHandoff = null;
+        }
+
+        // Sort
+        document.querySelectorAll('.handoffs-table th[data-sort]').forEach(th => {
+            th.addEventListener('click', () => {
+                const sort = th.dataset.sort;
+                if (currentSort === sort) {
+                    currentOrder = currentOrder === 'desc' ? 'asc' : 'desc';
+                } else {
+                    currentSort = sort;
+                    currentOrder = 'desc';
+                }
+
+                document.querySelectorAll('.handoffs-table th').forEach(t => {
+                    t.classList.remove('sorted', 'asc');
+                });
+                th.classList.add('sorted');
+                if (currentOrder === 'asc') th.classList.add('asc');
+
+                currentPage = 1;
+                loadHandoffs();
+            });
+        });
+
+        // Pagination
+        prevBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                loadHandoffs();
+            }
+        });
+
+        nextBtn.addEventListener('click', () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadHandoffs();
+            }
+        });
+
+        // Filters
+        ['filterProject', 'filterStatus', 'filterDirection'].forEach(id => {
+            document.getElementById(id).addEventListener('change', () => {
+                currentPage = 1;
+                loadHandoffs();
+            });
+        });
+
+        // Search with debounce
+        let searchTimeout;
+        document.getElementById('filterSearch').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                currentPage = 1;
+                loadHandoffs();
+            }, 300);
+        });
+
+        // Detail panel close
+        detailClose.addEventListener('click', closeDetail);
+        overlay.addEventListener('click', closeDetail);
+
+        // Mark as done
+        document.getElementById('markDoneBtn').addEventListener('click', async () => {
+            if (!selectedHandoff) return;
+            // Would need API key for this - just close for now
+            alert('Status update requires authentication. Use the API directly.');
+        });
+
+        // Theme (match dashboard)
+        const savedTheme = localStorage.getItem('metapm-theme');
+        if (savedTheme === 'light') {
+            document.body.classList.add('theme-light');
+        }
+
+        // Initial load
+        loadStats();
+        loadHandoffs();
+    </script>
+</body>
+</html>
