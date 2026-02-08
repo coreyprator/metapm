@@ -438,6 +438,70 @@
 
         .compliance-item a:hover { text-decoration: underline; }
 
+        /* GCS link in table */
+        .gcs-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            background: rgba(233, 69, 96, 0.15);
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .gcs-link:hover {
+            background: rgba(233, 69, 96, 0.3);
+            text-decoration: none;
+        }
+
+        /* Verify button */
+        .btn-verify {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+        .btn-verify:hover {
+            background: rgba(34, 197, 94, 0.3);
+        }
+        .btn-verify.loading::after {
+            content: "";
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid var(--success);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 8px;
+        }
+
+        /* Content preview section */
+        .content-section {
+            margin-top: 20px;
+        }
+        .content-section h4 {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .content-full {
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.75rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            color: var(--text-secondary);
+        }
+        body.theme-light .content-full {
+            background: rgba(0,0,0,0.05);
+        }
+
         .detail-preview {
             background: rgba(0,0,0,0.2);
             border-radius: 8px;
@@ -670,11 +734,18 @@
                 <div class="compliance-list" id="complianceList"></div>
             </div>
 
-            <h3 style="margin-bottom: 12px; font-size: 0.875rem; color: var(--text-muted);">Preview</h3>
-            <div class="detail-preview" id="detailPreview"></div>
+            <div class="content-section">
+                <h4>
+                    Content
+                    <button class="btn btn-secondary" id="copyContentBtn" style="padding: 4px 8px; font-size: 0.7rem;">Copy</button>
+                </h4>
+                <div class="content-full" id="detailContent">Loading...</div>
+            </div>
+
             <div class="detail-actions">
                 <a class="btn btn-primary" id="viewFullBtn" href="#" target="_blank">View Full</a>
-                <button class="btn btn-secondary" id="markDoneBtn">Mark as Done</button>
+                <button class="btn btn-verify" id="verifyGcsBtn">Verify GCS</button>
+                <button class="btn btn-secondary" id="markDoneBtn">Mark Done</button>
             </div>
         </div>
     </div>
@@ -794,7 +865,7 @@
                                 </span>
                             </td>
                             <td>${formatDate(h.created_at)}</td>
-                            <td class="col-compliance">${getComplianceIcon(h.gcs_synced)}</td>
+                            <td class="col-compliance">${h.gcs_url ? `<a href="${h.gcs_url.replace('gs://', 'https://storage.googleapis.com/')}" target="_blank" class="gcs-link" title="${h.gcs_url}">View</a>` : getComplianceIcon(h.gcs_synced)}</td>
                             <td class="col-compliance">
                                 <span class="compliance-score ${getScoreClass(h.compliance_score || 100)}">
                                     ${h.compliance_score || 100}%
@@ -818,7 +889,7 @@
         }
 
         // Show detail panel
-        function showDetail(id, handoff) {
+        async function showDetail(id, handoff) {
             selectedHandoff = handoff;
 
             document.getElementById('detailTitle').textContent = `${handoff.project_emoji || ''} ${handoff.title || handoff.task}`;
@@ -873,11 +944,30 @@
                 </div>
             `;
 
-            document.getElementById('detailPreview').textContent = handoff.summary || handoff.preview || 'No preview available';
+            // Update button states
+            const verifyBtn = document.getElementById('verifyGcsBtn');
+            verifyBtn.disabled = !gcsUrl;
+            verifyBtn.style.opacity = gcsUrl ? '1' : '0.5';
+
             document.getElementById('viewFullBtn').href = handoff.public_url || '#';
 
             detailPanel.classList.add('open');
             overlay.classList.add('visible');
+
+            // Load full content
+            const contentEl = document.getElementById('detailContent');
+            contentEl.textContent = 'Loading content...';
+            try {
+                const res = await fetch(`/mcp/handoffs/${id}/content`);
+                if (res.ok) {
+                    const content = await res.text();
+                    contentEl.textContent = content || 'No content available';
+                } else {
+                    contentEl.textContent = 'Failed to load content';
+                }
+            } catch (e) {
+                contentEl.textContent = 'Error loading content: ' + e.message;
+            }
         }
 
         // Close detail panel
@@ -958,6 +1048,52 @@
         document.getElementById('markDoneBtn').addEventListener('click', async () => {
             if (!selectedHandoff) return;
             alert('Status update requires authentication. Use the API directly.');
+        });
+
+        // Verify GCS sync
+        document.getElementById('verifyGcsBtn').addEventListener('click', async () => {
+            if (!selectedHandoff || !selectedHandoff.gcs_url) return;
+            const btn = document.getElementById('verifyGcsBtn');
+            const originalText = btn.textContent;
+            btn.classList.add('loading');
+            btn.textContent = 'Verifying';
+
+            try {
+                const gcsHttpUrl = selectedHandoff.gcs_url.replace('gs://', 'https://storage.googleapis.com/');
+                const res = await fetch(gcsHttpUrl, { method: 'HEAD' });
+                if (res.ok) {
+                    btn.textContent = 'Verified OK';
+                    btn.style.background = 'rgba(34, 197, 94, 0.3)';
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                        btn.style.background = '';
+                    }, 2000);
+                } else {
+                    btn.textContent = 'Not Found';
+                    btn.style.background = 'rgba(239, 68, 68, 0.3)';
+                    btn.style.color = 'var(--error)';
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                        btn.style.background = '';
+                        btn.style.color = '';
+                    }, 2000);
+                }
+            } catch (e) {
+                btn.textContent = 'Error';
+                btn.style.background = 'rgba(239, 68, 68, 0.3)';
+            }
+            btn.classList.remove('loading');
+        });
+
+        // Copy content
+        document.getElementById('copyContentBtn').addEventListener('click', () => {
+            const content = document.getElementById('detailContent').textContent;
+            navigator.clipboard.writeText(content).then(() => {
+                const btn = document.getElementById('copyContentBtn');
+                const original = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = original, 1500);
+            });
         });
 
         // Theme (match dashboard)

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "1.9.0"  # Phase 4 Final: Dashboard with SQL primary store
+    VERSION: str = "1.9.1"  # Bug fixes: clickable GCS links, content view, verify button
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
