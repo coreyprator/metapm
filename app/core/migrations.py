@@ -275,17 +275,17 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 7 warning: {e}")
 
-    # Migration 8: Create projects table (v2.0.0 Roadmap Feature)
+    # Migration 8: Create roadmap_projects table (v2.0.0 Roadmap Feature)
     try:
         result = execute_query("""
             SELECT COUNT(*) as cnt
             FROM INFORMATION_SCHEMA.TABLES
-            WHERE TABLE_NAME = 'projects'
+            WHERE TABLE_NAME = 'roadmap_projects'
         """, fetch="one")
         if result and result['cnt'] == 0:
-            logger.info("  Migration 8: Creating projects table...")
+            logger.info("  Migration 8: Creating roadmap_projects table...")
             execute_query("""
-                CREATE TABLE projects (
+                CREATE TABLE roadmap_projects (
                     id NVARCHAR(36) PRIMARY KEY,
                     code NVARCHAR(10) NOT NULL UNIQUE,
                     name NVARCHAR(100) NOT NULL,
@@ -299,25 +299,25 @@ def run_migrations():
                     updated_at DATETIME2 DEFAULT GETDATE()
                 )
             """, fetch="none")
-            execute_query("CREATE INDEX idx_projects_code ON projects(code)", fetch="none")
-            execute_query("CREATE INDEX idx_projects_status ON projects(status)", fetch="none")
-            logger.info("  Migration 8: projects table created.")
+            execute_query("CREATE INDEX idx_roadmap_projects_code ON roadmap_projects(code)", fetch="none")
+            execute_query("CREATE INDEX idx_roadmap_projects_status ON roadmap_projects(status)", fetch="none")
+            logger.info("  Migration 8: roadmap_projects table created.")
         else:
-            logger.info("  Migration 8: projects table already exists.")
+            logger.info("  Migration 8: roadmap_projects table already exists.")
     except Exception as e:
         logger.warning(f"  Migration 8 warning: {e}")
 
-    # Migration 9: Create sprints table (v2.0.0 Roadmap Feature)
+    # Migration 9: Create roadmap_sprints table (v2.0.0 Roadmap Feature)
     try:
         result = execute_query("""
             SELECT COUNT(*) as cnt
             FROM INFORMATION_SCHEMA.TABLES
-            WHERE TABLE_NAME = 'sprints'
+            WHERE TABLE_NAME = 'roadmap_sprints'
         """, fetch="one")
         if result and result['cnt'] == 0:
-            logger.info("  Migration 9: Creating sprints table...")
+            logger.info("  Migration 9: Creating roadmap_sprints table...")
             execute_query("""
-                CREATE TABLE sprints (
+                CREATE TABLE roadmap_sprints (
                     id NVARCHAR(36) PRIMARY KEY,
                     name NVARCHAR(100) NOT NULL,
                     description NVARCHAR(MAX),
@@ -327,24 +327,24 @@ def run_migrations():
                     created_at DATETIME2 DEFAULT GETDATE()
                 )
             """, fetch="none")
-            execute_query("CREATE INDEX idx_sprints_status ON sprints(status)", fetch="none")
-            logger.info("  Migration 9: sprints table created.")
+            execute_query("CREATE INDEX idx_roadmap_sprints_status ON roadmap_sprints(status)", fetch="none")
+            logger.info("  Migration 9: roadmap_sprints table created.")
         else:
-            logger.info("  Migration 9: sprints table already exists.")
+            logger.info("  Migration 9: roadmap_sprints table already exists.")
     except Exception as e:
         logger.warning(f"  Migration 9 warning: {e}")
 
-    # Migration 10: Create requirements table (v2.0.0 Roadmap Feature)
+    # Migration 10: Create roadmap_requirements table (v2.0.0 Roadmap Feature)
     try:
         result = execute_query("""
             SELECT COUNT(*) as cnt
             FROM INFORMATION_SCHEMA.TABLES
-            WHERE TABLE_NAME = 'requirements'
+            WHERE TABLE_NAME = 'roadmap_requirements'
         """, fetch="one")
         if result and result['cnt'] == 0:
-            logger.info("  Migration 10: Creating requirements table...")
+            logger.info("  Migration 10: Creating roadmap_requirements table...")
             execute_query("""
-                CREATE TABLE requirements (
+                CREATE TABLE roadmap_requirements (
                     id NVARCHAR(36) PRIMARY KEY,
                     project_id NVARCHAR(36) NOT NULL,
                     code NVARCHAR(20) NOT NULL,
@@ -359,19 +359,19 @@ def run_migrations():
                     uat_id UNIQUEIDENTIFIER,
                     created_at DATETIME2 DEFAULT GETDATE(),
                     updated_at DATETIME2 DEFAULT GETDATE(),
-                    CONSTRAINT FK_requirements_project FOREIGN KEY (project_id) REFERENCES projects(id),
-                    CONSTRAINT FK_requirements_sprint FOREIGN KEY (sprint_id) REFERENCES sprints(id),
-                    CONSTRAINT FK_requirements_handoff FOREIGN KEY (handoff_id) REFERENCES mcp_handoffs(id),
-                    CONSTRAINT FK_requirements_uat FOREIGN KEY (uat_id) REFERENCES uat_results(id)
+                    CONSTRAINT FK_roadmap_req_project FOREIGN KEY (project_id) REFERENCES roadmap_projects(id),
+                    CONSTRAINT FK_roadmap_req_sprint FOREIGN KEY (sprint_id) REFERENCES roadmap_sprints(id),
+                    CONSTRAINT FK_roadmap_req_handoff FOREIGN KEY (handoff_id) REFERENCES mcp_handoffs(id),
+                    CONSTRAINT FK_roadmap_req_uat FOREIGN KEY (uat_id) REFERENCES uat_results(id)
                 )
             """, fetch="none")
-            execute_query("CREATE INDEX idx_requirements_project ON requirements(project_id)", fetch="none")
-            execute_query("CREATE INDEX idx_requirements_status ON requirements(status)", fetch="none")
-            execute_query("CREATE INDEX idx_requirements_sprint ON requirements(sprint_id)", fetch="none")
-            execute_query("CREATE INDEX idx_requirements_code ON requirements(code)", fetch="none")
-            logger.info("  Migration 10: requirements table created.")
+            execute_query("CREATE INDEX idx_roadmap_req_project ON roadmap_requirements(project_id)", fetch="none")
+            execute_query("CREATE INDEX idx_roadmap_req_status ON roadmap_requirements(status)", fetch="none")
+            execute_query("CREATE INDEX idx_roadmap_req_sprint ON roadmap_requirements(sprint_id)", fetch="none")
+            execute_query("CREATE INDEX idx_roadmap_req_code ON roadmap_requirements(code)", fetch="none")
+            logger.info("  Migration 10: roadmap_requirements table created.")
         else:
-            logger.info("  Migration 10: requirements table already exists.")
+            logger.info("  Migration 10: roadmap_requirements table already exists.")
     except Exception as e:
         logger.warning(f"  Migration 10 warning: {e}")
 

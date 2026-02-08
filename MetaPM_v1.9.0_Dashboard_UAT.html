@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔴 MetaPM v1.9.0 — Dashboard UAT</title>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #252538;
+            --accent-red: #ef4444;
+            --accent-success: #22c55e;
+            --accent-danger: #ef4444;
+            --text-primary: #e5e5e5;
+            --text-muted: #9ca3af;
+            --border-color: #3a3a52;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+        
+        header h1 { font-size: 1.4rem; margin-bottom: 8px; }
+        header p { opacity: 0.9; font-size: 0.9rem; }
+        
+        .meta {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+            font-size: 0.85rem;
+        }
+        
+        .meta span {
+            background: rgba(255,255,255,0.15);
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+
+        .bugs-found {
+            background: #450a0a;
+            border: 2px solid #ef4444;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .bugs-found h3 { color: #fca5a5; margin-bottom: 10px; }
+        .bugs-found ul { margin-left: 20px; }
+        .bugs-found li { margin-bottom: 6px; color: #fca5a5; }
+
+        .url-link {
+            display: block;
+            background: #0f172a;
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin: 10px 0 20px 0;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .url-link a { color: #f87171; text-decoration: none; }
+        .url-link a:hover { text-decoration: underline; }
+        
+        section {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        
+        section h2 {
+            color: #f87171;
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--accent-red);
+        }
+        
+        .test-item {
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .test-item:last-child { border-bottom: none; }
+        
+        .test-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        
+        .test-content { flex: 1; }
+        
+        .test-label {
+            font-weight: 500;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .test-id {
+            font-family: monospace;
+            background: #3a3a52;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-right: 8px;
+        }
+
+        .bug-tag {
+            background: #991b1b;
+            color: #fecaca;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-left: 8px;
+        }
+        
+        .expected {
+            color: #a78bfa;
+            font-size: 0.85rem;
+            font-style: italic;
+        }
+        
+        .test-buttons { display: flex; gap: 6px; }
+        
+        .btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+        
+        .btn-pass { background: #166534; color: #bbf7d0; }
+        .btn-pass:hover, .btn-pass.selected { background: var(--accent-success); color: white; }
+        
+        .btn-fail { background: #991b1b; color: #fecaca; }
+        .btn-fail:hover, .btn-fail.selected { background: var(--accent-danger); color: white; }
+        
+        .test-item.passed .test-label { color: #4ade80; }
+        .test-item.failed .test-label { color: #f87171; }
+        
+        .notes-container { margin-top: 10px; }
+        .notes-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .notes-label::before { content: "📝"; font-size: 0.9rem; }
+        .notes-input {
+            width: 100%;
+            padding: 8px 10px;
+            background: #1e1e32;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: vertical;
+            min-height: 40px;
+        }
+        .notes-input:focus { outline: none; border-color: #ef4444; }
+        .notes-input::placeholder { color: #6b7280; }
+        .notes-input:not(:placeholder-shown) { border-color: #3b82f6; background: #1e2a3f; }
+        
+        .summary {
+            background: #1e1e32;
+            border: 2px solid var(--accent-red);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 24px;
+        }
+        
+        .summary h3 { margin-bottom: 16px; }
+        
+        .summary-stats {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        
+        .stat {
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .stat.total { background: var(--accent-red); }
+        .stat.passed { background: var(--accent-success); }
+        .stat.failed { background: var(--accent-danger); }
+        .stat.notes { background: #3b82f6; }
+        
+        .overall-result {
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 16px;
+        }
+        
+        .overall-result.pending { background: #374151; border: 2px dashed #6b7280; }
+        .overall-result.pass { background: #166534; border: 2px solid var(--accent-success); }
+        .overall-result.fail { background: #991b1b; border: 2px solid var(--accent-danger); }
+        
+        .overall-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+        
+        .overall-btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .overall-btn.approve { background: var(--accent-success); color: white; }
+        .overall-btn.reject { background: var(--accent-danger); color: white; }
+        
+        .copy-btn {
+            background: var(--accent-red);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🔴 MetaPM v1.9.0 — Handoff Dashboard UAT</h1>
+        <p>First UAT of the Handoff Dashboard feature</p>
+        <div class="meta">
+            <span>Version: 1.9.0</span>
+            <span>Revision: metapm-v2-00033-kvc</span>
+            <span>Handoffs imported: 30</span>
+            <span id="test-date"></span>
+        </div>
+    </header>
+
+    <div class="bugs-found">
+        <h3>🐛 Bugs Already Found</h3>
+        <ul>
+            <li><strong>BUG-001:</strong> All handoffs show "pending" — should be "done" (imported from completed GCS)</li>
+            <li><strong>BUG-002:</strong> No clickable URL to view handoff content</li>
+            <li><strong>BUG-003:</strong> Can't inspect/verify history backup</li>
+        </ul>
+    </div>
+
+    <div class="url-link">
+        <a href="https://metapm.rentyourcio.com/static/handoffs.html" target="_blank">https://metapm.rentyourcio.com/static/handoffs.html</a>
+    </div>
+
+    <section>
+        <h2>1. Dashboard Loads</h2>
+        
+        <div class="test-item" data-test="load1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Dashboard page loads without error</span>
+                    <span class="expected">→ Page renders, no console errors</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="Add context, feedback, or observations..."></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="load2">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Handoffs table populated</span>
+                    <span class="expected">→ Shows 30+ handoffs (imported from GCS)</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="How many handoffs shown?"></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>2. Status Display <span class="bug-tag">BUG-001</span></h2>
+        
+        <div class="test-item" data-test="status1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Imported handoffs show correct status</span>
+                    <span class="expected">→ Should show "done" not "pending" (these are completed handoffs from GCS)</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="What status is shown?"></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="status2">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Status filter works</span>
+                    <span class="expected">→ Can filter by pending/done/archived</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="Does filter exist? Does it work?"></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>3. View Handoff Content <span class="bug-tag">BUG-002</span></h2>
+        
+        <div class="test-item" data-test="view1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Click row → Detail panel shows</span>
+                    <span class="expected">→ Clicking a handoff row opens detail view</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="What happens when you click?"></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="view2">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Detail panel shows full content</span>
+                    <span class="expected">→ Can read the actual handoff markdown</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="Is content visible?"></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="view3">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">GCS URL is clickable</span>
+                    <span class="expected">→ Link to gs:// or https://storage.googleapis.com/ works</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="Is GCS URL shown and clickable?"></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>4. Sorting & Filtering</h2>
+        
+        <div class="test-item" data-test="sort1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Default sort is Date Descending</span>
+                    <span class="expected">→ Newest handoffs at top</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="What's at the top?"></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="sort2">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Can sort by clicking column headers</span>
+                    <span class="expected">→ Click Project, Date, etc. toggles sort</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="Which columns are sortable?"></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="filter1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Filter by Project works</span>
+                    <span class="expected">→ Select "HarmonyLab" → only HarmonyLab handoffs shown</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="Does project filter exist and work?"></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="search1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Search by content works</span>
+                    <span class="expected">→ Search "OAuth" → finds OAuth-related handoffs</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="Is search box present? Does it work?"></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>5. History Verification <span class="bug-tag">BUG-003</span></h2>
+        
+        <div class="test-item" data-test="hist1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Can verify a handoff exists in GCS</span>
+                    <span class="expected">→ Click GCS link → opens in browser → content visible</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="Can you verify backup?"></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="hist2">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">All 6 projects have handoffs</span>
+                    <span class="expected">→ Filter each project, verify handoffs exist</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="Which projects have handoffs?"></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="hist3">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Today's handoffs are present</span>
+                    <span class="expected">→ Dashboard v1.9.0, OAuth complete, Progress fix, etc.</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="What recent handoffs do you see?"></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>6. Stats & Analytics</h2>
+        
+        <div class="test-item" data-test="stats1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Stats summary visible</span>
+                    <span class="expected">→ Total handoffs, by project, this week, etc.</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="What stats are shown?"></textarea>
+            </div>
+        </div>
+    </section>
+
+    <div class="summary">
+        <h3>📊 Results Summary</h3>
+        <div class="summary-stats">
+            <div class="stat total">Total: <span id="total-count">14</span></div>
+            <div class="stat passed">Pass: <span id="pass-count">0</span></div>
+            <div class="stat failed">Fail: <span id="fail-count">0</span></div>
+            <div class="stat notes">Notes: <span id="notes-count">0</span></div>
+        </div>
+
+        <div class="overall-result pending" id="overall-result">
+            <h4>Overall Result</h4>
+            <p style="margin-bottom:12px;opacity:0.8;">Dashboard ready for use?</p>
+            <div class="overall-buttons">
+                <button class="overall-btn approve" onclick="setOverall('pass')">✓ v1.9.0 APPROVED</button>
+                <button class="overall-btn reject" onclick="setOverall('fail')">✗ NEEDS FIXES</button>
+            </div>
+        </div>
+
+        <button class="copy-btn" onclick="copyResults()">📋 Copy Results</button>
+    </div>
+
+    <script>
+        document.getElementById('test-date').textContent = new Date().toLocaleDateString();
+        document.querySelectorAll('.notes-input').forEach(input => {
+            input.addEventListener('input', updateCounts);
+        });
+
+        function setResult(btn, result) {
+            const item = btn.closest('.test-item');
+            const buttons = item.querySelectorAll('.btn');
+            buttons.forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            item.classList.remove('passed', 'failed');
+            item.classList.add(result === 'pass' ? 'passed' : 'failed');
+            updateCounts();
+        }
+
+        function updateCounts() {
+            document.getElementById('pass-count').textContent = document.querySelectorAll('.test-item.passed').length;
+            document.getElementById('fail-count').textContent = document.querySelectorAll('.test-item.failed').length;
+            const notesCount = Array.from(document.querySelectorAll('.notes-input'))
+                .filter(input => input.value.trim().length > 0).length;
+            document.getElementById('notes-count').textContent = notesCount;
+        }
+
+        function setOverall(result) {
+            const container = document.getElementById('overall-result');
+            container.classList.remove('pending', 'pass', 'fail');
+            container.classList.add(result);
+            if (result === 'pass') {
+                container.innerHTML = '<h4 style="color: #4ade80;">✓ v1.9.0 APPROVED</h4><p>Dashboard ready for use.</p>';
+            } else {
+                container.innerHTML = '<h4 style="color: #f87171;">✗ NEEDS FIXES</h4><p>See bugs above. Fix before release.</p>';
+            }
+        }
+
+        function copyResults() {
+            const passed = document.querySelectorAll('.test-item.passed').length;
+            const failed = document.querySelectorAll('.test-item.failed').length;
+            const notesCount = Array.from(document.querySelectorAll('.notes-input'))
+                .filter(input => input.value.trim().length > 0).length;
+            
+            let results = `[MetaPM] 🔴 v1.9.0 Dashboard UAT Results\n${'='.repeat(50)}\n`;
+            results += `Date: ${new Date().toLocaleString()}\n`;
+            results += `Version: 1.9.0\n`;
+            results += `URL: https://metapm.rentyourcio.com/static/handoffs.html\n`;
+            results += `Summary: ${passed} passed, ${failed} failed, ${notesCount} with notes\n`;
+            results += `${'='.repeat(50)}\n\n`;
+
+            results += `KNOWN BUGS:\n`;
+            results += `- BUG-001: All handoffs show "pending" instead of "done"\n`;
+            results += `- BUG-002: No clickable URL to view handoff content\n`;
+            results += `- BUG-003: Can't inspect/verify history backup\n\n`;
+
+            document.querySelectorAll('section').forEach(section => {
+                const h2 = section.querySelector('h2');
+                if (h2) {
+                    results += `${h2.textContent.replace(/BUG-\d+/g, '').trim()}\n${'-'.repeat(40)}\n`;
+                    section.querySelectorAll('.test-item').forEach(item => {
+                        const label = item.querySelector('.test-label').textContent;
+                        const notes = item.querySelector('.notes-input')?.value || '';
+                        let status = '○';
+                        if (item.classList.contains('passed')) status = '✓';
+                        if (item.classList.contains('failed')) status = '✗';
+                        results += `  ${status} ${label}\n`;
+                        if (notes.trim()) results += `      📝 ${notes}\n`;
+                    });
+                    results += '\n';
+                }
+            });
+
+            const overall = document.getElementById('overall-result');
+            if (overall.classList.contains('pass')) results += `OVERALL: ✓ v1.9.0 APPROVED\n`;
+            else if (overall.classList.contains('fail')) results += `OVERALL: ✗ NEEDS FIXES\n`;
+
+            navigator.clipboard.writeText(results).then(() => alert('Results copied!'));
+        }
+    </script>
+</body>
+</html>

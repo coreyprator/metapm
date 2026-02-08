@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<!-- saved from url=(0069)file:///C:/Users/Owner/Downloads/Development_System_Architecture.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Development System Architecture</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 40px;
+            color: #e5e5e5;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 1.8rem;
+            color: #fff;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #9ca3af;
+            margin-bottom: 40px;
+            font-size: 0.95rem;
+        }
+        
+        .diagram {
+            max-width: 1100px;
+            margin: 0 auto;
+            position: relative;
+        }
+        
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: auto auto auto;
+            gap: 30px;
+            align-items: start;
+        }
+        
+        /* Component Boxes */
+        .component {
+            background: #252538;
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        
+        .component h3 {
+            font-size: 1rem;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .component p {
+            font-size: 0.85rem;
+            color: #9ca3af;
+            line-height: 1.5;
+        }
+        
+        .component ul {
+            font-size: 0.8rem;
+            color: #9ca3af;
+            margin-left: 16px;
+            margin-top: 8px;
+        }
+        
+        .component li {
+            margin-bottom: 4px;
+        }
+        
+        /* Color coding */
+        .metapm { border: 2px solid #ef4444; }
+        .metapm h3 { color: #ef4444; }
+        
+        .storage { border: 2px solid #3b82f6; }
+        .storage h3 { color: #3b82f6; }
+        
+        .actor { border: 2px solid #22c55e; }
+        .actor h3 { color: #22c55e; }
+        
+        .projects { border: 2px solid #f97316; }
+        .projects h3 { color: #f97316; }
+        
+        .tools { border: 2px solid #a855f7; }
+        .tools h3 { color: #a855f7; }
+        
+        /* Central MetaPM */
+        .central {
+            grid-column: 2;
+            grid-row: 1;
+        }
+        
+        /* Storage Row */
+        .storage-row {
+            grid-column: 1 / 4;
+            grid-row: 2;
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+        }
+        
+        .storage-item {
+            width: 200px;
+        }
+        
+        /* Actor Row */
+        .actor-row {
+            grid-column: 1 / 4;
+            grid-row: 3;
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+        
+        .actor-item {
+            flex: 1;
+            max-width: 300px;
+        }
+        
+        /* Projects Stack */
+        .projects-stack {
+            position: absolute;
+            top: 60px;
+            left: -20px;
+            width: 180px;
+        }
+        
+        .project-card {
+            background: #1e1e32;
+            border: 1px solid #3a3a52;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: -20px;
+            font-size: 0.8rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        .project-card:nth-child(1) { transform: rotate(-2deg); }
+        .project-card:nth-child(2) { transform: rotate(1deg); margin-left: 5px; }
+        .project-card:nth-child(3) { transform: rotate(-1deg); margin-left: 2px; }
+        .project-card:nth-child(4) { transform: rotate(2deg); margin-left: 8px; }
+        .project-card:nth-child(5) { transform: rotate(-1deg); margin-left: 3px; }
+        .project-card:nth-child(6) { transform: rotate(1deg); margin-left: 6px; }
+        
+        /* Arrows / Connections */
+        .connections {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .arrow {
+            stroke: #4b5563;
+            stroke-width: 2;
+            fill: none;
+            marker-end: url(#arrowhead);
+        }
+        
+        .arrow-bidirectional {
+            stroke: #4b5563;
+            stroke-width: 2;
+            fill: none;
+            marker-end: url(#arrowhead);
+            marker-start: url(#arrowhead-start);
+        }
+        
+        .arrow-label {
+            fill: #9ca3af;
+            font-size: 11px;
+            font-family: inherit;
+        }
+        
+        /* Legend */
+        .legend {
+            margin-top: 40px;
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: #9ca3af;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            .storage-row, .actor-row {
+                flex-direction: column;
+                align-items: center;
+            }
+            .projects-stack {
+                position: relative;
+                top: 0;
+                left: 0;
+                margin-bottom: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🏗️ Development System Architecture</h1>
+    <p class="subtitle">Three-way collaboration: Claude Code (Implementation) ↔ Corey (Dev Lead) ↔ Claude.ai (Architect)</p>
+    
+    <div class="diagram">
+        <!-- Central Hub: MetaPM -->
+        <div style="display: flex; justify-content: center; margin-bottom: 30px;">
+            <div class="component metapm" style="width: 320px; text-align: center;">
+                <h3>🔴 MetaPM MCP Server</h3>
+                <p><strong>Central Hub — Single Source of Truth</strong></p>
+                <ul style="text-align: left;">
+                    <li>SQL Database (handoffs, projects)</li>
+                    <li>Handoff Dashboard</li>
+                    <li>MCP API for Claude.ai</li>
+                    <li>Compliance tracking</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Storage Row -->
+        <div style="display: flex; justify-content: center; gap: 40px; margin-bottom: 30px; flex-wrap: wrap;">
+            <div class="component storage" style="width: 220px;">
+                <h3>📁 Google Drive</h3>
+                <p>Project source code</p>
+                <ul>
+                    <li>G:\My Drive\Code\Python\*</li>
+                    <li>CLAUDE.md files</li>
+                    <li>Generated HANDOFF_LOG.md</li>
+                </ul>
+            </div>
+            
+            <div class="component storage" style="width: 220px;">
+                <h3>☁️ Google Cloud</h3>
+                <p>Cloud infrastructure</p>
+                <ul>
+                    <li>Cloud Run (6 services)</li>
+                    <li>Cloud SQL (databases)</li>
+                    <li>GCS Bucket (handoffs)</li>
+                    <li>Secret Manager</li>
+                </ul>
+            </div>
+            
+            <div class="component storage" style="width: 220px;">
+                <h3>🐙 GitHub</h3>
+                <p>Version control</p>
+                <ul>
+                    <li>All 6 project repos</li>
+                    <li>Commit history</li>
+                    <li>Backup &amp; rollback</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Projects -->
+        <div style="display: flex; justify-content: center; margin-bottom: 30px;">
+            <div class="component projects" style="width: 500px;">
+                <h3>📚 Projects</h3>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+                    <span style="background: #f97316; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">🟠 ArtForge</span>
+                    <span style="background: #3b82f6; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">🔵 HarmonyLab</span>
+                    <span style="background: #eab308; color: black; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">🟡 Super-Flashcards</span>
+                    <span style="background: #ef4444; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">🔴 MetaPM</span>
+                    <span style="background: #a855f7; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">🟣 Etymython</span>
+                    <span style="background: #22c55e; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">🟢 project-methodology</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Actors Row -->
+        <div style="display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
+            <div class="component tools" style="flex: 1; min-width: 250px;">
+                <h3>🤖 Claude Code</h3>
+                <p><strong>Command Center (CC)</strong></p>
+                <p style="margin-top: 8px;">Implementation &amp; Execution</p>
+                <ul>
+                    <li>VS Code + Copilot</li>
+                    <li>Writes code</li>
+                    <li>Runs deployments</li>
+                    <li>Git commits</li>
+                    <li>Sends completion handoffs</li>
+                </ul>
+            </div>
+            
+            <div class="component actor" style="flex: 1; min-width: 250px;">
+                <h3>👤 Corey</h3>
+                <p><strong>Dev Lead / Project Manager</strong></p>
+                <p style="margin-top: 8px;">Direction &amp; QA</p>
+                <ul>
+                    <li>Sets priorities</li>
+                    <li>Reviews handoffs</li>
+                    <li>Runs UAT</li>
+                    <li>Approves releases</li>
+                    <li>Routes between CC ↔ Architect</li>
+                </ul>
+            </div>
+            
+            <div class="component actor" style="flex: 1; min-width: 250px; border-color: #06b6d4;">
+                <h3 style="color: #06b6d4;">🧠 Claude.ai</h3>
+                <p><strong>Architect</strong></p>
+                <p style="margin-top: 8px;">Design &amp; Strategy</p>
+                <ul>
+                    <li>Creates specs &amp; handoffs</li>
+                    <li>Designs architecture</li>
+                    <li>Reviews completions</li>
+                    <li>Creates UAT checklists</li>
+                    <li>MCP API access to MetaPM</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Data Flow Section -->
+        <div style="margin-top: 40px; background: #1e1e32; border-radius: 12px; padding: 20px;">
+            <h3 style="color: #fff; margin-bottom: 15px; text-align: center;">📊 Data Flow</h3>
+            <div style="display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 0.9rem;">
+                <span style="background: #06b6d4; color: white; padding: 6px 12px; border-radius: 4px;">Claude.ai creates spec</span>
+                <span style="color: #4b5563;">→</span>
+                <span style="background: #22c55e; color: white; padding: 6px 12px; border-radius: 4px;">Corey routes to CC</span>
+                <span style="color: #4b5563;">→</span>
+                <span style="background: #a855f7; color: white; padding: 6px 12px; border-radius: 4px;">CC implements</span>
+                <span style="color: #4b5563;">→</span>
+                <span style="background: #ef4444; color: white; padding: 6px 12px; border-radius: 4px;">Handoff to SQL</span>
+                <span style="color: #4b5563;">→</span>
+                <span style="background: #3b82f6; color: white; padding: 6px 12px; border-radius: 4px;">Syncs to GCS</span>
+                <span style="color: #4b5563;">→</span>
+                <span style="background: #22c55e; color: white; padding: 6px 12px; border-radius: 4px;">Corey UAT</span>
+            </div>
+        </div>
+        
+        <!-- Handoff Bridge Section -->
+        <div style="margin-top: 20px; background: #1e1e32; border-radius: 12px; padding: 20px;">
+            <h3 style="color: #fff; margin-bottom: 15px; text-align: center;">🌉 Handoff Bridge</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; font-size: 0.85rem;">
+                <div style="background: #252538; padding: 12px; border-radius: 8px; border-left: 3px solid #ef4444;">
+                    <strong style="color: #ef4444;">SQL Primary</strong>
+                    <p style="color: #9ca3af; margin-top: 4px;">mcp_handoffs table</p>
+                </div>
+                <div style="background: #252538; padding: 12px; border-radius: 8px; border-left: 3px solid #3b82f6;">
+                    <strong style="color: #3b82f6;">GCS Backup</strong>
+                    <p style="color: #9ca3af; margin-top: 4px;">gs://corey-handoff-bridge/</p>
+                </div>
+                <div style="background: #252538; padding: 12px; border-radius: 8px; border-left: 3px solid #22c55e;">
+                    <strong style="color: #22c55e;">Logs Generated</strong>
+                    <p style="color: #9ca3af; margin-top: 4px;">HANDOFF_LOG.md from SQL</p>
+                </div>
+                <div style="background: #252538; padding: 12px; border-radius: 8px; border-left: 3px solid #f97316;">
+                    <strong style="color: #f97316;">web_fetch Access</strong>
+                    <p style="color: #9ca3af; margin-top: 4px;">Public GCS URLs for Claude.ai</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Legend -->
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background: #ef4444;"></div>
+            <span>Central Hub</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #3b82f6;"></div>
+            <span>Storage</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #f97316;"></div>
+            <span>Projects</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #a855f7;"></div>
+            <span>Claude Code</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #22c55e;"></div>
+            <span>Corey</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #06b6d4;"></div>
+            <span>Claude.ai</span>
+        </div>
+    </div>
+    
+    <p style="text-align: center; margin-top: 30px; color: #6b7280; font-size: 0.8rem;">
+        Architecture v1.0 — February 2026
+    </p>
+
+
+</body></html>

@@ -38,7 +38,7 @@ async def list_projects(
 
         # Get count
         count_result = execute_query(
-            f"SELECT COUNT(*) as total FROM projects {where_clause}",
+            f"SELECT COUNT(*) as total FROM roadmap_projects {where_clause}",
             tuple(params) if params else None,
             fetch="one"
         )
@@ -49,7 +49,7 @@ async def list_projects(
         results = execute_query(f"""
             SELECT id, code, name, emoji, color, current_version, status,
                    repo_url, deploy_url, created_at, updated_at
-            FROM projects
+            FROM roadmap_projects
             {where_clause}
             ORDER BY name
             OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
@@ -84,7 +84,7 @@ async def get_project(project_id: str):
         result = execute_query("""
             SELECT id, code, name, emoji, color, current_version, status,
                    repo_url, deploy_url, created_at, updated_at
-            FROM projects WHERE id = ?
+            FROM roadmap_projects WHERE id = ?
         """, (project_id,), fetch="one")
 
         if not result:
@@ -115,7 +115,7 @@ async def create_project(project: ProjectCreate):
     """Create a new project."""
     try:
         execute_query("""
-            INSERT INTO projects (id, code, name, emoji, color, current_version, status, repo_url, deploy_url)
+            INSERT INTO roadmap_projects (id, code, name, emoji, color, current_version, status, repo_url, deploy_url)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             project.id, project.code, project.name, project.emoji, project.color,
@@ -160,7 +160,7 @@ async def update_project(project_id: str, update: ProjectUpdate):
         params.append(project_id)
 
         execute_query(f"""
-            UPDATE projects SET {", ".join(set_clauses)} WHERE id = ?
+            UPDATE roadmap_projects SET {", ".join(set_clauses)} WHERE id = ?
         """, tuple(params), fetch="none")
 
         return await get_project(project_id)
@@ -187,7 +187,7 @@ async def list_sprints(
         params = [status.value] if status else []
 
         count_result = execute_query(
-            f"SELECT COUNT(*) as total FROM sprints {where_clause}",
+            f"SELECT COUNT(*) as total FROM roadmap_sprints {where_clause}",
             tuple(params) if params else None,
             fetch="one"
         )
@@ -196,7 +196,7 @@ async def list_sprints(
         params.extend([offset, limit])
         results = execute_query(f"""
             SELECT id, name, description, status, start_date, end_date, created_at
-            FROM sprints
+            FROM roadmap_sprints
             {where_clause}
             ORDER BY start_date DESC, created_at DESC
             OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
@@ -226,7 +226,7 @@ async def get_sprint(sprint_id: str):
     try:
         result = execute_query("""
             SELECT id, name, description, status, start_date, end_date, created_at
-            FROM sprints WHERE id = ?
+            FROM roadmap_sprints WHERE id = ?
         """, (sprint_id,), fetch="one")
 
         if not result:
@@ -253,7 +253,7 @@ async def create_sprint(sprint: SprintCreate):
     """Create a new sprint."""
     try:
         execute_query("""
-            INSERT INTO sprints (id, name, description, status, start_date, end_date)
+            INSERT INTO roadmap_sprints (id, name, description, status, start_date, end_date)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (
             sprint.id, sprint.name, sprint.description, sprint.status.value,
@@ -292,7 +292,7 @@ async def update_sprint(sprint_id: str, update: SprintUpdate):
         if set_clauses:
             params.append(sprint_id)
             execute_query(f"""
-                UPDATE sprints SET {", ".join(set_clauses)} WHERE id = ?
+                UPDATE roadmap_sprints SET {", ".join(set_clauses)} WHERE id = ?
             """, tuple(params), fetch="none")
 
         return await get_sprint(sprint_id)
@@ -345,8 +345,8 @@ async def list_requirements(
         where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
         count_result = execute_query(f"""
-            SELECT COUNT(*) as total FROM requirements r
-            JOIN projects p ON r.project_id = p.id
+            SELECT COUNT(*) as total FROM roadmap_requirements r
+            JOIN roadmap_projects p ON r.project_id = p.id
             WHERE {where_sql}
         """, tuple(params) if params else None, fetch="one")
         total = count_result['total'] if count_result else 0
@@ -358,8 +358,8 @@ async def list_requirements(
                    r.sprint_id, r.handoff_id, r.uat_id,
                    r.created_at, r.updated_at,
                    p.code as project_code, p.name as project_name, p.emoji as project_emoji
-            FROM requirements r
-            JOIN projects p ON r.project_id = p.id
+            FROM roadmap_requirements r
+            JOIN roadmap_projects p ON r.project_id = p.id
             WHERE {where_sql}
             ORDER BY
                 CASE r.priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 END,
@@ -405,8 +405,8 @@ async def get_requirement(requirement_id: str):
                    r.sprint_id, r.handoff_id, r.uat_id,
                    r.created_at, r.updated_at,
                    p.code as project_code, p.name as project_name, p.emoji as project_emoji
-            FROM requirements r
-            JOIN projects p ON r.project_id = p.id
+            FROM roadmap_requirements r
+            JOIN roadmap_projects p ON r.project_id = p.id
             WHERE r.id = ?
         """, (requirement_id,), fetch="one")
 
@@ -444,7 +444,7 @@ async def create_requirement(req: RequirementCreate):
     """Create a new requirement."""
     try:
         execute_query("""
-            INSERT INTO requirements (id, project_id, code, title, description, type, priority, status, target_version, sprint_id, handoff_id, uat_id)
+            INSERT INTO roadmap_requirements (id, project_id, code, title, description, type, priority, status, target_version, sprint_id, handoff_id, uat_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             req.id, req.project_id, req.code, req.title, req.description,
@@ -496,7 +496,7 @@ async def update_requirement(requirement_id: str, update: RequirementUpdate):
         params.append(requirement_id)
 
         execute_query(f"""
-            UPDATE requirements SET {", ".join(set_clauses)} WHERE id = ?
+            UPDATE roadmap_requirements SET {", ".join(set_clauses)} WHERE id = ?
         """, tuple(params), fetch="none")
 
         return await get_requirement(requirement_id)
@@ -511,7 +511,7 @@ async def update_requirement(requirement_id: str, update: RequirementUpdate):
 async def delete_requirement(requirement_id: str):
     """Delete a requirement."""
     try:
-        execute_query("DELETE FROM requirements WHERE id = ?", (requirement_id,), fetch="none")
+        execute_query("DELETE FROM roadmap_requirements WHERE id = ?", (requirement_id,), fetch="none")
     except Exception as e:
         logger.error(f"Error deleting requirement: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -537,7 +537,7 @@ async def get_roadmap(
 
         projects_result = execute_query(f"""
             SELECT id, code, name, emoji, color, current_version, status
-            FROM projects
+            FROM roadmap_projects
             {project_where}
             ORDER BY name
         """, project_params, fetch="all")
@@ -552,8 +552,8 @@ async def get_roadmap(
                        r.sprint_id, r.handoff_id, r.uat_id,
                        r.created_at, r.updated_at,
                        p.code as project_code, p.name as project_name, p.emoji as project_emoji
-                FROM requirements r
-                JOIN projects p ON r.project_id = p.id
+                FROM roadmap_requirements r
+                JOIN roadmap_projects p ON r.project_id = p.id
                 WHERE r.project_id = ?
                 ORDER BY
                     CASE r.priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 END,
@@ -608,7 +608,7 @@ async def get_roadmap(
                 SUM(CASE WHEN status = 'uat' THEN 1 ELSE 0 END) as uat,
                 SUM(CASE WHEN status = 'needs_fixes' THEN 1 ELSE 0 END) as needs_fixes,
                 SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as done
-            FROM requirements
+            FROM roadmap_requirements
         """, fetch="one")
 
         stats = {
@@ -632,7 +632,7 @@ async def seed_roadmap_data():
     """Seed initial project and requirement data (run once)."""
     try:
         # Check if projects exist
-        existing = execute_query("SELECT COUNT(*) as cnt FROM projects", fetch="one")
+        existing = execute_query("SELECT COUNT(*) as cnt FROM roadmap_projects", fetch="one")
         if existing and existing['cnt'] > 0:
             return {"message": "Data already seeded", "projects": existing['cnt']}
 
@@ -648,7 +648,7 @@ async def seed_roadmap_data():
 
         for p in projects:
             execute_query("""
-                INSERT INTO projects (id, code, name, emoji, color, current_version, status)
+                INSERT INTO roadmap_projects (id, code, name, emoji, color, current_version, status)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """, p, fetch="none")
 
@@ -676,7 +676,7 @@ async def seed_roadmap_data():
 
         for r in requirements:
             execute_query("""
-                INSERT INTO requirements (id, project_id, code, title, type, priority, status, target_version)
+                INSERT INTO roadmap_requirements (id, project_id, code, title, type, priority, status, target_version)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, r, fetch="none")
 

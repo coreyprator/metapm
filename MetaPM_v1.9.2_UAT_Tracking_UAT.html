@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔴 MetaPM v1.9.2 — UAT Tracking Feature UAT</title>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #252538;
+            --accent-red: #ef4444;
+            --accent-success: #22c55e;
+            --accent-danger: #ef4444;
+            --text-primary: #e5e5e5;
+            --text-muted: #9ca3af;
+            --border-color: #3a3a52;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+        
+        header h1 { font-size: 1.4rem; margin-bottom: 8px; }
+        header p { opacity: 0.9; font-size: 0.9rem; }
+        
+        .meta {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+            font-size: 0.85rem;
+        }
+        
+        .meta span {
+            background: rgba(255,255,255,0.15);
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+
+        .test-data {
+            background: #1e3a5f;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .test-data h3 { color: #60a5fa; margin-bottom: 10px; }
+        .test-data code { 
+            background: #1e1e32; 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            font-size: 0.85rem;
+        }
+        .test-data pre {
+            background: #1e1e32;
+            padding: 10px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 0.8rem;
+            margin-top: 10px;
+        }
+
+        .url-link {
+            display: block;
+            background: #0f172a;
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin: 10px 0 20px 0;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .url-link a { color: #f87171; text-decoration: none; }
+        .url-link a:hover { text-decoration: underline; }
+        
+        section {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        
+        section h2 {
+            color: #f87171;
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--accent-red);
+        }
+        
+        .test-item {
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .test-item:last-child { border-bottom: none; }
+        
+        .test-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        
+        .test-content { flex: 1; }
+        
+        .test-label {
+            font-weight: 500;
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .expected {
+            color: #a78bfa;
+            font-size: 0.85rem;
+            font-style: italic;
+        }
+        
+        .test-buttons { display: flex; gap: 6px; }
+        
+        .btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+        
+        .btn-pass { background: #166534; color: #bbf7d0; }
+        .btn-pass:hover, .btn-pass.selected { background: var(--accent-success); color: white; }
+        
+        .btn-fail { background: #991b1b; color: #fecaca; }
+        .btn-fail:hover, .btn-fail.selected { background: var(--accent-danger); color: white; }
+        
+        .test-item.passed .test-label { color: #4ade80; }
+        .test-item.failed .test-label { color: #f87171; }
+        
+        .notes-container { margin-top: 10px; }
+        .notes-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .notes-label::before { content: "📝"; font-size: 0.9rem; }
+        .notes-input {
+            width: 100%;
+            padding: 8px 10px;
+            background: #1e1e32;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: vertical;
+            min-height: 40px;
+        }
+        .notes-input:focus { outline: none; border-color: #ef4444; }
+        .notes-input::placeholder { color: #6b7280; }
+        .notes-input:not(:placeholder-shown) { border-color: #3b82f6; background: #1e2a3f; }
+        
+        .summary {
+            background: #1e1e32;
+            border: 2px solid var(--accent-red);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 24px;
+        }
+        
+        .summary h3 { margin-bottom: 16px; }
+        
+        .summary-stats {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        
+        .stat {
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .stat.total { background: var(--accent-red); }
+        .stat.passed { background: var(--accent-success); }
+        .stat.failed { background: var(--accent-danger); }
+        .stat.notes { background: #3b82f6; }
+        
+        .overall-result {
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 16px;
+        }
+        
+        .overall-result.pending { background: #374151; border: 2px dashed #6b7280; }
+        .overall-result.pass { background: #166534; border: 2px solid var(--accent-success); }
+        .overall-result.fail { background: #991b1b; border: 2px solid var(--accent-danger); }
+        
+        .overall-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+        
+        .overall-btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .overall-btn.approve { background: var(--accent-success); color: white; }
+        .overall-btn.reject { background: var(--accent-danger); color: white; }
+        
+        .copy-btn {
+            background: var(--accent-red);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🔴 MetaPM v1.9.2 — UAT Tracking Feature</h1>
+        <p>Testing the UAT tracking system itself (meta!)</p>
+        <div class="meta">
+            <span>Version: 1.9.2</span>
+            <span>Revision: metapm-v2-00035-sq5</span>
+            <span>Health: PINEAPPLE-99999</span>
+            <span id="test-date"></span>
+        </div>
+    </header>
+
+    <div class="test-data">
+        <h3>📋 Test Data — Submit This UAT Result</h3>
+        <p>After testing, use the dashboard to submit UAT results for one of the existing handoffs.</p>
+        <p>Find a handoff ID first, then submit via API or dashboard UI (if available).</p>
+        <pre>POST /mcp/handoffs/{handoff_id}/uat
+{
+  "status": "passed",
+  "total_tests": 10,
+  "passed": 10,
+  "failed": 0,
+  "notes_count": 0,
+  "results_text": "All tests passed!"
+}</pre>
+    </div>
+
+    <div class="url-link">
+        <a href="https://metapm.rentyourcio.com/static/handoffs.html" target="_blank">https://metapm.rentyourcio.com/static/handoffs.html</a>
+    </div>
+
+    <section>
+        <h2>1. Dashboard Updates</h2>
+        
+        <div class="test-item" data-test="dash1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Version shows 1.9.2</span>
+                    <span class="expected">→ Health check or UI shows v1.9.2</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="What version shows?"></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="dash2">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">UAT column visible in table</span>
+                    <span class="expected">→ New column shows ⏳, ✓ X/Y, or ✗ X/Y</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="Is UAT column visible? What does it show?"></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="dash3">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Status filter has new options</span>
+                    <span class="expected">→ Shows: pending, pending_uat, needs_fixes, done, processed</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="What status options are available?"></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>2. Bug Fixes Verified</h2>
+        
+        <div class="test-item" data-test="bug1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">BUG-001: Status shows correctly</span>
+                    <span class="expected">→ Imported handoffs show "processed" or "done", not "pending"</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="What status values do you see?"></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="bug2">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">BUG-002: GCS URLs are clickable</span>
+                    <span class="expected">→ Click GCS link → Opens in new tab → Shows markdown</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="Does clicking GCS link work?"></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="bug3">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">BUG-003: Verify GCS button works</span>
+                    <span class="expected">→ In detail panel, "Verify GCS" confirms backup exists</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="Is there a Verify button? Does it work?"></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>3. UAT API Endpoints</h2>
+        
+        <div class="test-item" data-test="api1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">GET /mcp/handoffs/{id}/uat works</span>
+                    <span class="expected">→ Returns UAT history (empty array if none submitted)</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="Test via curl or browser dev tools"></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="api2">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">POST /mcp/handoffs/{id}/uat works</span>
+                    <span class="expected">→ Submits UAT results, returns success</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="Try submitting test UAT data"></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="api3">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">UAT submission updates handoff status</span>
+                    <span class="expected">→ Failed UAT → status = "needs_fixes", Passed → status = "done"</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="Does status change after UAT submission?"></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>4. UAT Display in Dashboard</h2>
+        
+        <div class="test-item" data-test="disp1">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">UAT badge shows pass/fail correctly</span>
+                    <span class="expected">→ After submitting UAT, shows ✓ X/Y or ✗ X/Y</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes / Feedback</div>
+                <textarea class="notes-input" placeholder="What does the UAT badge show?"></textarea>
+            </div>
+        </div>
+    </section>
+
+    <div class="summary">
+        <h3>📊 Results Summary</h3>
+        <div class="summary-stats">
+            <div class="stat total">Total: <span id="total-count">10</span></div>
+            <div class="stat passed">Pass: <span id="pass-count">0</span></div>
+            <div class="stat failed">Fail: <span id="fail-count">0</span></div>
+            <div class="stat notes">Notes: <span id="notes-count">0</span></div>
+        </div>
+
+        <div class="overall-result pending" id="overall-result">
+            <h4>Overall Result</h4>
+            <p style="margin-bottom:12px;opacity:0.8;">UAT Tracking feature ready?</p>
+            <div class="overall-buttons">
+                <button class="overall-btn approve" onclick="setOverall('pass')">✓ v1.9.2 APPROVED</button>
+                <button class="overall-btn reject" onclick="setOverall('fail')">✗ NEEDS FIXES</button>
+            </div>
+        </div>
+
+        <button class="copy-btn" onclick="copyResults()">📋 Copy Results</button>
+    </div>
+
+    <script>
+        document.getElementById('test-date').textContent = new Date().toLocaleDateString();
+        document.querySelectorAll('.notes-input').forEach(input => {
+            input.addEventListener('input', updateCounts);
+        });
+
+        function setResult(btn, result) {
+            const item = btn.closest('.test-item');
+            const buttons = item.querySelectorAll('.btn');
+            buttons.forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            item.classList.remove('passed', 'failed');
+            item.classList.add(result === 'pass' ? 'passed' : 'failed');
+            updateCounts();
+        }
+
+        function updateCounts() {
+            document.getElementById('pass-count').textContent = document.querySelectorAll('.test-item.passed').length;
+            document.getElementById('fail-count').textContent = document.querySelectorAll('.test-item.failed').length;
+            const notesCount = Array.from(document.querySelectorAll('.notes-input'))
+                .filter(input => input.value.trim().length > 0).length;
+            document.getElementById('notes-count').textContent = notesCount;
+        }
+
+        function setOverall(result) {
+            const container = document.getElementById('overall-result');
+            container.classList.remove('pending', 'pass', 'fail');
+            container.classList.add(result);
+            if (result === 'pass') {
+                container.innerHTML = '<h4 style="color: #4ade80;">✓ v1.9.2 APPROVED</h4><p>UAT Tracking feature ready for use!</p>';
+            } else {
+                container.innerHTML = '<h4 style="color: #f87171;">✗ NEEDS FIXES</h4><p>See failed tests above.</p>';
+            }
+        }
+
+        function copyResults() {
+            const passed = document.querySelectorAll('.test-item.passed').length;
+            const failed = document.querySelectorAll('.test-item.failed').length;
+            const notesCount = Array.from(document.querySelectorAll('.notes-input'))
+                .filter(input => input.value.trim().length > 0).length;
+            
+            let results = `[MetaPM] 🔴 v1.9.2 UAT Tracking Feature — UAT Results\n${'='.repeat(50)}\n`;
+            results += `Date: ${new Date().toLocaleString()}\n`;
+            results += `Version: 1.9.2\n`;
+            results += `URL: https://metapm.rentyourcio.com/static/handoffs.html\n`;
+            results += `Summary: ${passed} passed, ${failed} failed, ${notesCount} with notes\n`;
+            results += `${'='.repeat(50)}\n\n`;
+
+            document.querySelectorAll('section').forEach(section => {
+                const h2 = section.querySelector('h2');
+                if (h2) {
+                    results += `${h2.textContent}\n${'-'.repeat(40)}\n`;
+                    section.querySelectorAll('.test-item').forEach(item => {
+                        const label = item.querySelector('.test-label').textContent;
+                        const notes = item.querySelector('.notes-input')?.value || '';
+                        let status = '○';
+                        if (item.classList.contains('passed')) status = '✓';
+                        if (item.classList.contains('failed')) status = '✗';
+                        results += `  ${status} ${label}\n`;
+                        if (notes.trim()) results += `      📝 ${notes}\n`;
+                    });
+                    results += '\n';
+                }
+            });
+
+            const overall = document.getElementById('overall-result');
+            if (overall.classList.contains('pass')) results += `OVERALL: ✓ v1.9.2 APPROVED\n`;
+            else if (overall.classList.contains('fail')) results += `OVERALL: ✗ NEEDS FIXES\n`;
+
+            navigator.clipboard.writeText(results).then(() => alert('Results copied!'));
+        }
+    </script>
+</body>
+</html>

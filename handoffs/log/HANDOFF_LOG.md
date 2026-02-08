@@ -10,3 +10,6 @@
 | 2026-02-07T23:05:23.992384+00:00 | AI→CC | handoff-dashboard | RECEIVED | 20260207_230520_handoff-dashboard.md |
 | 2026-02-08T02:26:43.981277+00:00 | CC→AI | dashboard-v190-complete | SENT | 20260208_010000_dashboard-v190-complete.md |
 | 2026-02-08T04:26:33.379527+00:00 | CC→AI | dashboard-v190-deployed | SENT | 20260208_043000_metapm-dashboard-deployed.md |
+| 2026-02-08T04:57:13.194521+00:00 | CC→AI | v1.9.1-bugfixes-complete | SENT | 20260208_v191-bugfixes-complete.md |
+| 2026-02-08T05:09:22.423016+00:00 | CC→AI | v1.9.2-uat-tracking-complete | SENT | 20260208_v192-uat-tracking-complete.md |
+| 2026-02-08T05:21:08.882750+00:00 | CC→AI | v1.9.2-status-filter-fixed | SENT | 20260208_v192-status-filter-fixed.md |
