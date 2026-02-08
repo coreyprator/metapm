@@ -261,6 +261,22 @@
         .status-read { background: #f59e0b; color: white; }
         .status-processed, .status-done { background: #22c55e; color: white; }
         .status-archived { background: #6b7280; color: white; }
+        .status-pending_uat { background: #8b5cf6; color: white; }
+        .status-needs_fixes { background: #ef4444; color: white; }
+
+        /* UAT badges */
+        .uat-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .uat-badge.passed { background: rgba(34, 197, 94, 0.2); color: var(--success); }
+        .uat-badge.failed { background: rgba(239, 68, 68, 0.2); color: var(--error); }
+        .uat-badge.pending { background: rgba(139, 92, 246, 0.2); color: #8b5cf6; }
 
         /* Direction badges */
         .direction-badge {
@@ -663,8 +679,10 @@
             <select class="filter-select" id="filterStatus">
                 <option value="">All Status</option>
                 <option value="pending">Pending</option>
-                <option value="read">Read</option>
+                <option value="pending_uat">Pending UAT</option>
+                <option value="needs_fixes">Needs Fixes</option>
                 <option value="done">Done</option>
+                <option value="processed">Processed</option>
                 <option value="archived">Archived</option>
             </select>
         </div>
@@ -698,12 +716,13 @@
                     <th data-sort="status">Status</th>
                     <th data-sort="direction">Direction</th>
                     <th data-sort="created_at" class="sorted">Date</th>
+                    <th class="col-compliance" title="UAT Status">UAT</th>
                     <th class="col-compliance" title="GCS Synced">GCS</th>
                     <th class="col-compliance" title="Compliance Score">Score</th>
                 </tr>
             </thead>
             <tbody id="handoffsBody">
-                <tr><td colspan="7" class="loading">Loading handoffs</td></tr>
+                <tr><td colspan="8" class="loading">Loading handoffs</td></tr>
             </tbody>
         </table>
     </div>
@@ -794,6 +813,28 @@
             return 'low';
         }
 
+        // Get UAT badge
+        function getUATBadge(handoff) {
+            const status = handoff.uat_status;
+            const passed = handoff.uat_passed;
+            const failed = handoff.uat_failed;
+            const total = (passed || 0) + (failed || 0);
+
+            if (!status) {
+                // No UAT yet
+                if (handoff.status === 'pending_uat') {
+                    return '<span class="uat-badge pending">&#9203;</span>';
+                }
+                return '<span class="compliance-icon warn">-</span>';
+            }
+
+            if (status === 'passed') {
+                return `<span class="uat-badge passed">&#10003; ${passed}/${total}</span>`;
+            } else {
+                return `<span class="uat-badge failed">&#10007; ${passed}/${total}</span>`;
+            }
+        }
+
         // Load stats
         async function loadStats() {
             try {
@@ -843,7 +884,7 @@
             if (gcsSync) params.append('gcs_sync', gcsSync);
             if (search) params.append('search', search);
 
-            handoffsBody.innerHTML = '<tr><td colspan="7" class="loading">Loading handoffs</td></tr>';
+            handoffsBody.innerHTML = '<tr><td colspan="8" class="loading">Loading handoffs</td></tr>';
 
             try {
                 const res = await fetch(`/mcp/handoffs/dashboard?${params}`);
@@ -852,7 +893,7 @@
                 totalPages = data.pages;
 
                 if (data.handoffs.length === 0) {
-                    handoffsBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px; color:var(--text-muted)">No handoffs found</td></tr>';
+                    handoffsBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:40px; color:var(--text-muted)">No handoffs found</td></tr>';
                 } else {
                     handoffsBody.innerHTML = data.handoffs.map(h => `
                         <tr onclick="showDetail('${h.id}', ${JSON.stringify(h).replace(/"/g, '&quot;')})">
@@ -865,6 +906,7 @@
                                 </span>
                             </td>
                             <td>${formatDate(h.created_at)}</td>
+                            <td class="col-compliance">${getUATBadge(h)}</td>
                             <td class="col-compliance">${h.gcs_url ? `<a href="${h.gcs_url.replace('gs://', 'https://storage.googleapis.com/')}" target="_blank" class="gcs-link" title="${h.gcs_url}">View</a>` : getComplianceIcon(h.gcs_synced)}</td>
                             <td class="col-compliance">
                                 <span class="compliance-score ${getScoreClass(h.compliance_score || 100)}">
@@ -884,7 +926,7 @@
 
             } catch (e) {
                 console.error('Error loading handoffs:', e);
-                handoffsBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px; color:#ef4444">Error loading handoffs</td></tr>';
+                handoffsBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:40px; color:#ef4444">Error loading handoffs</td></tr>';
             }
         }
 

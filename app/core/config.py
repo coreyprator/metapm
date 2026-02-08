@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "1.9.1"  # Bug fixes: clickable GCS links, content view, verify button
+    VERSION: str = "1.9.2"  # UAT tracking: uat_results table, endpoints, dashboard column
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

@@ -17,7 +17,8 @@ from app.schemas.mcp import (
     HandoffCreate, HandoffUpdate, HandoffResponse, HandoffListResponse,
     TaskCreate, TaskUpdate, TaskResponse, TaskListResponse,
     LogEntry, LogResponse, LogEntryType,
-    HandoffDirection, HandoffStatus, TaskStatus, TaskPriority
+    HandoffDirection, HandoffStatus, TaskStatus, TaskPriority,
+    UATSubmit, UATResult, UATHistoryResponse, UATStatus
 )
 
 logger = logging.getLogger(__name__)
@@ -284,6 +285,7 @@ async def dashboard_handoffs(
             SELECT id, project, task, title, direction, status, content, source,
                    gcs_path, gcs_url, gcs_synced, from_entity, to_entity,
                    version, git_commit, git_verified, compliance_score,
+                   uat_status, uat_passed, uat_failed, uat_date,
                    created_at, updated_at
             FROM mcp_handoffs
             WHERE {where_sql}
@@ -318,6 +320,10 @@ async def dashboard_handoffs(
                 "gcs_synced": bool(row.get('gcs_synced')),
                 "gcs_url": row.get('gcs_url'),
                 "compliance_score": row.get('compliance_score', 100),
+                "uat_status": row.get('uat_status'),
+                "uat_passed": row.get('uat_passed'),
+                "uat_failed": row.get('uat_failed'),
+                "uat_date": row['uat_date'].isoformat() if row.get('uat_date') else None,
                 "created_at": row['created_at'].isoformat() if row['created_at'] else None,
                 "public_url": f"https://metapm.rentyourcio.com/mcp/handoffs/{row['id']}/content"
             })
@@ -461,6 +467,143 @@ async def export_log(
         raise
     except Exception as e:
         logger.error(f"Error exporting log: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# UAT ENDPOINTS
+# ============================================
+
+@router.post("/handoffs/{handoff_id}/uat", response_model=UATResult, status_code=201)
+async def submit_uat_results(
+    handoff_id: str,
+    uat: UATSubmit,
+    _: bool = Depends(verify_api_key)
+):
+    """
+    Submit UAT results for a handoff (requires auth).
+    Updates handoff status based on UAT result.
+    """
+    try:
+        # Verify handoff exists
+        handoff = execute_query(
+            "SELECT id, status FROM mcp_handoffs WHERE id = ?",
+            (handoff_id,),
+            fetch="one"
+        )
+        if not handoff:
+            raise HTTPException(status_code=404, detail="Handoff not found")
+
+        # Insert UAT result
+        result = execute_query("""
+            INSERT INTO uat_results (
+                handoff_id, status, total_tests, passed, failed,
+                notes_count, results_text, checklist_path
+            )
+            OUTPUT INSERTED.id, INSERTED.handoff_id, INSERTED.status,
+                   INSERTED.total_tests, INSERTED.passed, INSERTED.failed,
+                   INSERTED.notes_count, INSERTED.tested_by, INSERTED.tested_at,
+                   INSERTED.checklist_path
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            handoff_id,
+            uat.status.value,
+            uat.total_tests,
+            uat.passed,
+            uat.failed,
+            uat.notes_count or 0,
+            uat.results_text,
+            uat.checklist_path
+        ), fetch="one")
+
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to create UAT result")
+
+        # Update handoff status and UAT fields
+        new_status = "done" if uat.status == UATStatus.PASSED else "needs_fixes"
+        execute_query("""
+            UPDATE mcp_handoffs
+            SET status = ?,
+                uat_status = ?,
+                uat_passed = ?,
+                uat_failed = ?,
+                uat_date = GETUTCDATE(),
+                updated_at = GETUTCDATE()
+            WHERE id = ?
+        """, (new_status, uat.status.value, uat.passed, uat.failed, handoff_id), fetch="none")
+
+        return UATResult(
+            id=str(result['id']),
+            handoff_id=str(result['handoff_id']),
+            status=UATStatus(result['status']),
+            total_tests=result['total_tests'],
+            passed=result['passed'],
+            failed=result['failed'],
+            notes_count=result['notes_count'],
+            tested_by=result['tested_by'],
+            tested_at=result['tested_at'],
+            checklist_path=result['checklist_path']
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error submitting UAT: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/handoffs/{handoff_id}/uat", response_model=UATHistoryResponse)
+async def get_uat_history(handoff_id: str):
+    """
+    Get UAT history for a handoff (PUBLIC - no auth for dashboard viewing).
+    Returns all UAT attempts for the handoff.
+    """
+    try:
+        # Verify handoff exists
+        handoff = execute_query(
+            "SELECT id FROM mcp_handoffs WHERE id = ?",
+            (handoff_id,),
+            fetch="one"
+        )
+        if not handoff:
+            raise HTTPException(status_code=404, detail="Handoff not found")
+
+        # Get UAT results
+        results = execute_query("""
+            SELECT id, handoff_id, status, total_tests, passed, failed,
+                   notes_count, results_text, tested_by, tested_at, checklist_path
+            FROM uat_results
+            WHERE handoff_id = ?
+            ORDER BY tested_at DESC
+        """, (handoff_id,), fetch="all")
+
+        attempts = []
+        latest_status = None
+        for row in (results or []):
+            if latest_status is None:
+                latest_status = UATStatus(row['status'])
+            attempts.append(UATResult(
+                id=str(row['id']),
+                handoff_id=str(row['handoff_id']),
+                status=UATStatus(row['status']),
+                total_tests=row['total_tests'],
+                passed=row['passed'],
+                failed=row['failed'],
+                notes_count=row['notes_count'],
+                results_text=row['results_text'],
+                tested_by=row['tested_by'],
+                tested_at=row['tested_at'],
+                checklist_path=row['checklist_path']
+            ))
+
+        return UATHistoryResponse(
+            handoff_id=handoff_id,
+            uat_attempts=attempts,
+            latest_status=latest_status
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting UAT history: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

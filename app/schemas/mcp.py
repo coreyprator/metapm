@@ -19,6 +19,14 @@ class HandoffStatus(str, Enum):
     READ = "read"
     PROCESSED = "processed"
     ARCHIVED = "archived"
+    PENDING_UAT = "pending_uat"
+    NEEDS_FIXES = "needs_fixes"
+    DONE = "done"
+
+
+class UATStatus(str, Enum):
+    PASSED = "passed"
+    FAILED = "failed"
 
 
 class TaskPriority(str, Enum):
@@ -139,3 +147,37 @@ class LogEntry(BaseModel):
 
 class LogResponse(BaseModel):
     entries: List[LogEntry]
+
+
+# UAT Schemas
+class UATSubmit(BaseModel):
+    """Submit UAT results for a handoff."""
+    status: UATStatus
+    total_tests: int = Field(..., ge=0)
+    passed: int = Field(..., ge=0)
+    failed: int = Field(..., ge=0)
+    notes_count: Optional[int] = Field(0, ge=0)
+    results_text: str
+    checklist_path: Optional[str] = None
+
+
+class UATResult(BaseModel):
+    """Single UAT result."""
+    id: str
+    handoff_id: str
+    status: UATStatus
+    total_tests: int
+    passed: int
+    failed: int
+    notes_count: Optional[int] = None
+    results_text: Optional[str] = None
+    tested_by: Optional[str] = None
+    tested_at: datetime
+    checklist_path: Optional[str] = None
+
+
+class UATHistoryResponse(BaseModel):
+    """UAT history for a handoff."""
+    handoff_id: str
+    uat_attempts: List[UATResult]
+    latest_status: Optional[UATStatus] = None

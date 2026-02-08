@@ -190,4 +190,89 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 5 warning: {e}")
 
+    # Migration 6: Create uat_results table and update handoff status constraint
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'uat_results'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 6: Creating uat_results table...")
+            execute_query("""
+                CREATE TABLE uat_results (
+                    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+                    handoff_id UNIQUEIDENTIFIER NOT NULL,
+
+                    -- Results
+                    status NVARCHAR(20) NOT NULL CHECK (status IN ('passed', 'failed')),
+                    total_tests INT,
+                    passed INT,
+                    failed INT,
+                    notes_count INT,
+
+                    -- Full results text
+                    results_text NVARCHAR(MAX),
+
+                    -- Metadata
+                    tested_by NVARCHAR(100) DEFAULT 'Corey',
+                    tested_at DATETIME2 DEFAULT GETUTCDATE(),
+
+                    -- Checklist reference
+                    checklist_path NVARCHAR(500),
+
+                    CONSTRAINT FK_uat_handoff FOREIGN KEY (handoff_id) REFERENCES mcp_handoffs(id)
+                )
+            """, fetch="none")
+            # Create indexes
+            execute_query("CREATE INDEX idx_uat_handoff ON uat_results(handoff_id)", fetch="none")
+            execute_query("CREATE INDEX idx_uat_status ON uat_results(status)", fetch="none")
+            logger.info("  Migration 6: uat_results table created.")
+
+            # Update handoff status CHECK constraint to include new values
+            logger.info("  Migration 6: Updating handoff status constraint...")
+            # First drop the existing constraint (find its name dynamically)
+            execute_query("""
+                DECLARE @constraint_name NVARCHAR(128)
+                SELECT @constraint_name = name
+                FROM sys.check_constraints
+                WHERE parent_object_id = OBJECT_ID('mcp_handoffs')
+                  AND definition LIKE '%status%'
+
+                IF @constraint_name IS NOT NULL
+                BEGIN
+                    EXEC('ALTER TABLE mcp_handoffs DROP CONSTRAINT ' + @constraint_name)
+                END
+            """, fetch="none")
+            # Add new constraint with additional status values
+            execute_query("""
+                ALTER TABLE mcp_handoffs
+                ADD CONSTRAINT CK_handoffs_status
+                CHECK (status IN ('pending', 'read', 'processed', 'archived', 'pending_uat', 'needs_fixes', 'done'))
+            """, fetch="none")
+            logger.info("  Migration 6: Handoff status constraint updated.")
+        else:
+            logger.info("  Migration 6: uat_results table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 6 warning: {e}")
+
+    # Migration 7: Add uat_status column to mcp_handoffs
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'uat_status'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 7: Adding UAT columns to mcp_handoffs...")
+            execute_query("ALTER TABLE mcp_handoffs ADD uat_status NVARCHAR(20)", fetch="none")
+            execute_query("ALTER TABLE mcp_handoffs ADD uat_passed INT", fetch="none")
+            execute_query("ALTER TABLE mcp_handoffs ADD uat_failed INT", fetch="none")
+            execute_query("ALTER TABLE mcp_handoffs ADD uat_date DATETIME2", fetch="none")
+            logger.info("  Migration 7: UAT columns added to mcp_handoffs.")
+        else:
+            logger.info("  Migration 7: UAT columns already exist.")
+    except Exception as e:
+        logger.warning(f"  Migration 7 warning: {e}")
+
     logger.info("Migrations complete.")
