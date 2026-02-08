@@ -42,10 +42,12 @@ async def root_redirect():
     return RedirectResponse(url="/static/dashboard.html")
 
 # CORS middleware for mobile/web access
+# allow_credentials=False allows wildcard origins, which is needed for file:// (null origin)
+# We use API keys instead of cookies, so credentials are not needed
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

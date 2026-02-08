@@ -18,7 +18,8 @@ from app.schemas.mcp import (
     TaskCreate, TaskUpdate, TaskResponse, TaskListResponse,
     LogEntry, LogResponse, LogEntryType,
     HandoffDirection, HandoffStatus, TaskStatus, TaskPriority,
-    UATSubmit, UATResult, UATHistoryResponse, UATStatus
+    UATSubmit, UATResult, UATHistoryResponse, UATStatus,
+    UATDirectSubmit, UATDirectSubmitResponse
 )
 
 logger = logging.getLogger(__name__)
@@ -604,6 +605,116 @@ async def get_uat_history(handoff_id: str):
         raise
     except Exception as e:
         logger.error(f"Error getting UAT history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/uat/submit", response_model=UATDirectSubmitResponse, status_code=201)
+async def submit_uat_direct(uat: UATDirectSubmit):
+    """
+    Submit UAT results directly from HTML checklist (PUBLIC - no auth required).
+    Creates or finds a handoff for the project/version, then adds UAT result.
+    Designed for file:// origin access from local HTML checklists.
+    """
+    try:
+        # Build task identifier from version + feature
+        task_id = f"v{uat.version}"
+        if uat.feature:
+            task_id = f"{task_id}-{uat.feature.lower().replace(' ', '-')}"
+
+        # Look for existing handoff for this project/version
+        handoff = execute_query("""
+            SELECT id, status FROM mcp_handoffs
+            WHERE project = ? AND task LIKE ?
+            ORDER BY created_at DESC
+        """, (uat.project, f"%{uat.version}%"), fetch="one")
+
+        if handoff:
+            handoff_id = str(handoff['id'])
+            logger.info(f"Found existing handoff {handoff_id} for {uat.project} {uat.version}")
+        else:
+            # Create a new handoff for this UAT submission
+            content = f"# UAT Results for {uat.project} v{uat.version}\n\n"
+            if uat.feature:
+                content += f"**Feature**: {uat.feature}\n\n"
+            content += f"**Status**: {uat.status.value}\n"
+            content += f"**Tests**: {uat.passed}/{uat.total_tests} passed"
+            if uat.skipped:
+                content += f", {uat.skipped} skipped"
+            content += "\n\n"
+            content += "---\n\n"
+            content += uat.results_text
+
+            result = execute_query("""
+                INSERT INTO mcp_handoffs (
+                    project, task, direction, status, content,
+                    source, version, title
+                )
+                OUTPUT INSERTED.id
+                VALUES (?, ?, 'ai_to_cc', 'pending_uat', ?, 'uat_checklist', ?, ?)
+            """, (
+                uat.project,
+                task_id,
+                content,
+                uat.version,
+                f"UAT: {uat.project} v{uat.version}"
+            ), fetch="one")
+
+            if not result:
+                raise HTTPException(status_code=500, detail="Failed to create handoff")
+
+            handoff_id = str(result['id'])
+            logger.info(f"Created new handoff {handoff_id} for {uat.project} {uat.version}")
+
+        # Insert UAT result
+        uat_result = execute_query("""
+            INSERT INTO uat_results (
+                handoff_id, status, total_tests, passed, failed,
+                notes_count, results_text, checklist_path
+            )
+            OUTPUT INSERTED.id, INSERTED.tested_at
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            handoff_id,
+            uat.status.value,
+            uat.total_tests,
+            uat.passed,
+            uat.failed,
+            uat.notes_count or 0,
+            uat.results_text,
+            uat.checklist_path
+        ), fetch="one")
+
+        if not uat_result:
+            raise HTTPException(status_code=500, detail="Failed to create UAT result")
+
+        uat_id = str(uat_result['id'])
+
+        # Update handoff status and UAT fields
+        new_status = "done" if uat.status == UATStatus.PASSED else "needs_fixes"
+        execute_query("""
+            UPDATE mcp_handoffs
+            SET status = ?,
+                uat_status = ?,
+                uat_passed = ?,
+                uat_failed = ?,
+                uat_date = GETUTCDATE(),
+                updated_at = GETUTCDATE()
+            WHERE id = ?
+        """, (new_status, uat.status.value, uat.passed, uat.failed, handoff_id), fetch="none")
+
+        handoff_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{handoff_id}/content"
+
+        return UATDirectSubmitResponse(
+            handoff_id=handoff_id,
+            uat_id=uat_id,
+            status=uat.status.value,
+            handoff_url=handoff_url,
+            message=f"UAT results recorded for {uat.project} v{uat.version}"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error submitting direct UAT: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

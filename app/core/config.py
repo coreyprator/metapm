@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "1.9.2"  # UAT tracking: uat_results table, endpoints, dashboard column
+    VERSION: str = "1.9.3"  # UAT direct submit: POST /mcp/uat/submit for HTML checklists
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
@@ -43,7 +43,8 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     
     # CORS - allow all origins in dev, restrict in production
-    CORS_ORIGINS: List[str] = ["*"]
+    # "null" is needed for file:// origins (local HTML files)
+    CORS_ORIGINS: List[str] = ["*", "null"]
     
     @property
     def database_url(self) -> str:

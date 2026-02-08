@@ -181,3 +181,29 @@ class UATHistoryResponse(BaseModel):
     handoff_id: str
     uat_attempts: List[UATResult]
     latest_status: Optional[UATStatus] = None
+
+
+# Direct UAT Submit (from checklist HTML)
+class UATDirectSubmit(BaseModel):
+    """Submit UAT results directly from HTML checklist."""
+    project: str = Field(..., max_length=100)
+    version: str = Field(..., max_length=20)
+    feature: Optional[str] = Field(None, max_length=200)
+    status: UATStatus
+    total_tests: int = Field(..., ge=0)
+    passed: int = Field(..., ge=0)
+    failed: int = Field(..., ge=0)
+    skipped: Optional[int] = Field(0, ge=0)
+    notes_count: Optional[int] = Field(0, ge=0)
+    results_text: str
+    checklist_path: Optional[str] = None
+    url: Optional[str] = None
+
+
+class UATDirectSubmitResponse(BaseModel):
+    """Response from direct UAT submit."""
+    handoff_id: str
+    uat_id: str
+    status: str
+    handoff_url: str
+    message: str
