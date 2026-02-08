@@ -8,3 +8,5 @@
 | 2026-02-07T16:49:50.624875+00:00 | CC→AI | phase3-mcp-complete | SENT | 20260207_phase3-mcp-complete.md |
 | 2026-02-07T18:03:02.703128+00:00 | CC→AI | phase3-api-testing | SENT | 20260207_phase3-api-test-results.md |
 | 2026-02-07T23:05:23.992384+00:00 | AI→CC | handoff-dashboard | RECEIVED | 20260207_230520_handoff-dashboard.md |
+| 2026-02-08T02:26:43.981277+00:00 | CC→AI | dashboard-v190-complete | SENT | 20260208_010000_dashboard-v190-complete.md |
+| 2026-02-08T04:26:33.379527+00:00 | CC→AI | dashboard-v190-deployed | SENT | 20260208_043000_metapm-dashboard-deployed.md |

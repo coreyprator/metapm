@@ -67,3 +67,4 @@ secrets/
 credentials/
 scripts/calendar_tokens.json
 scripts/oauth_credentials.json
+client_secret_*.json
