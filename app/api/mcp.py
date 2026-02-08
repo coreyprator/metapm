@@ -634,22 +634,29 @@ async def submit_uat_direct(uat: UATDirectSubmit):
             ORDER BY created_at DESC
         """, (uat.project, f"%{uat.version}%"), fetch="one")
 
+        # Build content from actual UAT data
+        content = f"# UAT Results for {uat.project} v{uat.version}\n\n"
+        if uat.feature:
+            content += f"**Feature**: {uat.feature}\n\n"
+        content += f"**Status**: {uat.status.value}\n"
+        content += f"**Tests**: {uat.passed} passed, {uat.failed} failed"
+        if uat.skipped:
+            content += f", {uat.skipped} skipped"
+        content += f" (out of {uat.total_tests} total)\n\n"
+        content += "---\n\n"
+        content += uat.results_text
+
         if handoff:
             handoff_id = str(handoff['id'])
             logger.info(f"Found existing handoff {handoff_id} for {uat.project} {uat.version}")
+            # Update existing handoff content with new UAT results
+            execute_query("""
+                UPDATE mcp_handoffs
+                SET content = ?, updated_at = GETUTCDATE()
+                WHERE id = ?
+            """, (content, handoff_id), fetch="none")
         else:
-            # Create a new handoff for this UAT submission
-            content = f"# UAT Results for {uat.project} v{uat.version}\n\n"
-            if uat.feature:
-                content += f"**Feature**: {uat.feature}\n\n"
-            content += f"**Status**: {uat.status.value}\n"
-            content += f"**Tests**: {uat.passed}/{uat.total_tests} passed"
-            if uat.skipped:
-                content += f", {uat.skipped} skipped"
-            content += "\n\n"
-            content += "---\n\n"
-            content += uat.results_text
-
+            # Create a new handoff for this UAT submission (using pre-built content)
             result = execute_query("""
                 INSERT INTO mcp_handoffs (
                     project, task, direction, status, content,
