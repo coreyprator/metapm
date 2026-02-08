@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "1.8.0"  # Phase 4: Handoff Dashboard with GCS sync
+    VERSION: str = "1.9.0"  # Phase 4 Final: Dashboard with SQL primary store
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

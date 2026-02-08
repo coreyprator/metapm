@@ -281,8 +281,10 @@ async def dashboard_handoffs(
         # Get paginated results
         params.extend([offset, limit])
         results = execute_query(f"""
-            SELECT id, project, task, direction, status, content, source,
-                   gcs_path, from_entity, to_entity, created_at, updated_at
+            SELECT id, project, task, title, direction, status, content, source,
+                   gcs_path, gcs_url, gcs_synced, from_entity, to_entity,
+                   version, git_commit, git_verified, compliance_score,
+                   created_at, updated_at
             FROM mcp_handoffs
             WHERE {where_sql}
             ORDER BY {sort} {order_sql}
@@ -303,12 +305,19 @@ async def dashboard_handoffs(
                 "project": row['project'],
                 "project_emoji": emoji,
                 "task": row['task'],
+                "title": row.get('title'),
                 "direction": row['direction'],
                 "status": row['status'],
                 "preview": preview,
-                "source": row['source'] or 'api',
-                "from_entity": row['from_entity'],
-                "to_entity": row['to_entity'],
+                "source": row.get('source') or 'api',
+                "from_entity": row.get('from_entity'),
+                "to_entity": row.get('to_entity'),
+                "version": row.get('version'),
+                "git_commit": row.get('git_commit'),
+                "git_verified": bool(row.get('git_verified')),
+                "gcs_synced": bool(row.get('gcs_synced')),
+                "gcs_url": row.get('gcs_url'),
+                "compliance_score": row.get('compliance_score', 100),
                 "created_at": row['created_at'].isoformat() if row['created_at'] else None,
                 "public_url": f"https://metapm.rentyourcio.com/mcp/handoffs/{row['id']}/content"
             })
@@ -329,7 +338,7 @@ async def dashboard_handoffs(
 async def handoff_stats():
     """
     Get handoff statistics (PUBLIC - no auth for dashboard viewing).
-    Returns total counts by project and status.
+    Returns total counts by project and status with enhanced stats.
     """
     try:
         # Total count
@@ -339,14 +348,26 @@ async def handoff_stats():
         )
         total = total_result['total'] if total_result else 0
 
-        # By project
+        # By project with enhanced stats
         project_results = execute_query("""
-            SELECT project, COUNT(*) as count
+            SELECT project,
+                   COUNT(*) as total,
+                   SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+                   SUM(CASE WHEN status IN ('processed', 'archived') THEN 1 ELSE 0 END) as done,
+                   SUM(CASE WHEN gcs_synced = 1 THEN 1 ELSE 0 END) as synced
             FROM mcp_handoffs
             GROUP BY project
-            ORDER BY count DESC
+            ORDER BY total DESC
         """, fetch="all")
-        by_project = {row['project']: row['count'] for row in (project_results or [])}
+        by_project = {}
+        for row in (project_results or []):
+            by_project[row['project']] = {
+                "total": row['total'],
+                "pending": row['pending'] or 0,
+                "done": row['done'] or 0,
+                "synced": row['synced'] or 0,
+                "emoji": PROJECT_EMOJI.get(row['project'], '📦')
+            }
 
         # By status
         status_results = execute_query("""
@@ -364,11 +385,31 @@ async def handoff_stats():
         """, fetch="all")
         by_direction = {row['direction']: row['count'] for row in (direction_results or [])}
 
+        # This week
+        week_result = execute_query("""
+            SELECT COUNT(*) as count FROM mcp_handoffs
+            WHERE created_at >= DATEADD(day, -7, GETDATE())
+        """, fetch="one")
+        this_week = week_result['count'] if week_result else 0
+
+        # GCS sync status
+        sync_result = execute_query("""
+            SELECT
+                SUM(CASE WHEN gcs_synced = 1 THEN 1 ELSE 0 END) as synced,
+                SUM(CASE WHEN gcs_synced = 0 OR gcs_synced IS NULL THEN 1 ELSE 0 END) as pending
+            FROM mcp_handoffs
+        """, fetch="one")
+
         return {
             "total": total,
+            "this_week": this_week,
             "by_project": by_project,
             "by_status": by_status,
-            "by_direction": by_direction
+            "by_direction": by_direction,
+            "gcs_sync_status": {
+                "synced": sync_result['synced'] or 0 if sync_result else 0,
+                "pending": sync_result['pending'] or 0 if sync_result else 0
+            }
         }
     except Exception as e:
         logger.error(f"Error getting handoff stats: {e}")
@@ -392,6 +433,34 @@ async def trigger_sync(
         }
     except Exception as e:
         logger.error(f"Error syncing GCS handoffs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/handoffs/export/log")
+async def export_log(
+    project: Optional[str] = Query(None),
+    format: str = Query("markdown")
+):
+    """
+    Generate HANDOFF_LOG.md from SQL data (PUBLIC - no auth).
+    Returns markdown content that can be saved to GDrive.
+    """
+    try:
+        from app.services.handoff_service import generate_log_markdown
+
+        if not project:
+            raise HTTPException(status_code=400, detail="project parameter required")
+
+        md = generate_log_markdown(project)
+
+        if format == "json":
+            return {"project": project, "content": md}
+
+        return Response(content=md, media_type="text/markdown")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error exporting log: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

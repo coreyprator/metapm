@@ -153,4 +153,41 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 4 warning: {e}")
 
+    # Migration 5: Add final dashboard columns to mcp_handoffs (v1.9.0)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'content_hash'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 5: Adding final dashboard columns to mcp_handoffs...")
+            # Content tracking
+            execute_query("ALTER TABLE mcp_handoffs ADD content_hash NVARCHAR(64)", fetch="none")
+            execute_query("ALTER TABLE mcp_handoffs ADD summary NVARCHAR(500)", fetch="none")
+            execute_query("ALTER TABLE mcp_handoffs ADD title NVARCHAR(255)", fetch="none")
+            # Metadata
+            execute_query("ALTER TABLE mcp_handoffs ADD version NVARCHAR(20)", fetch="none")
+            execute_query("ALTER TABLE mcp_handoffs ADD priority NVARCHAR(20)", fetch="none")
+            execute_query("ALTER TABLE mcp_handoffs ADD type NVARCHAR(50)", fetch="none")
+            # Timestamps
+            execute_query("ALTER TABLE mcp_handoffs ADD read_at DATETIME2", fetch="none")
+            execute_query("ALTER TABLE mcp_handoffs ADD completed_at DATETIME2", fetch="none")
+            # GCS sync status
+            execute_query("ALTER TABLE mcp_handoffs ADD gcs_synced BIT DEFAULT 0", fetch="none")
+            execute_query("ALTER TABLE mcp_handoffs ADD gcs_url NVARCHAR(500)", fetch="none")
+            execute_query("ALTER TABLE mcp_handoffs ADD gcs_synced_at DATETIME2", fetch="none")
+            # Git tracking
+            execute_query("ALTER TABLE mcp_handoffs ADD git_commit NVARCHAR(50)", fetch="none")
+            execute_query("ALTER TABLE mcp_handoffs ADD git_verified BIT DEFAULT 0", fetch="none")
+            # Compliance
+            execute_query("ALTER TABLE mcp_handoffs ADD compliance_score INT DEFAULT 100", fetch="none")
+            # Index for dedup
+            execute_query("CREATE INDEX idx_handoffs_content_hash ON mcp_handoffs(content_hash)", fetch="none")
+            logger.info("  Migration 5: Final dashboard columns added.")
+        else:
+            logger.info("  Migration 5: Final dashboard columns already exist.")
+    except Exception as e:
+        logger.warning(f"  Migration 5 warning: {e}")
+
     logger.info("Migrations complete.")
