@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "1.9.5"  # Fix: UAT submit stores actual request data
+    VERSION: str = "2.0.0"  # Roadmap Feature: projects, requirements, sprints
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

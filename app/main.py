@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp
+from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap
 from app.core.config import settings
 from app.core.migrations import run_migrations
 from transactions import router as transactions_router
@@ -63,6 +63,7 @@ app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"])
 app.include_router(themes.router, prefix="/api/themes", tags=["Themes"])
 app.include_router(backlog.router, prefix="/api/backlog", tags=["Backlog"])
 app.include_router(mcp.router, prefix="/mcp", tags=["MCP"])
+app.include_router(roadmap.router, prefix="/api", tags=["Roadmap"])
 
 
 # Define static_dir early for use in routes
@@ -121,6 +122,17 @@ async def handoffs_page():
         return FileResponse(str(handoffs_file), media_type="text/html")
     from fastapi import HTTPException
     raise HTTPException(status_code=404, detail="Handoffs page not found")
+
+
+@app.get("/roadmap.html")
+async def roadmap_page():
+    """Serve the Project Roadmap dashboard"""
+    from fastapi.responses import FileResponse
+    roadmap_file = static_dir / "roadmap.html"
+    if roadmap_file.exists():
+        return FileResponse(str(roadmap_file), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Roadmap page not found")
 
 
 # Mount static files LAST (after all route definitions)

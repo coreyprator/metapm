@@ -275,4 +275,104 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 7 warning: {e}")
 
+    # Migration 8: Create projects table (v2.0.0 Roadmap Feature)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'projects'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 8: Creating projects table...")
+            execute_query("""
+                CREATE TABLE projects (
+                    id NVARCHAR(36) PRIMARY KEY,
+                    code NVARCHAR(10) NOT NULL UNIQUE,
+                    name NVARCHAR(100) NOT NULL,
+                    emoji NVARCHAR(10),
+                    color NVARCHAR(20),
+                    current_version NVARCHAR(20),
+                    status NVARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'stable', 'maintenance', 'paused')),
+                    repo_url NVARCHAR(500),
+                    deploy_url NVARCHAR(500),
+                    created_at DATETIME2 DEFAULT GETDATE(),
+                    updated_at DATETIME2 DEFAULT GETDATE()
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_projects_code ON projects(code)", fetch="none")
+            execute_query("CREATE INDEX idx_projects_status ON projects(status)", fetch="none")
+            logger.info("  Migration 8: projects table created.")
+        else:
+            logger.info("  Migration 8: projects table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 8 warning: {e}")
+
+    # Migration 9: Create sprints table (v2.0.0 Roadmap Feature)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'sprints'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 9: Creating sprints table...")
+            execute_query("""
+                CREATE TABLE sprints (
+                    id NVARCHAR(36) PRIMARY KEY,
+                    name NVARCHAR(100) NOT NULL,
+                    description NVARCHAR(MAX),
+                    status NVARCHAR(20) DEFAULT 'planned' CHECK (status IN ('planned', 'active', 'complete')),
+                    start_date DATE,
+                    end_date DATE,
+                    created_at DATETIME2 DEFAULT GETDATE()
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_sprints_status ON sprints(status)", fetch="none")
+            logger.info("  Migration 9: sprints table created.")
+        else:
+            logger.info("  Migration 9: sprints table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 9 warning: {e}")
+
+    # Migration 10: Create requirements table (v2.0.0 Roadmap Feature)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'requirements'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 10: Creating requirements table...")
+            execute_query("""
+                CREATE TABLE requirements (
+                    id NVARCHAR(36) PRIMARY KEY,
+                    project_id NVARCHAR(36) NOT NULL,
+                    code NVARCHAR(20) NOT NULL,
+                    title NVARCHAR(200) NOT NULL,
+                    description NVARCHAR(MAX),
+                    type NVARCHAR(20) DEFAULT 'task' CHECK (type IN ('feature', 'bug', 'enhancement', 'task')),
+                    priority NVARCHAR(10) DEFAULT 'P2' CHECK (priority IN ('P1', 'P2', 'P3')),
+                    status NVARCHAR(20) DEFAULT 'backlog' CHECK (status IN ('backlog', 'planned', 'in_progress', 'uat', 'needs_fixes', 'done')),
+                    target_version NVARCHAR(20),
+                    sprint_id NVARCHAR(36),
+                    handoff_id UNIQUEIDENTIFIER,
+                    uat_id UNIQUEIDENTIFIER,
+                    created_at DATETIME2 DEFAULT GETDATE(),
+                    updated_at DATETIME2 DEFAULT GETDATE(),
+                    CONSTRAINT FK_requirements_project FOREIGN KEY (project_id) REFERENCES projects(id),
+                    CONSTRAINT FK_requirements_sprint FOREIGN KEY (sprint_id) REFERENCES sprints(id),
+                    CONSTRAINT FK_requirements_handoff FOREIGN KEY (handoff_id) REFERENCES mcp_handoffs(id),
+                    CONSTRAINT FK_requirements_uat FOREIGN KEY (uat_id) REFERENCES uat_results(id)
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_requirements_project ON requirements(project_id)", fetch="none")
+            execute_query("CREATE INDEX idx_requirements_status ON requirements(status)", fetch="none")
+            execute_query("CREATE INDEX idx_requirements_sprint ON requirements(sprint_id)", fetch="none")
+            execute_query("CREATE INDEX idx_requirements_code ON requirements(code)", fetch="none")
+            logger.info("  Migration 10: requirements table created.")
+        else:
+            logger.info("  Migration 10: requirements table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 10 warning: {e}")
+
     logger.info("Migrations complete.")
