@@ -468,6 +468,7 @@
                 <option value="history">AI History</option>
                 <option value="methodology">Methodology</option>
                 <option value="backlog">Backlog</option>
+                <option value="handoffs">🌉 Handoff Bridge</option>
             </select>
             <button id="addTaskBtn" class="btn btn-primary" style="padding:3px 10px;font-size:11px;white-space:nowrap;">+ Add Task</button>
             <button id="refreshBtn" class="icon-btn" title="Refresh" style="padding:3px;">
@@ -1495,6 +1496,11 @@
         };
 
         function switchView(view) {
+            // Handle Handoff Bridge navigation
+            if (view === 'handoffs') {
+                window.location.href = '/static/handoffs.html';
+                return;
+            }
             document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
             const section = document.getElementById(`tab-${view}`);
             if (section) section.classList.remove('hidden');

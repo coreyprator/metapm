@@ -235,6 +235,7 @@ async def dashboard_handoffs(
     project: Optional[str] = Query(None),
     status: Optional[HandoffStatus] = Query(None),
     direction: Optional[HandoffDirection] = Query(None),
+    gcs_sync: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     sort: str = Query("created_at"),
     order: str = Query("desc"),
@@ -261,6 +262,11 @@ async def dashboard_handoffs(
         if search:
             where_clauses.append("(task LIKE ? OR content LIKE ?)")
             params.extend([f"%{search}%", f"%{search}%"])
+        if gcs_sync:
+            if gcs_sync == "synced":
+                where_clauses.append("gcs_synced = 1")
+            elif gcs_sync == "pending":
+                where_clauses.append("(gcs_synced = 0 OR gcs_synced IS NULL)")
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 

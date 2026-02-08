@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "1.9.3"  # UAT direct submit: POST /mcp/uat/submit for HTML checklists
+    VERSION: str = "1.9.4"  # Fixes: domain mapping, dashboard nav, GCS sync filter
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
