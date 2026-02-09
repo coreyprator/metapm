@@ -527,12 +527,12 @@ async def get_roadmap(
 ):
     """Get aggregated roadmap view for dashboard."""
     try:
-        # Get projects
+        # Get projects (show all active and stable, exclude paused/archived)
         if project_code:
             project_where = "WHERE code = ?"
             project_params = (project_code,)
         else:
-            project_where = "WHERE status = 'active'"
+            project_where = "WHERE status IN ('active', 'stable')"
             project_params = None
 
         projects_result = execute_query(f"""

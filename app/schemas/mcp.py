@@ -198,6 +198,7 @@ class UATDirectSubmit(BaseModel):
     results_text: str
     checklist_path: Optional[str] = None
     url: Optional[str] = None
+    tested_by: Optional[str] = Field(None, max_length=100)
 
 
 class UATDirectSubmitResponse(BaseModel):

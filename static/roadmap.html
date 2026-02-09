@@ -237,9 +237,9 @@
     <header class="header">
         <h1><span style="color: #ef4444;">&#x1F534;</span> MetaPM Roadmap</h1>
         <nav class="nav-tabs">
-            <a href="/static/dashboard.html">Tasks</a>
+            <a href="/static/dashboard.html">🏠 Dashboard</a>
             <a href="/static/handoffs.html">Handoffs</a>
-            <a href="/static/roadmap.html" class="active">Roadmap</a>
+            <a href="/static/roadmap.html" class="active">📊 Roadmap</a>
             <a href="/static/backlog.html">Backlog</a>
         </nav>
     </header>
@@ -352,7 +352,15 @@
 
         function buildFilters(projects) {
             const filterBar = document.getElementById('filters');
-            filterBar.innerHTML = '<button class="filter-btn active" data-filter="all">All Projects</button>';
+            filterBar.innerHTML = '';
+
+            // Create "All" button
+            const allBtn = document.createElement('button');
+            allBtn.className = 'filter-btn active';
+            allBtn.dataset.filter = 'all';
+            allBtn.textContent = 'All Projects';
+            allBtn.onclick = () => setFilter('all');
+            filterBar.appendChild(allBtn);
 
             projects.forEach(project => {
                 const btn = document.createElement('button');
@@ -431,9 +439,6 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', loadRoadmap);
-
-        // Set up filter button for "All"
-        document.querySelector('[data-filter="all"]').onclick = () => setFilter('all');
     </script>
 </body>
 </html>
