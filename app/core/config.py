@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.0.3"  # UAT pending status, consistent navigation
+    VERSION: str = "2.0.4"  # Fix UAT submit status constraint
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

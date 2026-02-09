@@ -375,4 +375,39 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 10 warning: {e}")
 
+    # Migration 11: Update uat_results status constraint to allow 'pending' (v2.0.4)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM sys.check_constraints
+            WHERE parent_object_id = OBJECT_ID('uat_results')
+              AND definition LIKE '%pending%'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 11: Updating uat_results status constraint...")
+            # Drop the existing constraint
+            execute_query("""
+                DECLARE @constraint_name NVARCHAR(128)
+                SELECT @constraint_name = name
+                FROM sys.check_constraints
+                WHERE parent_object_id = OBJECT_ID('uat_results')
+                  AND definition LIKE '%status%'
+
+                IF @constraint_name IS NOT NULL
+                BEGIN
+                    EXEC('ALTER TABLE uat_results DROP CONSTRAINT ' + @constraint_name)
+                END
+            """, fetch="none")
+            # Add new constraint with 'pending' value
+            execute_query("""
+                ALTER TABLE uat_results
+                ADD CONSTRAINT CK_uat_results_status
+                CHECK (status IN ('passed', 'failed', 'pending'))
+            """, fetch="none")
+            logger.info("  Migration 11: uat_results status constraint updated to allow 'pending'.")
+        else:
+            logger.info("  Migration 11: uat_results status constraint already includes 'pending'.")
+    except Exception as e:
+        logger.warning(f"  Migration 11 warning: {e}")
+
     logger.info("Migrations complete.")
