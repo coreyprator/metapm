@@ -27,6 +27,7 @@ class HandoffStatus(str, Enum):
 class UATStatus(str, Enum):
     PASSED = "passed"
     FAILED = "failed"
+    PENDING = "pending"
 
 
 class TaskPriority(str, Enum):

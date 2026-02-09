@@ -75,15 +75,23 @@
 <body class="text-white">
     <div id="app" class="min-h-screen flex flex-col">
         <!-- Header -->
-        <header class="px-4 py-3 flex items-center justify-between">
+        <header class="px-4 py-3 flex items-center justify-between border-b border-white/10">
             <h1 class="text-xl font-semibold">MetaPM</h1>
             <button id="historyBtn" class="p-2 rounded-full hover:bg-white/10">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
             </button>
         </header>
+
+        <!-- Page Navigation -->
+        <nav class="flex gap-3 px-4 py-2 bg-black/20 border-b border-white/10 overflow-x-auto">
+            <a href="/static/dashboard.html" class="text-gray-400 text-sm px-2 py-1 rounded hover:bg-white/10 whitespace-nowrap">🏠 Dashboard</a>
+            <a href="/static/handoffs.html" class="text-gray-400 text-sm px-2 py-1 rounded hover:bg-white/10 whitespace-nowrap">📤 Handoffs</a>
+            <a href="/static/roadmap.html" class="text-gray-400 text-sm px-2 py-1 rounded hover:bg-white/10 whitespace-nowrap">📊 Roadmap</a>
+            <a href="/static/capture.html" class="text-white text-sm px-2 py-1 rounded bg-pink-600 whitespace-nowrap">🎤 Capture</a>
+        </nav>
         
         <!-- Main Content -->
         <main class="flex-1 flex flex-col items-center justify-center px-4 pb-8">
