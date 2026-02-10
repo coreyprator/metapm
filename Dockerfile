@@ -1,5 +1,6 @@
 # MetaPM Dockerfile
 # For GCP Cloud Run deployment with SQL Server connectivity
+# Build: 2026-02-10T01:30:00Z v2.0.4
 
 FROM python:3.11
 
