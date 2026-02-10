@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap
+from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle
 from app.core.config import settings
 from app.core.migrations import run_migrations
 from transactions import router as transactions_router
@@ -64,6 +64,7 @@ app.include_router(themes.router, prefix="/api/themes", tags=["Themes"])
 app.include_router(backlog.router, prefix="/api/backlog", tags=["Backlog"])
 app.include_router(mcp.router, prefix="/mcp", tags=["MCP"])
 app.include_router(roadmap.router, prefix="/api", tags=["Roadmap"])
+app.include_router(handoff_lifecycle.router, prefix="/api", tags=["Handoff Lifecycle"])
 
 
 # Define static_dir early for use in routes
@@ -133,6 +134,17 @@ async def roadmap_page():
         return FileResponse(str(roadmap_file), media_type="text/html")
     from fastapi import HTTPException
     raise HTTPException(status_code=404, detail="Roadmap page not found")
+
+
+@app.get("/compare/{handoff_id}")
+async def compare_page(handoff_id: str):
+    """Serve the Handoff Comparison page (HO-A1B2)"""
+    from fastapi.responses import FileResponse
+    compare_file = static_dir / "compare.html"
+    if compare_file.exists():
+        return FileResponse(str(compare_file), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Compare page not found")
 
 
 # Mount static files LAST (after all route definitions)

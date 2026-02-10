@@ -410,4 +410,75 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 11 warning: {e}")
 
+    # Migration 12: Create handoff lifecycle tracking tables (HO-A1B2)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'handoff_requests'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 12: Creating handoff lifecycle tracking tables...")
+
+            # Table 1: handoff_requests - tracks full lifecycle of each handoff
+            execute_query("""
+                CREATE TABLE handoff_requests (
+                    id VARCHAR(10) PRIMARY KEY,
+                    created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+                    project VARCHAR(50) NOT NULL,
+                    roadmap_id VARCHAR(20),
+                    request_type VARCHAR(20) NOT NULL,
+                    title VARCHAR(200) NOT NULL,
+                    description NVARCHAR(MAX),
+                    spec_handoff_url VARCHAR(500),
+                    status VARCHAR(20) NOT NULL DEFAULT 'SPEC',
+                    updated_at DATETIME2 DEFAULT GETDATE(),
+                    CONSTRAINT CK_handoff_req_type CHECK (request_type IN ('Requirement', 'Bug', 'UAT', 'Enhancement', 'Hotfix')),
+                    CONSTRAINT CK_handoff_req_status CHECK (status IN ('SPEC', 'PENDING', 'DELIVERED', 'UAT', 'PASSED', 'FAILED'))
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_handoff_req_project ON handoff_requests(project)", fetch="none")
+            execute_query("CREATE INDEX idx_handoff_req_status ON handoff_requests(status)", fetch="none")
+            execute_query("CREATE INDEX idx_handoff_req_roadmap ON handoff_requests(roadmap_id)", fetch="none")
+            logger.info("  Migration 12: handoff_requests table created.")
+
+            # Table 2: handoff_completions - tracks CC completion responses
+            execute_query("""
+                CREATE TABLE handoff_completions (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    handoff_id VARCHAR(10) NOT NULL,
+                    completed_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+                    status VARCHAR(20) NOT NULL,
+                    commit_hash VARCHAR(40),
+                    completion_handoff_url VARCHAR(500),
+                    notes NVARCHAR(MAX),
+                    CONSTRAINT CK_completion_status CHECK (status IN ('COMPLETE', 'PARTIAL', 'BLOCKED')),
+                    CONSTRAINT FK_completion_handoff FOREIGN KEY (handoff_id) REFERENCES handoff_requests(id)
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_completion_handoff ON handoff_completions(handoff_id)", fetch="none")
+            logger.info("  Migration 12: handoff_completions table created.")
+
+            # Table 3: roadmap_handoffs - junction table linking roadmap items to handoffs
+            execute_query("""
+                CREATE TABLE roadmap_handoffs (
+                    roadmap_id VARCHAR(20) NOT NULL,
+                    handoff_id VARCHAR(10) NOT NULL,
+                    relationship VARCHAR(20) NOT NULL,
+                    created_at DATETIME2 DEFAULT GETDATE(),
+                    CONSTRAINT PK_roadmap_handoffs PRIMARY KEY (roadmap_id, handoff_id),
+                    CONSTRAINT CK_roadmap_handoff_rel CHECK (relationship IN ('IMPLEMENTS', 'FIXES', 'TESTS', 'ENHANCES')),
+                    CONSTRAINT FK_roadmap_handoff_ho FOREIGN KEY (handoff_id) REFERENCES handoff_requests(id)
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_roadmap_ho_roadmap ON roadmap_handoffs(roadmap_id)", fetch="none")
+            execute_query("CREATE INDEX idx_roadmap_ho_handoff ON roadmap_handoffs(handoff_id)", fetch="none")
+            logger.info("  Migration 12: roadmap_handoffs table created.")
+
+            logger.info("  Migration 12: All handoff lifecycle tables created successfully.")
+        else:
+            logger.info("  Migration 12: handoff_requests table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 12 warning: {e}")
+
     logger.info("Migrations complete.")

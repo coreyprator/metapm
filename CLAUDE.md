@@ -10,7 +10,48 @@ NO EXCEPTIONS. See project-methodology/CLAUDE.md for details.
 
 ---
 
-> **Last Updated**: 2026-01-30
+## Handoff Lifecycle Protocol
+
+### Receiving Handoffs
+1. Note the ID (HO-XXXX) from the handoff header
+2. Archive handoff: `handoffs/archive/HO-XXXX_request.md`
+3. Delete from inbox (garbage collect)
+
+### Completion Response Format
+
+Every completion MUST include this exact format:
+
+| Field | Value |
+|-------|-------|
+| ID | HO-XXXX (from original request) |
+| Project | [Icon] [Name] |
+| Task | [Brief description] |
+| Status | COMPLETE / PARTIAL / BLOCKED |
+| Commit | [hash] |
+| Handoff | [Full GCS URL] |
+
+### Summary Section
+After the table, include:
+- Brief description of what was done
+- Files changed (list)
+- Inbox cleanup confirmation
+
+### Git Commit Format
+Include ID in commit message:
+```
+feat: [description] (HO-XXXX)
+fix: [description] (HO-XXXX)
+```
+
+### Garbage Collection Checklist
+After processing handoff:
+- [ ] Deleted from inbox: `handoffs/inbox/*.md`
+- [ ] Archived to: `handoffs/archive/`
+- [ ] Reminded Corey about Downloads folder cleanup
+
+---
+
+> **Last Updated**: 2026-02-10
 > **Current Service**: metapm-v2 (NOT "metapm")
 > **Current Project**: super-flashcards-475210 (NOT "metapm")
 

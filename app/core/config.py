@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.0.4"  # Fix UAT submit status constraint
+    VERSION: str = "2.0.5"  # Add handoff lifecycle tracking (HO-A1B2)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
