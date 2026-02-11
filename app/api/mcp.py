@@ -19,7 +19,8 @@ from app.schemas.mcp import (
     LogEntry, LogResponse, LogEntryType,
     HandoffDirection, HandoffStatus, TaskStatus, TaskPriority,
     UATSubmit, UATResult, UATHistoryResponse, UATStatus,
-    UATDirectSubmit, UATDirectSubmitResponse
+    UATDirectSubmit, UATDirectSubmitResponse,
+    UATListItem, UATListResponse
 )
 
 logger = logging.getLogger(__name__)
@@ -728,6 +729,178 @@ async def submit_uat_direct(uat: UATDirectSubmit):
         raise
     except Exception as e:
         logger.error(f"Error submitting direct UAT: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# UAT RETRIEVAL ENDPOINTS (Phase 5)
+# ============================================
+
+@router.get("/uat/latest", response_model=UATListItem)
+async def get_latest_uat(
+    project: Optional[str] = Query(None)
+):
+    """
+    Get most recent UAT submission (PUBLIC - no auth).
+    Optionally filter by project.
+    """
+    try:
+        if project:
+            result = execute_query("""
+                SELECT TOP 1 u.id, u.handoff_id, u.status, u.total_tests,
+                       u.passed, u.failed, u.notes_count, u.tested_by,
+                       u.tested_at, u.results_text,
+                       h.project, h.version
+                FROM uat_results u
+                JOIN mcp_handoffs h ON u.handoff_id = h.id
+                WHERE h.project = ?
+                ORDER BY u.tested_at DESC
+            """, (project,), fetch="one")
+        else:
+            result = execute_query("""
+                SELECT TOP 1 u.id, u.handoff_id, u.status, u.total_tests,
+                       u.passed, u.failed, u.notes_count, u.tested_by,
+                       u.tested_at, u.results_text,
+                       h.project, h.version
+                FROM uat_results u
+                JOIN mcp_handoffs h ON u.handoff_id = h.id
+                ORDER BY u.tested_at DESC
+            """, fetch="one")
+
+        if not result:
+            raise HTTPException(status_code=404, detail="No UAT submissions found")
+
+        return UATListItem(
+            id=str(result['id']),
+            handoff_id=str(result['handoff_id']),
+            project=result.get('project'),
+            version=result.get('version'),
+            status=UATStatus(result['status']),
+            total_tests=result['total_tests'],
+            passed=result['passed'],
+            failed=result['failed'],
+            notes_count=result.get('notes_count'),
+            tested_by=result.get('tested_by'),
+            tested_at=result['tested_at'],
+            results_text=result.get('results_text')
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting latest UAT: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/uat/list", response_model=UATListResponse)
+async def list_uat_results(
+    project: Optional[str] = Query(None),
+    status: Optional[UATStatus] = Query(None),
+    limit: int = Query(10, le=100),
+    offset: int = Query(0)
+):
+    """
+    List UAT submissions with optional filters (PUBLIC - no auth).
+    """
+    try:
+        where_clauses = []
+        params = []
+
+        if project:
+            where_clauses.append("h.project = ?")
+            params.append(project)
+        if status:
+            where_clauses.append("u.status = ?")
+            params.append(status.value)
+
+        where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+        # Get total count
+        count_result = execute_query(
+            f"""SELECT COUNT(*) as total
+                FROM uat_results u
+                JOIN mcp_handoffs h ON u.handoff_id = h.id
+                WHERE {where_sql}""",
+            tuple(params) if params else None,
+            fetch="one"
+        )
+        total = count_result['total'] if count_result else 0
+
+        # Get paginated results
+        params.extend([offset, limit])
+        results = execute_query(f"""
+            SELECT u.id, u.handoff_id, u.status, u.total_tests,
+                   u.passed, u.failed, u.notes_count, u.tested_by,
+                   u.tested_at, u.results_text,
+                   h.project, h.version
+            FROM uat_results u
+            JOIN mcp_handoffs h ON u.handoff_id = h.id
+            WHERE {where_sql}
+            ORDER BY u.tested_at DESC
+            OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+        """, tuple(params), fetch="all")
+
+        items = []
+        for row in (results or []):
+            items.append(UATListItem(
+                id=str(row['id']),
+                handoff_id=str(row['handoff_id']),
+                project=row.get('project'),
+                version=row.get('version'),
+                status=UATStatus(row['status']),
+                total_tests=row['total_tests'],
+                passed=row['passed'],
+                failed=row['failed'],
+                notes_count=row.get('notes_count'),
+                tested_by=row.get('tested_by'),
+                tested_at=row['tested_at'],
+                results_text=row.get('results_text')
+            ))
+
+        return UATListResponse(results=items, total=total)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing UAT results: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/uat/{uat_id}", response_model=UATListItem)
+async def get_uat_by_id(uat_id: str):
+    """
+    Get a specific UAT result by its ID (PUBLIC - no auth).
+    """
+    try:
+        result = execute_query("""
+            SELECT u.id, u.handoff_id, u.status, u.total_tests,
+                   u.passed, u.failed, u.notes_count, u.tested_by,
+                   u.tested_at, u.results_text,
+                   h.project, h.version
+            FROM uat_results u
+            JOIN mcp_handoffs h ON u.handoff_id = h.id
+            WHERE u.id = ?
+        """, (uat_id,), fetch="one")
+
+        if not result:
+            raise HTTPException(status_code=404, detail="UAT result not found")
+
+        return UATListItem(
+            id=str(result['id']),
+            handoff_id=str(result['handoff_id']),
+            project=result.get('project'),
+            version=result.get('version'),
+            status=UATStatus(result['status']),
+            total_tests=result['total_tests'],
+            passed=result['passed'],
+            failed=result['failed'],
+            notes_count=result.get('notes_count'),
+            tested_by=result.get('tested_by'),
+            tested_at=result['tested_at'],
+            results_text=result.get('results_text')
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting UAT result: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

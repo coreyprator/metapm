@@ -209,3 +209,25 @@ class UATDirectSubmitResponse(BaseModel):
     status: str
     handoff_url: str
     message: str
+
+
+class UATListItem(BaseModel):
+    """UAT result with project info for list views."""
+    id: str
+    handoff_id: str
+    project: Optional[str] = None
+    version: Optional[str] = None
+    status: UATStatus
+    total_tests: int
+    passed: int
+    failed: int
+    notes_count: Optional[int] = None
+    tested_by: Optional[str] = None
+    tested_at: datetime
+    results_text: Optional[str] = None
+
+
+class UATListResponse(BaseModel):
+    """Paginated list of UAT results."""
+    results: List[UATListItem]
+    total: int
