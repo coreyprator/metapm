@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.0.6"  # Fix compare page + seed test data (HO-G7H8)
+    VERSION: str = "2.0.7"  # Conductor API + PromptForge v3 (HO-Q5R6)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

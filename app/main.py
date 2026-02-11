@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle
+from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor
 from app.core.config import settings
 from app.core.migrations import run_migrations
 from transactions import router as transactions_router
@@ -65,6 +65,7 @@ app.include_router(backlog.router, prefix="/api/backlog", tags=["Backlog"])
 app.include_router(mcp.router, prefix="/mcp", tags=["MCP"])
 app.include_router(roadmap.router, prefix="/api", tags=["Roadmap"])
 app.include_router(handoff_lifecycle.router, prefix="/api", tags=["Handoff Lifecycle"])
+app.include_router(conductor.router, tags=["Conductor"])
 
 
 # Define static_dir early for use in routes
