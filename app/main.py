@@ -4,10 +4,11 @@ FastAPI Application Entry Point
 """
 
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.exceptions import RequestValidationError
 
 from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor
 from app.core.config import settings
@@ -51,6 +52,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Custom validation error handler for better 422 messages (HO-N3O4)
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = []
+    for error in exc.errors():
+        field = " → ".join(str(loc) for loc in error.get("loc", []))
+        errors.append(f"{field}: {error.get('msg', 'unknown error')} (type={error.get('type', '?')})")
+    detail = "; ".join(errors)
+    logger.warning(f"422 Validation Error on {request.method} {request.url.path}: {detail}")
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": detail,
+            "errors": exc.errors(),
+            "hint": "Check field names and types. See /docs for schema."
+        }
+    )
+
 
 # Include routers
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
