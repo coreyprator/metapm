@@ -1528,6 +1528,8 @@
             if (statusBar) statusBar.style.display = view === 'tasks' ? 'flex' : 'none';
             // Context-aware add button
             addBtn.textContent = addLabels[view] || '+ Add';
+            // Persist active tab (HO-MP02)
+            localStorage.setItem('metapm-activeTab', view);
         }
 
         viewSelect.addEventListener('change', e => switchView(e.target.value));
@@ -1540,7 +1542,9 @@
         });
 
         function setDefaultTab() {
-            switchView('tasks');
+            const saved = localStorage.getItem('metapm-activeTab') || 'tasks';
+            viewSelect.value = saved;
+            switchView(saved);
         }
         
         // ==================== SYNC STATUS ====================
@@ -1752,8 +1756,9 @@
             }
             document.getElementById('bulkStatusSelect').value = '';
             selectedTaskIds.clear();
+            updateSelectionUI();
             await loadTasks();
-            showToast(`${selectedTaskIds.size || 'Tasks'} updated to ${newStatus}`);
+            showToast(`Tasks updated to ${newStatus}`);
         }
         async function bulkDeleteSelected() {
             if (!confirm(`Delete ${selectedTaskIds.size} tasks?`)) return;
