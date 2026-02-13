@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.0.9"  # Better 422 error messages (HO-N3O4)
+    VERSION: str = "2.1.0"  # Fix UAT submit to accept results array (HO-U9V1)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

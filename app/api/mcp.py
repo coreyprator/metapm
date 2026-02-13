@@ -502,6 +502,19 @@ async def submit_uat_results(
         if not handoff:
             raise HTTPException(status_code=404, detail="Handoff not found")
 
+        # Convert results array to text if results_text not provided
+        results_text = uat.results_text
+        if not results_text and uat.results:
+            lines = []
+            for r in uat.results:
+                status_label = r.status.upper()
+                lines.append(f"  {status_label}  {r.id}: {r.title}")
+                if r.note:
+                    lines.append(f"        Note: {r.note}")
+            results_text = "\n".join(lines)
+        if not results_text:
+            results_text = ""
+
         # Insert UAT result
         result = execute_query("""
             INSERT INTO uat_results (
@@ -520,7 +533,7 @@ async def submit_uat_results(
             uat.passed,
             uat.failed,
             uat.notes_count or 0,
-            uat.results_text,
+            results_text,
             uat.checklist_path
         ), fetch="one")
 
@@ -621,8 +634,51 @@ async def submit_uat_direct(uat: UATDirectSubmit):
     Submit UAT results directly from HTML checklist (PUBLIC - no auth required).
     Creates or finds a handoff for the project/version, then adds UAT result.
     Designed for file:// origin access from local HTML checklists.
+
+    Accepts either:
+    - results_text (string) — backward compatible
+    - results (array of {id, title, status, note}) — from HTML templates
+    If both provided, results_text takes precedence. If neither, returns 422.
     """
     try:
+        # Validate: at least one results format provided
+        if not uat.results_text and not uat.results:
+            raise HTTPException(
+                status_code=422,
+                detail="Either 'results_text' or 'results' array is required"
+            )
+
+        # Validate: total_tests > 0
+        if uat.total_tests <= 0:
+            raise HTTPException(
+                status_code=422,
+                detail="total_tests must be greater than 0"
+            )
+
+        # Validate: counts don't exceed total
+        blocked = uat.blocked or 0
+        skipped = uat.skipped or 0
+        if uat.passed + uat.failed + blocked > uat.total_tests:
+            raise HTTPException(
+                status_code=422,
+                detail=f"passed ({uat.passed}) + failed ({uat.failed}) + blocked ({blocked}) = {uat.passed + uat.failed + blocked} exceeds total_tests ({uat.total_tests})"
+            )
+
+        # Convert results array to text if results_text not provided
+        results_text = uat.results_text
+        if not results_text and uat.results:
+            lines = []
+            for r in uat.results:
+                status_label = r.status.upper()
+                lines.append(f"  {status_label}  {r.id}: {r.title}")
+                if r.note:
+                    lines.append(f"        Note: {r.note}")
+            results_text = "\n".join(lines)
+
+        # Append general notes if provided
+        if uat.notes:
+            results_text = (results_text or "") + f"\n\nGeneral Notes:\n{uat.notes}"
+
         # Build task identifier from version + feature
         task_id = f"v{uat.version}"
         if uat.feature:
@@ -636,16 +692,18 @@ async def submit_uat_direct(uat: UATDirectSubmit):
         """, (uat.project, f"%{uat.version}%"), fetch="one")
 
         # Build content from actual UAT data
-        content = f"# UAT Results for {uat.project} v{uat.version}\n\n"
+        content = f"# UAT Results for {uat.project} {uat.version}\n\n"
         if uat.feature:
             content += f"**Feature**: {uat.feature}\n\n"
         content += f"**Status**: {uat.status.value}\n"
         content += f"**Tests**: {uat.passed} passed, {uat.failed} failed"
-        if uat.skipped:
-            content += f", {uat.skipped} skipped"
+        if blocked:
+            content += f", {blocked} blocked"
+        if skipped:
+            content += f", {skipped} skipped"
         content += f" (out of {uat.total_tests} total)\n\n"
         content += "---\n\n"
-        content += uat.results_text
+        content += results_text
 
         if handoff:
             handoff_id = str(handoff['id'])
@@ -694,7 +752,7 @@ async def submit_uat_direct(uat: UATDirectSubmit):
             uat.passed,
             uat.failed,
             uat.notes_count or 0,
-            uat.results_text,
+            results_text,
             uat.checklist_path
         ), fetch="one")
 

@@ -28,6 +28,8 @@ class UATStatus(str, Enum):
     PASSED = "passed"
     FAILED = "failed"
     PENDING = "pending"
+    BLOCKED = "blocked"
+    PARTIAL = "partial"
 
 
 class TaskPriority(str, Enum):
@@ -151,14 +153,24 @@ class LogResponse(BaseModel):
 
 
 # UAT Schemas
+class UATResultItem(BaseModel):
+    """A single UAT test result item from the HTML checklist."""
+    id: str
+    title: str
+    status: str
+    note: Optional[str] = None
+
+
 class UATSubmit(BaseModel):
     """Submit UAT results for a handoff."""
     status: UATStatus
     total_tests: int = Field(..., ge=0)
     passed: int = Field(..., ge=0)
     failed: int = Field(..., ge=0)
+    blocked: Optional[int] = Field(0, ge=0)
     notes_count: Optional[int] = Field(0, ge=0)
-    results_text: str
+    results_text: Optional[str] = None
+    results: Optional[List[UATResultItem]] = None
     checklist_path: Optional[str] = None
 
 
@@ -188,15 +200,19 @@ class UATHistoryResponse(BaseModel):
 class UATDirectSubmit(BaseModel):
     """Submit UAT results directly from HTML checklist."""
     project: str = Field(..., max_length=100)
-    version: str = Field(..., max_length=20)
+    version: str = Field(..., max_length=200)
     feature: Optional[str] = Field(None, max_length=200)
     status: UATStatus
     total_tests: int = Field(..., ge=0)
     passed: int = Field(..., ge=0)
     failed: int = Field(..., ge=0)
+    blocked: Optional[int] = Field(0, ge=0)
     skipped: Optional[int] = Field(0, ge=0)
     notes_count: Optional[int] = Field(0, ge=0)
-    results_text: str
+    results_text: Optional[str] = None
+    results: Optional[List[UATResultItem]] = None
+    notes: Optional[str] = None
+    submitted_at: Optional[str] = None
     checklist_path: Optional[str] = None
     url: Optional[str] = None
     tested_by: Optional[str] = Field(None, max_length=100)
