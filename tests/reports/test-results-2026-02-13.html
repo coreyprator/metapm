@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Automated Test Results - 2026-02-13</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 24px; color: #1a1a1a; }
+header { margin-bottom: 24px; }
+h1 { margin: 0 0 8px 0; }
+.small { color: #555; }
+.section { margin-top: 28px; }
+table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+th, td { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
+th { background: #f2f2f2; text-align: left; }
+.status-pass { color: #0a7d32; font-weight: bold; }
+.status-fail { color: #b00020; font-weight: bold; }
+.status-timeout { color: #b00020; font-weight: bold; }
+pre { background: #f8f8f8; padding: 12px; border: 1px solid #ddd; overflow-x: auto; }
+code { font-family: Consolas, monospace; }
+</style>
+</head>
+<body>
+<header>
+<h1>Automated Test Results - 2026-02-13</h1>
+<div class="small">Run timestamp: 2026-02-13 11:13:17</div>
+</header>
+
+<section class="section">
+<h2>Executive Summary</h2>
+<table>
+<tr><th>Metric</th><th>Value</th></tr>
+<tr><td>Total Passed</td><td>57</td></tr>
+<tr><td>Total Failed</td><td>0</td></tr>
+<tr><td>Total Errors</td><td>1 (MetaPM bulk status timeout)</td></tr>
+<tr><td>Total Skipped</td><td>0</td></tr>
+<tr><td>Overall Status</td><td><span class="status-fail">HAS FAILURES</span></td></tr>
+</table>
+</section>
+
+<section class="section">
+<h2>MetaPM (metapm-v2)</h2>
+<table>
+<tr><th>Test</th><th>Result</th><th>Duration</th><th>Notes</th></tr>
+<tr><td>test_tab_persists_after_reload[chromium]</td><td class="status-pass">PASS</td><td>n/a (suite 30.45s)</td><td>—</td></tr>
+<tr><td>test_default_tab_without_localstorage[chromium]</td><td class="status-pass">PASS</td><td>n/a (suite 30.45s)</td><td>—</td></tr>
+<tr><td>test_switching_tabs_updates_localstorage[chromium]</td><td class="status-pass">PASS</td><td>n/a (suite 30.45s)</td><td>—</td></tr>
+<tr><td>test_backlog_tab_persists[chromium]</td><td class="status-pass">PASS</td><td>n/a (suite 30.45s)</td><td>—</td></tr>
+<tr><td>tests/e2e/test_bulk_status.py (suite)</td><td class="status-timeout">TIMEOUT</td><td>60s (timeout, retry)</td><td>Chrome process hang; test did not complete after retry</td></tr>
+</table>
+</section>
+
+<section class="section">
+<h2>ArtForge</h2>
+<table>
+<tr><th>Test</th><th>Result</th><th>Duration</th><th>Notes</th></tr>
+<tr><td>test_collection_model_has_providers_column</td><td class="status-pass">PASS</td><td>n/a (suite 0.34s)</td><td>—</td></tr>
+<tr><td>test_providers_column_type_is_nvarchar</td><td class="status-pass">PASS</td><td>n/a (suite 0.34s)</td><td>—</td></tr>
+<tr><td>test_providers_column_is_nullable</td><td class="status-pass">PASS</td><td>n/a (suite 0.34s)</td><td>—</td></tr>
+<tr><td>test_providers_default_is_dalle3_json</td><td class="status-pass">PASS</td><td>n/a (suite 0.34s)</td><td>—</td></tr>
+<tr><td>test_create_schema_accepts_providers_list</td><td class="status-pass">PASS</td><td>n/a (suite 0.34s)</td><td>—</td></tr>
+<tr><td>test_create_schema_providers_optional</td><td class="status-pass">PASS</td><td>n/a (suite 0.34s)</td><td>—</td></tr>
+<tr><td>test_create_schema_empty_providers_list</td><td class="status-pass">PASS</td><td>n/a (suite 0.34s)</td><td>—</td></tr>
+<tr><td>test_response_schema_has_providers_field</td><td class="status-pass">PASS</td><td>n/a (suite 0.34s)</td><td>—</td></tr>
+<tr><td>test_response_schema_providers_is_optional_string</td><td class="status-pass">PASS</td><td>n/a (suite 0.34s)</td><td>—</td></tr>
+<tr><td>test_health_check</td><td class="status-pass">PASS</td><td>n/a (suite 2.02s)</td><td>—</td></tr>
+<tr><td>test_openapi_schema_includes_providers_in_collection</td><td class="status-pass">PASS</td><td>n/a (suite 2.02s)</td><td>—</td></tr>
+<tr><td>test_openapi_schema_collection_create_has_providers</td><td class="status-pass">PASS</td><td>n/a (suite 2.02s)</td><td>—</td></tr>
+<tr><td>test_providers_field_type_in_create_schema</td><td class="status-pass">PASS</td><td>n/a (suite 2.02s)</td><td>—</td></tr>
+</table>
+</section>
+
+<section class="section">
+<h2>Etymython</h2>
+<table>
+<tr><th>Test</th><th>Result</th><th>Duration</th><th>Notes</th></tr>
+<tr><td>test_figure_column_is_unicode[greek_name]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_figure_column_is_unicode[latin_name]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_figure_column_is_unicode[english_name]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_figure_column_is_unicode[role]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_figure_column_is_unicode[description]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_figure_column_is_unicode[symbols]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_figure_column_is_unicode[domain]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_figure_column_is_unicode[origin_story]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_figure_not_using_plain_string_for_greek</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_etymology_column_is_unicode[greek_root]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_etymology_column_is_unicode[root_meaning]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_etymology_column_is_unicode[phonetic_evolution]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_etymology_column_is_unicode[notes]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_cognate_column_is_unicode[word]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_cognate_column_is_unicode[definition]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_cognate_column_is_unicode[example_sentence]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_fun_fact_column_is_unicode[content]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_fun_fact_column_is_unicode[source_citation]</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_figure_relationships_notes_is_unicode</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_etymology_cognates_derivation_path_is_unicode</td><td class="status-pass">PASS</td><td>n/a (suite 3.94s)</td><td>—</td></tr>
+<tr><td>test_aphrodite_greek_name</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_multiple_figures_have_greek_names</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_etymology_greek_root_has_greek</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_fun_facts_not_corrupted[10-Ouranos]</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_fun_facts_not_corrupted[12-Titan]</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_fun_facts_not_corrupted[26-Rhea]</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_fun_facts_not_corrupted[27-Hyperion]</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_fun_facts_not_corrupted[28-Theia]</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_fun_facts_not_corrupted[29-Coeus]</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_fun_facts_not_corrupted[45-Dionysus]</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_fun_facts_not_corrupted[102-Odysseus]</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_fun_facts_have_content[10-Ouranos]</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_fun_facts_have_content[12-Titan]</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_fun_facts_have_content[26-Rhea]</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_fun_facts_have_content[27-Hyperion]</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_fun_facts_have_content[28-Theia]</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_fun_facts_have_content[29-Coeus]</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_fun_facts_have_content[45-Dionysus]</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_fun_facts_have_content[102-Odysseus]</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+<tr><td>test_no_question_mark_corruption_in_audit</td><td class="status-pass">PASS</td><td>n/a (suite 24.20s)</td><td>—</td></tr>
+</table>
+</section>
+
+<section class="section">
+<h2>Failure Details</h2>
+<table>
+<tr><th>Project</th><th>Test</th><th>Error</th><th>Explanation</th><th>Recommendation</th></tr>
+<tr>
+<td>MetaPM</td>
+<td>tests/e2e/test_bulk_status.py (suite)</td>
+<td>TIMEOUT after 60s (retry)</td>
+<td>Playwright/Chrome did not complete within 60 seconds on two attempts.</td>
+<td>Infrastructure issue: investigate Chrome/Playwright stability on host, then re-run tests.</td>
+</tr>
+</table>
+</section>
+
+<section class="section">
+<h2>Raw Output (Appendix)</h2>
+<h3>MetaPM - test_tab_persistence.py</h3>
+<pre>============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\Owner\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: G:\My Drive\Code\Python\metapm
+plugins: anyio-3.7.1, asyncio-1.3.0, base-url-2.1.0, playwright-0.7.2
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 4 items
+
+tests/e2e/test_tab_persistence.py::TestTabPersistence::test_tab_persists_after_reload[chromium] PASSED [ 25%]
+tests/e2e/test_tab_persistence.py::TestTabPersistence::test_default_tab_without_localstorage[chromium] PASSED [ 50%]
+tests/e2e/test_tab_persistence.py::TestTabPersistence::test_switching_tabs_updates_localstorage[chromium] PASSED [ 75%]
+tests/e2e/test_tab_persistence.py::TestTabPersistence::test_backlog_tab_persists[chromium] PASSED [100%]
+
+============================== warnings summary ===============================
+C:\Users\Owner\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\_internal\_config.py:271: 28 warnings
+  C:\Users\Owner\AppData\Local\Programs\Python\Python312\Lib\site-packages\pydantic\_internal\_config.py:271: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.5/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+app\api\tasks.py:33
+  G:\My Drive\Code\Python\metapm\app\api\tasks.py:33: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.5/migration/
+    @validator(&#39;title&#39;)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 4 passed, 29 warnings in 30.45s =======================
+</pre>
+<h3>MetaPM - test_bulk_status.py</h3>
+<pre>
+[HO-TR01] TIMEOUT after 60s (retry)
+</pre>
+<h3>ArtForge - test_provider_schema.py</h3>
+<pre>============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\Owner\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: G:\My Drive\Code\Python\ArtForge
+configfile: pytest.ini
+plugins: anyio-3.7.1, asyncio-1.3.0, base-url-2.1.0, playwright-0.7.2
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 9 items
+
+tests/unit/test_provider_schema.py::TestCollectionModelProviders::test_collection_model_has_providers_column PASSED [ 11%]
+tests/unit/test_provider_schema.py::TestCollectionModelProviders::test_providers_column_type_is_nvarchar PASSED [ 22%]
+tests/unit/test_provider_schema.py::TestCollectionModelProviders::test_providers_column_is_nullable PASSED [ 33%]
+tests/unit/test_provider_schema.py::TestCollectionModelProviders::test_providers_default_is_dalle3_json PASSED [ 44%]
+tests/unit/test_provider_schema.py::TestCollectionCreateSchema::test_create_schema_accepts_providers_list PASSED [ 55%]
+tests/unit/test_provider_schema.py::TestCollectionCreateSchema::test_create_schema_providers_optional PASSED [ 66%]
+tests/unit/test_provider_schema.py::TestCollectionCreateSchema::test_create_schema_empty_providers_list PASSED [ 77%]
+tests/unit/test_provider_schema.py::TestCollectionResponseSchema::test_response_schema_has_providers_field PASSED [ 88%]
+tests/unit/test_provider_schema.py::TestCollectionResponseSchema::test_response_schema_providers_is_optional_string PASSED [100%]
+
+============================== warnings summary ===============================
+&lt;frozen importlib._bootstrap&gt;:488
+  &lt;frozen importlib._bootstrap&gt;:488: DeprecationWarning: Type google._upb._message.MessageMapContainer uses PyType_Spec with a metaclass that has custom tp_new. This is deprecated and will no longer be allowed in Python 3.14.
+
+&lt;frozen importlib._bootstrap&gt;:488
+  &lt;frozen importlib._bootstrap&gt;:488: DeprecationWarning: Type google._upb._message.ScalarMapContainer uses PyType_Spec with a metaclass that has custom tp_new. This is deprecated and will no longer be allowed in Python 3.14.
+
+app\main.py:202
+  G:\My Drive\Code\Python\ArtForge\app\main.py:202: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event(&quot;startup&quot;)
+
+C:\Users\Owner\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\applications.py:4547
+C:\Users\Owner\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\applications.py:4547
+  C:\Users\Owner\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\applications.py:4547: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)
+
+app\main.py:224
+  G:\My Drive\Code\Python\ArtForge\app\main.py:224: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event(&quot;shutdown&quot;)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 9 passed, 6 warnings in 0.34s ========================
+</pre>
+<h3>ArtForge - test_collection_providers.py</h3>
+<pre>============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\Owner\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: G:\My Drive\Code\Python\ArtForge
+configfile: pytest.ini
+plugins: anyio-3.7.1, asyncio-1.3.0, base-url-2.1.0, playwright-0.7.2
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 4 items
+
+tests/api/test_collection_providers.py::TestProviderFieldInAPI::test_health_check PASSED [ 25%]
+tests/api/test_collection_providers.py::TestProviderFieldInAPI::test_openapi_schema_includes_providers_in_collection PASSED [ 50%]
+tests/api/test_collection_providers.py::TestProviderFieldInAPI::test_openapi_schema_collection_create_has_providers PASSED [ 75%]
+tests/api/test_collection_providers.py::TestProviderFieldInAPI::test_providers_field_type_in_create_schema PASSED [100%]
+
+============================== warnings summary ===============================
+&lt;frozen importlib._bootstrap&gt;:488
+  &lt;frozen importlib._bootstrap&gt;:488: DeprecationWarning: Type google._upb._message.MessageMapContainer uses PyType_Spec with a metaclass that has custom tp_new. This is deprecated and will no longer be allowed in Python 3.14.
+
+&lt;frozen importlib._bootstrap&gt;:488
+  &lt;frozen importlib._bootstrap&gt;:488: DeprecationWarning: Type google._upb._message.ScalarMapContainer uses PyType_Spec with a metaclass that has custom tp_new. This is deprecated and will no longer be allowed in Python 3.14.
+
+app\main.py:202
+  G:\My Drive\Code\Python\ArtForge\app\main.py:202: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event(&quot;startup&quot;)
+
+C:\Users\Owner\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\applications.py:4547
+C:\Users\Owner\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\applications.py:4547
+  C:\Users\Owner\AppData\Local\Programs\Python\Python312\Lib\site-packages\fastapi\applications.py:4547: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)
+
+app\main.py:224
+  G:\My Drive\Code\Python\ArtForge\app\main.py:224: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event(&quot;shutdown&quot;)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 4 passed, 6 warnings in 2.02s ========================
+</pre>
+<h3>Etymython - test_nvarchar_model.py</h3>
+<pre>============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\Owner\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: G:\My Drive\Code\Python\etymython
+plugins: anyio-3.7.1, asyncio-1.3.0, base-url-2.1.0, playwright-0.7.2
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 20 items
+
+tests/unit/test_nvarchar_model.py::TestMythologicalFigureColumns::test_figure_column_is_unicode[greek_name] PASSED [  5%]
+tests/unit/test_nvarchar_model.py::TestMythologicalFigureColumns::test_figure_column_is_unicode[latin_name] PASSED [ 10%]
+tests/unit/test_nvarchar_model.py::TestMythologicalFigureColumns::test_figure_column_is_unicode[english_name] PASSED [ 15%]
+tests/unit/test_nvarchar_model.py::TestMythologicalFigureColumns::test_figure_column_is_unicode[role] PASSED [ 20%]
+tests/unit/test_nvarchar_model.py::TestMythologicalFigureColumns::test_figure_column_is_unicode[description] PASSED [ 25%]
+tests/unit/test_nvarchar_model.py::TestMythologicalFigureColumns::test_figure_column_is_unicode[symbols] PASSED [ 30%]
+tests/unit/test_nvarchar_model.py::TestMythologicalFigureColumns::test_figure_column_is_unicode[domain] PASSED [ 35%]
+tests/unit/test_nvarchar_model.py::TestMythologicalFigureColumns::test_figure_column_is_unicode[origin_story] PASSED [ 40%]
+tests/unit/test_nvarchar_model.py::TestMythologicalFigureColumns::test_figure_not_using_plain_string_for_greek PASSED [ 45%]
+tests/unit/test_nvarchar_model.py::TestEtymologyColumns::test_etymology_column_is_unicode[greek_root] PASSED [ 50%]
+tests/unit/test_nvarchar_model.py::TestEtymologyColumns::test_etymology_column_is_unicode[root_meaning] PASSED [ 55%]
+tests/unit/test_nvarchar_model.py::TestEtymologyColumns::test_etymology_column_is_unicode[phonetic_evolution] PASSED [ 60%]
+tests/unit/test_nvarchar_model.py::TestEtymologyColumns::test_etymology_column_is_unicode[notes] PASSED [ 65%]
+tests/unit/test_nvarchar_model.py::TestEnglishCognateColumns::test_cognate_column_is_unicode[word] PASSED [ 70%]
+tests/unit/test_nvarchar_model.py::TestEnglishCognateColumns::test_cognate_column_is_unicode[definition] PASSED [ 75%]
+tests/unit/test_nvarchar_model.py::TestEnglishCognateColumns::test_cognate_column_is_unicode[example_sentence] PASSED [ 80%]
+tests/unit/test_nvarchar_model.py::TestFunFactColumns::test_fun_fact_column_is_unicode[content] PASSED [ 85%]
+tests/unit/test_nvarchar_model.py::TestFunFactColumns::test_fun_fact_column_is_unicode[source_citation] PASSED [ 90%]
+tests/unit/test_nvarchar_model.py::TestJunctionTableColumns::test_figure_relationships_notes_is_unicode PASSED [ 95%]
+tests/unit/test_nvarchar_model.py::TestJunctionTableColumns::test_etymology_cognates_derivation_path_is_unicode PASSED [100%]
+
+============================== warnings summary ===============================
+tests/unit/test_nvarchar_model.py::TestMythologicalFigureColumns::test_figure_column_is_unicode[greek_name]
+  &lt;frozen importlib._bootstrap&gt;:488: DeprecationWarning: Type google._upb._message.MessageMapContainer uses PyType_Spec with a metaclass that has custom tp_new. This is deprecated and will no longer be allowed in Python 3.14.
+
+tests/unit/test_nvarchar_model.py::TestMythologicalFigureColumns::test_figure_column_is_unicode[greek_name]
+  &lt;frozen importlib._bootstrap&gt;:488: DeprecationWarning: Type google._upb._message.ScalarMapContainer uses PyType_Spec with a metaclass that has custom tp_new. This is deprecated and will no longer be allowed in Python 3.14.
+
+tests/unit/test_nvarchar_model.py::TestMythologicalFigureColumns::test_figure_column_is_unicode[greek_name]
+  G:\My Drive\Code\Python\etymython\app\database.py:28: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+    Base = declarative_base()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 20 passed, 3 warnings in 3.94s ========================
+</pre>
+<h3>Etymython - test_unicode_greek.py</h3>
+<pre>============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\Owner\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: G:\My Drive\Code\Python\etymython
+plugins: anyio-3.7.1, asyncio-1.3.0, base-url-2.1.0, playwright-0.7.2
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 20 items
+
+tests/api/test_unicode_greek.py::TestGreekNameIntegrity::test_aphrodite_greek_name PASSED [  5%]
+tests/api/test_unicode_greek.py::TestGreekNameIntegrity::test_multiple_figures_have_greek_names PASSED [ 10%]
+tests/api/test_unicode_greek.py::TestGreekRootIntegrity::test_etymology_greek_root_has_greek PASSED [ 15%]
+tests/api/test_unicode_greek.py::TestRegeneratedFunFacts::test_fun_facts_not_corrupted[10-Ouranos] PASSED [ 20%]
+tests/api/test_unicode_greek.py::TestRegeneratedFunFacts::test_fun_facts_not_corrupted[12-Titan] PASSED [ 25%]
+tests/api/test_unicode_greek.py::TestRegeneratedFunFacts::test_fun_facts_not_corrupted[26-Rhea] PASSED [ 30%]
+tests/api/test_unicode_greek.py::TestRegeneratedFunFacts::test_fun_facts_not_corrupted[27-Hyperion] PASSED [ 35%]
+tests/api/test_unicode_greek.py::TestRegeneratedFunFacts::test_fun_facts_not_corrupted[28-Theia] PASSED [ 40%]
+tests/api/test_unicode_greek.py::TestRegeneratedFunFacts::test_fun_facts_not_corrupted[29-Coeus] PASSED [ 45%]
+tests/api/test_unicode_greek.py::TestRegeneratedFunFacts::test_fun_facts_not_corrupted[45-Dionysus] PASSED [ 50%]
+tests/api/test_unicode_greek.py::TestRegeneratedFunFacts::test_fun_facts_not_corrupted[102-Odysseus] PASSED [ 55%]
+tests/api/test_unicode_greek.py::TestRegeneratedFunFacts::test_fun_facts_have_content[10-Ouranos] PASSED [ 60%]
+tests/api/test_unicode_greek.py::TestRegeneratedFunFacts::test_fun_facts_have_content[12-Titan] PASSED [ 65%]
+tests/api/test_unicode_greek.py::TestRegeneratedFunFacts::test_fun_facts_have_content[26-Rhea] PASSED [ 70%]
+tests/api/test_unicode_greek.py::TestRegeneratedFunFacts::test_fun_facts_have_content[27-Hyperion] PASSED [ 75%]
+tests/api/test_unicode_greek.py::TestRegeneratedFunFacts::test_fun_facts_have_content[28-Theia] PASSED [ 80%]
+tests/api/test_unicode_greek.py::TestRegeneratedFunFacts::test_fun_facts_have_content[29-Coeus] PASSED [ 85%]
+tests/api/test_unicode_greek.py::TestRegeneratedFunFacts::test_fun_facts_have_content[45-Dionysus] PASSED [ 90%]
+tests/api/test_unicode_greek.py::TestRegeneratedFunFacts::test_fun_facts_have_content[102-Odysseus] PASSED [ 95%]
+tests/api/test_unicode_greek.py::TestAuditEndpoint::test_no_question_mark_corruption_in_audit PASSED [100%]
+
+============================= 20 passed in 24.20s =============================
+</pre>
+</section>
+</body>
+</html>
