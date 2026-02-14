@@ -1639,9 +1639,11 @@
             }
         }
         
-        function updateTaskStats() {
+        function updateTaskStats(tasksToCount = null) {
+            // If tasksToCount provided, count those; otherwise count all tasks
+            const tasks = tasksToCount || allTasks;
             const counts = { NEW: 0, STARTED: 0, BLOCKED: 0, DONE: 0 };
-            allTasks.forEach(t => { if (counts[t.status] !== undefined) counts[t.status]++; });
+            tasks.forEach(t => { if (counts[t.status] !== undefined) counts[t.status]++; });
             document.getElementById('statNew').textContent = counts.NEW;
             document.getElementById('statStarted').textContent = counts.STARTED;
             document.getElementById('statBlocked').textContent = counts.BLOCKED;
@@ -1691,6 +1693,14 @@
             const sortBy = document.getElementById('taskSortOrder')?.value || 'priority';
             const direction = document.getElementById('taskSortDirection')?.value || 'asc';
             tasks = sortTasks(tasks, sortBy, direction);
+
+            // Update status bar with filtered counts
+            // But only apply project filter to status bar, not other filters
+            let statsFilteredTasks = allTasks;
+            if (projectFilterValue) {
+                statsFilteredTasks = allTasks.filter(t => t.projectCode === projectFilterValue || (t.projects && t.projects.includes(projectFilterValue)));
+            }
+            updateTaskStats(statsFilteredTasks);
 
             const container = document.getElementById('taskList');
             if (!tasks.length) {

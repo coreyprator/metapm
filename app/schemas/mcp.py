@@ -5,7 +5,8 @@ Pydantic models for MCP handoffs and tasks.
 
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator, ValidationError
+from pydantic_core import PydanticCustomError
 from enum import Enum
 
 
@@ -158,7 +159,7 @@ class UATResultItem(BaseModel):
     id: str
     title: str
     status: str
-    note: Optional[str] = None
+    note: Optional[str] = Field(None, max_length=2000)
 
 
 class UATSubmit(BaseModel):
@@ -172,6 +173,35 @@ class UATSubmit(BaseModel):
     results_text: Optional[str] = None
     results: Optional[List[UATResultItem]] = None
     checklist_path: Optional[str] = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def validate_results(cls, data: Any) -> Any:
+        """Ensure at least one results format is provided and auto-generate results_text from results array if needed."""
+        if isinstance(data, dict):
+            results_text = data.get('results_text')
+            results = data.get('results')
+            
+            # Validate: at least one results format required
+            if not results_text and not results:
+                raise PydanticCustomError(
+                    'missing_results',
+                    "Either 'results_text' or 'results' array is required"
+                )
+            
+            # Auto-generate results_text from results array if not provided
+            if not results_text and results:
+                lines = []
+                for r in results:
+                    status_label = r.get('status', '').upper()
+                    r_id = r.get('id', '')
+                    r_title = r.get('title', '')
+                    lines.append(f"  {status_label}  {r_id}: {r_title}")
+                    if r.get('note'):
+                        lines.append(f"        Note: {r['note']}")
+                data['results_text'] = "\n".join(lines)
+        
+        return data
 
 
 class UATResult(BaseModel):
@@ -199,9 +229,9 @@ class UATHistoryResponse(BaseModel):
 # Direct UAT Submit (from checklist HTML)
 class UATDirectSubmit(BaseModel):
     """Submit UAT results directly from HTML checklist."""
-    project: str = Field(..., max_length=100)
-    version: str = Field(..., max_length=200)
-    feature: Optional[str] = Field(None, max_length=200)
+    project: str = Field(..., max_length=100, strip_whitespace=True)
+    version: str = Field(..., max_length=200, strip_whitespace=True)
+    feature: Optional[str] = Field(None, max_length=200, strip_whitespace=True)
     status: UATStatus
     total_tests: int = Field(..., ge=0)
     passed: int = Field(..., ge=0)
@@ -216,6 +246,60 @@ class UATDirectSubmit(BaseModel):
     checklist_path: Optional[str] = None
     url: Optional[str] = None
     tested_by: Optional[str] = Field(None, max_length=100)
+
+    @model_validator(mode='before')
+    @classmethod
+    def validate_and_prepare(cls, data: Any) -> Any:
+        """Validate inputs and auto-generate results_text from results array if needed."""
+        if isinstance(data, dict):
+            results_text = data.get('results_text')
+            results = data.get('results')
+            
+            # Validate: at least one results format required
+            if not results_text and not results:
+                raise PydanticCustomError(
+                    'missing_results',
+                    "Either 'results_text' or 'results' array is required"
+                )
+            
+            # Validate: total_tests > 0
+            total_tests = data.get('total_tests', 0)
+            if total_tests <= 0:
+                raise PydanticCustomError(
+                    'invalid_total_tests',
+                    "total_tests must be greater than 0"
+                )
+            
+            # Validate: counts don't exceed total
+            passed = data.get('passed', 0)
+            failed = data.get('failed', 0)
+            blocked = data.get('blocked', 0)
+            if passed + failed + blocked > total_tests:
+                raise PydanticCustomError(
+                    'counts_exceed_total',
+                    f"passed ({passed}) + failed ({failed}) + blocked ({blocked}) = "
+                    f"{passed + failed + blocked} exceeds total_tests ({total_tests})"
+                )
+            
+            # Auto-generate results_text from results array if not provided
+            if not results_text and results:
+                lines = []
+                for r in results:
+                    status_label = r.get('status', '').upper()
+                    r_id = r.get('id', '')
+                    r_title = r.get('title', '')
+                    lines.append(f"  {status_label}  {r_id}: {r_title}")
+                    if r.get('note'):
+                        # Truncate long notes
+                        note = r['note'][:2000] if len(r.get('note', '')) > 2000 else r['note']
+                        lines.append(f"        Note: {note}")
+                data['results_text'] = "\n".join(lines)
+            
+            # Append general notes if provided
+            if data.get('notes') and data.get('results_text'):
+                data['results_text'] = data['results_text'] + f"\n\nGeneral Notes:\n{data['notes']}"
+        
+        return data
 
 
 class UATDirectSubmitResponse(BaseModel):

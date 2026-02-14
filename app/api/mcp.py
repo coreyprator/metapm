@@ -492,6 +492,8 @@ async def submit_uat_results(
     """
     Submit UAT results for a handoff (requires auth).
     Updates handoff status based on UAT result.
+    
+    NOTE: results_text auto-conversion handled by UATSubmit model_validator.
     """
     try:
         # Verify handoff exists
@@ -503,18 +505,8 @@ async def submit_uat_results(
         if not handoff:
             raise HTTPException(status_code=404, detail="Handoff not found")
 
-        # Convert results array to text if results_text not provided
-        results_text = uat.results_text
-        if not results_text and uat.results:
-            lines = []
-            for r in uat.results:
-                status_label = r.status.upper()
-                lines.append(f"  {status_label}  {r.id}: {r.title}")
-                if r.note:
-                    lines.append(f"        Note: {r.note}")
-            results_text = "\n".join(lines)
-        if not results_text:
-            results_text = ""
+        # results_text is guaranteed to exist by model_validator
+        results_text = uat.results_text or ""
 
         # Insert UAT result
         result = execute_query("""
@@ -640,45 +632,14 @@ async def submit_uat_direct(uat: UATDirectSubmit):
     - results_text (string) — backward compatible
     - results (array of {id, title, status, note}) — from HTML templates
     If both provided, results_text takes precedence. If neither, returns 422.
+    
+    NOTE: Validation is now handled by the UATDirectSubmit model_validator.
     """
     try:
-        # Validate: at least one results format provided
-        if not uat.results_text and not uat.results:
-            raise HTTPException(
-                status_code=422,
-                detail="Either 'results_text' or 'results' array is required"
-            )
-
-        # Validate: total_tests > 0
-        if uat.total_tests <= 0:
-            raise HTTPException(
-                status_code=422,
-                detail="total_tests must be greater than 0"
-            )
-
-        # Validate: counts don't exceed total
+        # results_text is guaranteed to exist by model_validator
+        results_text = uat.results_text or ""
         blocked = uat.blocked or 0
         skipped = uat.skipped or 0
-        if uat.passed + uat.failed + blocked > uat.total_tests:
-            raise HTTPException(
-                status_code=422,
-                detail=f"passed ({uat.passed}) + failed ({uat.failed}) + blocked ({blocked}) = {uat.passed + uat.failed + blocked} exceeds total_tests ({uat.total_tests})"
-            )
-
-        # Convert results array to text if results_text not provided
-        results_text = uat.results_text
-        if not results_text and uat.results:
-            lines = []
-            for r in uat.results:
-                status_label = r.status.upper()
-                lines.append(f"  {status_label}  {r.id}: {r.title}")
-                if r.note:
-                    lines.append(f"        Note: {r.note}")
-            results_text = "\n".join(lines)
-
-        # Append general notes if provided
-        if uat.notes:
-            results_text = (results_text or "") + f"\n\nGeneral Notes:\n{uat.notes}"
 
         # Build task identifier from version + feature
         task_id = f"v{uat.version}"

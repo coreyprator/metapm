@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.1.1"  # Fix UAT/handoffs MCP endpoints (OFFSET/FETCH param issue)
+    VERSION: str = "2.1.2"  # Fix UAT submit 422 + dashboard status bar filtering (HO-U9V1)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
