@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.1.2"  # Fix UAT submit 422 + dashboard status bar filtering (HO-U9V1)
+    VERSION: str = "2.1.3"  # Fix UAT submit CORS/preflight + direct-submit alias
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

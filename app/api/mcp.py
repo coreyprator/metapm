@@ -621,6 +621,18 @@ async def get_uat_history(handoff_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.options("/uat/direct-submit")
+async def uat_direct_submit_preflight():
+    """Handle CORS preflight for direct-submit endpoint."""
+    return Response(status_code=204)
+
+
+@router.post("/uat/direct-submit", response_model=UATDirectSubmitResponse, status_code=201)
+async def submit_uat_direct_alias(uat: UATDirectSubmit):
+    """Alias for legacy direct-submit URL used by UAT templates."""
+    return await submit_uat_direct(uat)
+
+
 @router.post("/uat/submit", response_model=UATDirectSubmitResponse, status_code=201)
 async def submit_uat_direct(uat: UATDirectSubmit):
     """
