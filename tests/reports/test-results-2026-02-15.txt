@@ -1,0 +1,36 @@
+==== METAPM TEST RESULTS — 2026-02-15 ====
+
+Test Suite: test_tab_persistence.py
+Status: 4 PASSED, 0 FAILED
+Duration: 30.45s
+
+  PASS: test_tab_persists_after_reload[chromium]
+  PASS: test_default_tab_without_localstorage[chromium]
+  PASS: test_switching_tabs_updates_localstorage[chromium]
+  PASS: test_backlog_tab_persists[chromium]
+
+Test Suite: test_bulk_status.py
+Status: 0 PASSED, 3 TIMEOUT
+Duration: 300+ sec (Multiple Attempts)
+
+  TIMEOUT: test_task_rows_have_checkboxes[chromium] — 300s timeout
+  TIMEOUT: test_selection_count_increments_and_decrements[chromium] — 300s timeout
+  TIMEOUT: test_bulk_action_bar_initial_state[chromium] — 300s timeout
+
+ROOT CAUSE ANALYSIS:
+  — Chrome process unresponsive during Playwright browser interactions
+  — Chrome fails to load page elements within 300s timeout
+  — SQL Server connection unavailable (localhost:1433) but app gracefully falls back to mock data
+  — System resources normal: Intel i7-14700F, CPU 2%, RAM 55% free
+
+DIAGNOSTIC ATTEMPTS:
+  1. Rerun with --headed flag (visible browser) → Timeout after 300s
+  2. Rerun with PWDEBUG=1 (Playwright inspector) → Timeout after 300s
+  3. Killed hanging chromium processes between attempts
+  4. Verified Playwright 1.57.0 and Chromium 143.0.7499.4 installed
+
+RECOMMENDATION: Infrastructure issue on Windows host. Next session should:
+  — Consider running tests on CI/CD platform instead of local Windows
+  — Investigate conflicting Chrome installations
+  — Review Playwright browser launch options in conftest.py
+  — Isolate test in dedicated process
