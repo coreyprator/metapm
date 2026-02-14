@@ -13,3 +13,8 @@
 | 2026-02-08T04:57:13.194521+00:00 | CC→AI | v1.9.1-bugfixes-complete | SENT | 20260208_v191-bugfixes-complete.md |
 | 2026-02-08T05:09:22.423016+00:00 | CC→AI | v1.9.2-uat-tracking-complete | SENT | 20260208_v192-uat-tracking-complete.md |
 | 2026-02-08T05:21:08.882750+00:00 | CC→AI | v1.9.2-status-filter-fixed | SENT | 20260208_v192-status-filter-fixed.md |
+| 2026-02-09T15:27:46.128813+00:00 | CC→AI | v202-uat-fixes | SENT | 20260209_140000_v202-uat-fixes.md |
+| 2026-02-09T17:03:06.995981+00:00 | CC→AI | v203-quick-fixes | SENT | 20260209_160000_v203-quick-fixes.md |
+| 2026-02-09T18:51:03.655326+00:00 | CC→AI | v204-uat-constraint-fix | SENT | 20260209_185000_v204-uat-constraint-fix.md |
+| 2026-02-10T01:34:51.287230+00:00 | CC→AI | v204-deployment-verified | SENT | 20260210_013500_v204-deployment-verified.md |
+| 2026-02-12T21:12:39.005862+00:00 | CC→AI | bug-sprint-complete | SENT | 20260212_bug-sprint-complete.md |

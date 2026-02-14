@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UAT Checklist — MetaPM Bug Fixes (HO-MP01, HO-MP02)</title>
+    <style>
+        :root {
+            --bg-primary: #0f1117; --bg-secondary: #1a1b26; --bg-tertiary: #24253a;
+            --text-primary: #e1e1e6; --text-secondary: #9898a6;
+            --accent-teal: #2dd4bf; --accent-red: #f87171; --accent-amber: #fbbf24;
+            --accent-blue: #60a5fa; --accent-purple: #a78bfa;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.6; padding: 20px; max-width: 900px; margin: 0 auto; }
+        h1 { color: var(--accent-teal); margin-bottom: 8px; font-size: 1.5em; }
+        h2 { color: var(--accent-blue); margin: 24px 0 12px; font-size: 1.2em; border-bottom: 1px solid #4a4a6a; padding-bottom: 6px; }
+        .info-box { background: var(--bg-secondary); border: 1px solid #4a4a6a; border-radius: 8px; padding: 16px; margin-bottom: 20px; font-size: 0.9em; }
+        .info-box a { color: var(--accent-teal); }
+        .purpose-box { background: #1e2a3a; border: 1px solid var(--accent-blue); border-radius: 8px; padding: 16px; margin-bottom: 20px; font-size: 0.9em; }
+        .purpose-box strong { color: var(--accent-blue); }
+
+        /* Summary bar */
+        .summary { position: sticky; top: 0; z-index: 100; background: var(--bg-secondary); border: 1px solid #4a4a6a; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
+        .summary-stats { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+        .stat { font-weight: 600; font-size: 0.95em; }
+        .stat.passed { color: var(--accent-teal); }
+        .stat.failed { color: var(--accent-red); }
+        .stat.remaining { color: var(--text-secondary); }
+        .summary-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .summary-actions button { padding: 6px 14px; border: 1px solid #4a4a6a; border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); cursor: pointer; font-size: 0.85em; }
+        .summary-actions button:hover { border-color: var(--accent-teal); }
+        .btn-submit { background: #1a3a2a !important; border-color: var(--accent-teal) !important; color: var(--accent-teal) !important; font-weight: 600; }
+        .btn-submit:hover { background: #2a4a3a !important; }
+
+        /* Test items */
+        .test-item { background: var(--bg-secondary); border: 1px solid #4a4a6a; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; transition: border-color 0.2s; }
+        .test-item.passed { border-color: var(--accent-teal); }
+        .test-item.failed { border-color: var(--accent-red); }
+        .test-item.blocked { border-color: var(--accent-amber); }
+        .test-item-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .test-item-text { flex: 1; }
+        .test-item-text strong { display: block; margin-bottom: 2px; }
+        .test-item-text .detail { font-size: 0.85em; color: var(--text-secondary); }
+        .test-actions { display: flex; gap: 4px; flex-shrink: 0; }
+        .test-actions button { padding: 4px 10px; border: 1px solid #4a4a6a; border-radius: 4px; background: var(--bg-tertiary); color: var(--text-secondary); cursor: pointer; font-size: 0.8em; }
+        .test-actions .btn-pass.active { background: #1a3a2a; border-color: var(--accent-teal); color: var(--accent-teal); }
+        .test-actions .btn-fail.active { background: #3a1a1a; border-color: var(--accent-red); color: var(--accent-red); }
+        .test-actions .btn-blocked.active { background: #3a2a1a; border-color: var(--accent-amber); color: var(--accent-amber); }
+        .test-actions .btn-note { position: relative; }
+        .test-actions .btn-note.has-note { border-color: var(--accent-purple); color: var(--accent-purple); }
+        .item-note { display: none; width: 100%; margin-top: 8px; min-height: 40px; background: var(--bg-tertiary); border: 1px solid #4a4a6a; border-radius: 6px; color: var(--text-primary); padding: 8px; font-family: inherit; font-size: 0.85em; resize: vertical; }
+        .item-note.visible { display: block; }
+
+        /* Result message */
+        .result-message { display: none; padding: 12px 16px; border-radius: 8px; margin-top: 12px; font-size: 0.9em; }
+        .result-message.show { display: block; }
+        .result-message.success { background: #1a3a2a; border: 1px solid var(--accent-teal); color: var(--accent-teal); }
+        .result-message.error { background: #3a1a1a; border: 1px solid var(--accent-red); color: var(--accent-red); }
+
+        .notes-area { width: 100%; min-height: 80px; background: var(--bg-tertiary); border: 1px solid #4a4a6a; border-radius: 6px; color: var(--text-primary); padding: 12px; margin-top: 8px; font-family: inherit; resize: vertical; }
+    </style>
+</head>
+<body>
+    <h1>🔴 MetaPM — Bug Fix UAT (HO-MP01, HO-MP02)</h1>
+
+    <div class="info-box">
+        <strong>Test URL:</strong> <a href="https://metapm.rentyourcio.com" target="_blank">https://metapm.rentyourcio.com</a><br>
+        <strong>Handoff IDs:</strong> HO-MP01 (bulk status count), HO-MP02 (tab persistence)<br>
+        <strong>Test Backfill:</strong> HO-BS02 (automated tests written — this UAT is manual verification)<br>
+        <strong>Date:</strong> <span id="test-date"></span>
+    </div>
+
+    <div class="purpose-box">
+        <strong>🎯 Dual Purpose:</strong> This UAT validates the bug fixes AND tests the UAT submission workflow itself.
+        After completing all tests, use the <strong>📤 Submit to MetaPM</strong> button to verify that UAT results
+        are captured correctly in MetaPM (not hardcoded "5/5 passed"). If Submit fails, document the error — that's useful data too.
+    </div>
+
+    <div class="summary">
+        <h3>📊 Test Progress</h3>
+        <div class="summary-stats">
+            <span class="stat total">Total: <span id="total-count">0</span></span>
+            <span class="stat passed">✓ Pass: <span id="passed-count">0</span></span>
+            <span class="stat failed">✗ Fail: <span id="failed-count">0</span></span>
+            <span class="stat remaining">○ Todo: <span id="remaining-count">0</span></span>
+        </div>
+        <div class="summary-actions">
+            <button onclick="resetAll()">🔄 Reset All</button>
+            <button onclick="passRemaining()">✓ Pass Remaining</button>
+            <button onclick="exportResults()">📋 Copy Results</button>
+            <button class="btn-submit" onclick="submitToMetaPM()">📤 Submit to MetaPM</button>
+        </div>
+        <div id="result-message" class="result-message"></div>
+    </div>
+
+    <!-- SECTION 1: HO-MP01 Bulk Status Count -->
+    <h2>1. HO-MP01 — Bulk Status Selected Count</h2>
+
+    <div class="test-item" data-test="MP01-01">
+        <div class="test-item-header">
+            <div class="test-item-text">
+                <strong>MP01-01: Task rows have checkboxes</strong>
+                <div class="detail">Navigate to dashboard. Verify task rows display checkboxes.</div>
+            </div>
+            <div class="test-actions">
+                <button class="btn-pass" onclick="setResult(this, 'passed')">✓</button>
+                <button class="btn-fail" onclick="setResult(this, 'failed')">✗</button>
+                <button class="btn-blocked" onclick="setResult(this, 'blocked')">⊘</button>
+                <button class="btn-note" onclick="toggleNote(this)">📝</button>
+            </div>
+        </div>
+        <textarea class="item-note" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-test="MP01-02">
+        <div class="test-item-header">
+            <div class="test-item-text">
+                <strong>MP01-02: Selection count increments</strong>
+                <div class="detail">Check 2+ task checkboxes. Verify selected count displays correct number (e.g., "2 selected").</div>
+            </div>
+            <div class="test-actions">
+                <button class="btn-pass" onclick="setResult(this, 'passed')">✓</button>
+                <button class="btn-fail" onclick="setResult(this, 'failed')">✗</button>
+                <button class="btn-blocked" onclick="setResult(this, 'blocked')">⊘</button>
+                <button class="btn-note" onclick="toggleNote(this)">📝</button>
+            </div>
+        </div>
+        <textarea class="item-note" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-test="MP01-03">
+        <div class="test-item-header">
+            <div class="test-item-text">
+                <strong>MP01-03: Bulk status change clears count</strong>
+                <div class="detail">With tasks selected, perform a bulk status change. Verify selected count returns to 0 and all checkboxes are unchecked.</div>
+            </div>
+            <div class="test-actions">
+                <button class="btn-pass" onclick="setResult(this, 'passed')">✓</button>
+                <button class="btn-fail" onclick="setResult(this, 'failed')">✗</button>
+                <button class="btn-blocked" onclick="setResult(this, 'blocked')">⊘</button>
+                <button class="btn-note" onclick="toggleNote(this)">📝</button>
+            </div>
+        </div>
+        <textarea class="item-note" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-test="MP01-04">
+        <div class="test-item-header">
+            <div class="test-item-text">
+                <strong>MP01-04: Selection count decrements on uncheck</strong>
+                <div class="detail">Check 2 tasks, then uncheck 1. Verify count goes from 2 → 1 (not stuck or wrong).</div>
+            </div>
+            <div class="test-actions">
+                <button class="btn-pass" onclick="setResult(this, 'passed')">✓</button>
+                <button class="btn-fail" onclick="setResult(this, 'failed')">✗</button>
+                <button class="btn-blocked" onclick="setResult(this, 'blocked')">⊘</button>
+                <button class="btn-note" onclick="toggleNote(this)">📝</button>
+            </div>
+        </div>
+        <textarea class="item-note" placeholder="Notes..."></textarea>
+    </div>
+
+    <!-- SECTION 2: HO-MP02 Tab Persistence -->
+    <h2>2. HO-MP02 — Dashboard Tab Persistence</h2>
+
+    <div class="test-item" data-test="MP02-01">
+        <div class="test-item-header">
+            <div class="test-item-text">
+                <strong>MP02-01: Default tab is "Tasks"</strong>
+                <div class="detail">Open MetaPM dashboard fresh (clear localStorage first or use incognito). Verify "Tasks" tab is active by default.</div>
+            </div>
+            <div class="test-actions">
+                <button class="btn-pass" onclick="setResult(this, 'passed')">✓</button>
+                <button class="btn-fail" onclick="setResult(this, 'failed')">✗</button>
+                <button class="btn-blocked" onclick="setResult(this, 'blocked')">⊘</button>
+                <button class="btn-note" onclick="toggleNote(this)">📝</button>
+            </div>
+        </div>
+        <textarea class="item-note" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-test="MP02-02">
+        <div class="test-item-header">
+            <div class="test-item-text">
+                <strong>MP02-02: Tab switch persists on reload</strong>
+                <div class="detail">Switch to "Projects" (or another non-default tab). Reload the page (F5). Verify the same tab is still active after reload.</div>
+            </div>
+            <div class="test-actions">
+                <button class="btn-pass" onclick="setResult(this, 'passed')">✓</button>
+                <button class="btn-fail" onclick="setResult(this, 'failed')">✗</button>
+                <button class="btn-blocked" onclick="setResult(this, 'blocked')">⊘</button>
+                <button class="btn-note" onclick="toggleNote(this)">📝</button>
+            </div>
+        </div>
+        <textarea class="item-note" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-test="MP02-03">
+        <div class="test-item-header">
+            <div class="test-item-text">
+                <strong>MP02-03: Multiple tab switches persist last one</strong>
+                <div class="detail">Switch to "Projects", then "Backlog", then "Methodology". Reload. Verify "Methodology" (the last tab you clicked) is active.</div>
+            </div>
+            <div class="test-actions">
+                <button class="btn-pass" onclick="setResult(this, 'passed')">✓</button>
+                <button class="btn-fail" onclick="setResult(this, 'failed')">✗</button>
+                <button class="btn-blocked" onclick="setResult(this, 'blocked')">⊘</button>
+                <button class="btn-note" onclick="toggleNote(this)">📝</button>
+            </div>
+        </div>
+        <textarea class="item-note" placeholder="Notes..."></textarea>
+    </div>
+
+    <div class="test-item" data-test="MP02-04">
+        <div class="test-item-header">
+            <div class="test-item-text">
+                <strong>MP02-04: Clearing localStorage resets to default</strong>
+                <div class="detail">Open DevTools (F12) → Console → type: localStorage.removeItem('metapm-activeTab'). Reload. Verify "Tasks" tab is active (default fallback).</div>
+            </div>
+            <div class="test-actions">
+                <button class="btn-pass" onclick="setResult(this, 'passed')">✓</button>
+                <button class="btn-fail" onclick="setResult(this, 'failed')">✗</button>
+                <button class="btn-blocked" onclick="setResult(this, 'blocked')">⊘</button>
+                <button class="btn-note" onclick="toggleNote(this)">📝</button>
+            </div>
+        </div>
+        <textarea class="item-note" placeholder="Notes..."></textarea>
+    </div>
+
+    <!-- SECTION 3: UAT Submission Workflow Test -->
+    <h2>3. UAT Submission Workflow (Meta-Test)</h2>
+
+    <div class="test-item" data-test="SUB-01">
+        <div class="test-item-header">
+            <div class="test-item-text">
+                <strong>SUB-01: Submit button sends actual results</strong>
+                <div class="detail">After completing tests above, click "📤 Submit to MetaPM". Verify it sends your ACTUAL pass/fail counts (not hardcoded "5/5 passed"). Check the response message for correct numbers.</div>
+            </div>
+            <div class="test-actions">
+                <button class="btn-pass" onclick="setResult(this, 'passed')">✓</button>
+                <button class="btn-fail" onclick="setResult(this, 'failed')">✗</button>
+                <button class="btn-blocked" onclick="setResult(this, 'blocked')">⊘</button>
+                <button class="btn-note" onclick="toggleNote(this)">📝</button>
+            </div>
+        </div>
+        <textarea class="item-note" placeholder="Notes... (paste the response message or error here)"></textarea>
+    </div>
+
+    <div class="test-item" data-test="SUB-02">
+        <div class="test-item-header">
+            <div class="test-item-text">
+                <strong>SUB-02: No 422 error on submit</strong>
+                <div class="detail">Submit should NOT return HTTP 422. If it does, note the error detail (especially the "status" enum issue: backend may only accept 'passed'|'failed', not 'pending').</div>
+            </div>
+            <div class="test-actions">
+                <button class="btn-pass" onclick="setResult(this, 'passed')">✓</button>
+                <button class="btn-fail" onclick="setResult(this, 'failed')">✗</button>
+                <button class="btn-blocked" onclick="setResult(this, 'blocked')">⊘</button>
+                <button class="btn-note" onclick="toggleNote(this)">📝</button>
+            </div>
+        </div>
+        <textarea class="item-note" placeholder="Notes... (paste error detail if 422 occurs)"></textarea>
+    </div>
+
+    <div class="test-item" data-test="SUB-03">
+        <div class="test-item-header">
+            <div class="test-item-text">
+                <strong>SUB-03: Handoff URL returned after submit</strong>
+                <div class="detail">After successful submit, verify a handoff URL is displayed and the Copy URL button works.</div>
+            </div>
+            <div class="test-actions">
+                <button class="btn-pass" onclick="setResult(this, 'passed')">✓</button>
+                <button class="btn-fail" onclick="setResult(this, 'failed')">✗</button>
+                <button class="btn-blocked" onclick="setResult(this, 'blocked')">⊘</button>
+                <button class="btn-note" onclick="toggleNote(this)">📝</button>
+            </div>
+        </div>
+        <textarea class="item-note" placeholder="Notes... (paste the handoff URL here if returned)"></textarea>
+    </div>
+
+    <!-- General Notes -->
+    <h2>General Notes</h2>
+    <textarea id="notes" class="notes-area" placeholder="Overall observations, environment notes, browser version..."></textarea>
+
+    <script>
+        const STORAGE_KEY = 'uat-metapm-bugfix-ho-mp01-mp02';
+        // MetaPM API endpoints - try custom domain first, fall back to direct Cloud Run URL
+        const METAPM_URLS = [
+            'https://metapm.rentyourcio.com',
+            'https://metapm-v2-yvxxd6hkna-uc.a.run.app'
+        ];
+
+        document.getElementById('test-date', new Date().toLocaleDateString());
+
+        function setResult(btn, result) {
+            const item = btn.closest('.test-item');
+            const actions = item.querySelectorAll('.test-actions button');
+            actions.forEach(b => b.classList.remove('active'));
+            item.classList.remove('passed', 'failed', 'blocked');
+
+            btn.classList.add('active');
+            item.classList.add(result);
+
+            // Auto-show notes on fail
+            if (result === 'failed') {
+                const note = item.querySelector('.item-note');
+                note.classList.add('visible');
+                note.focus();
+            }
+
+            updateCounts();
+            saveState();
+        }
+
+        function toggleNote(btn) {
+            const note = btn.closest('.test-item').querySelector('.item-note');
+            note.classList.toggle('visible');
+            if (note.classList.contains('visible')) note.focus();
+        }
+
+        function updateCounts() {
+            const items = document.querySelectorAll('.test-item');
+            let passed = 0, failed = 0, blocked = 0;
+            items.forEach(item => {
+                if (item.classList.contains('passed')) passed++;
+                else if (item.classList.contains('failed')) failed++;
+                else if (item.classList.contains('blocked')) blocked++;
+            });
+            document.getElementById('total-count').textContent = items.length;
+            document.getElementById('passed-count').textContent = passed;
+            document.getElementById('failed-count').textContent = failed;
+            document.getElementById('remaining-count').textContent = items.length - passed - failed - blocked;
+        }
+
+        function resetAll() {
+            if (!confirm('Reset all test results?')) return;
+            document.querySelectorAll('.test-item').forEach(item => {
+                item.classList.remove('passed', 'failed', 'blocked');
+                item.querySelectorAll('.test-actions button').forEach(b => b.classList.remove('active'));
+                item.querySelector('.item-note').value = '';
+                item.querySelector('.item-note').classList.remove('visible');
+                item.querySelector('.btn-note').classList.remove('has-note');
+            });
+            document.getElementById('notes').value = '';
+            localStorage.removeItem(STORAGE_KEY);
+            updateCounts();
+        }
+
+        function passRemaining() {
+            document.querySelectorAll('.test-item').forEach(item => {
+                if (!item.classList.contains('passed') && !item.classList.contains('failed') && !item.classList.contains('blocked')) {
+                    item.classList.add('passed');
+                    item.querySelector('.btn-pass').classList.add('active');
+                }
+            });
+            updateCounts();
+            saveState();
+        }
+
+        function getResultsData() {
+            const items = document.querySelectorAll('.test-item');
+            let passed = 0, failed = 0, blocked = 0, results = [];
+            items.forEach(item => {
+                const id = item.dataset.test;
+                const title = item.querySelector('strong').textContent;
+                let status = 'pending';
+                if (item.classList.contains('passed')) { status = 'passed'; passed++; }
+                else if (item.classList.contains('failed')) { status = 'failed'; failed++; }
+                else if (item.classList.contains('blocked')) { status = 'blocked'; blocked++; }
+                const note = item.querySelector('.item-note').value.trim();
+                results.push({ id, title, status, note });
+            });
+            return { total: items.length, passed, failed, blocked, results, notes: document.getElementById('notes').value.trim() };
+        }
+
+        function exportResults() {
+            const data = getResultsData();
+            const date = new Date().toLocaleString();
+            let text = `[MetaPM] 🔴 Bug Fix UAT (HO-MP01, HO-MP02)\n`;
+            text += `==================================================\n`;
+            text += `Date: ${date}\n`;
+            text += `Summary: ${data.passed} passed, ${data.failed} failed, ${data.blocked} blocked\n`;
+            text += `==================================================\n`;
+
+            let currentSection = '';
+            data.results.forEach(r => {
+                const section = r.id.split('-')[0];
+                if (section !== currentSection) {
+                    currentSection = section;
+                    const sectionNames = { 'MP01': '1. HO-MP01 — Bulk Status Count', 'MP02': '2. HO-MP02 — Tab Persistence', 'SUB': '3. UAT Submission Workflow' };
+                    text += `\n${sectionNames[section] || section}\n`;
+                    text += `----------------------------------------\n`;
+                }
+                const icon = r.status === 'passed' ? '✓' : r.status === 'failed' ? '✗' : r.status === 'blocked' ? '⊘' : '○';
+                text += `  ${icon} ${r.title}\n`;
+                if (r.note) text += `      📝 ${r.note}\n`;
+            });
+
+            if (data.notes) {
+                text += `\nGeneral Notes\n----------------------------------------\n${data.notes}\n`;
+            }
+
+            navigator.clipboard.writeText(text).then(() => {
+                showMessage('success', '📋 Copied to clipboard!');
+            });
+        }
+
+        async function submitToMetaPM() {
+            const btn = document.querySelector('.btn-submit');
+            btn.disabled = true;
+            btn.textContent = '⏳ Submitting...';
+
+            const data = getResultsData();
+
+            // Validate: don't submit if no tests completed
+            if (data.passed + data.failed + data.blocked === 0) {
+                showMessage('error', '❌ Complete at least one test before submitting.');
+                btn.disabled = false;
+                btn.textContent = '📤 Submit to MetaPM';
+                return;
+            }
+
+            // Determine overall status from ACTUAL results
+            const status = data.failed > 0 ? 'failed' : (data.passed === data.total ? 'passed' : 'failed');
+
+            const payload = {
+                project: 'MetaPM',
+                version: 'Bug Fixes HO-MP01/HO-MP02',
+                status: status,
+                total_tests: data.total,
+                passed: data.passed,
+                failed: data.failed,
+                blocked: data.blocked,
+                results: data.results,
+                notes: data.notes || '',
+                submitted_at: new Date().toISOString()
+            };
+
+            let lastError = null;
+            for (const baseUrl of METAPM_URLS) {
+                try {
+                    const response = await fetch(`${baseUrl}/mcp/uat/submit`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        showMessage('success', `✅ Submitted! ${data.passed}/${data.total} passed. Handoff ID: ${result.id || result.handoff_id || 'created'}`);
+                        btn.textContent = '✅ Submitted!';
+                        return;
+                    } else {
+                        const errText = await response.text();
+                        lastError = `HTTP ${response.status}: ${errText}`;
+                    }
+                } catch (err) {
+                    lastError = err.message;
+                }
+            }
+
+            showMessage('error', `❌ Submit failed: ${lastError}`);
+            btn.textContent = '📤 Retry Submit';
+            btn.disabled = false;
+        }
+
+        function showMessage(type, text) {
+            const msg = document.getElementById('result-message');
+            msg.className = 'result-message show ' + type;
+            msg.textContent = text;
+        }
+
+        function saveState() {
+            const state = { tests: {}, notes: document.getElementById('notes').value };
+            document.querySelectorAll('.test-item').forEach(item => {
+                const id = item.dataset.test;
+                let result = 'pending';
+                if (item.classList.contains('passed')) result = 'passed';
+                else if (item.classList.contains('failed')) result = 'failed';
+                else if (item.classList.contains('blocked')) result = 'blocked';
+                state.tests[id] = { result, note: item.querySelector('.item-note').value };
+            });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        }
+
+        function loadState() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const state = JSON.parse(saved);
+                Object.keys(state.tests).forEach(id => {
+                    const item = document.querySelector(`[data-test="${id}"]`);
+                    if (item) {
+                        const data = state.tests[id];
+                        if (data.result !== 'pending') {
+                            item.classList.add(data.result);
+                            const btnClass = data.result === 'passed' ? '.btn-pass' : data.result === 'failed' ? '.btn-fail' : '.btn-blocked';
+                            item.querySelector(btnClass).classList.add('active');
+                        }
+                        if (data.note) {
+                            item.querySelector('.item-note').value = data.note;
+                            item.querySelector('.btn-note').classList.add('has-note');
+                        }
+                    }
+                });
+                document.getElementById('notes').value = state.notes || '';
+            }
+            updateCounts();
+        }
+
+        document.getElementById('notes').addEventListener('input', saveState);
+        document.querySelectorAll('.item-note').forEach(note => {
+            note.addEventListener('input', function() {
+                const btn = this.closest('.test-item').querySelector('.btn-note');
+                btn.classList.toggle('has-note', this.value.trim().length > 0);
+                saveState();
+            });
+        });
+
+        // Init
+        document.getElementById('test-date').textContent = new Date().toLocaleDateString();
+        loadState();
+    </script>
+</body>
+</html>

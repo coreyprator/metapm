@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔴 MetaPM v2.0.2 — UAT Fixes Verification</title>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #252538;
+            --accent: #ef4444;
+            --accent-success: #22c55e;
+            --accent-danger: #ef4444;
+            --accent-skip: #6b7280;
+            --text-primary: #e5e5e5;
+            --text-muted: #9ca3af;
+            --border-color: #3a3a52;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        header {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+        header h1 { font-size: 1.4rem; margin-bottom: 8px; }
+        header p { opacity: 0.9; font-size: 0.9rem; }
+        .meta {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+            font-size: 0.85rem;
+        }
+        .meta span {
+            background: rgba(255,255,255,0.15);
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+        .url-link {
+            display: block;
+            background: #0f172a;
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin: 10px 0 20px 0;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+        .url-link a { color: #f87171; text-decoration: none; }
+        .url-link a:hover { text-decoration: underline; }
+        .fix-summary {
+            background: #1e3a5f;
+            border-left: 4px solid #ef4444;
+            padding: 16px;
+            margin-bottom: 24px;
+            border-radius: 0 8px 8px 0;
+        }
+        .fix-summary h3 { color: #f87171; margin-bottom: 12px; }
+        .fix-summary ul { margin-left: 20px; font-size: 0.9rem; }
+        .fix-summary li { margin-bottom: 6px; }
+        section {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        section h2 {
+            color: #f87171;
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--accent);
+        }
+        .test-item {
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .test-item:last-child { border-bottom: none; }
+        .test-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .test-content { flex: 1; }
+        .test-label {
+            font-weight: 500;
+            display: block;
+            margin-bottom: 4px;
+        }
+        .expected {
+            color: #a78bfa;
+            font-size: 0.85rem;
+            font-style: italic;
+        }
+        .test-buttons { display: flex; gap: 6px; }
+        .btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+        .btn-pass { background: #166534; color: #bbf7d0; }
+        .btn-pass:hover, .btn-pass.selected { background: var(--accent-success); color: white; }
+        .btn-fail { background: #991b1b; color: #fecaca; }
+        .btn-fail:hover, .btn-fail.selected { background: var(--accent-danger); color: white; }
+        .btn-skip { background: #374151; color: #d1d5db; }
+        .btn-skip:hover, .btn-skip.selected { background: var(--accent-skip); color: white; }
+        .test-item.passed .test-label { color: #4ade80; }
+        .test-item.passed .test-label::before { content: "✓ "; }
+        .test-item.failed .test-label { color: #f87171; }
+        .test-item.failed .test-label::before { content: "✗ "; }
+        .test-item.skipped .test-label { color: #9ca3af; }
+        .test-item.skipped .test-label::before { content: "○ "; }
+        .notes-container { margin-top: 10px; }
+        .notes-label { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
+        .notes-label::before { content: "📝 "; }
+        .notes-input {
+            width: 100%;
+            padding: 8px 10px;
+            background: #1e1e32;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: vertical;
+            min-height: 40px;
+        }
+        .notes-input:focus { outline: none; border-color: #ef4444; }
+        .summary {
+            background: #1e1e32;
+            border: 2px solid var(--accent);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 24px;
+        }
+        .summary h3 { margin-bottom: 16px; }
+        .summary-stats {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .stat {
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .stat.total { background: var(--accent); }
+        .stat.passed { background: var(--accent-success); }
+        .stat.failed { background: #991b1b; }
+        .stat.skipped { background: var(--accent-skip); }
+        .overall-result {
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 16px;
+        }
+        .overall-result.pending { background: #374151; border: 2px dashed #6b7280; }
+        .overall-result.pass { background: #166534; border: 2px solid var(--accent-success); }
+        .overall-result.fail { background: #991b1b; border: 2px solid #ef4444; }
+        .overall-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+        .overall-btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .overall-btn.approve { background: var(--accent-success); color: white; }
+        .overall-btn.reject { background: #991b1b; color: white; }
+        .copy-btn {
+            background: var(--accent);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 16px;
+        }
+        .general-notes {
+            background: #1e2a3f;
+            border: 2px solid #8b5cf6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 24px;
+        }
+        .general-notes h3 { color: #a78bfa; margin-bottom: 12px; }
+        .general-notes h3::before { content: "📋 "; }
+        .general-notes-input {
+            width: 100%;
+            min-height: 80px;
+            padding: 12px;
+            background: #1e1e32;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            resize: vertical;
+        }
+        .submit-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+        .submit-btn {
+            background: #22c55e;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        .submit-btn:hover { background: #16a34a; }
+        .submit-btn:disabled { background: #374151; cursor: not-allowed; }
+        #submit-result { margin-top: 12px; padding: 12px; background: #1e3a5f; border-radius: 6px; }
+        #submit-result.hidden { display: none; }
+        #submit-result.error { background: #7f1d1d; }
+        #handoff-url {
+            width: 100%;
+            padding: 8px;
+            margin-top: 8px;
+            background: #1e1e32;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🔴 MetaPM v2.0.2 — UAT Fixes Verification</h1>
+        <p>Verifying fixes for 422 error, filters, navigation, and project display</p>
+        <div class="meta">
+            <span>Version: 2.0.2</span>
+            <span>Revision: metapm-v2-00043-h6j</span>
+            <span>Commit: 082d4b9</span>
+            <span id="test-date"></span>
+        </div>
+    </header>
+
+    <div class="url-link">
+        <strong>Dashboard:</strong> <a href="https://metapm.rentyourcio.com/dashboard.html" target="_blank">https://metapm.rentyourcio.com/dashboard.html</a><br>
+        <strong>Roadmap:</strong> <a href="https://metapm.rentyourcio.com/roadmap.html" target="_blank">https://metapm.rentyourcio.com/roadmap.html</a><br>
+        <strong>Health:</strong> <a href="https://metapm.rentyourcio.com/health" target="_blank">https://metapm.rentyourcio.com/health</a>
+    </div>
+
+    <div class="fix-summary">
+        <h3>🔧 Fixes Applied in v2.0.2</h3>
+        <ul>
+            <li><strong>422 UAT Submit</strong> — Added missing `tested_by` field to schema</li>
+            <li><strong>"All" filter broken</strong> — Fixed onclick handler with createElement</li>
+            <li><strong>Missing projects</strong> — Now shows 'stable' status projects (EM, SF, PM)</li>
+            <li><strong>No Roadmap tab</strong> — Added icon link to dashboard</li>
+            <li><strong>No Dashboard link</strong> — Added nav link to roadmap page</li>
+        </ul>
+    </div>
+
+    <section>
+        <h2>1. UAT Submit Button (CRITICAL FIX)</h2>
+        
+        <div class="test-item" data-test="submit-no-422">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Submit button does NOT return 422 error</span>
+                    <span class="expected">→ Click Submit to MetaPM below → should succeed (not 422)</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">○ Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder="Check browser console for errors"></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="submit-returns-url">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Submit returns Handoff URL</span>
+                    <span class="expected">→ After submit, URL field should populate</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">○ Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>2. Project Display</h2>
+        
+        <div class="test-item" data-test="all-6-projects">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">All 6 projects visible on Roadmap</span>
+                    <span class="expected">→ AF, EM, HL, MP, PM, SF all shown</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">○ Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder="Which projects do you see?"></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="all-filter">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">"All" filter button works</span>
+                    <span class="expected">→ Click "All" → shows all projects</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">○ Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="single-filter">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Single project filter works</span>
+                    <span class="expected">→ Click HL → only HarmonyLab items shown</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">○ Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>3. Navigation</h2>
+        
+        <div class="test-item" data-test="dashboard-to-roadmap">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Dashboard → Roadmap link exists</span>
+                    <span class="expected">→ Dashboard has "📊 Roadmap" tab/link</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">○ Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="roadmap-to-dashboard">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Roadmap → Dashboard link exists</span>
+                    <span class="expected">→ Roadmap has "🏠 Dashboard" link</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">○ Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>4. Health Check</h2>
+        
+        <div class="test-item" data-test="health-version">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">/health returns version 2.0.2</span>
+                    <span class="expected">→ {"version":"2.0.2",...}</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">✓ Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">✗ Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">○ Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder="Paste health response"></textarea>
+            </div>
+        </div>
+    </section>
+
+    <div class="general-notes">
+        <h3>General Notes & Enhancements</h3>
+        <textarea id="general-notes" class="general-notes-input" placeholder="Future enhancements from earlier:
+• Click requirement → show details/link to spec
+• Click status count → filter by that status
+• Icons on tabs"></textarea>
+    </div>
+
+    <div class="summary">
+        <h3>📊 Results Summary</h3>
+        <div class="summary-stats">
+            <div class="stat total">Total: <span id="total-count">9</span></div>
+            <div class="stat passed">Pass: <span id="pass-count">0</span></div>
+            <div class="stat failed">Fail: <span id="fail-count">0</span></div>
+            <div class="stat skipped">Skip: <span id="skip-count">0</span></div>
+        </div>
+
+        <div class="overall-result pending" id="overall-result">
+            <h4>Overall Result</h4>
+            <p style="margin-bottom:12px;opacity:0.8;">MetaPM v2.0.2 fixes verified?</p>
+            <div class="overall-buttons">
+                <button class="overall-btn approve" onclick="setOverall('pass')">✓ APPROVED</button>
+                <button class="overall-btn reject" onclick="setOverall('fail')">✗ NEEDS FIXES</button>
+            </div>
+        </div>
+
+        <button class="copy-btn" onclick="copyResults()">📋 Copy Results</button>
+
+        <div class="submit-section">
+            <button class="submit-btn" onclick="submitToMetaPM()">📤 Submit to MetaPM</button>
+            <div id="submit-result" class="hidden">
+                <p id="submit-message">✅ Submitted!</p>
+                <input type="text" id="handoff-url" readonly />
+                <button onclick="copyHandoffUrl()" style="margin-top:8px;padding:6px 12px;cursor:pointer;">📋 Copy URL</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('test-date').textContent = new Date().toLocaleDateString();
+        document.querySelectorAll('.notes-input').forEach(i => i.addEventListener('input', updateCounts));
+        document.getElementById('general-notes').addEventListener('input', updateCounts);
+
+        function setResult(btn, result) {
+            const item = btn.closest('.test-item');
+            item.querySelectorAll('.btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            item.classList.remove('passed', 'failed', 'skipped');
+            if (result === 'pass') item.classList.add('passed');
+            else if (result === 'fail') item.classList.add('failed');
+            else item.classList.add('skipped');
+            updateCounts();
+        }
+
+        function updateCounts() {
+            document.getElementById('pass-count').textContent = document.querySelectorAll('.test-item.passed').length;
+            document.getElementById('fail-count').textContent = document.querySelectorAll('.test-item.failed').length;
+            document.getElementById('skip-count').textContent = document.querySelectorAll('.test-item.skipped').length;
+            document.getElementById('total-count').textContent = document.querySelectorAll('.test-item').length;
+        }
+
+        function setOverall(result) {
+            const c = document.getElementById('overall-result');
+            c.classList.remove('pending', 'pass', 'fail');
+            c.classList.add(result);
+            c.innerHTML = result === 'pass' 
+                ? '<h4 style="color:#4ade80;">✓ v2.0.2 APPROVED</h4><p>🚀 Roadmap feature verified!</p>'
+                : '<h4 style="color:#f87171;">✗ NEEDS FIXES</h4><p>See notes above.</p>';
+        }
+
+        function buildResultsText() {
+            const p = document.querySelectorAll('.test-item.passed').length;
+            const f = document.querySelectorAll('.test-item.failed').length;
+            const s = document.querySelectorAll('.test-item.skipped').length;
+            let r = `[MetaPM] 🔴 v2.0.2 UAT Fixes — Results\n${'='.repeat(50)}\nDate: ${new Date().toLocaleString()}\nVersion: 2.0.2\nRevision: metapm-v2-00043-h6j\nSummary: ${p} passed, ${f} failed, ${s} skipped\n${'='.repeat(50)}\n`;
+            document.querySelectorAll('section').forEach(sec => {
+                const h = sec.querySelector('h2');
+                if (h) {
+                    r += `\n${h.textContent}\n${'-'.repeat(40)}\n`;
+                    sec.querySelectorAll('.test-item').forEach(item => {
+                        const label = item.querySelector('.test-label').textContent;
+                        const notes = item.querySelector('.notes-input')?.value || '';
+                        let st = '○';
+                        if (item.classList.contains('passed')) st = '✓';
+                        if (item.classList.contains('failed')) st = '✗';
+                        r += `  ${st} ${label}\n`;
+                        if (notes.trim()) r += `      📝 ${notes}\n`;
+                    });
+                }
+            });
+            const gn = document.getElementById('general-notes').value.trim();
+            if (gn) r += `\nGeneral Notes\n${'-'.repeat(40)}\n${gn}\n`;
+            const o = document.getElementById('overall-result');
+            if (o.classList.contains('pass')) r += `\nOVERALL: ✓ APPROVED\n`;
+            else if (o.classList.contains('fail')) r += `\nOVERALL: ✗ NEEDS FIXES\n`;
+            return r;
+        }
+
+        function copyResults() {
+            navigator.clipboard.writeText(buildResultsText()).then(() => alert('Copied!'));
+        }
+
+        async function submitToMetaPM() {
+            const btn = document.querySelector('.submit-btn');
+            const resultDiv = document.getElementById('submit-result');
+            const messageEl = document.getElementById('submit-message');
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ Submitting...';
+            resultDiv.classList.add('hidden');
+            resultDiv.classList.remove('error');
+
+            const passed = document.querySelectorAll('.test-item.passed').length;
+            const failed = document.querySelectorAll('.test-item.failed').length;
+            const skipped = document.querySelectorAll('.test-item.skipped').length;
+            const total = passed + failed + skipped;
+
+            if (total === 0) {
+                btn.textContent = '❌ No tests completed';
+                btn.disabled = false;
+                setTimeout(() => { btn.textContent = '📤 Submit to MetaPM'; }, 3000);
+                return;
+            }
+
+            const overall = document.getElementById('overall-result');
+            let status = 'pending';
+            if (overall.classList.contains('pass')) status = 'passed';
+            else if (overall.classList.contains('fail')) status = 'failed';
+
+            const resultsText = buildResultsText();
+
+            console.log('Submitting UAT:', {
+                status, total_tests: total, passed, failed, skipped
+            });
+
+            try {
+                const response = await fetch('https://metapm.rentyourcio.com/mcp/uat/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        status: status,
+                        total_tests: total,
+                        passed: passed,
+                        failed: failed,
+                        results_text: resultsText,
+                        project: 'MetaPM',
+                        version: '2.0.2',
+                        tested_by: 'Corey'
+                    })
+                });
+
+                const responseText = await response.text();
+                console.log('Response:', response.status, responseText);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${responseText.substring(0, 100)}`);
+                }
+
+                let result;
+                try {
+                    result = JSON.parse(responseText);
+                } catch (e) {
+                    throw new Error(`Invalid JSON: ${responseText.substring(0, 100)}`);
+                }
+                
+                resultDiv.classList.remove('hidden', 'error');
+                messageEl.textContent = '✅ Submitted! Handoff URL:';
+                document.getElementById('handoff-url').value = result.handoff_url || result.gcs_url || result.dashboard_url || 'Submitted';
+                btn.textContent = '✅ Submitted!';
+            } catch (error) {
+                console.error('Submit error:', error);
+                resultDiv.classList.remove('hidden');
+                resultDiv.classList.add('error');
+                messageEl.textContent = '❌ Error: ' + error.message;
+                btn.textContent = '❌ Submit Failed';
+                btn.disabled = false;
+                setTimeout(() => { btn.textContent = '📤 Submit to MetaPM'; }, 3000);
+            }
+        }
+
+        function copyHandoffUrl() {
+            const url = document.getElementById('handoff-url').value;
+            navigator.clipboard.writeText(url).then(() => alert('URL copied!'));
+        }
+    </script>
+</body>
+</html>

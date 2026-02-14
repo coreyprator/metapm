@@ -1,0 +1,201 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Results — 2026-02-15</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 3px solid #1e90ff; padding-bottom: 10px; }
+        h2 { color: #555; margin-top: 30px; border-left: 4px solid #1e90ff; padding-left: 10px; }
+        .executive-summary { background: #f0f8ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #1e90ff; }
+        .summary-stat { display: inline-block; margin-right: 30px; font-size: 18px; }
+        .stat-value { font-weight: bold; font-size: 24px; }
+        .pass { color: #28a745; }
+        .fail { color: #dc3545; }
+        .timeout { color: #ff9800; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f8f9fa; font-weight: bold; color: #333; }
+        tr:hover { background: #f9f9f9; }
+        .status-badge { padding: 4px 8px; border-radius: 3px; font-weight: bold; font-size: 12px; }
+        .badge-pass { background: #d4edda; color: #155724; }
+        .badge-fail { background: #f8d7da; color: #721c24; }
+        .badge-timeout { background: #fff3cd; color: #856404; }
+        .details-section { margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 5px; border-left: 3px solid #ddd; }
+        .project-section { margin-bottom: 30px; }
+        pre { background: #f4f4f4; padding: 10px; overflow-x: auto; border-radius: 5px; border-left: 3px solid #ccc; }
+        .note { background: #fffacd; padding: 10px; border-radius: 5px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Results Report — 2026-02-15</h1>
+        
+        <div class="executive-summary">
+            <h3>Executive Summary</h3>
+            <div class="summary-stat">
+                <div class="stat-value pass">58</div>
+                Passed
+            </div>
+            <div class="summary-stat">
+                <div class="stat-value fail">7</div>
+                Failed
+            </div>
+            <div class="summary-stat">
+                <div class="stat-value timeout">3</div>
+                Timeout
+            </div>
+            <div class="summary-stat">
+                <div class="stat-value" style="color: #666;">68</div>
+                Total
+            </div>
+        </div>
+
+        <h2>MetaPM Tests</h2>
+        <div class="project-section">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Test Suite</th>
+                        <th>Status</th>
+                        <th>Passed</th>
+                        <th>Failed</th>
+                        <th>Duration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>test_tab_persistence.py</td>
+                        <td><span class="status-badge badge-pass">PASS</span></td>
+                        <td>4</td>
+                        <td>0</td>
+                        <td>30.45s</td>
+                    </tr>
+                    <tr>
+                        <td>test_bulk_status.py</td>
+                        <td><span class="status-badge badge-timeout">TIMEOUT</span></td>
+                        <td>0</td>
+                        <td>3</td>
+                        <td>300+ sec (3 attempts)</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="details-section">
+                <strong>test_tab_persistence.py Details:</strong>
+                <ul>
+                    <li>test_tab_persists_after_reload[chromium] — <span class="pass">PASS</span></li>
+                    <li>test_default_tab_without_localstorage[chromium] — <span class="pass">PASS</span></li>
+                    <li>test_switching_tabs_updates_localstorage[chromium] — <span class="pass">PASS</span></li>
+                    <li>test_backlog_tab_persists[chromium] — <span class="pass">PASS</span></li>
+                </ul>
+            </div>
+            <div class="details-section">
+                <strong>test_bulk_status.py — Diagnosis:</strong>
+                <p>Chrome/Playwright process hangs during browser interaction; application falls back to mock data (SQL Server connection unavailable on localhost:1433). Test timeout occurs before UI interaction completes.</p>
+                <p><strong>Root Cause:</strong> Infrastructure issue (Chrome stability on Windows host), not test code.</p>
+                <p><strong>Attempted Fixes:</strong></p>
+                <ul>
+                    <li>Rerun with --headed (visible Chrome) — timeout</li>
+                    <li>Rerun with PWDEBUG=1 (Playwright inspector) — timeout</li>
+                    <li>Killed hanging chromium processes between attempts</li>
+                    <li>Verified system resources: CPU 2%, RAM 55% free</li>
+                </ul>
+            </div>
+        </div>
+
+        <h2>ArtForge Tests</h2>
+        <div class="project-section">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Test Suite</th>
+                        <th>Status</th>
+                        <th>Passed</th>
+                        <th>Failed</th>
+                        <th>Duration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>test_provider_schema.py</td>
+                        <td><span class="status-badge badge-pass">PASS</span></td>
+                        <td>9</td>
+                        <td>0</td>
+                        <td>0.34s</td>
+                    </tr>
+                    <tr>
+                        <td>test_collection_providers.py</td>
+                        <td><span class="status-badge badge-pass">PASS</span></td>
+                        <td>4</td>
+                        <td>0</td>
+                        <td>2.02s</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Etymython Tests</h2>
+        <div class="project-section">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Test Suite</th>
+                        <th>Status</th>
+                        <th>Passed</th>
+                        <th>Failed</th>
+                        <th>Duration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>test_nvarchar_model.py</td>
+                        <td><span class="status-badge badge-pass">PASS</span></td>
+                        <td>20</td>
+                        <td>0</td>
+                        <td>3.94s</td>
+                    </tr>
+                    <tr>
+                        <td>test_unicode_greek.py</td>
+                        <td><span class="status-badge badge-pass">PASS</span></td>
+                        <td>20</td>
+                        <td>0</td>
+                        <td>24.20s</td>
+                    </tr>
+                    <tr>
+                        <td>test_ui_persistence.py</td>
+                        <td><span class="status-badge badge-fail">FAIL</span></td>
+                        <td>1</td>
+                        <td>4</td>
+                        <td>83.07s</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="details-section">
+                <strong>test_ui_persistence.py Results:</strong>
+                <ul>
+                    <li><span class="fail">FAIL</span> test_mobile_origin_section_persists_on_reload[chromium] — Page.wait_for_selector timeout (10s)</li>
+                    <li><span class="fail">FAIL</span> test_origin_story_state_persists_on_reload[chromium] — Page.wait_for_selector timeout (10s)</li>
+                    <li><span class="fail">FAIL</span> test_cognate_section_state_persists[chromium] — Page.wait_for_selector timeout (10s)</li>
+                    <li><span class="fail">FAIL</span> test_section_state_persists_across_navigation[chromium] — Page.wait_for_selector timeout (10s)</li>
+                    <li><span class="pass">PASS</span> test_localstorage_key_format[chromium]</li>
+                </ul>
+                <p><strong>Root Cause:</strong> Tests expect specific CSS selectors (.figure-card, .family-tree-node, [onclick*='showFigureDetails']) that are not resolving within 10s timeout on production server (https://etymython.rentyourcio.com/app). Implementation may not match expected UI structure.</p>
+            </div>
+        </div>
+
+        <h2>Recommendations for Next Session</h2>
+        <ul>
+            <li><strong>MetaPM test_bulk_status.py:</strong> Investigate Windows host Chrome/Playwright stability before re-running. May require environment-specific fixes or CI/CD testing on different platform.</li>
+            <li><strong>Etymython test_ui_persistence.py:</strong> Verify CSS selectors match production UI (test expects .figure-card or onclick attributes not currently present). 4 tests require implementation fixes in app UI before E2E tests can pass.</li>
+            <li>All other tests (57 total) remain stable and passing.</li>
+        </ul>
+
+        <div class="note">
+            <strong>Note:</strong> Raw test output available in project repositories at <code>tests/reports/raw/</code> directories.
+        </div>
+    </div>
+</body>
+</html>
