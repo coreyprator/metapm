@@ -6,6 +6,7 @@ Allows Claude Code to interact directly with handoffs and tasks.
 
 import json
 import logging
+import uuid
 from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Header, Query, Response
@@ -51,11 +52,12 @@ async def verify_api_key(
     if not api_key:
         raise HTTPException(status_code=401, detail="API key required")
 
-    if not settings.MCP_API_KEY:
-        logger.warning("MCP_API_KEY not configured - rejecting request")
-        raise HTTPException(status_code=500, detail="MCP API key not configured")
+    expected_key = settings.MCP_API_KEY or settings.API_KEY
+    if not expected_key:
+        logger.warning("MCP/API key not configured - rejecting request")
+        raise HTTPException(status_code=503, detail="MCP API key not configured")
 
-    if api_key != settings.MCP_API_KEY:
+    if api_key != expected_key:
         raise HTTPException(status_code=403, detail="Invalid API key")
 
     return True
@@ -172,15 +174,14 @@ async def list_handoffs(
         )
         total = count_result['total'] if count_result else 0
 
-        # Get paginated results
-        params.extend([offset, limit])
+        # Get paginated results - use literal offset/limit, not parameterized
         results = execute_query(f"""
             SELECT id, project, task, direction, status, metadata, response_to, created_at, updated_at
             FROM mcp_handoffs
             WHERE {where_sql}
             ORDER BY created_at DESC
-            OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
-        """, tuple(params), fetch="all")
+            OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY
+        """, tuple(params) if params else None, fetch="all")
 
         handoffs = []
         for row in (results or []):
@@ -883,8 +884,7 @@ async def list_uat_results(
         )
         total = count_result['total'] if count_result else 0
 
-        # Get paginated results
-        params.extend([offset, limit])
+        # Get paginated results - use literal offset/limit values, not parameterized
         results = execute_query(f"""
             SELECT u.id, u.handoff_id, u.status, u.total_tests,
                    u.passed, u.failed, u.notes_count, u.tested_by,
@@ -894,8 +894,81 @@ async def list_uat_results(
             JOIN mcp_handoffs h ON u.handoff_id = h.id
             WHERE {where_sql}
             ORDER BY u.tested_at DESC
-            OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
-        """, tuple(params), fetch="all")
+            OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY
+        """, tuple(params) if params else None, fetch="all")
+
+        items = []
+        for row in (results or []):
+            items.append(UATListItem(
+                id=str(row['id']),
+                handoff_id=str(row['handoff_id']),
+                project=row.get('project'),
+                version=row.get('version'),
+                status=UATStatus(row['status']),
+                total_tests=row['total_tests'],
+                passed=row['passed'],
+                failed=row['failed'],
+                notes_count=row.get('notes_count'),
+                tested_by=row.get('tested_by'),
+                tested_at=row['tested_at'],
+                results_text=row.get('results_text')
+            ))
+
+        return UATListResponse(results=items, total=total)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing UAT results: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/uat/results", response_model=UATListResponse)
+async def list_uat_results_alias(
+    project: Optional[str] = Query(None),
+    status: Optional[UATStatus] = Query(None),
+    limit: int = Query(10, le=100),
+    offset: int = Query(0)
+):
+    """
+    Alias for list_uat_results (PUBLIC - no auth).
+    """
+    try:
+        where_clauses = []
+        params = []
+
+        if project:
+            where_clauses.append("h.project = ?")
+            params.append(project)
+        if status:
+            where_clauses.append("u.status = ?")
+            params.append(status.value)
+
+        where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+        # Get total count
+        count_result = execute_query(
+            f"""SELECT COUNT(*) as total
+                FROM uat_results u
+                JOIN mcp_handoffs h ON u.handoff_id = h.id
+                WHERE {where_sql}""",
+            tuple(params) if params else None,
+            fetch="one"
+        )
+        total = count_result['total'] if count_result else 0
+
+        # Get paginated results using SQL Server syntax (no OFFSET/FETCH for params)
+        query_params = list(params) + [limit, offset]
+        results = execute_query(f"""
+            SELECT u.id, u.handoff_id, u.status, u.total_tests,
+                   u.passed, u.failed, u.notes_count, u.tested_by,
+                   u.tested_at, u.results_text,
+                   h.project, h.version
+            FROM uat_results u
+            JOIN mcp_handoffs h ON u.handoff_id = h.id
+            WHERE {where_sql}
+            ORDER BY u.tested_at DESC
+            OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY
+        """, tuple(params) if params else None, fetch="all")
 
         items = []
         for row in (results or []):
@@ -928,6 +1001,11 @@ async def get_uat_by_id(uat_id: str):
     Get a specific UAT result by its ID (PUBLIC - no auth).
     """
     try:
+        try:
+            uuid.UUID(uat_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid UAT id") from exc
+
         result = execute_query("""
             SELECT u.id, u.handoff_id, u.status, u.total_tests,
                    u.passed, u.failed, u.notes_count, u.tested_by,
