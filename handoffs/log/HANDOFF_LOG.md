@@ -18,3 +18,4 @@
 | 2026-02-09T18:51:03.655326+00:00 | CC→AI | v204-uat-constraint-fix | SENT | 20260209_185000_v204-uat-constraint-fix.md |
 | 2026-02-10T01:34:51.287230+00:00 | CC→AI | v204-deployment-verified | SENT | 20260210_013500_v204-deployment-verified.md |
 | 2026-02-12T21:12:39.005862+00:00 | CC→AI | bug-sprint-complete | SENT | 20260212_bug-sprint-complete.md |
+| 2026-02-15T04:49:42.884184+00:00 | CC→AI | metapm-v2.1.4-fixes | SENT | 20260214_225900_metapm-v2.1.4-fixes.md |
