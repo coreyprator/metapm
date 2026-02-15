@@ -895,6 +895,14 @@ async def list_uat_results(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/uat/results/{uat_id}", response_model=UATListItem)
+async def get_uat_by_id_alias(uat_id: str):
+    """
+    Alias for get_uat_by_id (PUBLIC - no auth).
+    """
+    return await get_uat_by_id(uat_id)
+
+
 @router.get("/uat/results", response_model=UATListResponse)
 async def list_uat_results_alias(
     project: Optional[str] = Query(None),

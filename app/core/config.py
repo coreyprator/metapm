@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.1.3"  # Fix UAT submit CORS/preflight + direct-submit alias
+    VERSION: str = "2.1.4"  # Fix UAT result lookup + project stats normalization
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

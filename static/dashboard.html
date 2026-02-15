@@ -1643,7 +1643,12 @@
             // If tasksToCount provided, count those; otherwise count all tasks
             const tasks = tasksToCount || allTasks;
             const counts = { NEW: 0, STARTED: 0, BLOCKED: 0, DONE: 0 };
-            tasks.forEach(t => { if (counts[t.status] !== undefined) counts[t.status]++; });
+            tasks.forEach(t => {
+                let status = (t.status || 'NEW').toUpperCase();
+                if (status === 'COMPLETE') status = 'DONE';
+                if (status === 'IN_PROGRESS' || status === 'IN-PROGRESS') status = 'STARTED';
+                if (counts[status] !== undefined) counts[status]++;
+            });
             document.getElementById('statNew').textContent = counts.NEW;
             document.getElementById('statStarted').textContent = counts.STARTED;
             document.getElementById('statBlocked').textContent = counts.BLOCKED;
