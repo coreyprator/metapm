@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.1.4"  # Fix UAT result lookup + project stats normalization
+    VERSION: str = "2.1.5"  # Legacy UAT submit compatibility + direct-submit fixes
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

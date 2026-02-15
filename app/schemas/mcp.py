@@ -229,10 +229,10 @@ class UATHistoryResponse(BaseModel):
 # Direct UAT Submit (from checklist HTML)
 class UATDirectSubmit(BaseModel):
     """Submit UAT results directly from HTML checklist."""
-    project: str = Field(..., max_length=100, strip_whitespace=True)
+    project: Optional[str] = Field(None, max_length=100, strip_whitespace=True)
     version: str = Field(..., max_length=200, strip_whitespace=True)
     feature: Optional[str] = Field(None, max_length=200, strip_whitespace=True)
-    status: UATStatus
+    status: Optional[UATStatus] = None
     total_tests: int = Field(..., ge=0)
     passed: int = Field(..., ge=0)
     failed: int = Field(..., ge=0)
@@ -252,8 +252,30 @@ class UATDirectSubmit(BaseModel):
     def validate_and_prepare(cls, data: Any) -> Any:
         """Validate inputs and auto-generate results_text from results array if needed."""
         if isinstance(data, dict):
+            # Normalize legacy fields
+            if not data.get('submitted_at') and data.get('tested_at'):
+                data['submitted_at'] = data.get('tested_at')
+            if not data.get('notes') and data.get('general_notes'):
+                data['notes'] = data.get('general_notes')
+
             results_text = data.get('results_text')
             results = data.get('results')
+
+            # Normalize legacy results array fields (test_id/test_name/notes)
+            if isinstance(results, list):
+                normalized = []
+                for item in results:
+                    if not isinstance(item, dict):
+                        normalized.append(item)
+                        continue
+                    if not item.get('id') and item.get('test_id'):
+                        item['id'] = item.get('test_id')
+                    if not item.get('title') and item.get('test_name'):
+                        item['title'] = item.get('test_name')
+                    if item.get('note') is None and item.get('notes'):
+                        item['note'] = item.get('notes')
+                    normalized.append(item)
+                data['results'] = normalized
             
             # Validate: at least one results format required
             if not results_text and not results:
@@ -279,6 +301,38 @@ class UATDirectSubmit(BaseModel):
                     'counts_exceed_total',
                     f"passed ({passed}) + failed ({failed}) + blocked ({blocked}) = "
                     f"{passed + failed + blocked} exceeds total_tests ({total_tests})"
+                )
+
+            # Default status if missing
+            if not data.get('status'):
+                data['status'] = 'failed' if failed and int(failed) > 0 else 'passed'
+
+            # Default project if missing (derive from handoff_id prefix)
+            if not data.get('project'):
+                handoff_id = data.get('handoff_id') or ''
+                if handoff_id.startswith('HO-'):
+                    token = handoff_id.split('-', 2)[1]
+                    token_letters = ''.join([c for c in token if c.isalpha()]) or token
+                else:
+                    token = ''
+                    token_letters = ''
+
+                project_map = {
+                    'EM03': 'Etymython',
+                    'EM': 'Etymython',
+                    'HL': 'HarmonyLab',
+                    'AF': 'ArtForge',
+                    'SF': 'Super-Flashcards',
+                    'PM': 'project-methodology',
+                    'MP': 'MetaPM',
+                    'U9V1': 'MetaPM'
+                }
+                data['project'] = project_map.get(token, project_map.get(token_letters))
+
+            if not data.get('project'):
+                raise PydanticCustomError(
+                    'missing_project',
+                    "project is required or must be derivable from handoff_id"
                 )
             
             # Auto-generate results_text from results array if not provided
