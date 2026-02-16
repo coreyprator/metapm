@@ -3,7 +3,9 @@ import pyodbc
 import sys
 
 pw = sys.argv[1]
-conn = pyodbc.connect(f'DRIVER={{ODBC Driver 18 for SQL Server}};SERVER=35.224.242.223;DATABASE=MetaPM;UID=sqlserver;PWD={pw};TrustServerCertificate=yes;')
+# REDACTED: Connection string removed for security (GitGuardian alert resolved)
+# Usage: conn = pyodbc.connect(f'DRIVER={{...}};SERVER={{server}};DATABASE={{db}};UID={{user}};PWD={{password}};...')
+conn = pyodbc.connect(f'DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={{server}};DATABASE={{db}};UID={{user}};PWD={pw};TrustServerCertificate=yes;')
 cursor = conn.cursor()
 
 # 1. Schema overview
