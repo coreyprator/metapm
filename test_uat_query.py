@@ -1,7 +1,13 @@
 import pyodbc
+import sys
 
-# Hardcoded password for testing
-dbpass = "Sf2026_t6Q8AMrd15FLOueIHnYC"
+# REDACTED: Password removed for security
+# Usage: python test_uat_query.py <password>
+if len(sys.argv) < 2:
+    print("Usage: test_uat_query.py <password>")
+    sys.exit(1)
+
+dbpass = sys.argv[1]
 
 connstr = f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER=35.224.242.223;DATABASE=MetaPM;UID=sqlserver;PWD={dbpass};TrustServerCertificate=yes;"
 

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.1.5"  # Legacy UAT submit compatibility + direct-submit fixes
+    VERSION: str = "2.1.6"  # MP-008 PINEAPPLE removal, PM-003 done, new requirements seeded
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

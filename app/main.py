@@ -98,7 +98,6 @@ async def health_check():
     """Health check endpoint for Cloud Run"""
     return {
         "status": "healthy",
-        "test": "PINEAPPLE-99999",
         "version": settings.VERSION,
         "build": settings.BUILD,
     }
