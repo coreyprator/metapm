@@ -1,0 +1,64 @@
+{
+  "handoff_id": "HO-MP03",
+  "date": "2026-02-17",
+  "project": "MetaPM",
+  "version": "2.2.0",
+  "service_revision": "metapm-v2-00072-crt",
+  "environment": "production",
+  "base_url": "https://metapm.rentyourcio.com",
+  "summary": {
+    "health": "healthy",
+    "projects_total": 6,
+    "requirements_total": 78,
+    "sprints_total": 0
+  },
+  "tests": [
+    {
+      "id": "MP03-UAT-001",
+      "name": "Dashboard page loads",
+      "expected": "HTTP 200",
+      "actual": "HTTP 200",
+      "status": "passed"
+    },
+    {
+      "id": "MP03-UAT-002",
+      "name": "Roadmap page points to dashboard",
+      "expected": "roadmap entry transitions to dashboard",
+      "actual": "Roadmap page content references dashboard.html",
+      "status": "passed"
+    },
+    {
+      "id": "MP03-UAT-003",
+      "name": "Roadmap projects endpoint",
+      "expected": "6 roadmap projects",
+      "actual": "6 roadmap projects",
+      "status": "passed"
+    },
+    {
+      "id": "MP03-UAT-004",
+      "name": "Roadmap requirements endpoint",
+      "expected": "78 total requirements",
+      "actual": "78 total requirements",
+      "status": "passed"
+    },
+    {
+      "id": "MP03-UAT-005",
+      "name": "Legacy handoff create path auto-link test",
+      "expected": "Creates handoff and links MP-009/MP-010/EM-011",
+      "actual": "Create failed for test ID length; endpoint path does not perform auto-link parse/linking",
+      "status": "failed"
+    },
+    {
+      "id": "MP03-UAT-006",
+      "name": "MCP UAT path auto-link test",
+      "expected": "Handoff references create requirement links and expose via requirement handoff lookup",
+      "actual": "Linked handoff 9DE27714-8925-4432-8F2B-3512BD8F59FC visible on MP-009 and MP-010",
+      "status": "passed"
+    }
+  ],
+  "notes": [
+    "EM-011 requirement is not present in current live roadmap dataset, so no link can be created for EM-011.",
+    "Legacy /api/handoffs listing currently returns 500 due SQL query issue (documented regression)."
+  ],
+  "overall_status": "passed_with_known_gaps"
+}
