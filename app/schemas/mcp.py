@@ -160,6 +160,7 @@ class UATResultItem(BaseModel):
     title: str
     status: str
     note: Optional[str] = Field(None, max_length=2000)
+    linked_requirements: Optional[List[str]] = None
 
 
 class UATSubmit(BaseModel):
@@ -230,7 +231,9 @@ class UATHistoryResponse(BaseModel):
 class UATDirectSubmit(BaseModel):
     """Submit UAT results directly from HTML checklist."""
     project: Optional[str] = Field(None, max_length=100, strip_whitespace=True)
-    version: str = Field(..., max_length=200, strip_whitespace=True)
+    version: Optional[str] = Field(None, max_length=200, strip_whitespace=True)
+    uat_title: Optional[str] = Field(None, max_length=300, strip_whitespace=True)
+    uat_date: Optional[str] = Field(None, max_length=50, strip_whitespace=True)
     feature: Optional[str] = Field(None, max_length=200, strip_whitespace=True)
     status: Optional[UATStatus] = None
     total_tests: int = Field(..., ge=0)
@@ -242,6 +245,7 @@ class UATDirectSubmit(BaseModel):
     results_text: Optional[str] = None
     results: Optional[List[UATResultItem]] = None
     notes: Optional[str] = None
+    linked_requirements: Optional[List[str]] = None
     submitted_at: Optional[str] = None
     checklist_path: Optional[str] = None
     url: Optional[str] = None
@@ -258,6 +262,12 @@ class UATDirectSubmit(BaseModel):
             if not data.get('notes') and data.get('general_notes'):
                 data['notes'] = data.get('general_notes')
 
+            if not data.get('version') and data.get('uat_date'):
+                data['version'] = data.get('uat_date')
+
+            if not data.get('uat_title') and data.get('title'):
+                data['uat_title'] = data.get('title')
+
             results_text = data.get('results_text')
             results = data.get('results')
 
@@ -272,6 +282,8 @@ class UATDirectSubmit(BaseModel):
                         item['id'] = item.get('test_id')
                     if not item.get('title') and item.get('test_name'):
                         item['title'] = item.get('test_name')
+                    if not item.get('status') and item.get('result'):
+                        item['status'] = item.get('result')
                     if item.get('note') is None and item.get('notes'):
                         item['note'] = item.get('notes')
                     normalized.append(item)
@@ -307,7 +319,7 @@ class UATDirectSubmit(BaseModel):
             if not data.get('status'):
                 data['status'] = 'failed' if failed and int(failed) > 0 else 'passed'
 
-            # Default project if missing (derive from handoff_id prefix)
+            # Default project if missing (derive from handoff_id prefix, if available)
             if not data.get('project'):
                 handoff_id = data.get('handoff_id') or ''
                 if handoff_id.startswith('HO-'):
@@ -328,12 +340,6 @@ class UATDirectSubmit(BaseModel):
                     'U9V1': 'MetaPM'
                 }
                 data['project'] = project_map.get(token, project_map.get(token_letters))
-
-            if not data.get('project'):
-                raise PydanticCustomError(
-                    'missing_project',
-                    "project is required or must be derivable from handoff_id"
-                )
             
             # Auto-generate results_text from results array if not provided
             if not results_text and results:

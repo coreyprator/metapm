@@ -6,6 +6,7 @@ Allows Claude Code to interact directly with handoffs and tasks.
 
 import json
 import logging
+import re
 import uuid
 from datetime import datetime
 from typing import Optional, List
@@ -86,6 +87,141 @@ def _parse_tags_field(value: Optional[str]) -> Optional[List[str]]:
         return None
 
 
+REQ_ID_PATTERN = re.compile(r"\b[A-Z]{2}-\d{3}\b")
+
+
+def _extract_requirement_ids(handoff_content: str) -> List[str]:
+    if not handoff_content:
+        return []
+    return sorted(set(REQ_ID_PATTERN.findall(handoff_content)))
+
+
+def _collect_linked_requirements(uat: UATDirectSubmit) -> List[str]:
+    """Collect and normalize requirement codes from top-level and per-test links."""
+    collected: List[str] = []
+
+    for req in (uat.linked_requirements or []):
+        if isinstance(req, str):
+            req_code = req.strip().upper()
+            if REQ_ID_PATTERN.fullmatch(req_code):
+                collected.append(req_code)
+
+    for item in (uat.results or []):
+        for req in (item.linked_requirements or []):
+            if isinstance(req, str):
+                req_code = req.strip().upper()
+                if REQ_ID_PATTERN.fullmatch(req_code):
+                    collected.append(req_code)
+
+    return sorted(set(collected))
+
+
+def _fallback_project_from_requirement_codes(requirement_codes: List[str]) -> Optional[str]:
+    """Fallback project derivation from requirement code prefixes."""
+    if not requirement_codes:
+        return None
+
+    prefix_map = {
+        'HL': 'HarmonyLab',
+        'SF': 'Super Flashcards',
+        'AF': 'ArtForge',
+        'EM': 'Etymython',
+        'MP': 'MetaPM',
+        'PM': 'project-methodology',
+    }
+    projects = {
+        prefix_map[code.split('-', 1)[0]]
+        for code in requirement_codes
+        if '-' in code and code.split('-', 1)[0] in prefix_map
+    }
+
+    if len(projects) == 1:
+        return next(iter(projects))
+    if len(projects) > 1:
+        return 'cross-portfolio'
+    return None
+
+
+def _derive_project_from_requirements(requirement_codes: List[str]) -> str:
+    """Derive project name from linked requirement codes using DB lookup first."""
+    if not requirement_codes:
+        return 'cross-portfolio'
+
+    placeholders = ','.join(['?'] * len(requirement_codes))
+    rows = execute_query(f"""
+        SELECT DISTINCT p.name
+        FROM roadmap_requirements r
+        JOIN roadmap_projects p ON p.id = r.project_id
+        WHERE r.code IN ({placeholders})
+    """, tuple(requirement_codes), fetch="all") or []
+
+    project_names = sorted({row.get('name') for row in rows if row.get('name')})
+    if len(project_names) == 1:
+        return project_names[0]
+    if len(project_names) > 1:
+        return 'cross-portfolio'
+
+    fallback = _fallback_project_from_requirement_codes(requirement_codes)
+    return fallback or 'cross-portfolio'
+
+
+def _autolink_handoff_to_requirements(handoff_id: str, handoff_content: str) -> int:
+    """Parse requirement codes from handoff content and insert junction links."""
+    requirement_codes = _extract_requirement_ids(handoff_content)
+    if not requirement_codes:
+        return 0
+
+    linked = 0
+    for req_code in requirement_codes:
+        req = execute_query(
+            "SELECT id FROM roadmap_requirements WHERE code = ?",
+            (req_code,),
+            fetch="one"
+        )
+        if not req:
+            continue
+
+        execute_query("""
+            IF NOT EXISTS (
+                SELECT 1 FROM roadmap_requirement_handoffs
+                WHERE requirement_id = ? AND handoff_id = ?
+            )
+            BEGIN
+                INSERT INTO roadmap_requirement_handoffs (requirement_id, handoff_id, source)
+                VALUES (?, ?, 'content_parse')
+            END
+        """, (req['id'], handoff_id, req['id'], handoff_id), fetch="none")
+        linked += 1
+
+    if linked:
+        logger.info(f"Auto-linked handoff {handoff_id} to {linked} requirement(s)")
+    return linked
+
+
+def _auto_close_requirements_for_handoff(handoff_id: str, approved: bool) -> int:
+    """Set linked requirement statuses when UAT is approved/failed."""
+    if approved:
+        new_status = 'done'
+    else:
+        new_status = 'in_progress'
+
+    execute_query("""
+        UPDATE rr
+        SET rr.status = ?,
+            rr.updated_at = GETDATE()
+        FROM roadmap_requirements rr
+        JOIN roadmap_requirement_handoffs rrh ON rr.id = rrh.requirement_id
+        WHERE rrh.handoff_id = ?
+    """, (new_status, handoff_id), fetch="none")
+
+    count_row = execute_query(
+        "SELECT COUNT(*) as cnt FROM roadmap_requirement_handoffs WHERE handoff_id = ?",
+        (handoff_id,),
+        fetch="one"
+    )
+    return int((count_row or {}).get('cnt') or 0)
+
+
 # ============================================
 # HANDOFF ENDPOINTS
 # ============================================
@@ -118,6 +254,7 @@ async def create_handoff(
             raise HTTPException(status_code=500, detail="Failed to create handoff")
 
         handoff_id = str(result['id'])
+        _autolink_handoff_to_requirements(handoff_id, handoff.content)
         public_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{handoff_id}/content"
 
         return HandoffResponse(
@@ -648,27 +785,41 @@ async def submit_uat_direct(uat: UATDirectSubmit):
     NOTE: Validation is now handled by the UATDirectSubmit model_validator.
     """
     try:
+        linked_requirement_codes = _collect_linked_requirements(uat)
+        project_name = (uat.project or '').strip()
+        if not project_name:
+            project_name = _derive_project_from_requirements(linked_requirement_codes)
+
+        version_full = (uat.version or "ad-hoc").strip()
+        version_db = version_full[:20]
+        feature_value = (uat.feature or "").strip()
+
         # results_text is guaranteed to exist by model_validator
         results_text = uat.results_text or ""
         blocked = uat.blocked or 0
         skipped = uat.skipped or 0
 
         # Build task identifier from version + feature
-        task_id = f"v{uat.version}"
-        if uat.feature:
-            task_id = f"{task_id}-{uat.feature.lower().replace(' ', '-')}"
+        task_id = f"v{version_db}"
+        if feature_value:
+            task_id = f"{task_id}-{feature_value.lower().replace(' ', '-')}"
+        task_id = task_id[:200]
+
+        title_db = (uat.uat_title or f"UAT: {project_name} v{version_db}")[:200]
 
         # Look for existing handoff for this project/version
         handoff = execute_query("""
             SELECT id, status FROM mcp_handoffs
             WHERE project = ? AND task LIKE ?
             ORDER BY created_at DESC
-        """, (uat.project, f"%{uat.version}%"), fetch="one")
+        """, (project_name, f"%{version_db}%"), fetch="one")
 
         # Build content from actual UAT data
-        content = f"# UAT Results for {uat.project} {uat.version}\n\n"
-        if uat.feature:
-            content += f"**Feature**: {uat.feature}\n\n"
+        content = f"# UAT Results for {project_name} {version_full}\n\n"
+        if feature_value:
+            content += f"**Feature**: {feature_value}\n\n"
+        if linked_requirement_codes:
+            content += f"**Linked Requirements**: {', '.join(linked_requirement_codes)}\n\n"
         content += f"**Status**: {uat.status.value}\n"
         content += f"**Tests**: {uat.passed} passed, {uat.failed} failed"
         if blocked:
@@ -681,13 +832,14 @@ async def submit_uat_direct(uat: UATDirectSubmit):
 
         if handoff:
             handoff_id = str(handoff['id'])
-            logger.info(f"Found existing handoff {handoff_id} for {uat.project} {uat.version}")
+            logger.info(f"Found existing handoff {handoff_id} for {project_name} {version_db}")
             # Update existing handoff content with new UAT results
             execute_query("""
                 UPDATE mcp_handoffs
                 SET content = ?, updated_at = GETUTCDATE()
                 WHERE id = ?
             """, (content, handoff_id), fetch="none")
+            _autolink_handoff_to_requirements(handoff_id, content)
         else:
             # Create a new handoff for this UAT submission (using pre-built content)
             result = execute_query("""
@@ -698,18 +850,19 @@ async def submit_uat_direct(uat: UATDirectSubmit):
                 OUTPUT INSERTED.id
                 VALUES (?, ?, 'ai_to_cc', 'pending_uat', ?, 'uat_checklist', ?, ?)
             """, (
-                uat.project,
+                project_name,
                 task_id,
                 content,
-                uat.version,
-                f"UAT: {uat.project} v{uat.version}"
+                version_db,
+                title_db
             ), fetch="one")
 
             if not result:
                 raise HTTPException(status_code=500, detail="Failed to create handoff")
 
             handoff_id = str(result['id'])
-            logger.info(f"Created new handoff {handoff_id} for {uat.project} {uat.version}")
+            logger.info(f"Created new handoff {handoff_id} for {project_name} {version_db}")
+            _autolink_handoff_to_requirements(handoff_id, content)
 
         # Insert UAT result
         uat_result = execute_query("""
@@ -748,6 +901,15 @@ async def submit_uat_direct(uat: UATDirectSubmit):
             WHERE id = ?
         """, (new_status, uat.status.value, uat.passed, uat.failed, handoff_id), fetch="none")
 
+        linked_count = _auto_close_requirements_for_handoff(
+            handoff_id=handoff_id,
+            approved=(uat.status == UATStatus.PASSED)
+        )
+        if linked_count:
+            logger.info(
+                f"Updated {linked_count} linked requirement(s) to status {new_status} from UAT for handoff {handoff_id}"
+            )
+
         handoff_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{handoff_id}/content"
 
         return UATDirectSubmitResponse(
@@ -755,7 +917,7 @@ async def submit_uat_direct(uat: UATDirectSubmit):
             uat_id=uat_id,
             status=uat.status.value,
             handoff_url=handoff_url,
-            message=f"UAT results recorded for {uat.project} v{uat.version}"
+            message=f"UAT results recorded for {project_name} v{version_full}"
         )
     except HTTPException:
         raise
