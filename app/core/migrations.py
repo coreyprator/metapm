@@ -481,4 +481,117 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 12 warning: {e}")
 
+    # Migration 13: Ensure roadmap_sprints has project_id and FK/index (MP-011)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'roadmap_sprints' AND COLUMN_NAME = 'project_id'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 13: Adding project_id to roadmap_sprints...")
+            execute_query("ALTER TABLE roadmap_sprints ADD project_id NVARCHAR(36) NULL", fetch="none")
+            execute_query("""
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.foreign_keys
+                    WHERE name = 'FK_roadmap_sprints_project'
+                )
+                BEGIN
+                    ALTER TABLE roadmap_sprints
+                    ADD CONSTRAINT FK_roadmap_sprints_project
+                    FOREIGN KEY (project_id) REFERENCES roadmap_projects(id)
+                END
+            """, fetch="none")
+            execute_query("""
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = 'idx_roadmap_sprints_project'
+                      AND object_id = OBJECT_ID('roadmap_sprints')
+                )
+                BEGIN
+                    CREATE INDEX idx_roadmap_sprints_project ON roadmap_sprints(project_id)
+                END
+            """, fetch="none")
+            logger.info("  Migration 13: project_id added to roadmap_sprints.")
+        else:
+            logger.info("  Migration 13: roadmap_sprints.project_id already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 13 warning: {e}")
+
+    # Migration 14: Ensure roadmap_requirements.description exists (MP-010)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'roadmap_requirements' AND COLUMN_NAME = 'description'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 14: Adding description to roadmap_requirements...")
+            execute_query("ALTER TABLE roadmap_requirements ADD description NVARCHAR(MAX) NULL", fetch="none")
+            logger.info("  Migration 14: description added to roadmap_requirements.")
+        else:
+            logger.info("  Migration 14: roadmap_requirements.description already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 14 warning: {e}")
+
+    # Migration 15: Fix roadmap_handoffs handoff_id size/type compatibility (MP-003)
+    try:
+        type_result = execute_query("""
+            SELECT DATA_TYPE as data_type, CHARACTER_MAXIMUM_LENGTH as max_len
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'roadmap_handoffs' AND COLUMN_NAME = 'handoff_id'
+        """, fetch="one")
+        if type_result and type_result.get('max_len') == 10:
+            logger.info("  Migration 15: Expanding roadmap_handoffs.handoff_id to NVARCHAR(36)...")
+            execute_query("""
+                DECLARE @fk_name NVARCHAR(128)
+                SELECT @fk_name = fk.name
+                FROM sys.foreign_keys fk
+                JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
+                JOIN sys.columns c ON fkc.parent_object_id = c.object_id AND fkc.parent_column_id = c.column_id
+                WHERE fk.parent_object_id = OBJECT_ID('roadmap_handoffs')
+                  AND c.name = 'handoff_id'
+
+                IF @fk_name IS NOT NULL
+                BEGIN
+                    EXEC('ALTER TABLE roadmap_handoffs DROP CONSTRAINT ' + @fk_name)
+                END
+            """, fetch="none")
+            execute_query("ALTER TABLE roadmap_handoffs ALTER COLUMN handoff_id NVARCHAR(36) NOT NULL", fetch="none")
+            logger.info("  Migration 15: roadmap_handoffs.handoff_id type updated.")
+        else:
+            logger.info("  Migration 15: roadmap_handoffs.handoff_id already compatible.")
+    except Exception as e:
+        logger.warning(f"  Migration 15 warning: {e}")
+
+    # Migration 16: Create requirement↔handoff UUID junction table (MP-003/MP-015)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'roadmap_requirement_handoffs'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 16: Creating roadmap_requirement_handoffs table...")
+            execute_query("""
+                CREATE TABLE roadmap_requirement_handoffs (
+                    requirement_id NVARCHAR(36) NOT NULL,
+                    handoff_id UNIQUEIDENTIFIER NOT NULL,
+                    source NVARCHAR(20) DEFAULT 'content_parse',
+                    created_at DATETIME2 DEFAULT GETDATE(),
+                    CONSTRAINT PK_roadmap_requirement_handoffs PRIMARY KEY (requirement_id, handoff_id),
+                    CONSTRAINT FK_rrh_requirement FOREIGN KEY (requirement_id) REFERENCES roadmap_requirements(id),
+                    CONSTRAINT FK_rrh_handoff FOREIGN KEY (handoff_id) REFERENCES mcp_handoffs(id)
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_rrh_handoff ON roadmap_requirement_handoffs(handoff_id)", fetch="none")
+            execute_query("CREATE INDEX idx_rrh_requirement ON roadmap_requirement_handoffs(requirement_id)", fetch="none")
+            logger.info("  Migration 16: roadmap_requirement_handoffs table created.")
+        else:
+            logger.info("  Migration 16: roadmap_requirement_handoffs already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 16 warning: {e}")
+
     logger.info("Migrations complete.")

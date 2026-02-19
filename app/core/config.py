@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.1.6"  # MP-008 PINEAPPLE removal, PM-003 done, new requirements seeded
+    VERSION: str = "2.2.1"  # MP-020 CORS fix + type field fix + expand/collapse all
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

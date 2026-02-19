@@ -7,12 +7,13 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
 
 from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor
 from app.core.config import settings
 from app.core.migrations import run_migrations
+from app.schemas.mcp import UATDirectSubmit, UATDirectSubmitResponse
 from transactions import router as transactions_router
 import logging
 
@@ -49,7 +50,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -164,6 +165,34 @@ async def compare_page(handoff_id: str):
         return FileResponse(str(compare_file), media_type="text/html")
     from fastapi import HTTPException
     raise HTTPException(status_code=404, detail="Compare page not found")
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    """Serve favicon from static directory."""
+    favicon_file = static_dir / "favicon.ico"
+    if favicon_file.exists():
+        return FileResponse(str(favicon_file), media_type="image/x-icon")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Favicon not found")
+
+
+@app.options("/api/uat/submit")
+async def api_uat_submit_preflight():
+    """Handle browser preflight for UAT submit alias."""
+    return JSONResponse(status_code=204, content={})
+
+
+@app.post("/api/uat/submit", response_model=UATDirectSubmitResponse, status_code=201)
+async def api_uat_submit_alias(uat: UATDirectSubmit):
+    """Public alias for direct UAT submission used by checklist templates."""
+    return await mcp.submit_uat_direct(uat)
+
+
+@app.post("/api/uat/direct-submit", response_model=UATDirectSubmitResponse, status_code=201)
+async def api_uat_direct_submit_alias(uat: UATDirectSubmit):
+    """Backward-compatible API alias for direct UAT submission."""
+    return await mcp.submit_uat_direct(uat)
 
 
 # Mount static files LAST (after all route definitions)

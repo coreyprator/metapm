@@ -89,6 +89,7 @@ class ProjectListResponse(BaseModel):
 # Sprint schemas
 
 class SprintBase(BaseModel):
+    project_id: Optional[str] = None
     name: str = Field(..., max_length=100)
     description: Optional[str] = None
     status: SprintStatus = SprintStatus.PLANNED

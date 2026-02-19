@@ -26,9 +26,10 @@ router = APIRouter()
 # ============================================
 
 @router.get("/projects", response_model=ProjectListResponse)
+@router.get("/roadmap/projects", response_model=ProjectListResponse)
 async def list_projects(
     status: Optional[ProjectStatus] = Query(None),
-    limit: int = Query(20, le=100),
+    limit: int = Query(20, le=500),
     offset: int = Query(0)
 ):
     """List all projects with optional status filter."""
@@ -78,6 +79,7 @@ async def list_projects(
 
 
 @router.get("/projects/{project_id}", response_model=ProjectResponse)
+@router.get("/roadmap/projects/{project_id}", response_model=ProjectResponse)
 async def get_project(project_id: str):
     """Get a single project by ID."""
     try:
@@ -111,6 +113,7 @@ async def get_project(project_id: str):
 
 
 @router.post("/projects", response_model=ProjectResponse, status_code=201)
+@router.post("/roadmap/projects", response_model=ProjectResponse, status_code=201)
 async def create_project(project: ProjectCreate):
     """Create a new project."""
     try:
@@ -129,6 +132,7 @@ async def create_project(project: ProjectCreate):
 
 
 @router.put("/projects/{project_id}", response_model=ProjectResponse)
+@router.put("/roadmap/projects/{project_id}", response_model=ProjectResponse)
 async def update_project(project_id: str, update: ProjectUpdate):
     """Update a project."""
     try:
@@ -176,15 +180,26 @@ async def update_project(project_id: str, update: ProjectUpdate):
 # ============================================
 
 @router.get("/sprints", response_model=SprintListResponse)
+@router.get("/roadmap/sprints", response_model=SprintListResponse)
 async def list_sprints(
+    project_id: Optional[str] = Query(None),
     status: Optional[SprintStatus] = Query(None),
-    limit: int = Query(20, le=100),
+    limit: int = Query(20, le=500),
     offset: int = Query(0)
 ):
     """List all sprints with optional status filter."""
     try:
-        where_clause = "WHERE status = ?" if status else ""
-        params = [status.value] if status else []
+        where_clauses = []
+        params = []
+
+        if project_id:
+            where_clauses.append("project_id = ?")
+            params.append(project_id)
+        if status:
+            where_clauses.append("status = ?")
+            params.append(status.value)
+
+        where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
         count_result = execute_query(
             f"SELECT COUNT(*) as total FROM roadmap_sprints {where_clause}",
@@ -195,7 +210,7 @@ async def list_sprints(
 
         params.extend([offset, limit])
         results = execute_query(f"""
-            SELECT id, name, description, status, start_date, end_date, created_at
+            SELECT id, project_id, name, description, status, start_date, end_date, created_at
             FROM roadmap_sprints
             {where_clause}
             ORDER BY start_date DESC, created_at DESC
@@ -206,6 +221,7 @@ async def list_sprints(
         for row in (results or []):
             sprints.append(SprintResponse(
                 id=row['id'],
+                project_id=row.get('project_id'),
                 name=row['name'],
                 description=row['description'],
                 status=SprintStatus(row['status']) if row['status'] else SprintStatus.PLANNED,
@@ -221,11 +237,12 @@ async def list_sprints(
 
 
 @router.get("/sprints/{sprint_id}", response_model=SprintResponse)
+@router.get("/roadmap/sprints/{sprint_id}", response_model=SprintResponse)
 async def get_sprint(sprint_id: str):
     """Get a single sprint by ID."""
     try:
         result = execute_query("""
-            SELECT id, name, description, status, start_date, end_date, created_at
+            SELECT id, project_id, name, description, status, start_date, end_date, created_at
             FROM roadmap_sprints WHERE id = ?
         """, (sprint_id,), fetch="one")
 
@@ -234,6 +251,7 @@ async def get_sprint(sprint_id: str):
 
         return SprintResponse(
             id=result['id'],
+            project_id=result.get('project_id'),
             name=result['name'],
             description=result['description'],
             status=SprintStatus(result['status']) if result['status'] else SprintStatus.PLANNED,
@@ -249,14 +267,15 @@ async def get_sprint(sprint_id: str):
 
 
 @router.post("/sprints", response_model=SprintResponse, status_code=201)
+@router.post("/roadmap/sprints", response_model=SprintResponse, status_code=201)
 async def create_sprint(sprint: SprintCreate):
     """Create a new sprint."""
     try:
         execute_query("""
-            INSERT INTO roadmap_sprints (id, name, description, status, start_date, end_date)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO roadmap_sprints (id, project_id, name, description, status, start_date, end_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
-            sprint.id, sprint.name, sprint.description, sprint.status.value,
+            sprint.id, sprint.project_id, sprint.name, sprint.description, sprint.status.value,
             sprint.start_date, sprint.end_date
         ), fetch="none")
 
@@ -267,6 +286,7 @@ async def create_sprint(sprint: SprintCreate):
 
 
 @router.put("/sprints/{sprint_id}", response_model=SprintResponse)
+@router.put("/roadmap/sprints/{sprint_id}", response_model=SprintResponse)
 async def update_sprint(sprint_id: str, update: SprintUpdate):
     """Update a sprint."""
     try:
@@ -276,6 +296,9 @@ async def update_sprint(sprint_id: str, update: SprintUpdate):
         if update.name is not None:
             set_clauses.append("name = ?")
             params.append(update.name)
+        if update.project_id is not None:
+            set_clauses.append("project_id = ?")
+            params.append(update.project_id)
         if update.description is not None:
             set_clauses.append("description = ?")
             params.append(update.description)
@@ -308,6 +331,7 @@ async def update_sprint(sprint_id: str, update: SprintUpdate):
 # ============================================
 
 @router.get("/requirements", response_model=RequirementListResponse)
+@router.get("/roadmap/requirements", response_model=RequirementListResponse)
 async def list_requirements(
     project_id: Optional[str] = Query(None),
     project_code: Optional[str] = Query(None),
@@ -315,7 +339,7 @@ async def list_requirements(
     type: Optional[RequirementType] = Query(None),
     priority: Optional[RequirementPriority] = Query(None),
     sprint_id: Optional[str] = Query(None),
-    limit: int = Query(50, le=100),
+    limit: int = Query(50, le=500),
     offset: int = Query(0)
 ):
     """List requirements with filters."""
@@ -396,6 +420,7 @@ async def list_requirements(
 
 
 @router.get("/requirements/{requirement_id}", response_model=RequirementResponse)
+@router.get("/roadmap/requirements/{requirement_id}", response_model=RequirementResponse)
 async def get_requirement(requirement_id: str):
     """Get a single requirement by ID."""
     try:
@@ -440,6 +465,7 @@ async def get_requirement(requirement_id: str):
 
 
 @router.post("/requirements", response_model=RequirementResponse, status_code=201)
+@router.post("/roadmap/requirements", response_model=RequirementResponse, status_code=201)
 async def create_requirement(req: RequirementCreate):
     """Create a new requirement."""
     try:
@@ -459,6 +485,7 @@ async def create_requirement(req: RequirementCreate):
 
 
 @router.put("/requirements/{requirement_id}", response_model=RequirementResponse)
+@router.put("/roadmap/requirements/{requirement_id}", response_model=RequirementResponse)
 async def update_requirement(requirement_id: str, update: RequirementUpdate):
     """Update a requirement."""
     try:
@@ -508,12 +535,57 @@ async def update_requirement(requirement_id: str, update: RequirementUpdate):
 
 
 @router.delete("/requirements/{requirement_id}", status_code=204)
+@router.delete("/roadmap/requirements/{requirement_id}", status_code=204)
 async def delete_requirement(requirement_id: str):
     """Delete a requirement."""
     try:
         execute_query("DELETE FROM roadmap_requirements WHERE id = ?", (requirement_id,), fetch="none")
     except Exception as e:
         logger.error(f"Error deleting requirement: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/requirements/{requirement_id}/handoffs")
+@router.get("/roadmap/requirements/{requirement_id}/handoffs")
+async def list_requirement_handoffs(requirement_id: str):
+    """List linked MCP handoffs for a requirement."""
+    try:
+        req = execute_query(
+            "SELECT id, code FROM roadmap_requirements WHERE id = ?",
+            (requirement_id,),
+            fetch="one"
+        )
+        if not req:
+            raise HTTPException(status_code=404, detail="Requirement not found")
+
+        results = execute_query("""
+            SELECT h.id, h.project, h.task, h.status, h.direction, h.created_at
+            FROM roadmap_requirement_handoffs rrh
+            JOIN mcp_handoffs h ON rrh.handoff_id = h.id
+            WHERE rrh.requirement_id = ?
+            ORDER BY h.created_at DESC
+        """, (requirement_id,), fetch="all") or []
+
+        return {
+            "requirement_id": requirement_id,
+            "requirement_code": req['code'],
+            "handoffs": [
+                {
+                    "id": str(row['id']),
+                    "project": row.get('project'),
+                    "task": row.get('task'),
+                    "status": row.get('status'),
+                    "direction": row.get('direction'),
+                    "created_at": row['created_at'].isoformat() if row.get('created_at') else None,
+                    "url": f"https://metapm.rentyourcio.com/mcp/handoffs/{row['id']}/content"
+                }
+                for row in results
+            ]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing requirement handoffs: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
