@@ -1,6 +1,6 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-19 — Sprint "MP-020 Fix Sprint Start" close-out
+Updated: 2026-02-19 — Sprint "MP-020 Fix v2" close-out (v2.2.2 deployed)
 Purpose: Canonical reference for all AI sessions working on this project.
 
 ---
@@ -12,8 +12,8 @@ Purpose: Canonical reference for all AI sessions working on this project.
 **Repository**: github.com/coreyprator/metapm
 **Custom Domain**: https://metapm.rentyourcio.com
 **Cloud Run URL**: https://metapm-67661554310.us-central1.run.app (legacy; use custom domain)
-**Current Version**: v2.2.1 (per `app/core/config.py` line 15)
-**Latest Known Revision**: metapm-v2-00078-vsc _(Source: SESSION_CLOSEOUT_2026-02-18_MP020.md — deployed 2026-02-19)_
+**Current Version**: v2.2.2 (per `app/core/config.py` line 15)
+**Latest Known Revision**: metapm-v2-00079-szg _(Source: SESSION_CLOSEOUT_2026-02-19_MP020_v2.md — deployed 2026-02-19)_
 **Owner**: Corey Prator
 
 ### Tech Stack
@@ -265,7 +265,9 @@ Source: `static/` directory listing, `static/manifest.json`, `static/sw.js`
   - Triangle expand/collapse per project section
   - **Expand/Collapse All button (MP-019 — Done 2026-02-19)**: ▼/▲ toggle in control bar expands or collapses all project sections at once
   - Row click → detail panel slides in with description, status, priority, inline editing
-  - [+ Add ▼] button — **FIXED (MP-020 — Done 2026-02-19)**. Calls `/api/roadmap/projects`, `/api/roadmap/sprints`, `/api/roadmap/requirements`. Type field is a select with valid enum values. All creates confirmed working.
+  - [+ Add ▼] button — **FIXED (MP-020 v2 — 2026-02-19)**. Root cause was makeId() generating 40-41 char IDs into NVARCHAR(36) PKs. Fix: bare UUID always 36 chars. All Add operations (project, sprint, requirement, bug, task) confirmed working with HTTP 201.
+  - Requirement drawer: **Title field now editable** (v2.2.2). Title included in PUT payload.
+  - Dashboard header shows **version number** fetched from /health (v2.2.2).
   - /roadmap.html is now a redirect to dashboard.html
 - **CORS Fix (2026-02-19)**: `app/main.py` now allows `GET, POST, PUT, PATCH, DELETE, OPTIONS` — was missing PUT, PATCH, DELETE which blocked edit/delete from cross-origin contexts
 - **Requirements — 80 seeded (MP-002 — Complete)**: 79 from Portfolio Vision Framework v3 + MP-018 added by CAI
@@ -306,7 +308,7 @@ Sources: `app/main.py`, `app/api/*.py`, `PROJECT_STATUS.md`, `SPRINT3_IMPLEMENTA
   - 24 personal projects recovered to roadmap_projects table
   - MP-021 filed: Handoff CRUD visibility needed
   - Deployed revision: metapm-v2-00077-dzt
-- **Sprint "MP-020 Fix" (2026-02-18/19)**:
+- **Sprint "MP-020 Fix Sprint Start" (2026-02-18/19)**:
   - MP-020: Fixed [+ Add] button 500 error. Root cause: FK constraint when project_id invalid/empty in POST /api/roadmap/requirements. aType field was free-text input (invalid enum risk); changed to `<select>`. render() was filtering projects with no requirements (`if (!pReqs.length) continue`) hiding 24+ personal projects — removed.
   - MP-019: Expand/collapse all button added to dashboard.html control bar. Uses `state.expanded` Set and calls `render()`.
   - CORS: `allow_methods` updated to include PUT, PATCH, DELETE.
@@ -314,6 +316,15 @@ Sources: `app/main.py`, `app/api/*.py`, `PROJECT_STATUS.md`, `SPRINT3_IMPLEMENTA
   - roadmap_sprints.project_id FK added (Migration 13, from MP-009 sprint, committed this sprint).
   - MP-019, MP-020, MP-021 seeded as roadmap_requirements for proj-mp (21 total now).
   - Deployed revision: metapm-v2-00078-vsc
+- **Sprint "MP-020 Fix v2" (2026-02-19)**:
+  - MP-020 root cause corrected: makeId() prepended prefix to UUID generating 40-41 char IDs into NVARCHAR(36) columns, causing every Add operation to return 500.
+  - Fix: makeId() now returns bare crypto.randomUUID() (36 chars always).
+  - Title field added to requirement drawer (was not editable).
+  - PUT /api/roadmap/requirements payload now includes title field.
+  - Version number displayed in dashboard header via /health fetch on load.
+  - UAT Template v3 committed to project-methodology/templates/.
+  - MP-020 status updated to done.
+  - Deployed revision: metapm-v2-00079-szg
 
 Sources: `PROJECT_STATUS.md`, `SPRINT_4_CANCELED.md`, `handoffs/log/HANDOFF_LOG.md`
 
@@ -348,7 +359,7 @@ Full-text search, expand/collapse all, handoff/UAT visibility, cross-project lin
 
 | Variable | Purpose | Default | Source |
 |----------|---------|---------|--------|
-| `VERSION` | App version | "2.2.1" | config.py line 15 |
+| `VERSION` | App version | "2.2.2" | config.py line 15 |
 | `DB_SERVER` | SQL Server host | "localhost" | config.py line 19 |
 | `DB_NAME` | Database name | "MetaPM" | config.py line 20 |
 | `DB_USER` | Database user | "sqlserver" | config.py line 21 |
@@ -443,6 +454,12 @@ Source: `cloudbuild.yaml`
 
 Excludes: `.git`, `__pycache__`, `.env`, `.vscode`, `*.md`, `tests/`, `scripts/`, `.venv/`, `venv/`, `incoming_zip/`, `project-methodology/`
 
+### UAT Template
+
+Canonical UAT checklist template: `project-methodology/templates/UAT_Template_v3.html`
+GitHub: https://github.com/coreyprator/project-methodology/blob/main/templates/UAT_Template_v3.html
+Do not recreate from scratch. Copy and replace `UAT_` placeholders.
+
 Source: `.gcloudignore`
 
 ### Health Check
@@ -450,7 +467,7 @@ Source: `.gcloudignore`
 ```bash
 curl https://metapm.rentyourcio.com/health
 ```
-Returns: `{"status": "healthy", "version": "2.2.1", "build": "..."}`
+Returns: `{"status": "healthy", "version": "2.2.2", "build": "..."}`
 
 Source: `app/main.py` lines 95-104
 
@@ -554,12 +571,13 @@ Source: `app/api/mcp.py`, `app/api/handoff_lifecycle.py`, `app/services/handoff_
 | MP-018 | No full-text search | P2 | Must scroll to find anything |
 | — | Dashboard hierarchy incomplete | P2 | Only Projects → Requirements (no Tasks, UATs, Sprints) |
 | — | roadmap_handoffs type mismatch | P3 | Junction table has varchar/UUID type inconsistency |
-| — | Test data in DB | P3 | spr-test-mp020-2 sprint and test-proj-mp020 project remain; no DELETE endpoint for sprints/projects in roadmap.py |
+| — | Test data in DB | P3 | spr-test-mp020-2, test-proj-mp020, TFIX project (b89a1ab3), and test sprint (9d17491d) remain; no DELETE endpoint for sprints/projects |
+| — | backlog.py ReferenceURL column | P3 | Column referenced in INSERT/SELECT but missing from Requirements table schema; affects /api/backlog/requirements (NOT roadmap endpoints) |
 
 ### Resolved Bugs (Recent)
 | ID | Issue | Fixed | How |
 |----|-------|-------|-----|
-| MP-020 | [+ Add] button returned 500 | 2026-02-19 | Root cause: FK constraint when project_id empty/invalid. Also fixed: aType was free-text (now select enum), render() hid projects with no requirements (filter removed) |
+| MP-020 | makeId() generated 40-41 char IDs for NVARCHAR(36) PK columns — all Add ops returned 500 | 2026-02-19 | makeId() now returns bare crypto.randomUUID() (36 chars). Patched by CAI. |
 | MP-019 | No expand/collapse all button | 2026-02-19 | ▼/▲ Expand All button added to dashboard.html control bar |
 | CORS | PUT/DELETE blocked cross-origin | 2026-02-19 | allow_methods now includes PUT, PATCH, DELETE |
 
@@ -681,7 +699,7 @@ Source: `CLAUDE.md`, `.claude/settings.json`
 
 6. **Is the Google Calendar integration fully operational?** The code references OAuth credentials that may need rotation/reconfiguration.
 
-7. **What happened to the `templates/` directory?** It exists but only contains `.gitkeep` -- is it intentionally empty?
+7. **What happened to the `templates/` directory?** It exists and now contains `UAT_Template_v3.html` (committed 2026-02-19) as well as previous templates. Use this location for all UAT template versions.
 
 8. **Are the Backlog tables (`Bugs`, `Requirements`) still in use alongside `roadmap_requirements`?** There appears to be functional overlap.
 
