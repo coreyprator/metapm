@@ -1,5 +1,6 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
+Updated: 2026-02-18 — Sprint "Etymython Integration + MetaPM Dashboard Rework" close-out
 Purpose: Canonical reference for all AI sessions working on this project.
 
 ---
@@ -12,6 +13,7 @@ Purpose: Canonical reference for all AI sessions working on this project.
 **Custom Domain**: https://metapm.rentyourcio.com
 **Cloud Run URL**: https://metapm-67661554310.us-central1.run.app (legacy; use custom domain)
 **Current Version**: v2.1.5 (per `app/core/config.py` line 15)
+**Latest Known Revision**: metapm-v2-00077-dzt _(Source: Sprint_CloseOut_2026-02-18.md — deployed 2026-02-18)_
 **Owner**: Corey Prator
 
 ### Tech Stack
@@ -207,6 +209,8 @@ Sources: `scripts/schema.sql`, `scripts/backlog_schema.sql`, `app/core/migration
 **MCP Tasks** (`/mcp/tasks`): POST, GET (list), GET/{id}, PATCH/{id}, DELETE/{id}
 **UAT** (`/mcp/handoffs/{id}/uat`, `/mcp/uat/submit`, `/mcp/uat/direct-submit`, `/mcp/uat/latest`, `/mcp/uat/list`, `/mcp/uat/results`, `/mcp/uat/results/{id}`, `/mcp/uat/{id}`)
 **Roadmap** (`/api/projects`, `/api/sprints`, `/api/requirements`, `/api/roadmap`, `/api/roadmap/seed`)
+**Roadmap (New 2026-02-18)**: GET /api/roadmap/projects, GET /api/roadmap/requirements, GET /api/requirements?limit=N, POST /api/requirements, PATCH /api/requirements/:id, PUT /api/requirements/:id
+**UAT Submit (New 2026-02-18)**: POST /api/uat/submit (project derived from linked_requirements, 201 Created confirmed)
 **Handoff Lifecycle** (`/api/handoffs`, `/api/handoffs/{id}`, `/api/handoffs/{id}/status`, `/api/handoffs/{id}/complete`, `/api/roadmap/{id}/handoffs`)
 **Conductor** (`/api/conductor/update`, `/api/conductor/dispatch`, `/api/conductor/status`, `/api/conductor/inbox`)
 **Methodology**: `/api/methodology/rules`, `/api/methodology/violations`, `/api/methodology/analytics`
@@ -254,7 +258,22 @@ Source: `static/` directory listing, `static/manifest.json`, `static/sw.js`
 ## 6. FEATURES -- WHAT EXISTS TODAY
 
 ### Core Features (Production)
-- **4-Tab Dashboard**: Tasks, Projects, Methodology, Capture (+ Backlog added later)
+- **Hierarchical Single-Page Dashboard (MP-009 — Deployed 2026-02-18)**: Single scrollable page replacing old 3 separate pages (roadmap, backlog, dashboard)
+  - 6 portfolio project sections (HarmonyLab, Super Flashcards, ArtForge, Etymython, MetaPM, project-methodology)
+  - + 24 personal projects (recovered from legacy projects table to roadmap_projects)
+  - Filter bar: Project, Priority, Status dropdowns + Sort + Group By
+  - Triangle expand/collapse per project section
+  - Row click → detail panel slides in with description, status, priority, inline editing
+  - [+ Add ▼] button — **BROKEN (MP-020, P1 blocker)** — returns 500
+  - /roadmap and /backlog redirect to /dashboard
+- **Requirements — 80 seeded (MP-002 — Complete)**: 79 from Portfolio Vision Framework v3 + MP-018 added by CAI
+  - All 80 have descriptions in PL's voice (loaded from canonical seed file `metapm_descriptions_seed.json`)
+  - 17 done, 62 backlog, 1 in_progress
+- **UAT Submit Pipeline**: POST /api/uat/submit endpoint — 201 Created confirmed
+  - Project derivation from linked_requirements (no explicit project field needed)
+  - Cross-portfolio fallback when requirements span multiple projects
+  - First successful submission ID: 5A471083-51C4-4042-8A0C-8ABE92361CE6
+  - **Gap:** Submitted handoffs not yet visible in dashboard UI (MP-021)
 - **Full CRUD APIs**: Tasks, Projects, Categories, Themes, Methodology Rules/Violations, Bugs, Requirements
 - **Cross-Project Task Linking**: Tasks can belong to multiple projects
 - **Task Type System**: task, bug, requirement (auto-prefixed BUG-xxx, REQ-xxx)
@@ -268,12 +287,6 @@ Source: `static/` directory listing, `static/manifest.json`, `static/sw.js`
 - **Conductor API**: Prototype for CC/CAI status routing (in-memory only)
 - **PWA with Offline Sync**: Service worker, IndexedDB queue, background sync
 - **Dark/Light Theme Toggle**: Appearance theming with localStorage persistence
-- **Project Color Themes**: Peacock-style color picker per project
-- **Expand/Collapse Tasks**: On Projects tab
-- **Theme Management UI**: CRUD for project categorization themes
-- **Backlog Management**: Bugs and requirements per project, grouped view, next-code generator
-- **Handoff Dashboard**: Filter by project/status/direction, search, pagination, GCS sync status, UAT status display
-- **Custom Validation Error Handler**: Better 422 error messages with field paths
 
 Sources: `app/main.py`, `app/api/*.py`, `PROJECT_STATUS.md`, `SPRINT3_IMPLEMENTATION_SUMMARY.md`
 
@@ -283,6 +296,14 @@ Sources: `app/main.py`, `app/api/*.py`, `PROJECT_STATUS.md`, `SPRINT3_IMPLEMENTA
 - **Sprint 4**: Theme management UI (completed), Violation AI (CANCELED -- Command Center model replaces it)
 - **Sprint 5 Phase 3**: MCP API (handoffs, tasks, log), API key auth
 - **Post-Sprint**: Dashboard (v1.9.0), UAT tracking (v1.9.2), Roadmap (v2.0.0), Handoff lifecycle (v2.0.5), Bug sprint (v2.1.x)
+- **Sprint "Etymython Integration + MetaPM Dashboard Rework" (2026-02-18)**:
+  - MP-009: Hierarchical single-page dashboard deployed
+  - 80 requirements seeded (79 from Vision Framework + MP-018)
+  - 79 canonical descriptions loaded from seed file in PL's voice
+  - UAT Submit pipeline: POST /api/uat/submit working (201 confirmed)
+  - 24 personal projects recovered to roadmap_projects table
+  - MP-021 filed: Handoff CRUD visibility needed
+  - Deployed revision: metapm-v2-00077-dzt
 
 Sources: `PROJECT_STATUS.md`, `SPRINT_4_CANCELED.md`, `handoffs/log/HANDOFF_LOG.md`
 
@@ -290,26 +311,27 @@ Sources: `PROJECT_STATUS.md`, `SPRINT_4_CANCELED.md`, `handoffs/log/HANDOFF_LOG.
 
 ## 7. FEATURES -- PLANNED/IN PROGRESS
 
-Based on the roadmap seed data (`app/api/roadmap.py` lines 640-682) and handoff archive, the following are tracked as planned across all projects:
+### What's Next (per Roadmap_Status_Report_2026-02-18.md)
 
-### MetaPM Specific
-- No active sprint documented post v2.1.5
+| ID | Requirement | Priority | Notes |
+|----|------------|----------|-------|
+| MP-020 | BUG: Fix [+ Add] button 500 error | **P1 BLOCKER** | PL cannot add ANY items via UI |
+| MP-019 | Expand/collapse all button at top menu | P2 | Must click each project triangle — tedious |
+| MP-018 | Full-text search across all entities | P2 | No way to find anything except scrolling |
+| MP-021 | Handoff/UAT CRUD visibility | P2 | PL: "clicking on handoff ID should open MetaPM to show and CRUD" |
+| — | Add button full CRUD for all entity types | P2 | PL: "full CRUD capability all objects (Project, Items, UATs etc.)" |
+| — | Dashboard hierarchy incomplete | P2 | Only Projects → Requirements; needs Tasks + UATs |
+| — | Personal projects visibility in dashboard | P2 | Recovered to DB, UI filter may still hide them |
+| MP-012 | Task entity as child of requirement | P2 | New table needed |
+| MP-013 | Test Plan / UAT entity hierarchy | P2 | New table needed |
+| MP-011 | Sprint entity + assignment | P2 | new table |
+| MP-005 | Roadmap CRUD | P2 | |
 
-### Cross-Project Roadmap Items (from seed data)
-| Project | Code | Item | Status |
-|---------|------|------|--------|
-| HarmonyLab | HL-002 | Complete audio UAT | uat |
-| HarmonyLab | HL-003 | Show intervals on chord display | backlog |
-| HarmonyLab | HL-004 | Progression quiz (next chord) | backlog |
-| ArtForge | AF-001 | Export fixes (images + PDF) | planned |
-| ArtForge | AF-002 | Voice selection for 11Labs | backlog |
-| ArtForge | AF-003 | Slideshow feature (3 modes) | backlog |
-| ArtForge | AF-004 | Runway Gen-3 video generation | backlog |
-| Etymython | EM-001 | 11Labs VO from Origin Story | backlog |
-| Etymython | EM-002 | Link cognates SF<->EM | backlog |
-| Super-Flashcards | SF-001-004 | Various (stats, IPA, hyperlinks, back button) | backlog |
-
-Source: `app/api/roadmap.py` seed data, roadmap tables
+### MetaPM Vision — Full Entity Hierarchy Needed
+```
+Project → Sprint → Requirement/Bug → Task → Test Case → Result
+Full-text search, expand/collapse all, handoff/UAT visibility, cross-project links
+```
 
 ---
 
@@ -518,7 +540,18 @@ Source: `app/api/mcp.py`, `app/api/handoff_lifecycle.py`, `app/services/handoff_
 
 ## 12. KNOWN ISSUES & TECHNICAL DEBT
 
-### Known Issues
+### Open Bugs (Current)
+| ID | Issue | Severity | Impact |
+|----|-------|----------|--------|
+| MP-020 | [+ Add] button returns 500 | **P1** | PL cannot add ANY items via UI. Blocks self-service. |
+| MP-021 | Handoff/UAT data not visible in dashboard | P2 | Submit works but no UI to see/click/edit handoffs |
+| MP-019 | No expand/collapse all button | P2 | Must click each project triangle — tedious |
+| MP-018 | No full-text search | P2 | Must scroll to find anything |
+| — | Dashboard hierarchy incomplete | P2 | Only Projects → Requirements (no Tasks, UATs, Sprints) |
+| — | Personal projects filter in dashboard | P2 | 24 personal projects in roadmap_projects but may not show in UI |
+| — | roadmap_handoffs type mismatch | P3 | Junction table has varchar/UUID type inconsistency |
+
+### Pre-existing Technical Debt
 
 1. **Cloud Build tests disabled**: ODBC drivers not available in the Cloud Build test container, so CI tests are commented out (`cloudbuild.yaml` lines 5-13).
 
