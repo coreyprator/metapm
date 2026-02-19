@@ -5,6 +5,9 @@
 **Version Deployed:** v2.3.0
 **Revision:** metapm-v2-00080-22r
 **Commit Hash:** b64a61a
+**UAT Handoff ID:** FACE8E45-BE73-4B31-BDEA-C29ADBB06D26
+**UAT Handoff URL:** https://metapm.rentyourcio.com/mcp/handoffs/FACE8E45-BE73-4B31-BDEA-C29ADBB06D26/content
+**UAT Result:** 6 passed / 0 failed / 5 skipped (browser UAT pending PL)
 
 ---
 
