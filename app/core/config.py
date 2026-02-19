@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.2.1"  # MP-020 CORS fix + type field fix + expand/collapse all
+    VERSION: str = "2.2.2"  # MP-020 makeId() NVARCHAR(36) overflow fix + title editing + version display
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

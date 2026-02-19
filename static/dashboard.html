@@ -189,7 +189,7 @@
 <body>
   <div class="app">
     <div class="card header">
-      <div class="title">🔴 MetaPM</div>
+      <div class="title">🔴 MetaPM <span id="appVersion" style="font-size:13px;color:var(--muted);font-weight:400"></span></div>
       <div class="add-wrap">
         <button id="addBtn">+ Add ▾</button>
         <div id="addMenu" class="add-menu">
@@ -232,6 +232,10 @@
         <button id="saveBtn">Save</button>
         <button id="closeBtn">Close</button>
       </div>
+    </div>
+    <div>
+      <label>Title</label>
+      <input id="dTitle" style="width:100%;margin-bottom:8px" />
     </div>
     <div class="grid2">
       <div>
@@ -310,7 +314,7 @@
       return await res.json();
     }
 
-    function makeId(prefix) { return `${prefix}-${crypto.randomUUID()}`; }
+    function makeId(prefix) { return crypto.randomUUID(); }
 
     function normalizeReqText(req) { return `${req.code} ${req.title}`.toLowerCase(); }
 
@@ -451,6 +455,7 @@
       state.contextProjectId = req.project_id;
 
       qs('drawerTitle').textContent = `${req.code} ${req.title}`;
+      qs('dTitle').value = req.title;
       fillSelect('dProject', state.projects, 'id', 'name');
       const sprints = state.sprints.filter(s => !s.project_id || s.project_id === req.project_id);
       fillSelect('dSprint', sprints, 'id', 'name', true, 'unassigned');
@@ -481,6 +486,7 @@
       if (!req) return;
 
       const payload = {
+        title: qs('dTitle').value,
         priority: qs('dPriority').value,
         type: qs('dType').value,
         status: qs('dStatus').value,
@@ -637,6 +643,9 @@
     loadData().catch((err) => {
       qs('hierarchy').innerHTML = `<div style="color:#ff9a9a">Failed to load data: ${err.message}</div>`;
     });
+    api('/health').then(h => {
+      if (h && h.version) qs('appVersion').textContent = `v${h.version}`;
+    }).catch(() => {});
   </script>
 </body>
 </html>
