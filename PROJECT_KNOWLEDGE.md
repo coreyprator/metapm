@@ -1,6 +1,6 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-19 — Sprint "MP-020 Fix v2" close-out (v2.2.2 deployed)
+Updated: 2026-02-19 — Sprint "MP-022 Full CRUD + Search" close-out (v2.3.0 deployed)
 Purpose: Canonical reference for all AI sessions working on this project.
 
 ---
@@ -12,8 +12,8 @@ Purpose: Canonical reference for all AI sessions working on this project.
 **Repository**: github.com/coreyprator/metapm
 **Custom Domain**: https://metapm.rentyourcio.com
 **Cloud Run URL**: https://metapm-67661554310.us-central1.run.app (legacy; use custom domain)
-**Current Version**: v2.2.2 (per `app/core/config.py` line 15)
-**Latest Known Revision**: metapm-v2-00079-szg _(Source: SESSION_CLOSEOUT_2026-02-19_MP020_v2.md — deployed 2026-02-19)_
+**Current Version**: v2.3.0 (per `app/core/config.py` line 15)
+**Latest Known Revision**: metapm-v2-00080-22r _(Source: SESSION_CLOSEOUT_2026-02-19_MP022.md — deployed 2026-02-19)_
 **Owner**: Corey Prator
 
 ### Tech Stack
@@ -268,6 +268,15 @@ Source: `static/` directory listing, `static/manifest.json`, `static/sw.js`
   - [+ Add ▼] button — **FIXED (MP-020 v2 — 2026-02-19)**. Root cause was makeId() generating 40-41 char IDs into NVARCHAR(36) PKs. Fix: bare UUID always 36 chars. All Add operations (project, sprint, requirement, bug, task) confirmed working with HTTP 201.
   - Requirement drawer: **Title field now editable** (v2.2.2). Title included in PUT payload.
   - Dashboard header shows **version number** fetched from /health (v2.2.2).
+  - **Full CRUD for all entity types (MP-022 — v2.3.0)**:
+    - ✏️ Edit icon on project header opens edit modal (name, emoji, version, status, repo_url)
+    - ✏️ Edit icon on sprint bucket opens edit modal (name, project, status)
+    - 🗑 Delete button in requirement drawer (with confirm dialog)
+    - 🗑 Delete buttons in edit modals for projects and sprints
+    - DELETE /api/roadmap/projects/{id} — backend endpoint added (409 if has requirements)
+    - DELETE /api/roadmap/sprints/{id} — backend endpoint added
+  - **Client-side search (MP-022d — v2.3.0)**: Search box in controls bar filters requirements and projects by code, title, type, priority, status, project name. Instant, no backend call.
+  - **Requirement code badge (MP-022c — v2.3.0)**: `data-searchable` on all rows. Code already shown as `<strong>` badge (v2.2.2).
   - /roadmap.html is now a redirect to dashboard.html
 - **CORS Fix (2026-02-19)**: `app/main.py` now allows `GET, POST, PUT, PATCH, DELETE, OPTIONS` — was missing PUT, PATCH, DELETE which blocked edit/delete from cross-origin contexts
 - **Requirements — 80 seeded (MP-002 — Complete)**: 79 from Portfolio Vision Framework v3 + MP-018 added by CAI
@@ -325,6 +334,14 @@ Sources: `app/main.py`, `app/api/*.py`, `PROJECT_STATUS.md`, `SPRINT3_IMPLEMENTA
   - UAT Template v3 committed to project-methodology/templates/.
   - MP-020 status updated to done.
   - Deployed revision: metapm-v2-00079-szg
+- **Sprint "MP-022 Full CRUD + Search" (2026-02-19)**:
+  - MP-022a: Edit modal for projects (name, emoji, version, status, repo_url) and sprints (name, project, status). ✏️ icon in project-head and sprint bucket-title. Re-uses addModal with state.editMode toggle.
+  - MP-022b: DELETE /api/roadmap/projects/{id} (with FK check: 409 if has requirements) and DELETE /api/roadmap/sprints/{id} added to roadmap.py. Delete buttons in edit modal with confirm() dialog. 🗑 button in requirement drawer.
+  - MP-022c: data-searchable attribute on all requirement rows (code + title + type + priority + status + project name).
+  - MP-022d: Search bar added to controls (client-side, instant filter). Hides non-matching req rows and collapses empty project sections.
+  - Also: showToast() for delete confirmations, escHtml() XSS guard in openEdit().
+  - All test data cleaned up from DB (no residual test records).
+  - Deployed revision: metapm-v2-00080-22r
 
 Sources: `PROJECT_STATUS.md`, `SPRINT_4_CANCELED.md`, `handoffs/log/HANDOFF_LOG.md`
 
@@ -359,7 +376,7 @@ Full-text search, expand/collapse all, handoff/UAT visibility, cross-project lin
 
 | Variable | Purpose | Default | Source |
 |----------|---------|---------|--------|
-| `VERSION` | App version | "2.2.2" | config.py line 15 |
+| `VERSION` | App version | "2.3.0" | config.py line 15 |
 | `DB_SERVER` | SQL Server host | "localhost" | config.py line 19 |
 | `DB_NAME` | Database name | "MetaPM" | config.py line 20 |
 | `DB_USER` | Database user | "sqlserver" | config.py line 21 |
@@ -467,7 +484,7 @@ Source: `.gcloudignore`
 ```bash
 curl https://metapm.rentyourcio.com/health
 ```
-Returns: `{"status": "healthy", "version": "2.2.2", "build": "..."}`
+Returns: `{"status": "healthy", "version": "2.3.0", "build": "..."}`
 
 Source: `app/main.py` lines 95-104
 
@@ -568,15 +585,17 @@ Source: `app/api/mcp.py`, `app/api/handoff_lifecycle.py`, `app/services/handoff_
 | ID | Issue | Severity | Impact |
 |----|-------|----------|--------|
 | MP-021 | Handoff/UAT data not visible in dashboard | P2 | Submit works but no UI to see/click/edit handoffs |
-| MP-018 | No full-text search | P2 | Must scroll to find anything |
 | — | Dashboard hierarchy incomplete | P2 | Only Projects → Requirements (no Tasks, UATs, Sprints) |
 | — | roadmap_handoffs type mismatch | P3 | Junction table has varchar/UUID type inconsistency |
-| — | Test data in DB | P3 | spr-test-mp020-2, test-proj-mp020, TFIX project (b89a1ab3), and test sprint (9d17491d) remain; no DELETE endpoint for sprints/projects |
 | — | backlog.py ReferenceURL column | P3 | Column referenced in INSERT/SELECT but missing from Requirements table schema; affects /api/backlog/requirements (NOT roadmap endpoints) |
 
 ### Resolved Bugs (Recent)
 | ID | Issue | Fixed | How |
 |----|-------|-------|-----|
+| MP-022a | No edit UI for projects or sprints | 2026-02-19 | ✏️ edit icon in project/sprint headers; addModal re-used with editMode state |
+| MP-022b | No delete UI; no DELETE endpoints for projects/sprints | 2026-02-19 | DELETE endpoints added to roadmap.py; 🗑 buttons in edit modal + requirement drawer |
+| MP-022c | Requirement code not visible as searchable badge | 2026-02-19 | data-searchable attribute on req rows; code already shown as <strong> badge |
+| MP-022d | No search functionality | 2026-02-19 | Client-side search bar in controls; instant filter, no backend call |
 | MP-020 | makeId() generated 40-41 char IDs for NVARCHAR(36) PK columns — all Add ops returned 500 | 2026-02-19 | makeId() now returns bare crypto.randomUUID() (36 chars). Patched by CAI. |
 | MP-019 | No expand/collapse all button | 2026-02-19 | ▼/▲ Expand All button added to dashboard.html control bar |
 | CORS | PUT/DELETE blocked cross-origin | 2026-02-19 | allow_methods now includes PUT, PATCH, DELETE |
