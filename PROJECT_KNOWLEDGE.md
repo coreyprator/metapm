@@ -1,6 +1,6 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-18 — Sprint "Etymython Integration + MetaPM Dashboard Rework" close-out
+Updated: 2026-02-19 — Sprint "MP-020 Fix Sprint Start" close-out
 Purpose: Canonical reference for all AI sessions working on this project.
 
 ---
@@ -12,8 +12,8 @@ Purpose: Canonical reference for all AI sessions working on this project.
 **Repository**: github.com/coreyprator/metapm
 **Custom Domain**: https://metapm.rentyourcio.com
 **Cloud Run URL**: https://metapm-67661554310.us-central1.run.app (legacy; use custom domain)
-**Current Version**: v2.1.5 (per `app/core/config.py` line 15)
-**Latest Known Revision**: metapm-v2-00077-dzt _(Source: Sprint_CloseOut_2026-02-18.md — deployed 2026-02-18)_
+**Current Version**: v2.2.1 (per `app/core/config.py` line 15)
+**Latest Known Revision**: metapm-v2-00078-vsc _(Source: SESSION_CLOSEOUT_2026-02-18_MP020.md — deployed 2026-02-19)_
 **Owner**: Corey Prator
 
 ### Tech Stack
@@ -100,7 +100,7 @@ Source: `app/core/database.py`
 
 ### Migrations
 
-Idempotent startup migrations (12 total) run at application boot via `app/core/migrations.py`. They check `INFORMATION_SCHEMA` before applying changes. Migrations include:
+Idempotent startup migrations (13 total) run at application boot via `app/core/migrations.py`. They check `INFORMATION_SCHEMA` before applying changes. Migrations include:
 1. TaskType column on Tasks
 2. mcp_handoffs table
 3. mcp_tasks table
@@ -113,6 +113,7 @@ Idempotent startup migrations (12 total) run at application boot via `app/core/m
 10. roadmap_requirements table
 11. uat_results status constraint update (allow 'pending')
 12. Handoff lifecycle tables (handoff_requests, handoff_completions, roadmap_handoffs)
+13. roadmap_sprints.project_id column + FK_roadmap_sprints_project FK constraint
 
 Source: `app/core/migrations.py`
 
@@ -151,7 +152,7 @@ Source: `app/core/migrations.py`
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
 | `roadmap_projects` | Project registry for roadmap | id, code, name, emoji, color, current_version, status |
-| `roadmap_sprints` | Sprint definitions | id, name, status, start_date, end_date |
+| `roadmap_sprints` | Sprint definitions | id, name, project_id (FK → roadmap_projects.id), status, start_date, end_date |
 | `roadmap_requirements` | Requirements linked to projects/sprints | id, project_id, code, title, type, priority, status |
 
 ### Handoff Lifecycle Tables (from `app/core/migrations.py`)
@@ -236,7 +237,7 @@ Source: `app/api/mcp.py` lines 32-63
 | `static/dashboard.html` | `/static/dashboard.html` (root redirects here) | Main dashboard with tabs: Tasks, Projects, Methodology, Backlog, Capture | `static/dashboard.html` (~185KB) |
 | `static/capture.html` | `/capture.html` | Voice/text quick capture PWA page | `static/capture.html` |
 | `static/handoffs.html` | `/handoffs.html` | Handoff Bridge dashboard | `static/handoffs.html` |
-| `static/roadmap.html` | `/roadmap.html` | Project Roadmap dashboard | `static/roadmap.html` |
+| `static/roadmap.html` | `/roadmap.html` | Redirect to dashboard.html (13-line redirect, MP-009 sprint) | `static/roadmap.html` |
 | `static/compare.html` | `/compare/{handoff_id}` | Handoff comparison page | `static/compare.html` |
 
 ### Frontend Features
@@ -259,16 +260,17 @@ Source: `static/` directory listing, `static/manifest.json`, `static/sw.js`
 
 ### Core Features (Production)
 - **Hierarchical Single-Page Dashboard (MP-009 — Deployed 2026-02-18)**: Single scrollable page replacing old 3 separate pages (roadmap, backlog, dashboard)
-  - 6 portfolio project sections (HarmonyLab, Super Flashcards, ArtForge, Etymython, MetaPM, project-methodology)
-  - + 24 personal projects (recovered from legacy projects table to roadmap_projects)
+  - 31 total projects (6 portfolio + 25 personal legacy projects, all visible in dashboard)
   - Filter bar: Project, Priority, Status dropdowns + Sort + Group By
   - Triangle expand/collapse per project section
+  - **Expand/Collapse All button (MP-019 — Done 2026-02-19)**: ▼/▲ toggle in control bar expands or collapses all project sections at once
   - Row click → detail panel slides in with description, status, priority, inline editing
-  - [+ Add ▼] button — **BROKEN (MP-020, P1 blocker)** — returns 500
-  - /roadmap and /backlog redirect to /dashboard
+  - [+ Add ▼] button — **FIXED (MP-020 — Done 2026-02-19)**. Calls `/api/roadmap/projects`, `/api/roadmap/sprints`, `/api/roadmap/requirements`. Type field is a select with valid enum values. All creates confirmed working.
+  - /roadmap.html is now a redirect to dashboard.html
+- **CORS Fix (2026-02-19)**: `app/main.py` now allows `GET, POST, PUT, PATCH, DELETE, OPTIONS` — was missing PUT, PATCH, DELETE which blocked edit/delete from cross-origin contexts
 - **Requirements — 80 seeded (MP-002 — Complete)**: 79 from Portfolio Vision Framework v3 + MP-018 added by CAI
   - All 80 have descriptions in PL's voice (loaded from canonical seed file `metapm_descriptions_seed.json`)
-  - 17 done, 62 backlog, 1 in_progress
+  - Roadmap requirements for MetaPM project (proj-mp): 21 total (MP-001 through MP-021)
 - **UAT Submit Pipeline**: POST /api/uat/submit endpoint — 201 Created confirmed
   - Project derivation from linked_requirements (no explicit project field needed)
   - Cross-portfolio fallback when requirements span multiple projects
@@ -304,6 +306,14 @@ Sources: `app/main.py`, `app/api/*.py`, `PROJECT_STATUS.md`, `SPRINT3_IMPLEMENTA
   - 24 personal projects recovered to roadmap_projects table
   - MP-021 filed: Handoff CRUD visibility needed
   - Deployed revision: metapm-v2-00077-dzt
+- **Sprint "MP-020 Fix" (2026-02-18/19)**:
+  - MP-020: Fixed [+ Add] button 500 error. Root cause: FK constraint when project_id invalid/empty in POST /api/roadmap/requirements. aType field was free-text input (invalid enum risk); changed to `<select>`. render() was filtering projects with no requirements (`if (!pReqs.length) continue`) hiding 24+ personal projects — removed.
+  - MP-019: Expand/collapse all button added to dashboard.html control bar. Uses `state.expanded` Set and calls `render()`.
+  - CORS: `allow_methods` updated to include PUT, PATCH, DELETE.
+  - roadmap.html replaced with 13-line redirect to dashboard.html (from MP-009 sprint, committed this sprint).
+  - roadmap_sprints.project_id FK added (Migration 13, from MP-009 sprint, committed this sprint).
+  - MP-019, MP-020, MP-021 seeded as roadmap_requirements for proj-mp (21 total now).
+  - Deployed revision: metapm-v2-00078-vsc
 
 Sources: `PROJECT_STATUS.md`, `SPRINT_4_CANCELED.md`, `handoffs/log/HANDOFF_LOG.md`
 
@@ -311,20 +321,17 @@ Sources: `PROJECT_STATUS.md`, `SPRINT_4_CANCELED.md`, `handoffs/log/HANDOFF_LOG.
 
 ## 7. FEATURES -- PLANNED/IN PROGRESS
 
-### What's Next (per Roadmap_Status_Report_2026-02-18.md)
+### What's Next (per Roadmap, as of 2026-02-19)
 
 | ID | Requirement | Priority | Notes |
 |----|------------|----------|-------|
-| MP-020 | BUG: Fix [+ Add] button 500 error | **P1 BLOCKER** | PL cannot add ANY items via UI |
-| MP-019 | Expand/collapse all button at top menu | P2 | Must click each project triangle — tedious |
-| MP-018 | Full-text search across all entities | P2 | No way to find anything except scrolling |
 | MP-021 | Handoff/UAT CRUD visibility | P2 | PL: "clicking on handoff ID should open MetaPM to show and CRUD" |
+| MP-018 | Full-text search across all entities | P2 | No way to find anything except scrolling |
 | — | Add button full CRUD for all entity types | P2 | PL: "full CRUD capability all objects (Project, Items, UATs etc.)" |
 | — | Dashboard hierarchy incomplete | P2 | Only Projects → Requirements; needs Tasks + UATs |
-| — | Personal projects visibility in dashboard | P2 | Recovered to DB, UI filter may still hide them |
 | MP-012 | Task entity as child of requirement | P2 | New table needed |
 | MP-013 | Test Plan / UAT entity hierarchy | P2 | New table needed |
-| MP-011 | Sprint entity + assignment | P2 | new table |
+| MP-011 | Sprint entity + assignment | P2 | Sprint project_id FK now exists |
 | MP-005 | Roadmap CRUD | P2 | |
 
 ### MetaPM Vision — Full Entity Hierarchy Needed
@@ -341,7 +348,7 @@ Full-text search, expand/collapse all, handoff/UAT visibility, cross-project lin
 
 | Variable | Purpose | Default | Source |
 |----------|---------|---------|--------|
-| `VERSION` | App version | "2.1.5" | config.py line 15 |
+| `VERSION` | App version | "2.2.1" | config.py line 15 |
 | `DB_SERVER` | SQL Server host | "localhost" | config.py line 19 |
 | `DB_NAME` | Database name | "MetaPM" | config.py line 20 |
 | `DB_USER` | Database user | "sqlserver" | config.py line 21 |
@@ -443,7 +450,7 @@ Source: `.gcloudignore`
 ```bash
 curl https://metapm.rentyourcio.com/health
 ```
-Returns: `{"status": "healthy", "test": "PINEAPPLE-99999", "version": "2.1.5", "build": "..."}`
+Returns: `{"status": "healthy", "version": "2.2.1", "build": "..."}`
 
 Source: `app/main.py` lines 95-104
 
@@ -540,16 +547,21 @@ Source: `app/api/mcp.py`, `app/api/handoff_lifecycle.py`, `app/services/handoff_
 
 ## 12. KNOWN ISSUES & TECHNICAL DEBT
 
-### Open Bugs (Current)
+### Open Bugs (Current — as of 2026-02-19)
 | ID | Issue | Severity | Impact |
 |----|-------|----------|--------|
-| MP-020 | [+ Add] button returns 500 | **P1** | PL cannot add ANY items via UI. Blocks self-service. |
 | MP-021 | Handoff/UAT data not visible in dashboard | P2 | Submit works but no UI to see/click/edit handoffs |
-| MP-019 | No expand/collapse all button | P2 | Must click each project triangle — tedious |
 | MP-018 | No full-text search | P2 | Must scroll to find anything |
 | — | Dashboard hierarchy incomplete | P2 | Only Projects → Requirements (no Tasks, UATs, Sprints) |
-| — | Personal projects filter in dashboard | P2 | 24 personal projects in roadmap_projects but may not show in UI |
 | — | roadmap_handoffs type mismatch | P3 | Junction table has varchar/UUID type inconsistency |
+| — | Test data in DB | P3 | spr-test-mp020-2 sprint and test-proj-mp020 project remain; no DELETE endpoint for sprints/projects in roadmap.py |
+
+### Resolved Bugs (Recent)
+| ID | Issue | Fixed | How |
+|----|-------|-------|-----|
+| MP-020 | [+ Add] button returned 500 | 2026-02-19 | Root cause: FK constraint when project_id empty/invalid. Also fixed: aType was free-text (now select enum), render() hid projects with no requirements (filter removed) |
+| MP-019 | No expand/collapse all button | 2026-02-19 | ▼/▲ Expand All button added to dashboard.html control bar |
+| CORS | PUT/DELETE blocked cross-origin | 2026-02-19 | allow_methods now includes PUT, PATCH, DELETE |
 
 ### Pre-existing Technical Debt
 
