@@ -175,6 +175,31 @@ async def update_project(project_id: str, update: ProjectUpdate):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.delete("/projects/{project_id}", status_code=204)
+@router.delete("/roadmap/projects/{project_id}", status_code=204)
+async def delete_project(project_id: str):
+    """Delete a project. Fails if project has requirements (FK constraint)."""
+    try:
+        reqs = execute_query(
+            "SELECT COUNT(*) as cnt FROM roadmap_requirements WHERE project_id = ?",
+            (project_id,), fetch="one"
+        )
+        if reqs and reqs['cnt'] > 0:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot delete project with {reqs['cnt']} requirements. Delete requirements first."
+            )
+        execute_query(
+            "DELETE FROM roadmap_projects WHERE id = ?",
+            (project_id,), fetch="none"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting project: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================
 # SPRINT ENDPOINTS
 # ============================================
@@ -323,6 +348,20 @@ async def update_sprint(sprint_id: str, update: SprintUpdate):
         raise
     except Exception as e:
         logger.error(f"Error updating sprint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/sprints/{sprint_id}", status_code=204)
+@router.delete("/roadmap/sprints/{sprint_id}", status_code=204)
+async def delete_sprint(sprint_id: str):
+    """Delete a sprint."""
+    try:
+        execute_query(
+            "DELETE FROM roadmap_sprints WHERE id = ?",
+            (sprint_id,), fetch="none"
+        )
+    except Exception as e:
+        logger.error(f"Error deleting sprint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

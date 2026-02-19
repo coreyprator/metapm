@@ -184,6 +184,12 @@
       padding: 14px;
     }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .del-btn { background: #7f1d1d; color: #fecaca; border: 1px solid #991b1b; padding: 4px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; }
+    .del-btn:hover { background: #991b1b; }
+    .edit-icon { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 2px 5px; border-radius: 3px; }
+    .edit-icon:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+    .toast { position: fixed; bottom: 20px; right: 20px; background: #1f2d3d; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 10px 18px; z-index: 100; font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+    .toast.show { opacity: 1; }
   </style>
 </head>
 <body>
@@ -214,6 +220,7 @@
         <select id="sortBy"><option value="priority">Priority</option><option value="code">Code</option><option value="title">Title</option></select>
         <select id="groupBy"><option value="project">By Project</option></select>
         <button id="expandAllBtn" style="font-size:11px;padding:3px 10px;margin-left:8px;background:var(--card);border:1px solid var(--border);border-radius:4px;color:var(--fg);cursor:pointer;">▼ Expand All</button>
+        <input id="searchBox" type="text" placeholder="🔍 Search..." style="padding:5px 10px;font-size:12px;width:200px;border-radius:4px;border:1px solid var(--line);background:var(--panel-soft);color:var(--text);">
       </div>
     </div>
 
@@ -228,8 +235,9 @@
   <aside class="drawer" id="drawer">
     <div class="drawer-head">
       <strong id="drawerTitle">Requirement</strong>
-      <div>
+      <div style="display:flex;gap:6px">
         <button id="saveBtn">Save</button>
+        <button id="delReqBtn" class="del-btn" title="Delete requirement">🗑</button>
         <button id="closeBtn">Close</button>
       </div>
     </div>
@@ -302,7 +310,9 @@
       expanded: new Set(),
       selectedReq: null,
       contextProjectId: null,
-      addKind: null
+      addKind: null,
+      editMode: false,
+      editId: null
     };
 
     const qs = (id) => document.getElementById(id);
@@ -376,7 +386,8 @@
     }
 
     function rowHtml(req) {
-      return `<div class="req-row" data-req="${req.id}">
+      const searchable = `${req.code} ${req.title} ${req.type} ${req.priority} ${req.status} ${req.project_name || ''}`.toLowerCase();
+      return `<div class="req-row" data-req="${req.id}" data-searchable="${searchable}">
         <div><strong>${req.code}</strong> ${req.title}</div>
         <span class="pill ${req.priority.toLowerCase()}">${req.priority}</span>
         <span class="pill status-${req.status}">${req.status}</span>
@@ -401,14 +412,17 @@
 
         const buckets = groupedForProject(p.id, reqs);
         const sprintBlocks = Object.keys(buckets.sprint).map((sid) => `
-          <div class="bucket"><div class="bucket-title">Sprint: ${sprintName(sid)}</div>${buckets.sprint[sid].map(rowHtml).join('')}</div>
+          <div class="bucket"><div class="bucket-title" style="display:flex;justify-content:space-between;align-items:center;">Sprint: ${sprintName(sid)}<button class="edit-icon" data-edit-sprint="${sid}" title="Edit sprint">✏️</button></div>${buckets.sprint[sid].map(rowHtml).join('')}</div>
         `).join('');
 
         const html = `
           <section class="project" style="border-left-color:${color}">
-            <div class="project-head" data-project="${p.id}">
+            <div class="project-head" data-project="${p.id}" data-searchable="${(p.name+' '+(p.code||'')).toLowerCase()}">
               <div>${open ? '▼' : '▶'} ${p.emoji || ''} ${p.name} ${p.current_version || ''}</div>
-              <div class="project-summary">${done} done | ${p1} P1 | ${p2} P2</div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <span class="project-summary">${done} done | ${p1} P1 | ${p2} P2</span>
+                <button class="edit-icon" data-edit-project="${p.id}" title="Edit project">✏️</button>
+              </div>
             </div>
             <div class="project-body ${open ? 'open' : ''}">
               ${sprintBlocks}
@@ -427,7 +441,8 @@
 
     function bindHierarchyEvents() {
       document.querySelectorAll('[data-project]').forEach((el) => {
-        el.onclick = () => {
+        el.onclick = (e) => {
+          if (e.target.closest('[data-edit-project]')) return;
           const id = el.dataset.project;
           if (state.expanded.has(id)) state.expanded.delete(id); else state.expanded.add(id);
           state.contextProjectId = id;
@@ -437,6 +452,14 @@
 
       document.querySelectorAll('[data-req]').forEach((el) => {
         el.onclick = () => openRequirement(el.dataset.req);
+      });
+
+      document.querySelectorAll('[data-edit-project]').forEach((el) => {
+        el.onclick = (e) => { e.stopPropagation(); openEdit('project', el.dataset.editProject); };
+      });
+
+      document.querySelectorAll('[data-edit-sprint]').forEach((el) => {
+        el.onclick = (e) => { e.stopPropagation(); openEdit('sprint', el.dataset.editSprint); };
       });
     }
 
@@ -539,6 +562,38 @@
 
     async function saveAdd() {
       const kind = state.addKind;
+
+      if (state.editMode) {
+        const id = state.editId;
+        if (kind === 'project') {
+          await api(`/api/roadmap/projects/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              name: qs('aName').value.trim(),
+              emoji: qs('aEmoji').value.trim() || null,
+              current_version: qs('aVersion').value.trim() || null,
+              status: qs('aStatus').value,
+              repo_url: qs('aRepoUrl') ? qs('aRepoUrl').value.trim() || null : null
+            })
+          });
+        } else if (kind === 'sprint') {
+          await api(`/api/roadmap/sprints/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              project_id: qs('aProject').value,
+              name: qs('aName').value.trim(),
+              status: qs('aStatus').value
+            })
+          });
+        }
+        state.editMode = false;
+        state.editId = null;
+        qs('addModal').classList.remove('open');
+        qs('addSave').textContent = 'Create';
+        await loadData();
+        return;
+      }
+
       if (kind === 'project') {
         await api('/api/roadmap/projects', {
           method: 'POST',
@@ -608,8 +663,10 @@
       ['projectFilter', 'priorityFilter', 'statusFilter', 'sortBy', 'groupBy'].forEach((id) => {
         qs(id).onchange = () => render();
       });
+      qs('searchBox').addEventListener('input', (e) => filterDashboard(e.target.value));
       qs('closeBtn').onclick = () => qs('drawer').classList.remove('open');
       qs('saveBtn').onclick = () => saveRequirement().catch(err => alert(err.message));
+      qs('delReqBtn').onclick = () => deleteRequirement().catch(err => alert(err.message));
 
       qs('addBtn').onclick = () => qs('addMenu').classList.toggle('open');
       qs('addMenu').onclick = (e) => {
@@ -619,7 +676,12 @@
         openAdd(btn.dataset.kind);
       };
 
-      qs('addClose').onclick = () => qs('addModal').classList.remove('open');
+      qs('addClose').onclick = () => {
+        qs('addModal').classList.remove('open');
+        state.editMode = false;
+        state.editId = null;
+        qs('addSave').textContent = 'Create';
+      };
       qs('addSave').onclick = () => saveAdd().catch(err => alert(err.message));
 
       qs('expandAllBtn').onclick = () => {
@@ -636,6 +698,121 @@
 
       document.addEventListener('click', (e) => {
         if (!e.target.closest('.add-wrap')) qs('addMenu').classList.remove('open');
+      });
+    }
+
+    function escHtml(str) {
+      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    function openEdit(kind, id) {
+      state.addKind = kind;
+      state.editMode = true;
+      state.editId = id;
+      qs('addTitle').textContent = `Edit ${kind}`;
+      qs('addSave').textContent = 'Save';
+
+      if (kind === 'project') {
+        const p = state.projects.find(x => x.id === id);
+        if (!p) return;
+        qs('addFields').innerHTML = `
+          <div class="grid2">
+            <div><label>Name</label><input id="aName" value="${escHtml(p.name)}" style="width:100%" /></div>
+            <div><label>Code (read-only)</label><input id="aCode" value="${escHtml(p.code)}" readonly style="width:100%;opacity:0.6" /></div>
+            <div><label>Emoji</label><input id="aEmoji" value="${escHtml(p.emoji)}" style="width:100%" /></div>
+            <div><label>Version</label><input id="aVersion" value="${escHtml(p.current_version)}" style="width:100%" /></div>
+            <div><label>Status</label><select id="aStatus" style="width:100%">
+              <option value="active" ${p.status==='active'?'selected':''}>active</option>
+              <option value="stable" ${p.status==='stable'?'selected':''}>stable</option>
+              <option value="paused" ${p.status==='paused'?'selected':''}>paused</option>
+              <option value="archived" ${p.status==='archived'?'selected':''}>archived</option>
+            </select></div>
+            <div><label>Repo URL</label><input id="aRepoUrl" value="${escHtml(p.repo_url)}" style="width:100%" /></div>
+          </div>
+          <div style="margin-top:10px">
+            <button class="del-btn" onclick="deleteEntity('projects','${escHtml(id)}','${escHtml(p.name)}')">🗑 Delete Project</button>
+            <small style="color:var(--muted);margin-left:8px">Only works if project has no requirements.</small>
+          </div>`;
+      } else if (kind === 'sprint') {
+        const s = state.sprints.find(x => x.id === id);
+        if (!s) return;
+        qs('addFields').innerHTML = `
+          <div class="grid2">
+            <div><label>Project</label><select id="aProject" style="width:100%">${state.projects.map(p => `<option value="${p.id}" ${p.id===s.project_id?'selected':''}>${escHtml(p.name)}</option>`).join('')}</select></div>
+            <div><label>Name</label><input id="aName" value="${escHtml(s.name)}" style="width:100%" /></div>
+            <div><label>Status</label><select id="aStatus" style="width:100%">
+              <option value="active" ${s.status==='active'?'selected':''}>active</option>
+              <option value="planned" ${s.status==='planned'?'selected':''}>planned</option>
+              <option value="complete" ${s.status==='complete'?'selected':''}>complete</option>
+            </select></div>
+          </div>
+          <div style="margin-top:10px">
+            <button class="del-btn" onclick="deleteEntity('sprints','${escHtml(id)}','${escHtml(s.name)}')">🗑 Delete Sprint</button>
+          </div>`;
+      }
+
+      qs('addModal').classList.add('open');
+    }
+
+    async function deleteEntity(kind, id, name) {
+      if (!confirm(`Delete ${kind.slice(0,-1)} "${name}"? This cannot be undone.`)) return;
+      qs('addModal').classList.remove('open');
+      state.editMode = false;
+      state.editId = null;
+      qs('addSave').textContent = 'Create';
+      try {
+        await api(`/api/roadmap/${kind}/${id}`, { method: 'DELETE' });
+        await loadData();
+        showToast(`Deleted "${name}"`);
+      } catch (err) {
+        alert(`Delete failed: ${err.message}`);
+      }
+    }
+
+    async function deleteRequirement() {
+      const req = state.selectedReq;
+      if (!req) return;
+      if (!confirm(`Delete "${req.code} ${req.title}"? This cannot be undone.`)) return;
+      qs('drawer').classList.remove('open');
+      try {
+        await api(`/api/roadmap/requirements/${req.id}`, { method: 'DELETE' });
+        await loadData();
+        showToast(`Deleted "${req.code}"`);
+      } catch (err) {
+        alert(`Delete failed: ${err.message}`);
+      }
+    }
+
+    let _toastTimer;
+    function showToast(msg) {
+      let t = qs('toast');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = 'toast';
+        t.className = 'toast';
+        document.body.appendChild(t);
+      }
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(_toastTimer);
+      _toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    function filterDashboard(query) {
+      const q = query.toLowerCase().trim();
+      if (!q) {
+        document.querySelectorAll('[data-req]').forEach(el => el.style.display = '');
+        document.querySelectorAll('.project').forEach(el => el.style.display = '');
+        return;
+      }
+      document.querySelectorAll('[data-req][data-searchable]').forEach(el => {
+        el.style.display = el.dataset.searchable.includes(q) ? '' : 'none';
+      });
+      document.querySelectorAll('.project').forEach(proj => {
+        const head = proj.querySelector('[data-searchable]');
+        const projMatch = head && head.dataset.searchable.includes(q);
+        const hasVisible = [...proj.querySelectorAll('[data-req]')].some(r => r.style.display !== 'none');
+        proj.style.display = (projMatch || hasVisible) ? '' : 'none';
       });
     }
 
