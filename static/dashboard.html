@@ -369,6 +369,19 @@
     </div>
   </div>
 
+  <div class="modal" id="editModal">
+    <div class="modal-card">
+      <div class="drawer-head">
+        <strong id="editTitle">Edit</strong>
+        <button id="editClose">Close</button>
+      </div>
+      <div id="editFields"></div>
+      <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:8px">
+        <button id="editSave">Save</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const PROJECT_COLORS = {
       HL: '#4A90D9', SF: '#F5A623', AF: '#E8751A', EM: '#9B59B6', MP: '#E74C3C', PM: '#27AE60'
@@ -381,7 +394,9 @@
       expanded: new Set(),
       selectedReq: null,
       contextProjectId: null,
-      addKind: null
+      addKind: null,
+      editKind: null,
+      editId: null
     };
 
     const qs = (id) => document.getElementById(id);
@@ -422,6 +437,19 @@
     }
 
     function makeId() { return crypto.randomUUID(); }
+
+    function friendlyCreateError(kind, rawMessage, code) {
+      const msg = String(rawMessage || '');
+      if (/unique key|duplicate key|already exists/i.test(msg)) {
+        if (kind === 'project') {
+          return `A project with code '${code || ''}' already exists. Choose a different code.`;
+        }
+        if (code) {
+          return `A ${kind} with code '${code}' already exists. Choose a different code.`;
+        }
+      }
+      return msg || 'Request failed.';
+    }
 
     function normalizeReqText(req) { return `${req.code} ${req.title}`.toLowerCase(); }
 
@@ -509,7 +537,7 @@
         <span class="pill status-${req.status}">${req.status}</span>
         <span class="pill">${req.type}</span>
         <div class="actions-row">
-          <button class="icon-btn" data-open-req="${req.id}" title="Open Requirement">▸</button>
+          <button class="icon-btn" data-open-req="${req.id}" title="Edit Requirement">✏️</button>
           <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete Requirement">🗑️</button>
         </div>
       </div>`;
@@ -519,7 +547,10 @@
       const count = projectReqs.filter(r => r.sprint_id === sprint.id && r.status !== 'done').length;
       return `<div class="sprint-row">
         <div><strong>${sprint.name}</strong> <span class="project-summary">(${count} active items)</span></div>
-        <button class="icon-btn danger-btn" data-delete-sprint="${sprint.id}" title="Delete Sprint">🗑️</button>
+        <div class="actions-row">
+          <button class="icon-btn" data-edit-sprint="${sprint.id}" title="Edit Sprint">✏️</button>
+          <button class="icon-btn danger-btn" data-delete-sprint="${sprint.id}" title="Delete Sprint">🗑️</button>
+        </div>
       </div>`;
     }
 
@@ -550,6 +581,7 @@
               <div data-project="${p.id}">${open ? '▼' : '▶'} ${p.emoji || ''} ${p.name} ${p.current_version || ''}</div>
               <div class="actions-row">
                 <div class="project-summary">${done} done | ${p1} P1 | ${p2} P2</div>
+                <button class="icon-btn" data-edit-project="${p.id}" title="Edit Project">✏️</button>
                 <button class="icon-btn danger-btn" data-delete-project="${p.id}" title="Delete Project">🗑️</button>
               </div>
             </div>
@@ -590,7 +622,9 @@
       document.querySelectorAll('[data-delete-req]').forEach((el) => {
         el.onclick = async (e) => {
           e.stopPropagation();
-          if (!confirm('Delete this requirement?')) return;
+          const req = state.requirements.find(r => r.id === el.dataset.deleteReq);
+          const label = req ? `${req.code || 'REQ'} — ${req.title || ''}` : el.dataset.deleteReq;
+          if (!confirm(`Delete requirement '${label}'?`)) return;
           await api(`/api/roadmap/requirements/${el.dataset.deleteReq}`, { method: 'DELETE' });
           if (state.selectedReq?.id === el.dataset.deleteReq) {
             state.selectedReq = null;
@@ -600,10 +634,28 @@
         };
       });
 
+      document.querySelectorAll('[data-edit-project]').forEach((el) => {
+        el.onclick = (e) => {
+          e.stopPropagation();
+          openEditProject(el.dataset.editProject);
+        };
+      });
+
+      document.querySelectorAll('[data-edit-sprint]').forEach((el) => {
+        el.onclick = (e) => {
+          e.stopPropagation();
+          openEditSprint(el.dataset.editSprint);
+        };
+      });
+
       document.querySelectorAll('[data-delete-project]').forEach((el) => {
         el.onclick = async (e) => {
           e.stopPropagation();
-          if (!confirm('Delete this project?')) return;
+          const proj = state.projects.find(p => p.id === el.dataset.deleteProject);
+          const reqCount = state.requirements.filter(r => r.project_id === el.dataset.deleteProject).length;
+          const name = proj?.name || el.dataset.deleteProject;
+          const warning = reqCount > 0 ? ' Delete all requirements first.' : '';
+          if (!confirm(`Delete project '${name}'? This project has ${reqCount} requirements.${warning}`)) return;
           await api(`/api/roadmap/projects/${el.dataset.deleteProject}`, { method: 'DELETE' });
           await loadData();
         };
@@ -612,7 +664,10 @@
       document.querySelectorAll('[data-delete-sprint]').forEach((el) => {
         el.onclick = async (e) => {
           e.stopPropagation();
-          if (!confirm('Delete this sprint?')) return;
+          const sprint = state.sprints.find(s => s.id === el.dataset.deleteSprint);
+          const reqCount = state.requirements.filter(r => r.sprint_id === el.dataset.deleteSprint).length;
+          const name = sprint?.name || el.dataset.deleteSprint;
+          if (!confirm(`Delete sprint '${name}'? ${reqCount} requirements are assigned to this sprint.`)) return;
           await api(`/api/roadmap/sprints/${el.dataset.deleteSprint}`, { method: 'DELETE' });
           await loadData();
         };
@@ -681,10 +736,73 @@
     async function deleteSelectedRequirement() {
       const req = state.selectedReq;
       if (!req) return;
-      if (!confirm(`Delete requirement ${req.code}?`)) return;
+      if (!confirm(`Delete requirement '${req.code} — ${req.title}'?`)) return;
       await api(`/api/roadmap/requirements/${req.id}`, { method: 'DELETE' });
       qs('drawer').classList.remove('open');
       state.selectedReq = null;
+      await loadData();
+    }
+
+    function openEditProject(projectId) {
+      const project = state.projects.find(p => p.id === projectId);
+      if (!project) return;
+      state.editKind = 'project';
+      state.editId = projectId;
+      qs('editTitle').textContent = 'Edit Project';
+      qs('editFields').innerHTML = `
+        <div class="grid2">
+          <div><label>Code</label><input id="eCode" value="${project.code || ''}" readonly /></div>
+          <div><label>Name</label><input id="eName" value="${project.name || ''}" /></div>
+          <div><label>Emoji</label><input id="eEmoji" value="${project.emoji || ''}" /></div>
+          <div><label>Version</label><input id="eVersion" value="${project.current_version || ''}" /></div>
+          <div><label>Status</label><select id="eStatus"><option value="active">active</option><option value="stable">stable</option><option value="paused">paused</option><option value="archived">archived</option></select></div>
+        </div>`;
+      qs('eStatus').value = project.status || 'active';
+      qs('editModal').classList.add('open');
+    }
+
+    function openEditSprint(sprintId) {
+      const sprint = state.sprints.find(s => s.id === sprintId);
+      if (!sprint) return;
+      state.editKind = 'sprint';
+      state.editId = sprintId;
+      qs('editTitle').textContent = 'Edit Sprint';
+      qs('editFields').innerHTML = `
+        <div class="grid2">
+          <div><label>Project</label><select id="eProject">${state.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select></div>
+          <div><label>Name</label><input id="eName" value="${sprint.name || ''}" /></div>
+          <div><label>Status</label><select id="eStatus"><option value="active">active</option><option value="planned">planned</option><option value="complete">complete</option></select></div>
+        </div>`;
+      qs('eProject').value = sprint.project_id || '';
+      qs('eStatus').value = sprint.status || 'planned';
+      qs('editModal').classList.add('open');
+    }
+
+    async function saveEdit() {
+      if (state.editKind === 'project' && state.editId) {
+        await api(`/api/roadmap/projects/${state.editId}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            name: qs('eName').value.trim(),
+            emoji: qs('eEmoji').value.trim() || null,
+            current_version: qs('eVersion').value.trim() || null,
+            status: qs('eStatus').value
+          })
+        });
+      }
+      if (state.editKind === 'sprint' && state.editId) {
+        await api(`/api/roadmap/sprints/${state.editId}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            project_id: qs('eProject').value || null,
+            name: qs('eName').value.trim(),
+            status: qs('eStatus').value
+          })
+        });
+      }
+      qs('editModal').classList.remove('open');
+      state.editKind = null;
+      state.editId = null;
       await loadData();
     }
 
@@ -713,6 +831,7 @@
         qs('addFields').innerHTML = `
           <div class="grid2">
             <div><label>Project</label><select id="aProject">${state.projects.map(p => `<option value="${p.id}" ${p.id === projectDefault ? 'selected' : ''}>${p.name}</option>`).join('')}</select></div>
+            <div><label>Sprint</label><select id="aSprint"><option value="">unassigned</option>${state.sprints.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select></div>
             <div><label>Code</label><input id="aCode" placeholder="MP-018" /></div>
             <div><label>Title</label><input id="aTitle" placeholder="Title" /></div>
             <div><label>Priority</label><select id="aPriority"><option>P1</option><option selected>P2</option><option>P3</option></select></div>
@@ -727,42 +846,49 @@
 
     async function saveAdd() {
       const kind = state.addKind;
-      if (kind === 'project') {
-        await api('/api/roadmap/projects', {
-          method: 'POST',
-          body: JSON.stringify({
-            id: makeId(),
-            code: qs('aCode').value.trim().toUpperCase(),
-            name: qs('aName').value.trim(),
-            emoji: qs('aEmoji').value.trim() || null,
-            current_version: qs('aVersion').value.trim() || null,
-            status: 'active'
-          })
-        });
-      } else if (kind === 'sprint') {
-        await api('/api/roadmap/sprints', {
-          method: 'POST',
-          body: JSON.stringify({
-            id: makeId(),
-            project_id: qs('aProject').value,
-            name: qs('aName').value.trim(),
-            status: qs('aStatus').value
-          })
-        });
-      } else {
-        await api('/api/roadmap/requirements', {
-          method: 'POST',
-          body: JSON.stringify({
-            id: makeId(),
-            project_id: qs('aProject').value,
-            code: qs('aCode').value.trim().toUpperCase(),
-            title: qs('aTitle').value.trim(),
-            description: qs('aDescription').value,
-            type: qs('aType').value,
-            priority: qs('aPriority').value,
-            status: qs('aStatus').value
-          })
-        });
+      try {
+        if (kind === 'project') {
+          await api('/api/roadmap/projects', {
+            method: 'POST',
+            body: JSON.stringify({
+              id: makeId(),
+              code: qs('aCode').value.trim().toUpperCase(),
+              name: qs('aName').value.trim(),
+              emoji: qs('aEmoji').value.trim() || null,
+              current_version: qs('aVersion').value.trim() || null,
+              status: 'active'
+            })
+          });
+        } else if (kind === 'sprint') {
+          await api('/api/roadmap/sprints', {
+            method: 'POST',
+            body: JSON.stringify({
+              id: makeId(),
+              project_id: qs('aProject').value,
+              name: qs('aName').value.trim(),
+              status: qs('aStatus').value
+            })
+          });
+        } else {
+          await api('/api/roadmap/requirements', {
+            method: 'POST',
+            body: JSON.stringify({
+              id: makeId(),
+              project_id: qs('aProject').value,
+              sprint_id: qs('aSprint').value || null,
+              code: qs('aCode').value.trim().toUpperCase(),
+              title: qs('aTitle').value.trim(),
+              description: qs('aDescription').value,
+              type: qs('aType').value,
+              priority: qs('aPriority').value,
+              status: qs('aStatus').value
+            })
+          });
+        }
+      } catch (err) {
+        const code = qs('aCode') ? qs('aCode').value.trim().toUpperCase() : '';
+        alert(friendlyCreateError(kind, err?.message || '', code));
+        return;
       }
 
       qs('addModal').classList.remove('open');
@@ -838,6 +964,13 @@
 
       qs('addClose').onclick = () => qs('addModal').classList.remove('open');
       qs('addSave').onclick = () => saveAdd().catch(err => alert(err.message));
+
+      qs('editClose').onclick = () => {
+        qs('editModal').classList.remove('open');
+        state.editKind = null;
+        state.editId = null;
+      };
+      qs('editSave').onclick = () => saveEdit().catch(err => alert(err.message));
 
       qs('expandAllBtn').onclick = () => {
         state.expanded = new Set(getFilteredRequirements().map((r) => r.project_id));

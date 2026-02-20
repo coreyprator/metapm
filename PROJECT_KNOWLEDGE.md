@@ -1,9 +1,21 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-20 — Sprint "MP-024 CRUD Fix + Housekeeping" (v2.3.2 in progress)
+Updated: 2026-02-20 — Sprint "MP-025 Dashboard Polish + Roadmap Report" (v2.3.3 in progress)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-02-20 (MP-024)
+### Latest Session Update — 2026-02-20 (MP-025)
+
+- Added project/sprint edit affordances with ✏️ icons and edit modal flows (pre-populate + PUT + refresh).
+- Standardized requirement edit affordance to ✏️ for icon consistency across entities.
+- Improved delete confirmations to include entity names/codes and dependency counts for projects/sprints.
+- Added duplicate-code friendly error handling for create flows to avoid exposing raw SQL uniqueness errors.
+- Added sprint selector to Add Requirement modal with `unassigned` option.
+- Added auto-generated portfolio report page at `/static/roadmap-report.html` fed by `/api/roadmap/export`, defaulting to Not Done view with All toggle and print CSS.
+- Re-ran SF housekeeping for MP-025:
+  - SF-015 assignment succeeded (1 row updated)
+  - SF-016 already present (0 rows inserted)
+
+### Prior Session Update — 2026-02-20 (MP-024)
 
 - Dashboard CRUD rendering fixed for Add Project/Add Sprint by always rendering project containers and sprint rows even when requirement lists are empty.
 - Dashboard polish shipped: reset filters control, project count in summary, Open P1 count, explicit delete icons for project/sprint/requirement rows, and delete action in requirement drawer with confirmations.
@@ -23,7 +35,7 @@ Purpose: Canonical reference for all AI sessions working on this project.
 **Repository**: github.com/coreyprator/metapm
 **Custom Domain**: https://metapm.rentyourcio.com
 **Cloud Run URL**: https://metapm-67661554310.us-central1.run.app (legacy; use custom domain)
-**Current Version**: v2.3.2 (per `app/core/config.py` line 15)
+**Current Version**: v2.3.3 (per `app/core/config.py` line 15)
 **Latest Known Revision**: metapm-v2-00080-22r _(Source: SESSION_CLOSEOUT_2026-02-19_MP022.md — deployed 2026-02-19)_
 **Owner**: Corey Prator
 

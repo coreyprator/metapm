@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MetaPM Roadmap Report</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #111a2d;
+      --panel-soft: #0f1729;
+      --text: #e6edf8;
+      --muted: #9aa8c7;
+      --line: #26344f;
+      --p1: #ff9a9a;
+      --p2: #ffd18a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .app {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 16px 16px 82px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      margin-bottom: 10px;
+    }
+    .title { font-size: 22px; font-weight: 700; }
+    .controls { display: flex; align-items: center; gap: 10px; }
+    button {
+      border: 1px solid var(--line);
+      background: var(--panel-soft);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 10px;
+      cursor: pointer;
+    }
+    button.active {
+      border-color: #4a90d9;
+      color: #9ec2ff;
+    }
+    .project {
+      margin-bottom: 10px;
+      padding: 10px;
+    }
+    .project-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .project-name { font-size: 18px; font-weight: 700; }
+    .project-stats { color: var(--muted); font-size: 13px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px;
+      vertical-align: top;
+    }
+    th {
+      background: var(--panel-soft);
+      text-align: left;
+      position: sticky;
+      top: 58px;
+      z-index: 5;
+    }
+    .priority-P1 { color: var(--p1); }
+    .priority-P2 { color: var(--p2); }
+    .muted { color: var(--muted); }
+    .summary {
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      bottom: 8px;
+      max-width: 1400px;
+      margin-left: auto;
+      margin-right: auto;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      z-index: 12;
+    }
+    @media print {
+      body { background: white; color: black; }
+      .header, .summary { position: static; }
+      .card, th, td { border-color: #bbb; background: white; color: black; }
+      .app { padding: 0; max-width: none; }
+      button { display: none; }
+      th { position: static; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="card header">
+      <div class="title">📊 Portfolio Roadmap Report</div>
+      <div class="controls">
+        <button id="showNotDoneBtn" class="active">Not Done</button>
+        <button id="showAllBtn">All</button>
+      </div>
+    </div>
+    <div id="content"></div>
+    <div class="card summary" id="summary">
+      <div>Total: 0 | Done: 0 | In Progress: 0 | Backlog: 0 | Open P1s: 0 | Projects: 0</div>
+    </div>
+  </div>
+
+  <script>
+    const state = { showAll: false, data: null };
+
+    function priorityWeight(priority) {
+      const w = { P1: 1, P2: 2, P3: 3 };
+      return w[priority] || 9;
+    }
+
+    function reqSorter(a, b) {
+      return priorityWeight(a.priority) - priorityWeight(b.priority) || String(a.code || '').localeCompare(String(b.code || ''));
+    }
+
+    function computeSummary(projects) {
+      const allReqs = projects.flatMap(p => p.requirements || []);
+      const total = allReqs.length;
+      const done = allReqs.filter(r => r.status === 'done').length;
+      const inProgress = allReqs.filter(r => r.status === 'in_progress').length;
+      const backlog = allReqs.filter(r => r.status === 'backlog').length;
+      const openP1 = allReqs.filter(r => r.priority === 'P1' && r.status !== 'done').length;
+      return { total, done, inProgress, backlog, openP1, projects: projects.length };
+    }
+
+    function render() {
+      if (!state.data) return;
+      const content = document.getElementById('content');
+      content.innerHTML = '';
+
+      const projects = [...(state.data.projects || [])].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+
+      for (const project of projects) {
+        let reqs = [...(project.requirements || [])].sort(reqSorter);
+        if (!state.showAll) reqs = reqs.filter(r => r.status !== 'done');
+
+        const openCount = reqs.filter(r => r.status !== 'done').length;
+        const doneCount = (project.requirements || []).filter(r => r.status === 'done').length;
+        const p1Count = reqs.filter(r => r.priority === 'P1' && r.status !== 'done').length;
+
+        const rows = reqs.map(r => `
+          <tr>
+            <td>${r.code || ''}</td>
+            <td class="priority-${r.priority || ''}">${r.priority || ''}</td>
+            <td>${r.status || ''}</td>
+            <td>${r.title || ''}</td>
+            <td>${(r.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+          </tr>
+        `).join('') || '<tr><td colspan="5" class="muted">No items for current filter.</td></tr>';
+
+        const section = document.createElement('section');
+        section.className = 'card project';
+        section.innerHTML = `
+          <div class="project-head">
+            <div class="project-name">${project.emoji || ''} ${project.name || ''} ${project.current_version || ''}</div>
+            <div class="project-stats">Open: ${openCount} | Done: ${doneCount} | P1: ${p1Count}</div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width:100px">Code</th>
+                <th style="width:80px">Priority</th>
+                <th style="width:120px">Status</th>
+                <th style="width:280px">Title</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `;
+        content.appendChild(section);
+      }
+
+      const summary = computeSummary(projects);
+      document.getElementById('summary').children[0].textContent = `Total: ${summary.total} | Done: ${summary.done} | In Progress: ${summary.inProgress} | Backlog: ${summary.backlog} | Open P1s: ${summary.openP1} | Projects: ${summary.projects}`;
+    }
+
+    async function load() {
+      const res = await fetch('/api/roadmap/export');
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      state.data = await res.json();
+      render();
+    }
+
+    document.getElementById('showNotDoneBtn').onclick = () => {
+      state.showAll = false;
+      document.getElementById('showNotDoneBtn').classList.add('active');
+      document.getElementById('showAllBtn').classList.remove('active');
+      render();
+    };
+
+    document.getElementById('showAllBtn').onclick = () => {
+      state.showAll = true;
+      document.getElementById('showAllBtn').classList.add('active');
+      document.getElementById('showNotDoneBtn').classList.remove('active');
+      render();
+    };
+
+    load().catch((err) => {
+      document.getElementById('content').innerHTML = `<div class="card project" style="color:#ff9a9a">Failed to load report: ${err.message}</div>`;
+    });
+  </script>
+</body>
+</html>

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.3.2"  # MP-024 CRUD rendering + dashboard polish + housekeeping
+    VERSION: str = "2.3.3"  # MP-025 edit/delete polish + roadmap report + housekeeping
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
