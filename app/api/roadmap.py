@@ -21,6 +21,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _project_done_counts() -> dict:
+    rows = execute_query("""
+        SELECT project_id,
+               COUNT(*) as total_count,
+               SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as done_count
+        FROM roadmap_requirements
+        GROUP BY project_id
+    """, fetch="all") or []
+    return {
+        row['project_id']: {
+            'total': int(row.get('total_count') or 0),
+            'done': int(row.get('done_count') or 0),
+        }
+        for row in rows
+    }
+
+
 # ============================================
 # PROJECT ENDPOINTS
 # ============================================
@@ -178,21 +195,29 @@ async def update_project(project_id: str, update: ProjectUpdate):
 @router.delete("/projects/{project_id}", status_code=204)
 @router.delete("/roadmap/projects/{project_id}", status_code=204)
 async def delete_project(project_id: str):
-    """Delete a project. Fails if project has requirements (FK constraint)."""
+    """Delete a project only if it has no linked requirements."""
     try:
-        reqs = execute_query(
-            "SELECT COUNT(*) as cnt FROM roadmap_requirements WHERE project_id = ?",
-            (project_id,), fetch="one"
+        project = execute_query(
+            "SELECT id FROM roadmap_projects WHERE id = ?",
+            (project_id,),
+            fetch="one"
         )
-        if reqs and reqs['cnt'] > 0:
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        linked = execute_query(
+            "SELECT COUNT(*) as cnt FROM roadmap_requirements WHERE project_id = ?",
+            (project_id,),
+            fetch="one"
+        )
+        linked_count = int((linked or {}).get('cnt') or 0)
+        if linked_count > 0:
             raise HTTPException(
                 status_code=409,
-                detail=f"Cannot delete project with {reqs['cnt']} requirements. Delete requirements first."
+                detail=f"Cannot delete project with {linked_count} requirements. Delete requirements first."
             )
-        execute_query(
-            "DELETE FROM roadmap_projects WHERE id = ?",
-            (project_id,), fetch="none"
-        )
+
+        execute_query("DELETE FROM roadmap_projects WHERE id = ?", (project_id,), fetch="none")
     except HTTPException:
         raise
     except Exception as e:
@@ -354,12 +379,24 @@ async def update_sprint(sprint_id: str, update: SprintUpdate):
 @router.delete("/sprints/{sprint_id}", status_code=204)
 @router.delete("/roadmap/sprints/{sprint_id}", status_code=204)
 async def delete_sprint(sprint_id: str):
-    """Delete a sprint."""
+    """Delete a sprint and unassign linked requirements first."""
     try:
-        execute_query(
-            "DELETE FROM roadmap_sprints WHERE id = ?",
-            (sprint_id,), fetch="none"
+        sprint = execute_query(
+            "SELECT id FROM roadmap_sprints WHERE id = ?",
+            (sprint_id,),
+            fetch="one"
         )
+        if not sprint:
+            raise HTTPException(status_code=404, detail="Sprint not found")
+
+        execute_query(
+            "UPDATE roadmap_requirements SET sprint_id = NULL, updated_at = GETDATE() WHERE sprint_id = ?",
+            (sprint_id,),
+            fetch="none"
+        )
+        execute_query("DELETE FROM roadmap_sprints WHERE id = ?", (sprint_id,), fetch="none")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error deleting sprint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -735,6 +772,109 @@ async def get_roadmap(
         return RoadmapResponse(projects=roadmap_items, stats=stats)
     except Exception as e:
         logger.error(f"Error getting roadmap: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/roadmap/export")
+async def export_roadmap():
+    """Export full roadmap with projects, requirements, sprints, and aggregate stats."""
+    try:
+        projects = execute_query("""
+            SELECT id, code, name, emoji, status, current_version, deploy_url
+            FROM roadmap_projects
+            ORDER BY name
+        """, fetch="all") or []
+
+        sprints = execute_query("""
+            SELECT id, project_id, name, description, status, start_date, end_date, created_at
+            FROM roadmap_sprints
+            ORDER BY created_at DESC
+        """, fetch="all") or []
+
+        requirements = execute_query("""
+            SELECT id, project_id, code, title, description, type, priority, status,
+                   target_version, sprint_id, created_at, updated_at
+            FROM roadmap_requirements
+            ORDER BY code
+        """, fetch="all") or []
+
+        sprint_by_id = {s['id']: s for s in sprints}
+        counts_by_project = _project_done_counts()
+
+        projects_out = []
+        for p in projects:
+            reqs_for_project = [r for r in requirements if r['project_id'] == p['id']]
+            reqs_out = []
+            for r in reqs_for_project:
+                s = sprint_by_id.get(r.get('sprint_id')) if r.get('sprint_id') else None
+                reqs_out.append({
+                    "id": r['id'],
+                    "code": r['code'],
+                    "title": r['title'],
+                    "description": r.get('description'),
+                    "type": r.get('type'),
+                    "priority": r.get('priority'),
+                    "status": r.get('status'),
+                    "target_version": r.get('target_version'),
+                    "sprint_id": r.get('sprint_id'),
+                    "sprint_name": s.get('name') if s else None,
+                    "created_at": r.get('created_at'),
+                    "updated_at": r.get('updated_at'),
+                })
+
+            counts = counts_by_project.get(p['id'], {'total': 0, 'done': 0})
+            projects_out.append({
+                "id": p['id'],
+                "code": p.get('code'),
+                "name": p.get('name'),
+                "emoji": p.get('emoji'),
+                "status": p.get('status'),
+                "current_version": p.get('current_version'),
+                "deploy_url": p.get('deploy_url'),
+                "requirement_count": counts['total'],
+                "done_count": counts['done'],
+                "requirements": reqs_out,
+            })
+
+        stats_row = execute_query("""
+            SELECT
+                COUNT(*) as total_requirements,
+                SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as done,
+                SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
+                SUM(CASE WHEN status = 'backlog' THEN 1 ELSE 0 END) as backlog,
+                SUM(CASE WHEN type = 'bug' THEN 1 ELSE 0 END) as bugs,
+                SUM(CASE WHEN type = 'feature' THEN 1 ELSE 0 END) as features,
+                SUM(CASE WHEN type = 'task' THEN 1 ELSE 0 END) as tasks
+            FROM roadmap_requirements
+        """, fetch="one") or {}
+
+        return {
+            "projects": projects_out,
+            "stats": {
+                "total_requirements": int(stats_row.get('total_requirements') or 0),
+                "done": int(stats_row.get('done') or 0),
+                "in_progress": int(stats_row.get('in_progress') or 0),
+                "backlog": int(stats_row.get('backlog') or 0),
+                "bugs": int(stats_row.get('bugs') or 0),
+                "features": int(stats_row.get('features') or 0),
+                "tasks": int(stats_row.get('tasks') or 0),
+            },
+            "sprints": [
+                {
+                    "id": s.get('id'),
+                    "project_id": s.get('project_id'),
+                    "name": s.get('name'),
+                    "description": s.get('description'),
+                    "status": s.get('status'),
+                    "start_date": s.get('start_date'),
+                    "end_date": s.get('end_date'),
+                    "created_at": s.get('created_at'),
+                }
+                for s in sprints
+            ],
+        }
+    except Exception as e:
+        logger.error(f"Error exporting roadmap: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

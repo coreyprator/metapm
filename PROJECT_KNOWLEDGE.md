@@ -1,6 +1,6 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-19 — Sprint "MP-022 Full CRUD + Search" close-out (v2.3.0 deployed)
+Updated: 2026-02-20 — Sprint "MP-023 Roadmap API + Dashboard Fixes" (v2.3.1 in progress)
 Purpose: Canonical reference for all AI sessions working on this project.
 
 ---
@@ -12,7 +12,7 @@ Purpose: Canonical reference for all AI sessions working on this project.
 **Repository**: github.com/coreyprator/metapm
 **Custom Domain**: https://metapm.rentyourcio.com
 **Cloud Run URL**: https://metapm-67661554310.us-central1.run.app (legacy; use custom domain)
-**Current Version**: v2.3.0 (per `app/core/config.py` line 15)
+**Current Version**: v2.3.1 (per `app/core/config.py` line 15)
 **Latest Known Revision**: metapm-v2-00080-22r _(Source: SESSION_CLOSEOUT_2026-02-19_MP022.md — deployed 2026-02-19)_
 **Owner**: Corey Prator
 
@@ -211,6 +211,7 @@ Sources: `scripts/schema.sql`, `scripts/backlog_schema.sql`, `app/core/migration
 **UAT** (`/mcp/handoffs/{id}/uat`, `/mcp/uat/submit`, `/mcp/uat/direct-submit`, `/mcp/uat/latest`, `/mcp/uat/list`, `/mcp/uat/results`, `/mcp/uat/results/{id}`, `/mcp/uat/{id}`)
 **Roadmap** (`/api/projects`, `/api/sprints`, `/api/requirements`, `/api/roadmap`, `/api/roadmap/seed`)
 **Roadmap (New 2026-02-18)**: GET /api/roadmap/projects, GET /api/roadmap/requirements, GET /api/requirements?limit=N, POST /api/requirements, PATCH /api/requirements/:id, PUT /api/requirements/:id
+**Roadmap Export (New 2026-02-20)**: GET /api/roadmap/export (public JSON snapshot with projects, nested requirements, sprints, and aggregate stats)
 **UAT Submit (New 2026-02-18)**: POST /api/uat/submit (project derived from linked_requirements, 201 Created confirmed)
 **Handoff Lifecycle** (`/api/handoffs`, `/api/handoffs/{id}`, `/api/handoffs/{id}/status`, `/api/handoffs/{id}/complete`, `/api/roadmap/{id}/handoffs`)
 **Conductor** (`/api/conductor/update`, `/api/conductor/dispatch`, `/api/conductor/status`, `/api/conductor/inbox`)
@@ -279,6 +280,13 @@ Source: `static/` directory listing, `static/manifest.json`, `static/sw.js`
   - **Requirement code badge (MP-022c — v2.3.0)**: `data-searchable` on all rows. Code already shown as `<strong>` badge (v2.2.2).
   - /roadmap.html is now a redirect to dashboard.html
 - **CORS Fix (2026-02-19)**: `app/main.py` now allows `GET, POST, PUT, PATCH, DELETE, OPTIONS` — was missing PUT, PATCH, DELETE which blocked edit/delete from cross-origin contexts
+- **MP-023 API + Dashboard Fixes (2026-02-20, v2.3.1)**:
+  - Public roadmap export endpoint: `GET /api/roadmap/export` (all projects + nested requirements + sprints + stats)
+  - Roadmap delete endpoints: `DELETE /api/roadmap/projects/{id}` (409 guard if requirements exist), `DELETE /api/roadmap/sprints/{id}` (unassigns linked requirements first)
+  - Sprint create ID fix in dashboard (`crypto.randomUUID()` UUID-only IDs)
+  - Requirement drawer save/close lifecycle fixed (no stale reopen behavior)
+  - Dashboard UX updates: sticky header/footer, independent content scroll, Enter-to-research behavior, and `Not Done` status preset
+  - Status cleanup applied: MP-018/019/020/021 set to `done`
 - **Requirements — 80 seeded (MP-002 — Complete)**: 79 from Portfolio Vision Framework v3 + MP-018 added by CAI
   - All 80 have descriptions in PL's voice (loaded from canonical seed file `metapm_descriptions_seed.json`)
   - Roadmap requirements for MetaPM project (proj-mp): 21 total (MP-001 through MP-021)
