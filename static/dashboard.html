@@ -265,6 +265,8 @@
         </div>
         <select id="sortBy"><option value="priority">Priority</option><option value="code">Code</option><option value="title">Title</option></select>
         <select id="groupBy"><option value="project">By Project</option></select>
+        <button id="expandAllBtn" type="button">Expand All</button>
+        <button id="collapseAllBtn" type="button">Collapse All</button>
       </div>
     </div>
 
@@ -712,6 +714,15 @@
 
       qs('addClose').onclick = () => qs('addModal').classList.remove('open');
       qs('addSave').onclick = () => saveAdd().catch(err => alert(err.message));
+
+      qs('expandAllBtn').onclick = () => {
+        state.expanded = new Set(getFilteredRequirements().map((r) => r.project_id));
+        render();
+      };
+      qs('collapseAllBtn').onclick = () => {
+        state.expanded.clear();
+        render();
+      };
 
       document.addEventListener('click', (e) => {
         if (!e.target.closest('.add-wrap')) qs('addMenu').classList.remove('open');
