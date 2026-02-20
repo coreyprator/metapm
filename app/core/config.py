@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.3.1"  # MP-023 roadmap export + dashboard/API fix sprint
+    VERSION: str = "2.3.2"  # MP-024 CRUD rendering + dashboard polish + housekeeping
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

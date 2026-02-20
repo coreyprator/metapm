@@ -165,6 +165,17 @@
       cursor: pointer;
     }
     .req-row:hover { background: #13203a; }
+    .sprint-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      margin-bottom: 6px;
+      background: #0f182b;
+    }
     .pill { font-size: 11px; border-radius: 999px; padding: 2px 8px; border: 1px solid var(--line); color: var(--muted); }
     .p1 { color: #ff9a9a; border-color: #803c3c; }
     .p2 { color: #ffd18a; border-color: #7a5a2f; }
@@ -229,6 +240,23 @@
       padding: 14px;
     }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .danger-btn {
+      border-color: #803c3c;
+      color: #ff9a9a;
+    }
+    .danger-btn.active {
+      background: #2b1414;
+    }
+    .icon-btn {
+      min-width: 32px;
+      padding: 4px 8px;
+      line-height: 1;
+    }
+    .actions-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
   </style>
 </head>
 <body>
@@ -256,6 +284,7 @@
         <select id="projectFilter"><option value="">All Projects</option></select>
         <select id="priorityFilter"><option value="">All Priorities</option><option>P1</option><option>P2</option><option>P3</option></select>
         <select id="statusFilter"><option value="">All Status</option><option value="not_done">Not Done</option><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="done">done</option></select>
+        <button id="resetFiltersBtn" type="button" class="danger-btn">Reset Filters</button>
       </div>
       <div class="control-row">
         <label>Sort/Group</label>
@@ -273,8 +302,8 @@
     <div class="card hierarchy" id="hierarchy"></div>
 
     <div class="card footer" id="summary">
-      <div>Total: 0 | Done: 0 | In Progress: 0 | Backlog: 0</div>
-      <div id="nextP1">Next P1: -</div>
+      <div>Total: 0 | Done: 0 | In Progress: 0 | Backlog: 0 | Projects: 0</div>
+      <div id="openP1">Open P1s: 0</div>
     </div>
   </div>
 
@@ -283,6 +312,7 @@
       <strong id="drawerTitle">Requirement</strong>
       <div>
         <button id="saveBtn">Save</button>
+        <button id="deleteReqBtn" class="danger-btn icon-btn" title="Delete Requirement">🗑️</button>
         <button id="closeBtn">Close</button>
       </div>
     </div>
@@ -395,6 +425,19 @@
 
     function normalizeReqText(req) { return `${req.code} ${req.title}`.toLowerCase(); }
 
+    function filtersActive() {
+      return Boolean(
+        qs('projectFilter').value ||
+        qs('priorityFilter').value ||
+        qs('statusFilter').value ||
+        (qs('searchInput').value || '').trim()
+      );
+    }
+
+    function updateResetButtonState() {
+      qs('resetFiltersBtn').classList.toggle('active', filtersActive());
+    }
+
     function getFilteredRequirements() {
       const project = qs('projectFilter').value;
       const priority = qs('priorityFilter').value;
@@ -428,9 +471,10 @@
       const done = reqs.filter(r => r.status === 'done').length;
       const inProgress = reqs.filter(r => r.status === 'in_progress').length;
       const backlog = reqs.filter(r => r.status === 'backlog').length;
-      qs('summary').children[0].textContent = `Total: ${total} | Done: ${done} | In Progress: ${inProgress} | Backlog: ${backlog}`;
-      const nextP1 = reqs.filter(r => r.priority === 'P1' && r.status !== 'done').sort(compareReq)[0];
-      qs('nextP1').textContent = `Next P1: ${nextP1 ? `${nextP1.code} (${projectName(nextP1.project_id)})` : '-'}`;
+      const projectCount = state.projects.length;
+      const openP1 = reqs.filter(r => r.priority === 'P1' && r.status !== 'done').length;
+      qs('summary').children[0].textContent = `Total: ${total} | Done: ${done} | In Progress: ${inProgress} | Backlog: ${backlog} | Projects: ${projectCount}`;
+      qs('openP1').textContent = `Open P1s: ${openP1}`;
     }
 
     function projectName(id) {
@@ -464,7 +508,18 @@
         <span class="pill ${req.priority.toLowerCase()}">${req.priority}</span>
         <span class="pill status-${req.status}">${req.status}</span>
         <span class="pill">${req.type}</span>
-        <span>▸</span>
+        <div class="actions-row">
+          <button class="icon-btn" data-open-req="${req.id}" title="Open Requirement">▸</button>
+          <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete Requirement">🗑️</button>
+        </div>
+      </div>`;
+    }
+
+    function sprintRowHtml(sprint, projectReqs) {
+      const count = projectReqs.filter(r => r.sprint_id === sprint.id && r.status !== 'done').length;
+      return `<div class="sprint-row">
+        <div><strong>${sprint.name}</strong> <span class="project-summary">(${count} active items)</span></div>
+        <button class="icon-btn danger-btn" data-delete-sprint="${sprint.id}" title="Delete Sprint">🗑️</button>
       </div>`;
     }
 
@@ -475,26 +530,31 @@
 
       for (const p of state.projects) {
         const pReqs = reqs.filter(r => r.project_id === p.id);
-        if (!pReqs.length) continue;
 
         const done = pReqs.filter(r => r.status === 'done').length;
         const p1 = pReqs.filter(r => r.priority === 'P1').length;
         const p2 = pReqs.filter(r => r.priority === 'P2').length;
         const open = state.expanded.has(p.id);
         const color = PROJECT_COLORS[p.code] || p.color || '#4A90D9';
+        const projectSprints = state.sprints.filter(s => !s.project_id || s.project_id === p.id);
 
         const buckets = groupedForProject(p.id, reqs);
+        const sprintRows = projectSprints.map((s) => sprintRowHtml(s, pReqs)).join('') || '<div class="project-summary">None</div>';
         const sprintBlocks = Object.keys(buckets.sprint).map((sid) => `
           <div class="bucket"><div class="bucket-title">Sprint: ${sprintName(sid)}</div>${buckets.sprint[sid].map(rowHtml).join('')}</div>
         `).join('');
 
         const html = `
           <section class="project" style="border-left-color:${color}">
-            <div class="project-head" data-project="${p.id}">
-              <div>${open ? '▼' : '▶'} ${p.emoji || ''} ${p.name} ${p.current_version || ''}</div>
-              <div class="project-summary">${done} done | ${p1} P1 | ${p2} P2</div>
+            <div class="project-head">
+              <div data-project="${p.id}">${open ? '▼' : '▶'} ${p.emoji || ''} ${p.name} ${p.current_version || ''}</div>
+              <div class="actions-row">
+                <div class="project-summary">${done} done | ${p1} P1 | ${p2} P2</div>
+                <button class="icon-btn danger-btn" data-delete-project="${p.id}" title="Delete Project">🗑️</button>
+              </div>
             </div>
             <div class="project-body ${open ? 'open' : ''}">
+              <div class="bucket"><div class="bucket-title">Sprints</div>${sprintRows}</div>
               ${sprintBlocks}
               <div class="bucket"><div class="bucket-title">Backlog (unassigned)</div>${buckets.backlog.map(rowHtml).join('') || '<div class="project-summary">None</div>'}</div>
               <div class="bucket"><div class="bucket-title">Done</div>${buckets.done.map(rowHtml).join('') || '<div class="project-summary">None</div>'}</div>
@@ -506,6 +566,7 @@
 
       if (!hierarchy.children.length) hierarchy.innerHTML = '<div class="project-summary">No matching requirements.</div>';
       setSummary(reqs);
+      updateResetButtonState();
       bindHierarchyEvents();
     }
 
@@ -519,8 +580,42 @@
         };
       });
 
-      document.querySelectorAll('[data-req]').forEach((el) => {
-        el.onclick = () => openRequirement(el.dataset.req);
+      document.querySelectorAll('[data-open-req]').forEach((el) => {
+        el.onclick = (e) => {
+          e.stopPropagation();
+          openRequirement(el.dataset.openReq);
+        };
+      });
+
+      document.querySelectorAll('[data-delete-req]').forEach((el) => {
+        el.onclick = async (e) => {
+          e.stopPropagation();
+          if (!confirm('Delete this requirement?')) return;
+          await api(`/api/roadmap/requirements/${el.dataset.deleteReq}`, { method: 'DELETE' });
+          if (state.selectedReq?.id === el.dataset.deleteReq) {
+            state.selectedReq = null;
+            qs('drawer').classList.remove('open');
+          }
+          await loadData();
+        };
+      });
+
+      document.querySelectorAll('[data-delete-project]').forEach((el) => {
+        el.onclick = async (e) => {
+          e.stopPropagation();
+          if (!confirm('Delete this project?')) return;
+          await api(`/api/roadmap/projects/${el.dataset.deleteProject}`, { method: 'DELETE' });
+          await loadData();
+        };
+      });
+
+      document.querySelectorAll('[data-delete-sprint]').forEach((el) => {
+        el.onclick = async (e) => {
+          e.stopPropagation();
+          if (!confirm('Delete this sprint?')) return;
+          await api(`/api/roadmap/sprints/${el.dataset.deleteSprint}`, { method: 'DELETE' });
+          await loadData();
+        };
       });
     }
 
@@ -578,6 +673,16 @@
       };
 
       await api(`/api/roadmap/requirements/${req.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      qs('drawer').classList.remove('open');
+      state.selectedReq = null;
+      await loadData();
+    }
+
+    async function deleteSelectedRequirement() {
+      const req = state.selectedReq;
+      if (!req) return;
+      if (!confirm(`Delete requirement ${req.code}?`)) return;
+      await api(`/api/roadmap/requirements/${req.id}`, { method: 'DELETE' });
       qs('drawer').classList.remove('open');
       state.selectedReq = null;
       await loadData();
@@ -661,6 +766,9 @@
       }
 
       qs('addModal').classList.remove('open');
+      if (kind === 'project') {
+        qs('projectFilter').value = '';
+      }
       await loadData();
     }
 
@@ -689,9 +797,15 @@
 
     function bindControls() {
       ['projectFilter', 'priorityFilter', 'statusFilter', 'sortBy', 'groupBy'].forEach((id) => {
-        qs(id).onchange = () => render();
+        qs(id).onchange = () => {
+          updateResetButtonState();
+          render();
+        };
       });
-      qs('searchInput').addEventListener('input', () => render());
+      qs('searchInput').addEventListener('input', () => {
+        updateResetButtonState();
+        render();
+      });
       qs('searchInput').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
@@ -703,6 +817,16 @@
         state.selectedReq = null;
       };
       qs('saveBtn').onclick = () => saveRequirement().catch(err => alert(err.message));
+      qs('deleteReqBtn').onclick = () => deleteSelectedRequirement().catch(err => alert(err.message));
+
+      qs('resetFiltersBtn').onclick = () => {
+        qs('projectFilter').value = '';
+        qs('priorityFilter').value = '';
+        qs('statusFilter').value = '';
+        qs('searchInput').value = '';
+        updateResetButtonState();
+        render();
+      };
 
       qs('addBtn').onclick = () => qs('addMenu').classList.toggle('open');
       qs('addMenu').onclick = (e) => {

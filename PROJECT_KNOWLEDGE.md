@@ -1,7 +1,18 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-20 — Sprint "MP-023 Roadmap API + Dashboard Fixes" (v2.3.1 in progress)
+Updated: 2026-02-20 — Sprint "MP-024 CRUD Fix + Housekeeping" (v2.3.2 in progress)
 Purpose: Canonical reference for all AI sessions working on this project.
+
+### Latest Session Update — 2026-02-20 (MP-024)
+
+- Dashboard CRUD rendering fixed for Add Project/Add Sprint by always rendering project containers and sprint rows even when requirement lists are empty.
+- Dashboard polish shipped: reset filters control, project count in summary, Open P1 count, explicit delete icons for project/sprint/requirement rows, and delete action in requirement drawer with confirmations.
+- Housekeeping SQL applied for roadmap requirements:
+  - Status done enforced: AF-004, AF-015, MP-004, MP-005, MP-006.
+  - AF-011 description updated for provider-agnostic video architecture.
+  - SF-016 inserted: "Add gender articles to French/Spanish/Portuguese nouns".
+  - SF-015 assignment update returned 0 rows (no null-code match found during this run).
+- Export endpoint JSON validated in production and spot-checked with special-character descriptions.
 
 ---
 
@@ -12,7 +23,7 @@ Purpose: Canonical reference for all AI sessions working on this project.
 **Repository**: github.com/coreyprator/metapm
 **Custom Domain**: https://metapm.rentyourcio.com
 **Cloud Run URL**: https://metapm-67661554310.us-central1.run.app (legacy; use custom domain)
-**Current Version**: v2.3.1 (per `app/core/config.py` line 15)
+**Current Version**: v2.3.2 (per `app/core/config.py` line 15)
 **Latest Known Revision**: metapm-v2-00080-22r _(Source: SESSION_CLOSEOUT_2026-02-19_MP022.md — deployed 2026-02-19)_
 **Owner**: Corey Prator
 
