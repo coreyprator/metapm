@@ -1,0 +1,123 @@
+{
+  "uat_version": "2.2",
+  "generated_by": "cc",
+  "generated_at": "2026-02-21T00:00:00Z",
+  "handoff_id": "HO-MP09",
+  "project": {
+    "name": "MetaPM",
+    "emoji": "🔴",
+    "version": "2.3.5",
+    "app_url": "https://metapm.rentyourcio.com",
+    "health_url": "https://metapm-v2-57478301787.us-central1.run.app/health",
+    "deployed_revision": "metapm-v2-00088-4rb"
+  },
+  "context": {
+    "summary": "Architecture diagram v4.0 committed to project-methodology repo, uploaded to GCS at stable URL, and MetaPM /architecture redirect + dashboard button deployed.",
+    "root_cause": "N/A — feature sprint",
+    "files_modified": [
+      "docs/architecture/Development_System_Architecture_v4.html",
+      "docs/architecture/Development_System_Architecture.html",
+      "templates/CC_Bootstrap_v1.md",
+      "app/main.py",
+      "static/dashboard.html",
+      "app/core/config.py"
+    ],
+    "commit": "2b8d380 (project-methodology), 7ea33c6 (MetaPM feature), 84b903b (MetaPM PK close-out)",
+    "risk_areas": [
+      "GCS file visibility — bucket must be publicly readable for redirect to work",
+      "Dashboard button opens /architecture which 302s to GCS; if GCS perms change, diagram goes blank"
+    ]
+  },
+  "sections": [
+    {
+      "id": "section-1",
+      "title": "GCS Upload Verification",
+      "tests": [
+        {
+          "id": "MP09-01",
+          "title": "V4 file exists in GCS",
+          "description": "Run: gcloud storage ls gs://corey-handoff-bridge/project-methodology/docs/ — verify Development_System_Architecture_v4.html is listed",
+          "expected": "Both Development_System_Architecture.html and Development_System_Architecture_v4.html are listed",
+          "category": "fix_verification",
+          "priority": "critical"
+        },
+        {
+          "id": "MP09-02",
+          "title": "Stable GCS URL serves V4 content",
+          "description": "Open https://storage.googleapis.com/corey-handoff-bridge/project-methodology/docs/Development_System_Architecture.html in browser",
+          "expected": "Page renders and title shows 'Development System Architecture' with v4.0 visible in the content",
+          "category": "fix_verification",
+          "priority": "critical"
+        }
+      ]
+    },
+    {
+      "id": "section-2",
+      "title": "MetaPM Redirect Route",
+      "tests": [
+        {
+          "id": "MP09-03",
+          "title": "/architecture returns 302 to GCS",
+          "description": "Run: curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://metapm.rentyourcio.com/architecture",
+          "expected": "HTTP 302, redirect URL contains storage.googleapis.com/corey-handoff-bridge/project-methodology/docs/Development_System_Architecture.html",
+          "category": "fix_verification",
+          "priority": "critical"
+        },
+        {
+          "id": "MP09-04",
+          "title": "End-to-end: redirect loads V4 content",
+          "description": "Open https://metapm.rentyourcio.com/architecture in browser — allow redirect to follow",
+          "expected": "Architecture diagram renders fully, shows v4.0, page title is 'Development System Architecture'",
+          "category": "fix_verification",
+          "priority": "critical"
+        }
+      ]
+    },
+    {
+      "id": "section-3",
+      "title": "Dashboard Button",
+      "tests": [
+        {
+          "id": "MP09-05",
+          "title": "Architecture button visible in dashboard header",
+          "description": "Open https://metapm.rentyourcio.com — look at the header action row next to the Roadmap Report button",
+          "expected": "🏗️ Architecture button is visible, positioned next to 📊 Roadmap Report, same styling",
+          "category": "fix_verification",
+          "priority": "critical"
+        },
+        {
+          "id": "MP09-06",
+          "title": "Button opens in new tab",
+          "description": "Click 🏗️ Architecture button",
+          "expected": "Architecture diagram opens in a new browser tab showing V4 content",
+          "category": "fix_verification",
+          "priority": "critical"
+        }
+      ]
+    },
+    {
+      "id": "section-4",
+      "title": "Health and Version",
+      "tests": [
+        {
+          "id": "MP09-07",
+          "title": "Health check reports v2.3.5",
+          "description": "Run: curl -s https://metapm.rentyourcio.com/health",
+          "expected": "{\"status\":\"healthy\",\"version\":\"2.3.5\",\"build\":\"...\"}",
+          "category": "regression",
+          "priority": "critical"
+        },
+        {
+          "id": "MP09-08",
+          "title": "Roadmap Report button still works",
+          "description": "Click 📊 Roadmap Report button in dashboard header",
+          "expected": "Roadmap report page opens in new tab, renders correctly — not broken by dashboard changes",
+          "category": "regression",
+          "priority": "high"
+        }
+      ]
+    }
+  ],
+  "test_data_notes": "No test data setup required. All tests are read-only verification against production.",
+  "cc_observations": "test_ui_smoke.py referenced in CLAUDE.md does not exist in the tests/ directory. Playwright UI tests could not be run. All verification done via curl against production URLs. Bootstrap file (CC_Bootstrap_v1.md) was moved from project-methodology root to templates/ by PL — this was included in the commit as a housekeeping item."
+}
