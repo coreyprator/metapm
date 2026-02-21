@@ -1,15 +1,13 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-20 — Sprint "MP-026 Final Fixes" (v2.3.4 in progress)
+Updated: 2026-02-21 — Sprint "MP-027 Architecture Link" (v2.3.5)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-02-20 (MP-026)
+### Latest Session Update — 2026-02-21 (MP-027)
 
-- Fixed sprint edit API 500 by removing invalid `project_id` reference from sprint update handler.
-- Fixed requirement title persistence by adding editable title field in the drawer and including `title` in PUT payload.
-- Reverted stale local CORS narrowing in `app/main.py` to restore full methods (`GET, POST, PUT, PATCH, DELETE, OPTIONS`).
-- Added dashboard header link button to roadmap report (`📊 Roadmap Report`) opening `/static/roadmap-report.html` in a new tab.
-- Kept consistent ✏️ edit affordance across requirements/projects/sprints.
+- Added `GET /architecture` redirect route (302) → GCS-hosted Development System Architecture HTML.
+- Added 🏗️ Architecture button to dashboard header `actions-row`, next to 📊 Roadmap Report button.
+- Version bumped 2.3.4 → 2.3.5.
 
 ### Prior Session Update — 2026-02-20 (MP-025)
 
@@ -43,8 +41,8 @@ Purpose: Canonical reference for all AI sessions working on this project.
 **Repository**: github.com/coreyprator/metapm
 **Custom Domain**: https://metapm.rentyourcio.com
 **Cloud Run URL**: https://metapm-67661554310.us-central1.run.app (legacy; use custom domain)
-**Current Version**: v2.3.4 (per `app/core/config.py` line 15)
-**Latest Known Revision**: metapm-v2-00080-22r _(Source: SESSION_CLOSEOUT_2026-02-19_MP022.md — deployed 2026-02-19)_
+**Current Version**: v2.3.5 (per `app/core/config.py` line 15)
+**Latest Known Revision**: metapm-v2-00088-4rb _(deployed 2026-02-21, sprint MP-027)_
 **Owner**: Corey Prator
 
 ### Tech Stack
@@ -250,7 +248,7 @@ Sources: `scripts/schema.sql`, `scripts/backlog_schema.sql`, `app/core/migration
 **Backlog**: `/api/backlog/bugs`, `/api/backlog/requirements`, `/api/backlog/grouped`, `/api/backlog/next-code/{project_id}/{item_type}`
 **Calendar**: `/api/calendar/status`, `/api/calendar/today`, `/api/calendar/week`, `/api/calendar/events`, `/api/calendar/from-voice`, `/api/calendar/calendars`
 **Capture**: `/api/capture/text`, `/api/capture/voice`
-**System**: `/health`, `/api/version`, `/debug/routes`, `/docs`, `/redoc`
+**System**: `/health`, `/api/version`, `/debug/routes`, `/architecture` (302 → GCS architecture doc), `/docs`, `/redoc`
 
 ### Authentication
 
@@ -381,6 +379,17 @@ Sources: `app/main.py`, `app/api/*.py`, `PROJECT_STATUS.md`, `SPRINT3_IMPLEMENTA
   - Also: showToast() for delete confirmations, escHtml() XSS guard in openEdit().
   - All test data cleaned up from DB (no residual test records).
   - Deployed revision: metapm-v2-00080-22r
+- **Sprint "MP-026 Final Fixes" (2026-02-20, v2.3.4)**:
+  - Fixed sprint edit API 500 (invalid `project_id` in PUT handler).
+  - Fixed requirement title persistence (editable title field in drawer, included in PUT payload).
+  - Reverted CORS narrowing to restore full methods.
+  - Added 📊 Roadmap Report header button linking to `/static/roadmap-report.html`.
+  - Deployed revision: metapm-v2-00087-??? _(revision not recorded in PK)_
+- **Sprint "MP-027 Architecture Link" (2026-02-21, v2.3.5)**:
+  - ARCH-01: `GET /architecture` → 302 redirect to GCS `Development_System_Architecture.html` (stable URL, no redeploy needed when arch doc updates).
+  - ARCH-02: 🏗️ Architecture button added to dashboard header `actions-row` next to 📊 Roadmap Report.
+  - ARCH-03: Version bumped 2.3.4 → 2.3.5.
+  - Deployed revision: metapm-v2-00088-4rb
 
 Sources: `PROJECT_STATUS.md`, `SPRINT_4_CANCELED.md`, `handoffs/log/HANDOFF_LOG.md`
 
