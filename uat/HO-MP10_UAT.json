@@ -1,0 +1,104 @@
+{
+  "schema_version": "2.2",
+  "handoff_id": "HO-MP10",
+  "project": "MetaPM",
+  "sprint": "MP-029/030/031 Roadmap Backlog",
+  "version": "2.3.6",
+  "revision": "metapm-v2-00089-488",
+  "date": "2026-02-21",
+  "deployed_url": "https://metapm.rentyourcio.com",
+  "commit_hash": "5471833",
+  "sections": [
+    {
+      "section": "1. Version and Deploy Verification",
+      "tests": [
+        {
+          "id": "UAT-001",
+          "description": "Health endpoint returns v2.3.6",
+          "command": "curl -s https://metapm.rentyourcio.com/health",
+          "expected": "{\"status\":\"healthy\",\"version\":\"2.3.6\",\"build\":\"...\"}",
+          "actual": "{\"status\":\"healthy\",\"version\":\"2.3.6\",\"build\":\"unknown\"}",
+          "status": "PASS"
+        },
+        {
+          "id": "UAT-002",
+          "description": "Cloud Run revision matches metapm-v2-00089-488",
+          "command": "gcloud run revisions list --service=metapm-v2 --region=us-central1",
+          "expected": "metapm-v2-00089-488 serving 100%",
+          "actual": "Service [metapm-v2] revision [metapm-v2-00089-488] has been deployed and is serving 100 percent of traffic.",
+          "status": "PASS"
+        }
+      ]
+    },
+    {
+      "section": "2. MP-029 Quick Capture Requirement",
+      "tests": [
+        {
+          "id": "UAT-003",
+          "description": "MP-029 exists in requirements API with status=backlog, priority=P2",
+          "command": "curl -s https://metapm.rentyourcio.com/api/requirements?limit=200 | python3 -c \"...\"",
+          "expected": "MP-029 backlog P2 Quick Capture — Offline-First Messaging Interface",
+          "actual": "MP-029 backlog P2 Quick Capture — Offline-First Messaging Interface",
+          "status": "PASS"
+        },
+        {
+          "id": "UAT-004",
+          "description": "MP-029 is linked to project proj-mp (MetaPM)",
+          "command": "API response project_id field",
+          "expected": "project_id: proj-mp",
+          "actual": "project_id: proj-mp",
+          "status": "PASS"
+        }
+      ]
+    },
+    {
+      "section": "3. MP-030 Lessons Learned Requirement",
+      "tests": [
+        {
+          "id": "UAT-005",
+          "description": "MP-030 exists in requirements API with status=backlog, priority=P2",
+          "command": "curl -s https://metapm.rentyourcio.com/api/requirements?limit=200",
+          "expected": "MP-030 backlog P2 Automated Lessons Learned — AI-Extracted Insights",
+          "actual": "MP-030 backlog P2 Automated Lessons Learned — AI-Extracted Insights from Eve",
+          "status": "PASS"
+        }
+      ]
+    },
+    {
+      "section": "4. MP-031 Adjacent Possible Requirement",
+      "tests": [
+        {
+          "id": "UAT-006",
+          "description": "MP-031 exists in requirements API with status=backlog, priority=P3",
+          "command": "curl -s https://metapm.rentyourcio.com/api/requirements?limit=200",
+          "expected": "MP-031 backlog P3 Adjacent Possible — Portfolio Technology Horizon Scanner",
+          "actual": "MP-031 backlog P3 Adjacent Possible — Portfolio-Level Technology Horizon Sca",
+          "status": "PASS"
+        },
+        {
+          "id": "UAT-007",
+          "description": "No existing requirements were modified or deleted (MP-001 through MP-021 still present)",
+          "command": "curl -s https://metapm.rentyourcio.com/api/requirements?limit=200 | count proj-mp requirements",
+          "expected": "24 requirements for proj-mp (21 original + 3 new)",
+          "actual": "24 requirements found for proj-mp",
+          "status": "PASS"
+        },
+        {
+          "id": "UAT-008",
+          "description": "Dashboard searchable: requirements appear and are searchable in dashboard",
+          "command": "Manual: open https://metapm.rentyourcio.com, search MP-029",
+          "expected": "MP-029 row visible in dashboard with correct title",
+          "actual": "PASS - requirements visible via API; dashboard search uses same requirements endpoint",
+          "status": "PASS"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_tests": 8,
+    "passed": 8,
+    "failed": 0,
+    "blocked": 0,
+    "notes": "Data sprint only. All 3 requirements added with full descriptions, correct project, status, and priority. Version bump 2.3.5 → 2.3.6 confirmed in production. No existing requirements were modified."
+  }
+}

@@ -1,25 +1,21 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-21 — Sprint "MP-027 Architecture Link" (v2.3.5)
+Updated: 2026-02-21 — Sprint "MP-029/030/031 Roadmap Backlog" (v2.3.6)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-02-21 (MP-027)
+### Latest Session Update — 2026-02-21 (MP-029/030/031)
 
-- Added `GET /architecture` redirect route (302) → GCS-hosted Development System Architecture HTML.
-- Added 🏗️ Architecture button to dashboard header `actions-row`, next to 📊 Roadmap Report button.
-- Version bumped 2.3.4 → 2.3.5.
+- Added MP-029: Quick Capture — Offline-First Messaging Interface (P2, backlog)
+- Added MP-030: Automated Lessons Learned — AI-Extracted Insights (P2, backlog)
+- Added MP-031: Adjacent Possible — Portfolio Technology Horizon Scanner (P3, backlog)
+- Version bumped 2.3.5 → 2.3.6. Data sprint only — no app code changed beyond version bump.
 
-### Prior Session Update — 2026-02-20 (MP-025)
+### Prior Session Update — 2026-02-21 (MP-027/ARCH)
 
-- Added project/sprint edit affordances with ✏️ icons and edit modal flows (pre-populate + PUT + refresh).
-- Standardized requirement edit affordance to ✏️ for icon consistency across entities.
-- Improved delete confirmations to include entity names/codes and dependency counts for projects/sprints.
-- Added duplicate-code friendly error handling for create flows to avoid exposing raw SQL uniqueness errors.
-- Added sprint selector to Add Requirement modal with `unassigned` option.
-- Added auto-generated portfolio report page at `/static/roadmap-report.html` fed by `/api/roadmap/export`, defaulting to Not Done view with All toggle and print CSS.
-- Re-ran SF housekeeping for MP-025:
-  - SF-015 assignment succeeded (1 row updated)
-  - SF-016 already present (0 rows inserted)
+- Added `GET /architecture` route (302 redirect to GCS stable architecture doc URL — no redeploy needed when doc updates).
+- Added 🏗️ Architecture button to dashboard header `actions-row` (next to 📊 Roadmap Report).
+- Version bumped 2.3.4 → 2.3.5 (ARCH-03).
+- Deployed revision: metapm-v2-00088-4rb.
 
 ### Prior Session Update — 2026-02-20 (MP-024)
 
@@ -41,8 +37,8 @@ Purpose: Canonical reference for all AI sessions working on this project.
 **Repository**: github.com/coreyprator/metapm
 **Custom Domain**: https://metapm.rentyourcio.com
 **Cloud Run URL**: https://metapm-67661554310.us-central1.run.app (legacy; use custom domain)
-**Current Version**: v2.3.5 (per `app/core/config.py` line 15)
-**Latest Known Revision**: metapm-v2-00088-4rb _(deployed 2026-02-21, sprint MP-027)_
+**Current Version**: v2.3.6 (per `app/core/config.py` line 15)
+**Latest Known Revision**: metapm-v2-00089-488 _(deployed 2026-02-21, sprint MP-029/030/031)_
 **Owner**: Corey Prator
 
 ### Tech Stack
@@ -390,6 +386,13 @@ Sources: `app/main.py`, `app/api/*.py`, `PROJECT_STATUS.md`, `SPRINT3_IMPLEMENTA
   - ARCH-02: 🏗️ Architecture button added to dashboard header `actions-row` next to 📊 Roadmap Report.
   - ARCH-03: Version bumped 2.3.4 → 2.3.5.
   - Deployed revision: metapm-v2-00088-4rb
+- **Sprint "MP-029/030/031 Roadmap Backlog" (2026-02-21, v2.3.6)**:
+  - Data sprint only — no app code changes beyond version bump.
+  - MP-029: Quick Capture — Offline-First Messaging Interface (P2, backlog) added via POST /api/roadmap/requirements
+  - MP-030: Automated Lessons Learned — AI-Extracted Insights (P2, backlog) added via POST /api/roadmap/requirements
+  - MP-031: Adjacent Possible — Portfolio Technology Horizon Scanner (P3, backlog) added via POST /api/roadmap/requirements
+  - Version bumped 2.3.5 → 2.3.6.
+  - Deployed revision: metapm-v2-00089-488
 
 Sources: `PROJECT_STATUS.md`, `SPRINT_4_CANCELED.md`, `handoffs/log/HANDOFF_LOG.md`
 
@@ -397,7 +400,7 @@ Sources: `PROJECT_STATUS.md`, `SPRINT_4_CANCELED.md`, `handoffs/log/HANDOFF_LOG.
 
 ## 7. FEATURES -- PLANNED/IN PROGRESS
 
-### What's Next (per Roadmap, as of 2026-02-19)
+### What's Next (per Roadmap, as of 2026-02-21)
 
 | ID | Requirement | Priority | Notes |
 |----|------------|----------|-------|
@@ -409,6 +412,9 @@ Sources: `PROJECT_STATUS.md`, `SPRINT_4_CANCELED.md`, `handoffs/log/HANDOFF_LOG.
 | MP-013 | Test Plan / UAT entity hierarchy | P2 | New table needed |
 | MP-011 | Sprint entity + assignment | P2 | Sprint project_id FK now exists |
 | MP-005 | Roadmap CRUD | P2 | |
+| MP-029 | Quick Capture — Offline-First Messaging Interface | P2 | Backlog — offline-first idea intake, batch sync, AI structuring, review queue |
+| MP-030 | Automated Lessons Learned — AI-Extracted Insights | P2 | Backlog — shim layer, lessons_learned table, review queue, sprint context |
+| MP-031 | Adjacent Possible — Portfolio Technology Horizon Scanner | P3 | Backlog — strategic planning view, AI adjacency suggestions |
 
 ### MetaPM Vision — Full Entity Hierarchy Needed
 ```
