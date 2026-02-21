@@ -104,6 +104,14 @@ async def health_check():
     }
 
 
+@app.get("/architecture")
+async def architecture_redirect():
+    return RedirectResponse(
+        url="https://storage.googleapis.com/corey-handoff-bridge/project-methodology/docs/Development_System_Architecture.html",
+        status_code=302
+    )
+
+
 @app.get("/debug/routes")
 async def list_routes():
     """Debug: List all registered routes"""
