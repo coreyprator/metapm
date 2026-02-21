@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.3.5"  # ARCH-01/02/03: architecture diagram link + dashboard button
+    VERSION: str = "2.3.6"  # MP-029/030/031: roadmap backlog requirements added
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
