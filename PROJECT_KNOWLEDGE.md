@@ -1,9 +1,17 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-20 — Sprint "MP-025 Dashboard Polish + Roadmap Report" (v2.3.3 in progress)
+Updated: 2026-02-20 — Sprint "MP-026 Final Fixes" (v2.3.4 in progress)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-02-20 (MP-025)
+### Latest Session Update — 2026-02-20 (MP-026)
+
+- Fixed sprint edit API 500 by removing invalid `project_id` reference from sprint update handler.
+- Fixed requirement title persistence by adding editable title field in the drawer and including `title` in PUT payload.
+- Reverted stale local CORS narrowing in `app/main.py` to restore full methods (`GET, POST, PUT, PATCH, DELETE, OPTIONS`).
+- Added dashboard header link button to roadmap report (`📊 Roadmap Report`) opening `/static/roadmap-report.html` in a new tab.
+- Kept consistent ✏️ edit affordance across requirements/projects/sprints.
+
+### Prior Session Update — 2026-02-20 (MP-025)
 
 - Added project/sprint edit affordances with ✏️ icons and edit modal flows (pre-populate + PUT + refresh).
 - Standardized requirement edit affordance to ✏️ for icon consistency across entities.
@@ -35,7 +43,7 @@ Purpose: Canonical reference for all AI sessions working on this project.
 **Repository**: github.com/coreyprator/metapm
 **Custom Domain**: https://metapm.rentyourcio.com
 **Cloud Run URL**: https://metapm-67661554310.us-central1.run.app (legacy; use custom domain)
-**Current Version**: v2.3.3 (per `app/core/config.py` line 15)
+**Current Version**: v2.3.4 (per `app/core/config.py` line 15)
 **Latest Known Revision**: metapm-v2-00080-22r _(Source: SESSION_CLOSEOUT_2026-02-19_MP022.md — deployed 2026-02-19)_
 **Owner**: Corey Prator
 

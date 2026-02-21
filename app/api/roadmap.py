@@ -346,9 +346,6 @@ async def update_sprint(sprint_id: str, update: SprintUpdate):
         if update.name is not None:
             set_clauses.append("name = ?")
             params.append(update.name)
-        if update.project_id is not None:
-            set_clauses.append("project_id = ?")
-            params.append(update.project_id)
         if update.description is not None:
             set_clauses.append("description = ?")
             params.append(update.description)

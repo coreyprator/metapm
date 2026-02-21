@@ -266,14 +266,17 @@
         <div class="title">🔴 MetaPM</div>
         <span id="appVersion" class="version-badge">v-</span>
       </div>
-      <div class="add-wrap">
-        <button id="addBtn">+ Add ▾</button>
-        <div id="addMenu" class="add-menu">
-          <button data-kind="project">Project</button>
-          <button data-kind="sprint">Sprint</button>
-          <button data-kind="requirement">Requirement</button>
-          <button data-kind="bug">Bug</button>
-          <button data-kind="task">Task</button>
+      <div class="actions-row">
+        <a href="/static/roadmap-report.html" target="_blank" rel="noopener"><button type="button">📊 Roadmap Report</button></a>
+        <div class="add-wrap">
+          <button id="addBtn">+ Add ▾</button>
+          <div id="addMenu" class="add-menu">
+            <button data-kind="project">Project</button>
+            <button data-kind="sprint">Sprint</button>
+            <button data-kind="requirement">Requirement</button>
+            <button data-kind="bug">Bug</button>
+            <button data-kind="task">Task</button>
+          </div>
         </div>
       </div>
     </div>
@@ -317,6 +320,14 @@
       </div>
     </div>
     <div class="grid2">
+      <div>
+        <label>Code</label>
+        <input id="dCode" readonly />
+      </div>
+      <div>
+        <label>Title</label>
+        <input id="dTitle" />
+      </div>
       <div>
         <label>Project</label>
         <select id="dProject"></select>
@@ -692,6 +703,8 @@
       fillSelect('dProject', state.projects, 'id', 'name');
       const sprints = state.sprints.filter(s => !s.project_id || s.project_id === req.project_id);
       fillSelect('dSprint', sprints, 'id', 'name', true, 'unassigned');
+      qs('dCode').value = req.code || '';
+      qs('dTitle').value = req.title || '';
       qs('dProject').value = req.project_id;
       qs('dSprint').value = req.sprint_id || '';
       qs('dPriority').value = req.priority;
@@ -719,6 +732,7 @@
       if (!req) return;
 
       const payload = {
+        title: qs('dTitle').value.trim(),
         priority: qs('dPriority').value,
         type: qs('dType').value,
         status: qs('dStatus').value,
@@ -769,11 +783,9 @@
       qs('editTitle').textContent = 'Edit Sprint';
       qs('editFields').innerHTML = `
         <div class="grid2">
-          <div><label>Project</label><select id="eProject">${state.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select></div>
           <div><label>Name</label><input id="eName" value="${sprint.name || ''}" /></div>
           <div><label>Status</label><select id="eStatus"><option value="active">active</option><option value="planned">planned</option><option value="complete">complete</option></select></div>
         </div>`;
-      qs('eProject').value = sprint.project_id || '';
       qs('eStatus').value = sprint.status || 'planned';
       qs('editModal').classList.add('open');
     }
@@ -794,7 +806,6 @@
         await api(`/api/roadmap/sprints/${state.editId}`, {
           method: 'PUT',
           body: JSON.stringify({
-            project_id: qs('eProject').value || null,
             name: qs('eName').value.trim(),
             status: qs('eStatus').value
           })
