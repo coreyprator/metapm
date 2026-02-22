@@ -158,8 +158,9 @@
         </main>
         
         <!-- Toast Notification -->
-        <div id="toast" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-green-600 px-6 py-3 rounded-xl shadow-lg hidden transition-opacity">
+        <div id="toast" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-green-600 px-4 py-3 rounded-xl shadow-lg hidden transition-opacity flex items-center gap-3">
             <span id="toastText">Task created!</span>
+            <button onclick="document.getElementById('toast').classList.add('hidden')" style="background:none;border:none;cursor:pointer;font-size:18px;line-height:1;padding:0;opacity:0.7;flex-shrink:0;color:white;" title="Dismiss">&times;</button>
         </div>
         
         <!-- Bottom Safe Area -->
@@ -223,11 +224,14 @@
             });
         }
         
-        // Show toast notification
-        function showToast(message, duration = 3000) {
+        // Show toast notification — Standard B: errors persist 10s with close button
+        function showToast(message, type = '') {
             toastText.textContent = message;
+            const duration = type === 'error' ? 10000 : 3000;
+            if (type === 'error') console.error('[MetaPM]', message);
             toast.classList.remove('hidden');
-            setTimeout(() => toast.classList.add('hidden'), duration);
+            if (toast._toastTimer) clearTimeout(toast._toastTimer);
+            toast._toastTimer = setTimeout(() => toast.classList.add('hidden'), duration);
         }
         
         // Start recording
@@ -296,12 +300,16 @@
                 });
                 
                 if (!response.ok) {
+                    // Standard A: log full response body
+                    let errorBody = '';
+                    try { errorBody = JSON.stringify(await response.json()); } catch { errorBody = `${response.status} ${response.statusText}`; }
+                    console.error('[API Error] POST /api/voice/voice', { status: response.status, statusText: response.statusText, body: errorBody });
                     throw new Error(`API error: ${response.status}`);
                 }
-                
+
                 currentResult = await response.json();
                 showResult(currentResult);
-                
+
             } catch (err) {
                 console.error('Error processing audio:', err);
                 statusText.textContent = 'Error processing. Try again.';
@@ -324,11 +332,15 @@
                 });
                 
                 if (!response.ok) {
+                    // Standard A: log full response body
+                    let errorBody = '';
+                    try { errorBody = JSON.stringify(await response.json()); } catch { errorBody = `${response.status} ${response.statusText}`; }
+                    console.error('[API Error] POST /api/voice/text', { status: response.status, statusText: response.statusText, body: errorBody });
                     throw new Error(`API error: ${response.status}`);
                 }
-                
+
                 currentResult = await response.json();
-                
+
                 // If task was auto-created, show toast
                 if (currentResult.taskCreated) {
                     showToast(`Task #${currentResult.taskCreated.taskId} created!`);

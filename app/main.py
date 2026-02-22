@@ -16,6 +16,7 @@ from app.core.migrations import run_migrations
 from app.schemas.mcp import UATDirectSubmit, UATDirectSubmitResponse
 from transactions import router as transactions_router
 import logging
+import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,22 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={
             "detail": detail,
             "hint": "Check field names and types. See /docs for schema."
+        }
+    )
+
+
+# Standard C: Global exception handler — catches unhandled exceptions, returns structured JSON
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    error_detail = str(exc)
+    traceback_str = traceback.format_exc()
+    logger.error(f"Unhandled exception on {request.method} {request.url}: {error_detail}\n{traceback_str}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal Server Error",
+            "detail": error_detail,
+            "path": str(request.url.path)
         }
     )
 

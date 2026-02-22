@@ -394,10 +394,14 @@ ${latestCompletion.notes || 'No notes provided.'}
                 if (response.ok) {
                     loadHandoff(); // Reload
                 } else {
-                    alert('Failed to update status');
+                    // Standard A: log full response body
+                    let errorBody = '';
+                    try { errorBody = JSON.stringify(await response.clone().json()); } catch { errorBody = `${response.status} ${response.statusText}`; }
+                    console.error('[API Error] PUT /api/handoffs/status', { status: response.status, statusText: response.statusText, body: errorBody });
+                    console.error('Failed to update status: ' + errorBody);
                 }
             } catch (err) {
-                alert('Error: ' + err.message);
+                console.error('[MetaPM compare] Error updating status:', err);
             }
         }
 

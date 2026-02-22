@@ -436,16 +436,47 @@
       const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...options });
       if (!res.ok) {
         let detail = '';
+        let rawBody = '';
         try {
           const payload = await res.json();
+          rawBody = JSON.stringify(payload);
           detail = payload?.detail || payload?.message || '';
         } catch {
           detail = '';
         }
+        // Standard A: log full response body to console
+        console.error(`[API Error] ${options.method || 'GET'} ${path}`, { status: res.status, statusText: res.statusText, body: rawBody });
         throw new Error(detail ? `${res.status} ${detail}` : `${res.status} ${res.statusText}`);
       }
       if (res.status === 204) return null;
       return await res.json();
+    }
+
+    // Standard B: toast notification — errors persist 10s with close button
+    function showToast(message, type = 'error') {
+      let container = document.getElementById('metapm-toast-container');
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'metapm-toast-container';
+        container.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;';
+        document.body.appendChild(container);
+      }
+      const toast = document.createElement('div');
+      toast.style.cssText = `background:${type === 'error' ? '#dc2626' : '#16a34a'};color:#fff;padding:12px 16px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.3);display:flex;align-items:flex-start;gap:12px;max-width:400px;min-width:240px;word-break:break-word;`;
+      const msg = document.createElement('span');
+      msg.style.flex = '1';
+      msg.textContent = message;
+      const close = document.createElement('button');
+      close.textContent = '✕';
+      close.title = 'Dismiss';
+      close.style.cssText = 'background:none;border:none;cursor:pointer;font-size:16px;line-height:1;padding:0;opacity:.75;flex-shrink:0;color:inherit;';
+      close.onclick = () => toast.remove();
+      toast.appendChild(msg);
+      toast.appendChild(close);
+      container.appendChild(toast);
+      const duration = type === 'error' ? 10000 : 4000;
+      if (type === 'error') console.error('[MetaPM Error]', message);
+      setTimeout(() => toast.remove(), duration);
     }
 
     function makeId() { return crypto.randomUUID(); }
@@ -899,7 +930,7 @@
         }
       } catch (err) {
         const code = qs('aCode') ? qs('aCode').value.trim().toUpperCase() : '';
-        alert(friendlyCreateError(kind, err?.message || '', code));
+        showToast(friendlyCreateError(kind, err?.message || '', code));
         return;
       }
 
@@ -954,8 +985,8 @@
         qs('drawer').classList.remove('open');
         state.selectedReq = null;
       };
-      qs('saveBtn').onclick = () => saveRequirement().catch(err => alert(err.message));
-      qs('deleteReqBtn').onclick = () => deleteSelectedRequirement().catch(err => alert(err.message));
+      qs('saveBtn').onclick = () => saveRequirement().catch(err => showToast(err.message));
+      qs('deleteReqBtn').onclick = () => deleteSelectedRequirement().catch(err => showToast(err.message));
 
       qs('resetFiltersBtn').onclick = () => {
         qs('projectFilter').value = '';
@@ -975,14 +1006,14 @@
       };
 
       qs('addClose').onclick = () => qs('addModal').classList.remove('open');
-      qs('addSave').onclick = () => saveAdd().catch(err => alert(err.message));
+      qs('addSave').onclick = () => saveAdd().catch(err => showToast(err.message));
 
       qs('editClose').onclick = () => {
         qs('editModal').classList.remove('open');
         state.editKind = null;
         state.editId = null;
       };
-      qs('editSave').onclick = () => saveEdit().catch(err => alert(err.message));
+      qs('editSave').onclick = () => saveEdit().catch(err => showToast(err.message));
 
       qs('expandAllBtn').onclick = () => {
         state.expanded = new Set(getFilteredRequirements().map((r) => r.project_id));

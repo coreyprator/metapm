@@ -840,6 +840,13 @@
         async function loadStats() {
             try {
                 const res = await fetch('/mcp/handoffs/stats');
+                if (!res.ok) {
+                    // Standard A: log full response body
+                    let errorBody = '';
+                    try { errorBody = JSON.stringify(await res.clone().json()); } catch { errorBody = `${res.status} ${res.statusText}`; }
+                    console.error('[API Error] GET /mcp/handoffs/stats', { status: res.status, statusText: res.statusText, body: errorBody });
+                    return;
+                }
                 const data = await res.json();
                 document.getElementById('statTotal').textContent = data.total || 0;
                 document.getElementById('statThisWeek').textContent = data.this_week || 0;
@@ -889,6 +896,14 @@
 
             try {
                 const res = await fetch(`/mcp/handoffs/dashboard?${params}`);
+                if (!res.ok) {
+                    // Standard A: log full response body
+                    let errorBody = '';
+                    try { errorBody = JSON.stringify(await res.clone().json()); } catch { errorBody = `${res.status} ${res.statusText}`; }
+                    console.error('[API Error] GET /mcp/handoffs/dashboard', { status: res.status, statusText: res.statusText, body: errorBody });
+                    handoffsBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:40px; color:#ef4444">Failed to load handoffs (${res.status})</td></tr>`;
+                    return;
+                }
                 const data = await res.json();
 
                 totalPages = data.pages;

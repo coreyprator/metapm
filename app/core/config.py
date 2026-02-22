@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.3.7"  # Audit+cleanup: handoffs SQL fix, conditional_pass UAT status, smoke test
+    VERSION: str = "2.3.8"  # Standard C: global exception handler; error logging standardization
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
