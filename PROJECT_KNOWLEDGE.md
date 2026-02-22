@@ -1,14 +1,22 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-21 — Sprint "MP-029/030/031 Roadmap Backlog" (v2.3.6)
+Updated: 2026-02-22 — Sprint "HO-MP11 Audit+Cleanup" (v2.3.7)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-02-21 (MP-029/030/031)
+### Latest Session Update — 2026-02-22 (HO-MP11 Audit+Cleanup)
+
+- **Phase 1 audit**: All 20 in_progress requirements verified against production. 12 corrected to done, 6 to backlog, MP-003 fixed in Phase 2, EM-012 stays in_progress.
+- **Phase 2 cleanup**: Fixed `/api/handoffs` SQL ORDER BY error in `handoff_lifecycle.py`. Created `tests/test_ui_smoke.py` (9 production smoke tests; run with `--noconftest`).
+- **Phase 3 build**: Added `conditional_pass` to UATStatus enum (MP-007 → done).
+- Version bumped 2.3.6 → 2.3.7. Deployed revision: metapm-v2-00090-vtn.
+
+### Prior Session Update — 2026-02-21 (MP-029/030/031)
 
 - Added MP-029: Quick Capture — Offline-First Messaging Interface (P2, backlog)
 - Added MP-030: Automated Lessons Learned — AI-Extracted Insights (P2, backlog)
 - Added MP-031: Adjacent Possible — Portfolio Technology Horizon Scanner (P3, backlog)
 - Version bumped 2.3.5 → 2.3.6. Data sprint only — no app code changed beyond version bump.
+- Deployed revision: metapm-v2-00089-488.
 
 ### Prior Session Update — 2026-02-21 (MP-027/ARCH)
 
@@ -37,8 +45,8 @@ Purpose: Canonical reference for all AI sessions working on this project.
 **Repository**: github.com/coreyprator/metapm
 **Custom Domain**: https://metapm.rentyourcio.com
 **Cloud Run URL**: https://metapm-67661554310.us-central1.run.app (legacy; use custom domain)
-**Current Version**: v2.3.6 (per `app/core/config.py` line 15)
-**Latest Known Revision**: metapm-v2-00089-488 _(deployed 2026-02-21, sprint MP-029/030/031)_
+**Current Version**: v2.3.7 (per `app/core/config.py` line 15)
+**Latest Known Revision**: metapm-v2-00090-vtn _(deployed 2026-02-22, sprint HO-MP11 Audit+Cleanup)_
 **Owner**: Corey Prator
 
 ### Tech Stack
@@ -393,6 +401,11 @@ Sources: `app/main.py`, `app/api/*.py`, `PROJECT_STATUS.md`, `SPRINT3_IMPLEMENTA
   - MP-031: Adjacent Possible — Portfolio Technology Horizon Scanner (P3, backlog) added via POST /api/roadmap/requirements
   - Version bumped 2.3.5 → 2.3.6.
   - Deployed revision: metapm-v2-00089-488
+- **Sprint "HO-MP11 Audit+Cleanup" (2026-02-22, v2.3.7)**:
+  - Phase 1: Audited all 20 in_progress requirements. 12 → done, 6 → backlog, 2 stayed.
+  - Phase 2: Fixed /api/handoffs SQL ORDER BY bug. Created tests/test_ui_smoke.py (9 production tests).
+  - Phase 3: Added conditional_pass to UATStatus enum (MP-007 → done).
+  - Deployed revision: metapm-v2-00090-vtn
 
 Sources: `PROJECT_STATUS.md`, `SPRINT_4_CANCELED.md`, `handoffs/log/HANDOFF_LOG.md`
 
@@ -400,18 +413,17 @@ Sources: `PROJECT_STATUS.md`, `SPRINT_4_CANCELED.md`, `handoffs/log/HANDOFF_LOG.
 
 ## 7. FEATURES -- PLANNED/IN PROGRESS
 
-### What's Next (per Roadmap, as of 2026-02-21)
+### What's Next (per Roadmap, as of 2026-02-22)
 
 | ID | Requirement | Priority | Notes |
 |----|------------|----------|-------|
 | MP-021 | Handoff/UAT CRUD visibility | P2 | PL: "clicking on handoff ID should open MetaPM to show and CRUD" |
 | MP-018 | Full-text search across all entities | P2 | No way to find anything except scrolling |
-| — | Add button full CRUD for all entity types | P2 | PL: "full CRUD capability all objects (Project, Items, UATs etc.)" |
-| — | Dashboard hierarchy incomplete | P2 | Only Projects → Requirements; needs Tasks + UATs |
+| MP-014 | Cross-project dependency links | P2 | No API routes or UI — not started |
 | MP-012 | Task entity as child of requirement | P2 | New table needed |
 | MP-013 | Test Plan / UAT entity hierarchy | P2 | New table needed |
 | MP-011 | Sprint entity + assignment | P2 | Sprint project_id FK now exists |
-| MP-005 | Roadmap CRUD | P2 | |
+| MP-001 | GitHub Actions CI/CD | P1 | No .github dir — needs dedicated session |
 | MP-029 | Quick Capture — Offline-First Messaging Interface | P2 | Backlog — offline-first idea intake, batch sync, AI structuring, review queue |
 | MP-030 | Automated Lessons Learned — AI-Extracted Insights | P2 | Backlog — shim layer, lessons_learned table, review queue, sprint context |
 | MP-031 | Adjacent Possible — Portfolio Technology Horizon Scanner | P3 | Backlog — strategic planning view, AI adjacency suggestions |
