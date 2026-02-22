@@ -115,7 +115,7 @@ You CANNOT manually test UI. Use Playwright.
 
 Before EVERY handoff:
 ```powershell
-pytest tests/test_ui_smoke.py -v
+pytest tests/test_ui_smoke.py -v --noconftest
 ```
 
 ALL tests must pass. Include test output in your report.
@@ -279,7 +279,7 @@ You CANNOT manually test UI. Use Playwright.
 
 Before EVERY handoff:
 ```powershell
-pytest tests/test_ui_smoke.py -v
+pytest tests/test_ui_smoke.py -v --noconftest
 ```
 
 ALL tests must pass. Include test output in your report.

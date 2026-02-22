@@ -186,7 +186,7 @@ async def list_handoffs(
 ):
     """List handoff requests with optional filters."""
     try:
-        query = "SELECT * FROM handoff_requests WHERE 1=1"
+        query = f"SELECT TOP {limit} * FROM handoff_requests WHERE 1=1"
         params = []
 
         if project:
@@ -198,9 +198,6 @@ async def list_handoffs(
             params.append(status)
 
         query += " ORDER BY created_at DESC"
-
-        if limit:
-            query = f"SELECT TOP {limit} * FROM ({query}) AS sub"
 
         handoffs = execute_query(query, tuple(params), fetch="all") or []
 

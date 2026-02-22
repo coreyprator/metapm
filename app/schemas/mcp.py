@@ -31,6 +31,7 @@ class UATStatus(str, Enum):
     PENDING = "pending"
     BLOCKED = "blocked"
     PARTIAL = "partial"
+    CONDITIONAL_PASS = "conditional_pass"
 
 
 class TaskPriority(str, Enum):

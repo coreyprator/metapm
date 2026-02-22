@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.3.6"  # MP-029/030/031: roadmap backlog requirements added
+    VERSION: str = "2.3.7"  # Audit+cleanup: handoffs SQL fix, conditional_pass UAT status, smoke test
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
