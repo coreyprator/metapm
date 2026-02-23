@@ -1,9 +1,17 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-22 — Sprint "UAT Submit Fix + Template v4" (v2.3.9)
+Updated: 2026-02-23 — Sprint "Audit + Cleanup" (v2.3.10)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-02-22 (UAT Submit Fix + Template v4, v2.3.9)
+### Latest Session Update — 2026-02-23 (CC_Audit_MetaPM_Cleanup_Sprint, v2.3.10)
+
+- **Phase 1 Audit**: Pulled all 106 requirements from production. Identified 12 in_progress items across AF/EM/HL/SF projects (cannot verify without project-specific auth). Identified 2 status lies in MetaPM requirements.
+- **Phase 2 Cleanup**: Corrected MP-029 done→backlog (Quick Capture: no implementation, no `/api/quick-capture` endpoint). Corrected MP-030 done→backlog (Lessons Learned: no implementation, no `/api/lessons` endpoint). Deleted MP-TEST (test data). Confirmed and marked MP-010 done (drawer detail panel fully implemented: status/priority/description/type editable, save via PUT). Confirmed and marked MP-016 done (reopen via drawer status dropdown contains all statuses including backlog/in_progress). Confirmed and marked MP-017 done (contextProjectId pre-populates project dropdown on Add).
+- **Phase 3 Build**: Removed dead `dNotes` textarea from dashboard drawer (no `notes` column in DB, textarea always reset to '' on open and never saved). Commit `0ffa9a9`.
+- Version bumped 2.3.9 → 2.3.10. Deployed revision: metapm-v2-00094-b4n.
+- Health: `{"status":"healthy","version":"2.3.10"}` ✅. Smoke tests: 9/9 ✅.
+
+### Prior Session Update — 2026-02-22 (UAT Submit Fix + Template v4, v2.3.9)
 
 - **P0**: Audited UAT submit API schema (`UATDirectSubmit` in `app/schemas/mcp.py`). Root causes: no `total_tests` inference, no `project_name`/`test_results_detail`/`test_results_summary` aliases.
 - **P1**: Added field aliases (`project_name→project`, `test_results_detail→results_text`, `test_results_summary→results_text`). Added `total_tests` inference from `[XX-NN]` pattern count in results_text; fallback to PASS/FAIL/SKIP/PENDING line count; minimum 1. Moved results_text auto-generation before inference.
