@@ -467,6 +467,11 @@ Sources: `app/main.py`, `app/api/*.py`, `PROJECT_STATUS.md`, `SPRINT3_IMPLEMENTA
   - Phase 2: Fixed /api/handoffs SQL ORDER BY bug. Created tests/test_ui_smoke.py (9 production tests).
   - Phase 3: Added conditional_pass to UATStatus enum (MP-007 → done).
   - Deployed revision: metapm-v2-00090-vtn
+- **Sprint "AF Requirements Data Sprint" (2026-02-23, v2.3.9 — data only, no deploy)**:
+  - Inserted 14 new ArtForge requirements: AF-016 through AF-029 (PL UAT 2/22/2026 feedback).
+  - ArtForge requirements total: 15 → 29 (proj-af).
+  - CODE CONFLICT FLAGGED: AF-015 was already occupied ("Deprecate Battle of the Bands", seeded 2026-02-17). The "Prompt Moderation Pre-Check" spec (from CC_Sprint_MetaPM_AF015_Moderation.md) was NOT inserted — needs CAI to assign correct code (AF-030 is next available).
+  - Handoff ID: 767C616E-5DF2-40C7-BFAA-7CA45820A156
 
 Sources: `PROJECT_STATUS.md`, `SPRINT_4_CANCELED.md`, `handoffs/log/HANDOFF_LOG.md`
 
