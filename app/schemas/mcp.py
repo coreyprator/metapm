@@ -238,9 +238,9 @@ class UATDirectSubmit(BaseModel):
     uat_date: Optional[str] = Field(None, max_length=50, strip_whitespace=True)
     feature: Optional[str] = Field(None, max_length=200, strip_whitespace=True)
     status: Optional[UATStatus] = None
-    total_tests: int = Field(..., ge=0)
-    passed: int = Field(..., ge=0)
-    failed: int = Field(..., ge=0)
+    total_tests: int = Field(0, ge=0)
+    passed: int = Field(0, ge=0)
+    failed: int = Field(0, ge=0)
     blocked: Optional[int] = Field(0, ge=0)
     skipped: Optional[int] = Field(0, ge=0)
     notes_count: Optional[int] = Field(0, ge=0)
