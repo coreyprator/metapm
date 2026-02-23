@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.3.8"  # Standard C: global exception handler; error logging standardization
+    VERSION: str = "2.3.9"  # UAT submit API: field aliases, total_tests inference, canonical template v4
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

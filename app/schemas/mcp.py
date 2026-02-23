@@ -3,6 +3,7 @@ MetaPM MCP Schemas
 Pydantic models for MCP handoffs and tasks.
 """
 
+import re
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, model_validator, ValidationError
@@ -257,6 +258,15 @@ class UATDirectSubmit(BaseModel):
     def validate_and_prepare(cls, data: Any) -> Any:
         """Validate inputs and auto-generate results_text from results array if needed."""
         if isinstance(data, dict):
+            # Map legacy/alias field names for backward compatibility
+            if not data.get('project') and data.get('project_name'):
+                data['project'] = data['project_name']
+            if not data.get('results_text'):
+                if data.get('test_results_detail'):
+                    data['results_text'] = data['test_results_detail']
+                elif data.get('test_results_summary'):
+                    data['results_text'] = data['test_results_summary']
+
             # Normalize legacy fields
             if not data.get('submitted_at') and data.get('tested_at'):
                 data['submitted_at'] = data.get('tested_at')
@@ -289,14 +299,42 @@ class UATDirectSubmit(BaseModel):
                         item['note'] = item.get('notes')
                     normalized.append(item)
                 data['results'] = normalized
-            
+
             # Validate: at least one results format required
             if not results_text and not results:
                 raise PydanticCustomError(
                     'missing_results',
                     "Either 'results_text' or 'results' array is required"
                 )
-            
+
+            # Auto-generate results_text from results array if not provided
+            if not results_text and results:
+                lines = []
+                for r in results:
+                    status_label = r.get('status', '').upper()
+                    r_id = r.get('id', '')
+                    r_title = r.get('title', '')
+                    lines.append(f"  {status_label}  {r_id}: {r_title}")
+                    if r.get('note'):
+                        note = r['note'][:2000] if len(r.get('note', '')) > 2000 else r['note']
+                        lines.append(f"        Note: {note}")
+                data['results_text'] = "\n".join(lines)
+
+            # Infer total_tests from results_text if missing or zero
+            total_tests = data.get('total_tests', 0)
+            if not total_tests or int(total_tests) <= 0:
+                rt = data.get('results_text', '') or ''
+                # Count [XX-NN] test ID patterns
+                test_ids = re.findall(r'\[[\w]+-\d+\]', rt)
+                inferred_count = len(test_ids)
+                if not inferred_count:
+                    # Fallback: count lines containing status keywords
+                    inferred_count = sum(
+                        1 for line in rt.splitlines()
+                        if any(kw in line.upper() for kw in ('PASS', 'FAIL', 'SKIP', 'PENDING'))
+                    )
+                data['total_tests'] = max(inferred_count, 1)
+
             # Validate: total_tests > 0
             total_tests = data.get('total_tests', 0)
             if total_tests <= 0:
@@ -304,7 +342,7 @@ class UATDirectSubmit(BaseModel):
                     'invalid_total_tests',
                     "total_tests must be greater than 0"
                 )
-            
+
             # Validate: counts don't exceed total
             passed = data.get('passed', 0)
             failed = data.get('failed', 0)
@@ -341,25 +379,11 @@ class UATDirectSubmit(BaseModel):
                     'U9V1': 'MetaPM'
                 }
                 data['project'] = project_map.get(token, project_map.get(token_letters))
-            
-            # Auto-generate results_text from results array if not provided
-            if not results_text and results:
-                lines = []
-                for r in results:
-                    status_label = r.get('status', '').upper()
-                    r_id = r.get('id', '')
-                    r_title = r.get('title', '')
-                    lines.append(f"  {status_label}  {r_id}: {r_title}")
-                    if r.get('note'):
-                        # Truncate long notes
-                        note = r['note'][:2000] if len(r.get('note', '')) > 2000 else r['note']
-                        lines.append(f"        Note: {note}")
-                data['results_text'] = "\n".join(lines)
-            
+
             # Append general notes if provided
             if data.get('notes') and data.get('results_text'):
                 data['results_text'] = data['results_text'] + f"\n\nGeneral Notes:\n{data['notes']}"
-        
+
         return data
 
 
