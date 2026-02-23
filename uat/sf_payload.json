@@ -1,0 +1,12 @@
+{
+  "project_name": "Super Flashcards",
+  "version": "3.0.1",
+  "status": "failed",
+  "total_tests": 11,
+  "passed": 7,
+  "failed": 1,
+  "skipped": 3,
+  "linked_requirements": ["SF-005", "SF-007", "SF-008", "SF-013"],
+  "notes": "PL UAT 2/22/2026. SF-005 SRS reverted to backlog. Three new reqs captured.",
+  "results_text": "[Super Flashcards] v3.0.1 UAT: Sprint 9 Rework\nDate: 2/22/2026 | Rev: super-flashcards-00299-6cs\nReqs: SF-005, SF-007, SF-008, SF-013\nSummary: 7 passed, 1 failed, 3 pending/skipped out of 11 tests\n\n[SM-01] PASS: Version v3.0.1 confirmed, no mismatch. Console: IMG resource load error on error-tracker.js.\n[SM-02] PASS: Cards visible, pronunciation works.\n[SR-01] PASS: Study mode accessible. 474 cards due.\n[SR-02] FAIL: No SRS sorting found. SF-005 set back to backlog. Needs membership model.\n[SR-03] PENDING: No rating buttons on cards. PL questions whether req exists.\n[PD-01] PASS: Progress page exists. Needs membership to be useful. 1586 cards, 0 mastered.\n[PD-02] PASS: Stats present: total, due, mastered, streak, by-language table.\n[DIF-01] PASS: Difficulty dropdown visible. All cards unrated.\n[PIE-01] PASS: PIE root visible with amber highlight. Example: *ghai- to rejoice.\n[PIE-02] PENDING: Spot check not done. New req: PIE pronunciation play button.\n[REG-01] PENDING: New req: language reassignment in edit modal. Found Greek word in English.\n\nNew Requirements:\n- SF-005 back to backlog (SRS needs membership model)\n- New: PIE root pronunciation play button\n- New: Language reassignment (move card between languages)\n- Bug: error-tracker.js IMG resource load failure"
+}

@@ -267,6 +267,11 @@ class UATDirectSubmit(BaseModel):
                 elif data.get('test_results_summary'):
                     data['results_text'] = data['test_results_summary']
 
+            # Normalize linked_requirements: accept comma-separated string or list
+            lr = data.get('linked_requirements')
+            if isinstance(lr, str) and lr.strip():
+                data['linked_requirements'] = [r.strip() for r in re.split(r'[,;]+', lr) if r.strip()]
+
             # Normalize legacy fields
             if not data.get('submitted_at') and data.get('tested_at'):
                 data['submitted_at'] = data.get('tested_at')

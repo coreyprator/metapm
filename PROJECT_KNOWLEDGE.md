@@ -1,16 +1,32 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-22 — Sprint "HO-MP11 Audit+Cleanup" (v2.3.7)
+Updated: 2026-02-22 — Sprint "UAT Submit Fix + Template v4" (v2.3.9)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-02-22 (HO-MP11 Audit+Cleanup)
+### Latest Session Update — 2026-02-22 (UAT Submit Fix + Template v4, v2.3.9)
 
-- **Phase 1 audit**: All 20 in_progress requirements verified against production. 12 corrected to done, 6 to backlog, MP-003 fixed in Phase 2, EM-012 stays in_progress.
-- **Phase 2 cleanup**: Fixed `/api/handoffs` SQL ORDER BY error in `handoff_lifecycle.py`. Created `tests/test_ui_smoke.py` (9 production smoke tests; run with `--noconftest`).
-- **Phase 3 build**: Added `conditional_pass` to UATStatus enum (MP-007 → done).
+- **P0**: Audited UAT submit API schema (`UATDirectSubmit` in `app/schemas/mcp.py`). Root causes: no `total_tests` inference, no `project_name`/`test_results_detail`/`test_results_summary` aliases.
+- **P1**: Added field aliases (`project_name→project`, `test_results_detail→results_text`, `test_results_summary→results_text`). Added `total_tests` inference from `[XX-NN]` pattern count in results_text; fallback to PASS/FAIL/SKIP/PENDING line count; minimum 1. Moved results_text auto-generation before inference.
+- **P2**: Created canonical `UAT_Template_v4.html` at `project-methodology/templates/UAT_Template_v4.html`. Dark theme (#0f1117/#161b22/#30363d), radio buttons, FIX/NEW/REG/HOT badges, general notes field, persistent submit result, correct API field names.
+- **P3**: Reposted 3 failed UAT results (Super Flashcards v3.0.1, ArtForge v2.3.3, HarmonyLab v1.8.4) after P1 deployed.
+- **P4**: Version bumped 2.3.8 → 2.3.9 (2.3.8 was error logging standardization sprint).
+- **P5**: UAT Submit API schema documented in PROJECT_KNOWLEDGE.md (section 4).
+- Deployed revision: metapm-v2-00091-r5h.
+
+### Prior Session Update — 2026-02-22 (Error Logging Standardization, v2.3.8)
+
+- Portfolio-wide error logging standardization (standards A, B, C across all 5 apps).
+- MetaPM bumped 2.3.7 → 2.3.8. Deployed revision: metapm-00011-b4s.
+- NOTE: MetaPM had SQL Server connectivity issues during that sprint (pre-existing).
+
+### Prior Session Update — 2026-02-22 (HO-MP11 Audit+Cleanup, v2.3.7)
+
+- Phase 1 audit: All 20 in_progress requirements verified against production. 12 corrected to done, 6 to backlog, MP-003 fixed in Phase 2, EM-012 stays in_progress.
+- Phase 2 cleanup: Fixed `/api/handoffs` SQL ORDER BY error in `handoff_lifecycle.py`. Created `tests/test_ui_smoke.py` (9 production smoke tests).
+- Phase 3 build: Added `conditional_pass` to UATStatus enum (MP-007 → done).
 - Version bumped 2.3.6 → 2.3.7. Deployed revision: metapm-v2-00090-vtn.
 
-### Prior Session Update — 2026-02-21 (MP-029/030/031)
+### Prior Session Update — 2026-02-21 (MP-029/030/031, v2.3.6)
 
 - Added MP-029: Quick Capture — Offline-First Messaging Interface (P2, backlog)
 - Added MP-030: Automated Lessons Learned — AI-Extracted Insights (P2, backlog)
@@ -247,6 +263,51 @@ Sources: `scripts/schema.sql`, `scripts/backlog_schema.sql`, `app/core/migration
 **Roadmap Export (New 2026-02-20)**: GET /api/roadmap/export (public JSON snapshot with projects, nested requirements, sprints, and aggregate stats)
 **UAT Submit (New 2026-02-18)**: POST /api/uat/submit (project derived from linked_requirements, 201 Created confirmed)
 **Handoff Lifecycle** (`/api/handoffs`, `/api/handoffs/{id}`, `/api/handoffs/{id}/status`, `/api/handoffs/{id}/complete`, `/api/roadmap/{id}/handoffs`)
+
+### UAT Submit API Schema (Updated v2.3.9)
+
+**Endpoint**: `POST /api/uat/submit` (also `/mcp/uat/submit`, `/mcp/uat/direct-submit`)
+**Auth**: None (public endpoint) | **Returns**: 201 Created
+
+```
+Required (at least one results format):
+  results_text        string  Full text block of test results
+                              Aliases: test_results_detail, test_results_summary
+
+Optional (smart defaults applied):
+  project             string  Project name (alias: project_name)
+                              Auto-derived from handoff_id prefix if omitted
+  version             string  Version string max 200 chars (alias: uat_date)
+  total_tests         int     Auto-inferred from [XX-NN] patterns in results_text
+                              if missing or 0; defaults to 1 if inference fails
+  passed              int     Pass count (default 0)
+  failed              int     Fail count (default 0)
+  skipped             int     Skip count (default 0)
+  blocked             int     Blocked count (default 0)
+  status              string  passed|failed|pending|blocked|partial|conditional_pass
+                              Auto-set from failed count if omitted
+  notes               string  General notes appended to results_text (alias: general_notes)
+  linked_requirements list    Requirement codes e.g. ["SF-005", "HL-008"]
+  uat_title           string  UAT title max 300 chars (alias: title)
+  tested_by           string  Tester name max 100 chars
+  submitted_at        string  Submission timestamp (alias: tested_at)
+  checklist_path      string  Path to HTML checklist
+  url                 string  URL of checklist
+
+Alternative results format (instead of results_text):
+  results             array   [{id, title, status, note?, linked_requirements?}]
+                              Array item aliases: test_id->id, test_name->title,
+                              result->status, notes->note
+                              Auto-generates results_text from array if omitted
+
+Validation:
+  total_tests inferred from results_text if missing/0; minimum 1 after inference
+  passed + failed + blocked must not exceed total_tests
+  Either results_text or results required (missing_results error if neither)
+```
+
+**Canonical HTML template**: `project-methodology/templates/UAT_Template_v4.html`
+**Source**: `app/schemas/mcp.py` (UATDirectSubmit), `app/api/mcp.py` (/mcp/uat/submit)
 **Conductor** (`/api/conductor/update`, `/api/conductor/dispatch`, `/api/conductor/status`, `/api/conductor/inbox`)
 **Methodology**: `/api/methodology/rules`, `/api/methodology/violations`, `/api/methodology/analytics`
 **Backlog**: `/api/backlog/bugs`, `/api/backlog/requirements`, `/api/backlog/grouped`, `/api/backlog/next-code/{project_id}/{item_type}`

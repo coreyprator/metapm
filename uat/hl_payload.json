@@ -1,0 +1,12 @@
+{
+  "project_name": "HarmonyLab",
+  "version": "1.8.4",
+  "status": "failed",
+  "total_tests": 18,
+  "passed": 10,
+  "failed": 2,
+  "skipped": 6,
+  "linked_requirements": ["HL-008", "HL-009", "HL-014", "HL-018"],
+  "notes": "PL UAT 2/22/2026. CHD-01 CRITICAL: chord dropdowns not implemented despite CC claiming done. .mscz parser returns 0 chords. 10 pass, 2 fail, 4 skip.",
+  "results_text": "[HarmonyLab] v1.8.4 UAT: Rework Sprint\nDate: 2/22/2026 | BE Rev: harmonylab-00087-fw9 | FE Rev: harmonylab-frontend-00059-ctf\nReqs: HL-008, HL-009, HL-014, HL-018\nSummary: 10 passed, 2 failed, 4 skipped, 2 pending out of 18 tests\n\n[SM-01] PENDING: Shows v1.8.5 (error logging sprint bumped). Health is a machine test.\n[SM-02] PASS: App loads, login works, song list visible. No membership prompt.\n[IMP-01] PASS: MIDI import works, no crash/logout.\n[IMP-02] PASS: MIDI import creates song with chords.\n[IMP-03] FAIL: .mscz files consistently show 'No chord symbols detected'. Reads header (key, time sig, tempo) but derives 0 chords. Import problem specific to MuseScore format.\n[IMP-04] PASS: Bad file (.pdf) shows clear error message.\n[CHD-01] FAIL: Chord edit modal still has FREE TEXT input, NOT dropdowns. Root/Quality/Extension/Bass dropdowns were NOT implemented.\n[CHD-02] SKIP: Blocked by CHD-01.\n[CHD-03] SKIP: Blocked by CHD-01.\n[CHD-04] SKIP: Blocked by CHD-01.\n[CHD-05] PENDING: Blocked by CHD-01.\n[DIAG-01] PASS: Import diagnostics present. A Whiter Shade of Pale shows key detection, ii-V-I patterns, confidence.\n[DIAG-02] SKIP: Blocked by IMP-03 (.mscz parsing issue).\n[ERR-01] PASS: Error toasts working, not alert() dialogs.\n[STD-01] PASS: Jazz standards visible. All songs default to Jazz genre.\n[BAT-01] PASS: Batch import works, handles duplicates.\n[REG-01] PASS: Existing songs work in analysis + quiz.\n[REG-02] PASS: Analysis is default view.\n\nCritical Issues:\n- CHD-01: Chord dropdowns NOT implemented. CC claimed done but modal still has free text.\n- IMP-03: .mscz harmonic analysis returns 0 chords. Works for .mid and .musicxml.\n\nNew Requirements:\n- Genre variety (not just Jazz default)\n- Status bar with song count totals"
+}

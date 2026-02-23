@@ -1,0 +1,12 @@
+{
+  "project_name": "ArtForge",
+  "version": "2.3.3",
+  "status": "failed",
+  "total_tests": 18,
+  "passed": 11,
+  "failed": 5,
+  "skipped": 2,
+  "linked_requirements": ["AF-007", "AF-009", "AF-010", "AF-011", "AF-013"],
+  "notes": "PL UAT 2/22/2026. Runway confirmed working (Scene 2). 5 fails mostly persistence issues. 13 new reqs captured.",
+  "results_text": "[ArtForge] v2.3.3 UAT: Runway Hotfix + Full Pipeline\nDate: 2/22/2026 | Rev: artforge-00104-dq4\nReqs: AF-007, AF-009, AF-010, AF-011, AF-013\nSummary: 11 passed, 5 failed, 1 skipped, 1 pending out of 18 tests\n\n[SM-01] SKIP: Health should be machine test. Footer shows v2.3.0, inconsistent with release.\n[SM-02] FAIL: Desktop works. Logout doesn't prompt for userid. iPhone caches last account.\n[IMG-01] PASS: Image generation works. New req: default to last provider used.\n[IMG-02] PASS: Radio buttons confirmed.\n[VID-01] PASS: Generate Video button visible.\n[VID-02] PASS: Runway selectable, duration dropdown works.\n[VID-03] PASS: Runway video generated successfully (Scene 2).\n[VID-04] FAIL: Video disappeared after leaving and returning to story.\n[VO-01] PASS: Voice-over works.\n[SFX-01] PASS: SFX panel visible, dropdown populated.\n[SFX-02] FAIL: SFX assignment doesn't persist. AI Generate works but doesn't save.\n[MUS-01] FAIL: Music dropdown exists but doesn't persist. New req: AI generate music from prompt.\n[ASM-01] PASS: Assemble button visible.\n[ASM-02] FAIL: Assembly failed: 403 Forbidden on Pixabay CDN music URL.\n[PRE-01] PASS: Export button visible.\n[PRE-02] PENDING: XML exported but Premiere couldn't import. Files use GCS URLs not local paths.\n[REG-01] PASS: Story creation and scene splitter work.\n[REG-02] PASS: Existing stories load, CRUD works. New req: better top nav (Collections/Storyboard).\n\nNew Requirements:\n- Default provider memory (last used provider per image/video)\n- Seedance provider setup instructions\n- Video persistence (clips disappear after leaving story)\n- SFX persistence fix\n- Music persistence fix + AI music generation from prompt\n- Premiere export: download media locally, use local paths\n- Scene splitter: loading state + disable during processing\n- Voice-over: UI placement, double-click protection, avatar selection, VCR controls\n- SFX: auto-generate prompt from scene description\n- Establishing shot / story-level setting (location, mood, era)\n- Scene context: AI generated dark pub for Brazil story\n- Top navigation: Collections / Storyboard breadcrumb\n- Login: prompt for userid on logout/re-login"
+}
