@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.3.9"  # UAT submit API: field aliases, total_tests inference, canonical template v4
+    VERSION: str = "2.3.10"  # Audit cleanup: status corrections, dead dNotes removed, MP-010/016/017 marked done
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

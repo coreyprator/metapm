@@ -359,10 +359,6 @@
       <textarea id="dDescription"></textarea>
     </div>
     <div>
-      <label>Notes</label>
-      <textarea id="dNotes"></textarea>
-    </div>
-    <div>
       <label>Linked Handoffs</label>
       <div id="dHandoffs" style="font-size:13px;color:var(--muted)">None</div>
     </div>
@@ -744,7 +740,6 @@
       qs('dStatus').value = req.status;
       qs('dVersion').value = req.target_version || '';
       qs('dDescription').value = req.description || '';
-      qs('dNotes').value = '';
 
       try {
         const links = await api(`/api/roadmap/requirements/${req.id}/handoffs`);

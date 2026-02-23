@@ -71,3 +71,10 @@ credentials/
 scripts/calendar_tokens.json
 scripts/oauth_credentials.json
 client_secret_*.json
+
+# Claude temp files
+tmpclaude-*
+# Audit scratch files
+uat/all_requirements.json
+uat/mp_requirements.json
+uat/requirements_page2.json
