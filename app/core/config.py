@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.3.10"  # Audit cleanup: status corrections, dead dNotes removed, MP-010/016/017 marked done
+    VERSION: str = "2.3.11"  # Data sprint: AF-030 Prompt Moderation Pre-Check requirement added
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
