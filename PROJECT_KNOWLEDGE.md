@@ -1,9 +1,18 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-23 — Sprint "Audit + Cleanup" (v2.3.10)
+Updated: 2026-02-23 — Sprint "AF-030 Moderation Data Sprint" (v2.3.11)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-02-23 (CC_Audit_MetaPM_Cleanup_Sprint, v2.3.10)
+### Latest Session Update — 2026-02-23 (CC_Retry_MetaPM_AF030_Moderation, v2.3.11)
+
+- **Data sprint only.** No features built.
+- Inserted AF-030 (Prompt Moderation Pre-Check & Auto-Sanitize) for ArtForge project via `POST /api/roadmap/requirements`. Description inserted verbatim per spec.
+- AF-015 remains occupied by "Deprecate Battle of the Bands" (seeded 2026-02-17). AF-030 is the correct code.
+- ArtForge now has 30 requirements (AF-001 through AF-030).
+- Version bumped 2.3.10 → 2.3.11. Deployed revision: metapm-v2-00095-gw2.
+- UAT handoff: `9686FA63-F4E3-4E14-8FDD-8445F289963A`
+
+### Prior Session Update — 2026-02-23 (CC_Audit_MetaPM_Cleanup_Sprint, v2.3.10)
 
 - **Phase 1 Audit**: Pulled all 106 requirements from production. Identified 12 in_progress items across AF/EM/HL/SF projects (cannot verify without project-specific auth). Identified 2 status lies in MetaPM requirements.
 - **Phase 2 Cleanup**: Corrected MP-029 done→backlog (Quick Capture: no implementation, no `/api/quick-capture` endpoint). Corrected MP-030 done→backlog (Lessons Learned: no implementation, no `/api/lessons` endpoint). Deleted MP-TEST (test data). Confirmed and marked MP-010 done (drawer detail panel fully implemented: status/priority/description/type editable, save via PUT). Confirmed and marked MP-016 done (reopen via drawer status dropdown contains all statuses including backlog/in_progress). Confirmed and marked MP-017 done (contextProjectId pre-populates project dropdown on Add).
