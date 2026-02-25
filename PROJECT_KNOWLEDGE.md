@@ -1,9 +1,25 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-23 — Sprint "AF-030 Moderation Data Sprint" (v2.3.11)
+Updated: 2026-02-25 — Sprint "Roadmap Data Reconciliation" (v2.4.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-02-23 (CC_Retry_MetaPM_AF030_Moderation, v2.3.11)
+### Latest Session Update — 2026-02-25 (CC_MetaPM_v2.4.0_Roadmap_Data_Reconciliation)
+
+- **Data-only sprint.** PL roadmap reconciliation from 2/24/2026.
+- **Current Version**: v2.4.0 (committed, deploy pending PL — cprator auth expired)
+- **Portfolio**: 6 active projects (AF, EM, HL, MP, PM, SF) + Etymology Family Graph + PromptForge (legacy)
+- **Total requirements**: 114 (AF:32, EM:12, HL:16, MP:25, SF:24, PM:5)
+- **Deletions**: MP-001 (marked done, FK prevented hard delete), SF-009 (already absent), SF-001 (merged into SF-008)
+- **Closures**: PM-005 (Bootstrap IS deployment checklist), EM-005 (PK handles GCP ID), EM-002 (cognate links working), HL-014/HL-018 (redundant with HL-008)
+- **New items**: SF-019-026 (8 from BUGS_AND_TODOS), AF-031 (Custom Voice Library), AF-032 (Gallery Slideshow)
+- **Description updates**: MP-011 (sprint entity), MP-012 (task entity), MP-013 (test plan), SF-002 (IPA direction), SF-013 (PIE root), SF-014 (cross-language search), HL-016 (melody analysis), HL-017 (rhythm analysis)
+- **Mega sprints**: 10 created with assignments (MP-MS1, PM-MS1, SF-MS1/MS2/MS3, AF-MS1/MS2, HL-MS1, EM-MS1, PF-MS1)
+- **New projects**: Etymology Family Graph (proj-efg), PromptForge (legacy-26, needs migration to proper roadmap project)
+- **API quirk**: `/api/requirements` has default limit of 50. Use `?limit=200` for full list.
+- **API quirk**: DELETE fails on requirements with handoff references (FK_rrh_requirement). Use status='done' + title prefix '[REMOVED]' as workaround.
+- **Deploy note**: cc-deploy SA lacks MetaPM deploy permissions. Requires cprator@cbsware.com (auth expired). PL must `gcloud auth login` then deploy.
+
+### Prior Session Update — 2026-02-23 (CC_Retry_MetaPM_AF030_Moderation, v2.3.11)
 
 - **Data sprint only.** No features built.
 - Inserted AF-030 (Prompt Moderation Pre-Check & Auto-Sanitize) for ArtForge project via `POST /api/roadmap/requirements`. Description inserted verbatim per spec.
@@ -78,7 +94,7 @@ Purpose: Canonical reference for all AI sessions working on this project.
 **Repository**: github.com/coreyprator/metapm
 **Custom Domain**: https://metapm.rentyourcio.com
 **Cloud Run URL**: https://metapm-67661554310.us-central1.run.app (legacy; use custom domain)
-**Current Version**: v2.3.7 (per `app/core/config.py` line 15)
+**Current Version**: v2.4.0 (per `app/core/config.py` line 15)
 **Latest Known Revision**: metapm-v2-00090-vtn _(deployed 2026-02-22, sprint HO-MP11 Audit+Cleanup)_
 **Owner**: Corey Prator
 
