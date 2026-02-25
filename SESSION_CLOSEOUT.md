@@ -1,81 +1,71 @@
-# SESSION CLOSEOUT -- Roadmap Data Reconciliation
+# SESSION CLOSEOUT -- MetaPM v2.4.0 Deploy + UAT + Bootstrap v1.4
 # Date: 2026-02-25
 # Model: Claude Opus 4.6
 # Runtime: Claude Code (VS Code extension)
-# Sprint: CC_MetaPM_v2.4.0_Roadmap_Data_Reconciliation
+# Sprint: CC_MetaPM_v2.4.0_Deploy_UAT_Bootstrap_v1.4
 
 ## Summary
-Data-only sprint to reconcile PL's roadmap decisions from 2/24/2026. No UI changes.
+Three-part sprint: (A) Deploy v2.4.0, (B) Generate UAT from standard template, (C) Bootstrap v1.4 amendment. Deploy BLOCKED by cprator auth expiry. UAT and Bootstrap completed.
 
-## Operations Performed
+## Part A: Deploy MetaPM v2.4.0 — BLOCKED
 
-### P0: DELETE
-- MP-001 (GitHub Actions CI/CD): Marked as done with [REMOVED] prefix. FK constraint (roadmap_requirement_handoffs) prevented hard DELETE.
-- SF-009: Already absent from roadmap_requirements table.
+### Blocking Issue
+- cprator@cbsware.com auth expired. `gcloud auth login` requires browser interaction CC cannot perform.
+- cc-deploy SA lacks MetaPM deploy permissions (PERMISSION_DENIED on iam.serviceaccounts.actAs).
+- Production still shows v2.3.11. Code v2.4.0 is committed and pushed (5171c72).
 
-### P1: CLOSE (status -> done)
-- PM-005: Bootstrap v1.3 IS the deployment checklist
-- EM-005: Bootstrap + PROJECT_KNOWLEDGE.md handles GCP ID
-- EM-002: Cognate links working, confirmed in UAT v0.2.2
-- HL-014: Redundant with HL-008 (MuseScore import)
-- HL-018: Redundant with HL-008 (batch import)
+### PL Action Required
+```powershell
+# 1. Authenticate
+gcloud auth login
+# Authenticate as cprator@cbsware.com in browser
 
-### P2: MERGE
-- SF-001 -> SF-008: Updated SF-008 description to include performance stats scope. SF-001 did not exist in roadmap.
+# 2. Deploy
+cd "G:\My Drive\Code\Python\metapm"
+gcloud config set account cprator@cbsware.com
+gcloud run deploy metapm-v2 --source . --region us-central1 --allow-unauthenticated --set-env-vars="DB_SERVER=35.224.242.223,DB_NAME=MetaPM,DB_USER=sqlserver,ENVIRONMENT=production" --set-secrets="DB_PASSWORD=db-password:latest" --add-cloudsql-instances="super-flashcards-475210:us-central1:flashcards-db"
 
-### P3: ADD (10 new requirements)
-- SF-019 through SF-026: 8 from BUGS_AND_TODOS.md (7 existed from previous session; SF-021 created fresh)
-- AF-031 (Custom Voice Library), AF-032 (Gallery Slideshow): Both existed from previous session
+# 3. Verify
+curl https://metapm.rentyourcio.com/health
+# Expected: v2.4.0
+```
 
-### P4: UPDATE (8 descriptions)
-- MP-011: Sprint entity + assignment (set to in_progress)
-- MP-012: Task entity (set to in_progress)
-- MP-013: Test Plan / UAT entity
-- SF-002: IPA direction fix (arrow direction inverted)
-- SF-013: PIE root field
-- SF-014: Changed from "PIE Root Pronunciation Audio" to "Cross-language search from header bar" (set to backlog)
-- HL-016: Melody analysis (note display per measure)
-- HL-017: Rhythm analysis (note timing storage)
+## Part B: UAT — COMPLETED (40/41 pass)
 
-### P5: MEGA SPRINTS
-10 sprints already created by previous session with assignments:
-- MP-MS1, PM-MS1, SF-MS1/MS2/MS3, AF-MS1/MS2, HL-MS1, EM-MS1, PF-MS1
-- All existing requirements assigned to correct sprints (60 items total)
+### Artifacts
+- `run_uat_tests.py` — Automated test script, 41 tests (44 checks)
+- `UAT_MetaPM_v2.4.0.html` — Populated from standard template with auto-results
 
-### P6: VERSION BUMP
-- v2.3.11 -> v2.4.0 in app/core/config.py
-- Committed: 5171c72
-- Deploy PENDING: cc-deploy SA lacks permissions, cprator@cbsware.com auth expired
+### Test Results
+- **40 PASSED, 1 FAILED** (out of 41 tests)
+- **FUN-01 FAIL**: Version check returns v2.3.11 (deploy pending)
+- All data reconciliation verified: deletions, closures, merge, new items, description updates, count integrity
+- All regression tests pass
+- All data integrity tests pass
 
-## Data Issue: Duplicate Cleanup
-Initial Phase 0 showed 50 items due to /api/requirements default limit=50.
-Created P1/P2/P4 items as new records, then discovered originals existed beyond page 1.
-Deleted 15 duplicate records, updated originals instead. Final count clean: 114.
+### UAT Handoff
+- MetaPM deploy+UAT: `B8E9CEE2-B2E9-4F93-A4FE-CD3E80388235`
 
-## Final Counts
-| Project | Count |
-|---------|-------|
-| ArtForge | 32 |
-| Etymython | 12 |
-| HarmonyLab | 16 |
-| MetaPM | 25 |
-| Super-Flashcards | 24 |
-| project-methodology | 5 |
-| **TOTAL** | **114** |
+## Part C: Bootstrap v1.4 — COMPLETED
 
-## API Quirks Discovered
-1. `/api/requirements` default limit is 50. Use `?limit=200` for full list.
-2. DELETE fails on requirements with handoff references (FK_rrh_requirement). Use status update as workaround.
-3. Status enum: backlog, planned, in_progress, uat, needs_fixes, done (no "deleted" option).
-4. POST /api/requirements requires `id` (UUID) and `project_id` (not project name).
+### Amendments Applied
+1. **Deploy-First Auth**: Added after Step 2 auth check. Projects requiring cprator listed. Deploy is CC's job.
+2. **Machine-Verifiable UAT**: Added to compliance section. CC must run tests programmatically. Copy template, never recreate.
+3. **Lessons Learned Routing**: New table routing process/technical/architecture/quality lessons to specific destinations.
+
+### Artifacts
+- `templates/CC_Bootstrap_v1.md` v1.4.0
+- Commit: `308035f` (project-methodology, pushed)
+- UAT Handoff: `7EEB4CD6-A12B-4C7E-B851-F12F1D126469`
+
+## Git State
+- **MetaPM**: main at latest (PK update + closeout pending commit)
+- **project-methodology**: main at `308035f` (Bootstrap v1.4 pushed, PK update + closeout pending commit)
 
 ## PL Next Steps
-1. Run `gcloud auth login` to refresh cprator@cbsware.com credentials
-2. Deploy MetaPM:
-   ```
-   cd "G:\My Drive\Code\Python\metapm"
-   gcloud config set account cprator@cbsware.com
-   gcloud run deploy metapm-v2 --source . --region us-central1 --allow-unauthenticated --set-env-vars="DB_SERVER=35.224.242.223,DB_NAME=MetaPM,DB_USER=sqlserver,ENVIRONMENT=production" --set-secrets="DB_PASSWORD=db-password:latest" --add-cloudsql-instances="super-flashcards-475210:us-central1:flashcards-db"
-   ```
-3. Verify: `curl https://metapm.rentyourcio.com/health` should show v2.4.0
-4. Grant cc-deploy SA deploy permissions for MetaPM to avoid this issue in future sprints
+1. Run `gcloud auth login` as cprator@cbsware.com
+2. Deploy MetaPM v2.4.0 per commands above
+3. Verify health returns v2.4.0
+4. Re-run `python run_uat_tests.py` to confirm FUN-01 passes
+5. Open `UAT_MetaPM_v2.4.0.html` in browser, click APPROVED, submit
+6. Grant cc-deploy SA deploy permissions for MetaPM (prevents future blocked deploys)

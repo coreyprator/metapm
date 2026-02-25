@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetaPM v2.4.0 — UAT: Roadmap Data Reconciliation</title>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #252538;
+            --accent: #ef4444;
+            --accent-success: #22c55e;
+            --accent-danger: #ef4444;
+            --accent-skip: #6b7280;
+            --text-primary: #e5e5e5;
+            --text-muted: #9ca3af;
+            --border-color: #3a3a52;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        header {
+            background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent), black 15%));
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+        header h1 { font-size: 1.4rem; margin-bottom: 8px; }
+        header p { opacity: 0.9; font-size: 0.9rem; }
+        .meta { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; font-size: 0.85rem; }
+        .meta span { background: rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 4px; }
+        .url-link { display: block; background: #0f172a; padding: 10px 14px; border-radius: 6px; margin: 10px 0 20px 0; font-family: monospace; font-size: 0.85rem; }
+        .url-link a { color: color-mix(in srgb, var(--accent), white 40%); text-decoration: none; }
+        .url-link a:hover { text-decoration: underline; }
+        section { background: var(--bg-secondary); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+        section h2 { color: color-mix(in srgb, var(--accent), white 40%); font-size: 1.1rem; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid var(--accent); }
+        .test-item { padding: 16px 0; border-bottom: 1px solid var(--border-color); }
+        .test-item:last-child { border-bottom: none; }
+        .test-row { display: flex; align-items: flex-start; gap: 12px; }
+        .test-content { flex: 1; }
+        .test-label { font-weight: 500; display: block; margin-bottom: 4px; }
+        .expected { color: #a78bfa; font-size: 0.85rem; font-style: italic; }
+        .req-tag { display: inline-block; font-size: 0.7rem; background: rgba(239,68,68,0.25); color: #fca5a5; padding: 1px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
+        .test-buttons { display: flex; gap: 6px; flex-shrink: 0; }
+        .btn { padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.15s; }
+        .btn-pass { background: #166534; color: #bbf7d0; }
+        .btn-pass:hover, .btn-pass.selected { background: var(--accent-success); color: white; }
+        .btn-fail { background: #991b1b; color: #fecaca; }
+        .btn-fail:hover, .btn-fail.selected { background: var(--accent-danger); color: white; }
+        .btn-skip { background: #374151; color: #d1d5db; }
+        .btn-skip:hover, .btn-skip.selected { background: var(--accent-skip); color: white; }
+        .test-item.passed .test-label { color: #4ade80; }
+        .test-item.passed .test-label::before { content: "\2713 "; }
+        .test-item.failed .test-label { color: #f87171; }
+        .test-item.failed .test-label::before { content: "\2717 "; }
+        .test-item.skipped .test-label { color: #9ca3af; }
+        .test-item.skipped .test-label::before { content: "\25CB "; }
+        .notes-container { margin-top: 10px; }
+        .notes-label { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
+        .notes-input { width: 100%; padding: 8px 10px; background: #1e1e32; border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-family: inherit; font-size: 0.9rem; resize: vertical; min-height: 40px; }
+        .notes-input:focus { outline: none; border-color: var(--accent); }
+        .general-notes { background: #1e2a3f; border: 2px solid #8b5cf6; border-radius: 8px; padding: 20px; margin-top: 24px; }
+        .general-notes h3 { color: #a78bfa; margin-bottom: 12px; }
+        .general-notes-input { width: 100%; min-height: 80px; padding: 12px; background: #1e1e32; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; resize: vertical; }
+        .summary { background: #1e1e32; border: 2px solid var(--accent); border-radius: 8px; padding: 20px; margin-top: 24px; }
+        .summary h3 { margin-bottom: 16px; }
+        .summary-stats { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+        .stat { padding: 12px 20px; border-radius: 6px; font-weight: bold; text-align: center; }
+        .stat.total { background: var(--accent); }
+        .stat.passed { background: var(--accent-success); }
+        .stat.failed { background: #991b1b; }
+        .stat.skipped { background: var(--accent-skip); }
+        .overall-result { padding: 16px; border-radius: 8px; text-align: center; margin-top: 16px; }
+        .overall-result.pending { background: #374151; border: 2px dashed #6b7280; }
+        .overall-result.pass { background: #166534; border: 2px solid var(--accent-success); }
+        .overall-result.fail { background: #991b1b; border: 2px solid #ef4444; }
+        .overall-buttons { display: flex; gap: 12px; justify-content: center; margin-top: 12px; }
+        .overall-btn { padding: 10px 24px; border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .overall-btn.approve { background: var(--accent-success); color: white; }
+        .overall-btn.reject { background: #991b1b; color: white; }
+        .export-bar { text-align: center; margin-top: 24px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+        .export-btn { padding: 12px 32px; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; font-weight: 600; }
+        .copy-btn { background: var(--accent); color: white; }
+        .submit-btn { background: var(--accent-success); color: white; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>MetaPM v2.4.0 — UAT: Roadmap Data Reconciliation</h1>
+        <p>2 deletions, 5 closures, 1 merge, 10 new items, 8 description updates, 10 mega sprints | Commits: 5171c72, 190e13d</p>
+        <div class="meta">
+            <span>Version: 2.4.0</span>
+            <span>Revision: 5171c72</span>
+            <span id="test-date">2/25/2026</span>
+        </div>
+    </header>
+
+    <div class="url-link">
+        <strong>Production:</strong> <a href="https://metapm.rentyourcio.com" target="_blank">https://metapm.rentyourcio.com</a><br>
+        <strong>Health:</strong> <a href="https://metapm.rentyourcio.com/health" target="_blank">https://metapm.rentyourcio.com/health</a>
+    </div>
+
+    <!-- ================ 1. DEPLOY VERIFICATION ================ -->
+    <section>
+        <h2>1. Deploy Verification</h2>
+
+        <div class="test-item" data-test="FUN-01" data-reqs="">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Version deployed — /health returns v2.4.0</span>
+                    <span class="expected">&rarr; Returns v2.4.0</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder="">FAIL: Got v2.3.11 — deploy pending (cprator@cbsware.com auth expired)</textarea>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================ 2. DELETIONS & CLOSURES ================ -->
+    <section>
+        <h2>2. Deletions &amp; Closures</h2>
+
+        <div class="test-item" data-test="FUN-02" data-reqs="MP-001">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">MP-001 deleted or done<span class="req-tag">MP-001</span></span>
+                    <span class="expected">&rarr; Not in active requirements (status=done or absent)</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder="">status=done (FK prevented hard delete, marked done with [REMOVED] prefix)</textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-03" data-reqs="SF-009">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">SF-009 absent from roadmap<span class="req-tag">SF-009</span></span>
+                    <span class="expected">&rarr; Not found in requirements</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-04" data-reqs="PM-005">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">PM-005 closed<span class="req-tag">PM-005</span></span>
+                    <span class="expected">&rarr; status = done</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder="">status=done</textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-05" data-reqs="EM-005">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">EM-005 closed<span class="req-tag">EM-005</span></span>
+                    <span class="expected">&rarr; status = done</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder="">status=done</textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-06" data-reqs="EM-002">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">EM-002 closed<span class="req-tag">EM-002</span></span>
+                    <span class="expected">&rarr; status = done</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder="">status=done</textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-07" data-reqs="HL-014">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">HL-014 closed<span class="req-tag">HL-014</span></span>
+                    <span class="expected">&rarr; status = done</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder="">status=done</textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-08" data-reqs="HL-018">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">HL-018 closed<span class="req-tag">HL-018</span></span>
+                    <span class="expected">&rarr; status = done</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder="">status=done</textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-09" data-reqs="SF-001">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">SF-001 deleted (merged into SF-008)<span class="req-tag">SF-001</span></span>
+                    <span class="expected">&rarr; Not found in requirements</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================ 3. NEW REQUIREMENTS ================ -->
+    <section>
+        <h2>3. New Requirements (10 items)</h2>
+
+        <div class="test-item" data-test="FUN-11" data-reqs="SF-019">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">SF-019 exists (bug, P1)<span class="req-tag">SF-019</span></span>
+                    <span class="expected">&rarr; Found with type=bug, priority=P1</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-12" data-reqs="SF-020">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">SF-020 exists (bug, P1)<span class="req-tag">SF-020</span></span>
+                    <span class="expected">&rarr; Found with type=bug, priority=P1</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-13" data-reqs="SF-021">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">SF-021 exists (bug, P3)<span class="req-tag">SF-021</span></span>
+                    <span class="expected">&rarr; Found with type=bug, priority=P3</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-14" data-reqs="SF-022">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">SF-022 exists (bug, P2)<span class="req-tag">SF-022</span></span>
+                    <span class="expected">&rarr; Found with type=bug, priority=P2</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-15" data-reqs="SF-023">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">SF-023 exists (feature, P2)<span class="req-tag">SF-023</span></span>
+                    <span class="expected">&rarr; Found with type=feature, priority=P2</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-16" data-reqs="SF-024">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">SF-024 exists (feature, P2)<span class="req-tag">SF-024</span></span>
+                    <span class="expected">&rarr; Found with type=feature, priority=P2</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-17" data-reqs="SF-025">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">SF-025 exists (feature, P2)<span class="req-tag">SF-025</span></span>
+                    <span class="expected">&rarr; Found with type=feature, priority=P2</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-18" data-reqs="SF-026">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">SF-026 exists (feature, P2)<span class="req-tag">SF-026</span></span>
+                    <span class="expected">&rarr; Found with type=feature, priority=P2</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-19" data-reqs="AF-031">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">AF-031 exists (feature, P2)<span class="req-tag">AF-031</span></span>
+                    <span class="expected">&rarr; Found with type=feature, priority=P2</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-20" data-reqs="AF-032">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">AF-032 exists (feature, P2)<span class="req-tag">AF-032</span></span>
+                    <span class="expected">&rarr; Found with type=feature, priority=P2</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================ 4. MERGE & DESCRIPTION UPDATES ================ -->
+    <section>
+        <h2>4. Merge &amp; Description Updates</h2>
+
+        <div class="test-item" data-test="FUN-10" data-reqs="SF-008,SF-001">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">SF-008 description updated (merged from SF-001)<span class="req-tag">SF-008</span></span>
+                    <span class="expected">&rarr; Contains "performance stats" and "per-user data"</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-21" data-reqs="MP-011">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">MP-011 description updated<span class="req-tag">MP-011</span></span>
+                    <span class="expected">&rarr; Contains "Multi-select" and "hierarchical"</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-22" data-reqs="MP-012">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">MP-012 description updated<span class="req-tag">MP-012</span></span>
+                    <span class="expected">&rarr; Contains "siblings of requirements"</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-23" data-reqs="MP-013">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">MP-013 description updated<span class="req-tag">MP-013</span></span>
+                    <span class="expected">&rarr; Contains "audit trail"</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-24" data-reqs="SF-002">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">SF-002 description updated (IPA direction fix)<span class="req-tag">SF-002</span></span>
+                    <span class="expected">&rarr; Contains "arrow" and "inverted"</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-25" data-reqs="SF-013">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">SF-013 description updated<span class="req-tag">SF-013</span></span>
+                    <span class="expected">&rarr; Contains "Etymology Family Graph"</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-26" data-reqs="SF-014">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">SF-014 content correct (cross-language search)<span class="req-tag">SF-014</span></span>
+                    <span class="expected">&rarr; Contains "header bar"</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-27" data-reqs="HL-016">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">HL-016 description updated<span class="req-tag">HL-016</span></span>
+                    <span class="expected">&rarr; Contains "NOT a melody quiz"</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-28" data-reqs="HL-017">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">HL-017 description updated<span class="req-tag">HL-017</span></span>
+                    <span class="expected">&rarr; Contains "NOT MIDI keyboard"</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================ 5. COUNT VERIFICATION ================ -->
+    <section>
+        <h2>5. Count Verification</h2>
+
+        <div class="test-item" data-test="FUN-29" data-reqs="">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Total requirement count = 114</span>
+                    <span class="expected">&rarr; 114 requirements across all projects</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder="">Got 114</textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="FUN-30" data-reqs="">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Count by project matches expected</span>
+                    <span class="expected">&rarr; AF:32, EM:12, HL:16, MP:25, SF:24, PM:5</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder="">ArtForge:32, Etymython:12, HarmonyLab:16, MetaPM:25, Super-Flashcards:24, project-methodology:5</textarea>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================ 6. REGRESSION TESTS ================ -->
+    <section>
+        <h2>6. Regression Tests</h2>
+
+        <div class="test-item" data-test="REG-01" data-reqs="">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">API /requirements responds</span>
+                    <span class="expected">&rarr; 200 OK, returns requirements array</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder="">114 items returned</textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="REG-02" data-reqs="">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">API /projects responds</span>
+                    <span class="expected">&rarr; 200 OK, returns projects array</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="REG-03" data-reqs="">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">API /sprints responds</span>
+                    <span class="expected">&rarr; 200 OK, returns sprints array</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="REG-04" data-reqs="">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Search works (query: "chord")</span>
+                    <span class="expected">&rarr; Returns relevant results</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="REG-05" data-reqs="AF-016,AF-017">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Existing ArtForge reqs intact<span class="req-tag">AF-016</span><span class="req-tag">AF-017</span></span>
+                    <span class="expected">&rarr; AF-016 and AF-017 present and unchanged</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="REG-06" data-reqs="HL-008,HL-012">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Existing HarmonyLab reqs intact<span class="req-tag">HL-008</span><span class="req-tag">HL-012</span></span>
+                    <span class="expected">&rarr; HL-008 and HL-012 present and unchanged</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="REG-07" data-reqs="EM-012,EM-008">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Existing Etymython reqs intact<span class="req-tag">EM-012</span><span class="req-tag">EM-008</span></span>
+                    <span class="expected">&rarr; EM-012 and EM-008 present and unchanged</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================ 7. DATA INTEGRITY ================ -->
+    <section>
+        <h2>7. Data Integrity</h2>
+
+        <div class="test-item" data-test="DATA-01" data-reqs="">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">Etymology Family Graph project exists</span>
+                    <span class="expected">&rarr; Present in projects list</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="DATA-02" data-reqs="">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">PromptForge project exists</span>
+                    <span class="expected">&rarr; Present in projects list</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="DATA-03" data-reqs="">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">10 mega sprints exist</span>
+                    <span class="expected">&rarr; At least 10 sprints found</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder=""></textarea>
+            </div>
+        </div>
+
+        <div class="test-item" data-test="DATA-04" data-reqs="">
+            <div class="test-row">
+                <div class="test-content">
+                    <span class="test-label">No orphaned requirements</span>
+                    <span class="expected">&rarr; All requirements have valid project_id</span>
+                </div>
+                <div class="test-buttons">
+                    <button class="btn btn-pass" onclick="setResult(this, 'pass')">&#10003; Pass</button>
+                    <button class="btn btn-fail" onclick="setResult(this, 'fail')">&#10007; Fail</button>
+                    <button class="btn btn-skip" onclick="setResult(this, 'skip')">&#9675; Skip</button>
+                </div>
+            </div>
+            <div class="notes-container">
+                <div class="notes-label">Notes</div>
+                <textarea class="notes-input" placeholder="">0 orphans</textarea>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================ GENERAL NOTES ================ -->
+    <div class="general-notes">
+        <h3>General Notes</h3>
+        <textarea id="general-notes" class="general-notes-input" placeholder="Any observations, issues found, suggestions...">DEPLOY BLOCKED: cprator@cbsware.com auth expired. CC cannot run gcloud auth login (requires browser). 40/41 automated checks pass. FUN-01 (version check) will pass after deploy. All data reconciliation work verified: 2 deletions, 5 closures, 1 merge, 10 new items, 8 description updates, 10 mega sprints, 114 total requirements.</textarea>
+    </div>
+
+    <!-- ================ RESULTS SUMMARY ================ -->
+    <div class="summary">
+        <h3>Results Summary</h3>
+        <div class="summary-stats">
+            <div class="stat total">Total: <span id="total-count">41</span></div>
+            <div class="stat passed">Pass: <span id="pass-count">0</span></div>
+            <div class="stat failed">Fail: <span id="fail-count">0</span></div>
+            <div class="stat skipped">Skip: <span id="skip-count">0</span></div>
+        </div>
+
+        <div class="overall-result pending" id="overall-result">
+            <h4>Overall Result</h4>
+            <p style="margin-bottom:12px;opacity:0.8;">MetaPM v2.4.0 — UAT: Roadmap Data Reconciliation approved?</p>
+            <div class="overall-buttons">
+                <button class="overall-btn approve" onclick="setOverall('pass')">&#10003; APPROVED</button>
+                <button class="overall-btn reject" onclick="setOverall('fail')">&#10007; NEEDS FIXES</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================ EXPORT / SUBMIT ================ -->
+    <div class="export-bar">
+        <button class="export-btn copy-btn" onclick="copyResults()">Copy Results</button>
+        <button class="export-btn submit-btn" id="submit-btn" onclick="submitToMetaPM()">Submit to MetaPM</button>
+    </div>
+
+    <script>
+        // ====================================================================
+        // UAT_CONFIG — customize these 4 fields per sprint. Nothing else.
+        // ====================================================================
+        const UAT_CONFIG = {
+            project: 'MetaPM',
+            version: '2.4.0',
+            feature: 'Roadmap Data Reconciliation',
+            linked_requirements: ['MP-001','SF-009','PM-005','EM-005','EM-002','HL-014','HL-018','SF-001','SF-008','SF-019','SF-020','SF-021','SF-022','SF-023','SF-024','SF-025','SF-026','AF-031','AF-032','MP-011','MP-012','MP-013','SF-002','SF-013','SF-014','HL-016','HL-017']
+        };
+
+        // State
+        const results = {};
+
+        // Init
+        document.getElementById('total-count').textContent =
+            document.querySelectorAll('.test-item').length;
+
+        function setResult(btn, result) {
+            const item = btn.closest('.test-item');
+            const id = item.dataset.test;
+            item.querySelectorAll('.btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            item.classList.remove('passed', 'failed', 'skipped');
+            if (result === 'pass') item.classList.add('passed');
+            else if (result === 'fail') item.classList.add('failed');
+            else item.classList.add('skipped');
+            results[id] = result;
+            updateCounts();
+        }
+
+        function updateCounts() {
+            const p = Object.values(results).filter(r => r === 'pass').length;
+            const f = Object.values(results).filter(r => r === 'fail').length;
+            const s = Object.values(results).filter(r => r === 'skip').length;
+            document.getElementById('pass-count').textContent = p;
+            document.getElementById('fail-count').textContent = f;
+            document.getElementById('skip-count').textContent = s;
+        }
+
+        function setOverall(result) {
+            const c = document.getElementById('overall-result');
+            c.classList.remove('pending', 'pass', 'fail');
+            c.classList.add(result);
+            c.innerHTML = result === 'pass'
+                ? '<h4 style="color:#4ade80;">v2.4.0 APPROVED</h4><p>All data reconciliation verified!</p>'
+                : '<h4 style="color:#f87171;">NEEDS FIXES</h4><p>See notes above.</p>';
+        }
+
+        function buildResultsText() {
+            const total = document.querySelectorAll('.test-item').length;
+            const passed = Object.values(results).filter(r => r === 'pass').length;
+            const failed = Object.values(results).filter(r => r === 'fail').length;
+            const skipped = total - passed - failed;
+            const sep = '='.repeat(60);
+            const subsep = '-'.repeat(50);
+
+            let out = `[${UAT_CONFIG.project}] `;
+            const overall = document.getElementById('overall-result');
+            if (overall.classList.contains('fail') || failed > 0) out += 'FAIL ';
+            else if (overall.classList.contains('pass')) out += 'PASS ';
+            out += `v${UAT_CONFIG.version} — UAT: ${UAT_CONFIG.feature}\n${sep}\n`;
+            out += `Date: ${new Date().toLocaleString()}\n`;
+            out += `Version: ${UAT_CONFIG.version}\n`;
+            if (UAT_CONFIG.linked_requirements.length)
+                out += `Requirements: ${UAT_CONFIG.linked_requirements.join(', ')}\n`;
+            out += `Summary: ${passed} passed, ${failed} failed, ${skipped} skipped\n${sep}\n`;
+
+            document.querySelectorAll('section').forEach(sec => {
+                const h = sec.querySelector('h2');
+                if (!h) return;
+                out += `\n${h.textContent}\n${subsep}\n`;
+                sec.querySelectorAll('.test-item').forEach(item => {
+                    const id = item.dataset.test;
+                    const label = item.querySelector('.test-label');
+                    const title = label
+                        ? label.textContent.replace(/[A-Z]+-\d+/g, '').trim()
+                        : '';
+                    const notes = item.querySelector('.notes-input')?.value || '';
+                    const status = results[id] || 'pending';
+                    const icons = { pass: 'PASS', fail: 'FAIL', skip: 'SKIP', pending: '?' };
+                    out += `  [${id}] ${icons[status]}: ${title}\n`;
+                    if (notes.trim()) out += `         Note: ${notes}\n`;
+                });
+            });
+
+            const gn = document.getElementById('general-notes').value.trim();
+            if (gn) out += `\nGeneral Notes\n${subsep}\n${gn}\n`;
+
+            if (overall.classList.contains('pass')) out += `\nOVERALL: APPROVED\n`;
+            else if (overall.classList.contains('fail')) out += `\nOVERALL: NEEDS FIXES\n`;
+            else out += `\nOVERALL: PENDING\n`;
+
+            return out;
+        }
+
+        function copyResults() {
+            const text = buildResultsText();
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => alert('Copied!'));
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                alert('Copied!');
+            }
+        }
+
+        // =================================================================
+        // SUBMIT TO METAPM
+        // =================================================================
+        async function submitToMetaPM() {
+            const submitBtn = document.getElementById('submit-btn');
+            const total = document.querySelectorAll('.test-item').length;
+            const passed = Object.values(results).filter(r => r === 'pass').length;
+            const failed = Object.values(results).filter(r => r === 'fail').length;
+            const skipped = total - passed - failed;
+
+            if ((passed + failed) === 0) {
+                alert('Complete at least one test as Pass or Fail before submitting.');
+                return;
+            }
+
+            const detailed = [];
+            document.querySelectorAll('.test-item').forEach(t => {
+                const id = t.dataset.test;
+                const reqs = t.dataset.reqs || '';
+                const label = t.querySelector('.test-label');
+                const title = label
+                    ? label.textContent.replace(/[A-Z]+-\d+/g, '').trim()
+                    : '';
+                const status = results[id] || 'skip';
+                const note = t.querySelector('.notes-input')?.value || '';
+                detailed.push({
+                    id, title, status, note,
+                    linked_requirements: reqs
+                        ? reqs.split(',').map(s => s.trim())
+                        : []
+                });
+            });
+
+            const overall = document.getElementById('overall-result');
+            let overallStatus = 'pending';
+            if (overall.classList.contains('pass')) overallStatus = 'passed';
+            else if (overall.classList.contains('fail')) overallStatus = 'failed';
+            else overallStatus = failed > 0 ? 'failed' : 'passed';
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            try {
+                const response = await fetch(
+                    'https://metapm.rentyourcio.com/api/uat/submit',
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            project: UAT_CONFIG.project,
+                            version: UAT_CONFIG.version,
+                            feature: UAT_CONFIG.feature,
+                            status: overallStatus,
+                            total_tests: total,
+                            passed,
+                            failed,
+                            skipped,
+                            notes_count: detailed.filter(
+                                d => (d.note || '').trim().length > 0
+                            ).length,
+                            results_text: buildResultsText(),
+                            results: detailed,
+                            linked_requirements: UAT_CONFIG.linked_requirements,
+                            checklist_path: window.location.pathname,
+                            url: window.location.href,
+                            tested_by: 'Corey'
+                        })
+                    }
+                );
+
+                const body = await response.text();
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${body}`);
+                }
+
+                const data = JSON.parse(body);
+                submitBtn.textContent = 'Submitted to MetaPM';
+                submitBtn.style.background = '#166534';
+
+                const link = document.createElement('a');
+                link.href = data.handoff_url;
+                link.textContent = 'View in MetaPM';
+                link.target = '_blank';
+                link.style.cssText =
+                    'display:block;text-align:center;margin-top:12px;' +
+                    'color:#60a5fa;font-weight:600;';
+                submitBtn.parentElement.appendChild(link);
+            } catch (err) {
+                alert(`Submit failed: ${err.message}`);
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit to MetaPM';
+            }
+        }
+
+        // =================================================================
+        // AUTO-POPULATE: Results from run_uat_tests.py (2026-02-25)
+        // 40 PASS, 1 FAIL (FUN-01: deploy pending)
+        // =================================================================
+        const autoResults = {
+            'FUN-01': 'fail',
+            'FUN-02': 'pass', 'FUN-03': 'pass',
+            'FUN-04': 'pass', 'FUN-05': 'pass', 'FUN-06': 'pass',
+            'FUN-07': 'pass', 'FUN-08': 'pass', 'FUN-09': 'pass',
+            'FUN-10': 'pass',
+            'FUN-11': 'pass', 'FUN-12': 'pass', 'FUN-13': 'pass',
+            'FUN-14': 'pass', 'FUN-15': 'pass', 'FUN-16': 'pass',
+            'FUN-17': 'pass', 'FUN-18': 'pass', 'FUN-19': 'pass',
+            'FUN-20': 'pass',
+            'FUN-21': 'pass', 'FUN-22': 'pass', 'FUN-23': 'pass',
+            'FUN-24': 'pass', 'FUN-25': 'pass', 'FUN-26': 'pass',
+            'FUN-27': 'pass', 'FUN-28': 'pass',
+            'FUN-29': 'pass', 'FUN-30': 'pass',
+            'REG-01': 'pass', 'REG-02': 'pass', 'REG-03': 'pass',
+            'REG-04': 'pass', 'REG-05': 'pass', 'REG-06': 'pass',
+            'REG-07': 'pass',
+            'DATA-01': 'pass', 'DATA-02': 'pass', 'DATA-03': 'pass',
+            'DATA-04': 'pass'
+        };
+
+        // Apply auto-results on page load
+        Object.entries(autoResults).forEach(([id, result]) => {
+            const item = document.querySelector(`[data-test="${id}"]`);
+            if (!item) return;
+            const btn = item.querySelector(`.btn-${result}`);
+            if (btn) setResult(btn, result);
+        });
+    </script>
+</body>
+</html>
