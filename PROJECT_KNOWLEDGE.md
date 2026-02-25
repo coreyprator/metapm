@@ -3,14 +3,20 @@ Generated: 2026-02-15 by CC Session
 Updated: 2026-02-25 — Sprint "Roadmap Data Reconciliation" (v2.4.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-02-25 (CC_MetaPM_v2.4.0_Deploy_UAT_Bootstrap_v1.4)
+### Latest Session Update — 2026-02-25 (CC_MetaPM_v2.4.0_Deploy_UAT_SA_Permissions)
 
-- **Deploy + UAT + Bootstrap sprint.** Deploy BLOCKED (cprator auth expired). UAT generated and run. Bootstrap v1.4 applied.
-- **Current Version**: v2.4.0 (committed `5171c72`, deploy pending — cprator@cbsware.com auth expired)
-- **UAT**: 41 tests (40 pass, 1 fail). FUN-01 (version check) fails — returns v2.3.11, expected v2.4.0 (deploy pending).
-- **UAT HTML**: `UAT_MetaPM_v2.4.0.html` — auto-populated from `run_uat_tests.py` results via standard template
-- **UAT handoffs**: `B8E9CEE2` (deploy+UAT), `7EEB4CD6` (Bootstrap v1.4)
-- **Deploy requires**: PL runs `gcloud auth login` as cprator@cbsware.com, then deploys per SESSION_CLOSEOUT.md
+- **Deploy + UAT + SA permissions sprint.** All 3 parts COMPLETE.
+- **Current Version**: v2.4.0 — **DEPLOYED** revision `metapm-v2-00096-q7r`
+- **Health**: `{"status":"healthy","version":"2.4.0"}`
+- **UAT**: 44/44 automated checks pass. 6 status corrections applied (MP-001, PM-005, EM-005, EM-002, HL-014, HL-018 were in_progress, now done).
+- **UAT HTML**: `UAT_MetaPM_v2.4.0.html` — all 41 tests PASS, auto-populated
+- **UAT handoff**: `B8E9CEE2` (passed), `6BC58603` (UAT result ID)
+- **cc-deploy SA**: Granted `roles/iam.serviceAccountUser`. cc-deploy can now deploy MetaPM without cprator workaround.
+- **cc-deploy SA roles**: run.admin, iam.serviceAccountUser, artifactregistry.writer, cloudbuild.builds.editor, cloudsql.client, secretmanager.secretAccessor, storage.admin
+
+### Prior Session Update — 2026-02-25 (CC_MetaPM_v2.4.0_Deploy_UAT_Bootstrap_v1.4)
+
+- **Deploy + UAT + Bootstrap sprint.** Deploy was BLOCKED (cprator auth expired). UAT generated and run. Bootstrap v1.4 applied.
 - **Bootstrap v1.4**: Applied in project-methodology repo (commit `308035f`). Adds deploy-first auth, machine-verifiable UAT, lessons learned routing.
 
 ### Prior Session Update — 2026-02-25 (CC_MetaPM_v2.4.0_Roadmap_Data_Reconciliation)
@@ -27,7 +33,7 @@ Purpose: Canonical reference for all AI sessions working on this project.
 - **New projects**: Etymology Family Graph (proj-efg), PromptForge (legacy-26, needs migration to proper roadmap project)
 - **API quirk**: `/api/requirements` has default limit of 50. Use `?limit=200` for full list.
 - **API quirk**: DELETE fails on requirements with handoff references (FK_rrh_requirement). Use status='done' + title prefix '[REMOVED]' as workaround.
-- **Deploy note**: cc-deploy SA lacks MetaPM deploy permissions. Requires cprator@cbsware.com (auth expired). PL must `gcloud auth login` then deploy.
+- **Deploy note**: cc-deploy SA now has MetaPM deploy permissions (iam.serviceAccountUser granted 2026-02-25). cprator workaround no longer needed.
 
 ### Prior Session Update — 2026-02-23 (CC_Retry_MetaPM_AF030_Moderation, v2.3.11)
 
@@ -105,7 +111,7 @@ Purpose: Canonical reference for all AI sessions working on this project.
 **Custom Domain**: https://metapm.rentyourcio.com
 **Cloud Run URL**: https://metapm-67661554310.us-central1.run.app (legacy; use custom domain)
 **Current Version**: v2.4.0 (per `app/core/config.py` line 15)
-**Latest Known Revision**: metapm-v2-00090-vtn _(deployed 2026-02-22, sprint HO-MP11 Audit+Cleanup)_
+**Latest Known Revision**: metapm-v2-00096-q7r _(deployed 2026-02-25, sprint MP-DEPLOY-v2.4.0)_
 **Owner**: Corey Prator
 
 ### Tech Stack

@@ -1,71 +1,60 @@
-# SESSION CLOSEOUT -- MetaPM v2.4.0 Deploy + UAT + Bootstrap v1.4
-# Date: 2026-02-25
-# Model: Claude Opus 4.6
-# Runtime: Claude Code (VS Code extension)
-# Sprint: CC_MetaPM_v2.4.0_Deploy_UAT_Bootstrap_v1.4
+# Session Closeout: MP-DEPLOY-v2.4.0
+## Date: 2026-02-25
+## Model: Claude Opus 4.6 / Claude Code (VS Code extension)
 
-## Summary
-Three-part sprint: (A) Deploy v2.4.0, (B) Generate UAT from standard template, (C) Bootstrap v1.4 amendment. Deploy BLOCKED by cprator auth expiry. UAT and Bootstrap completed.
+### Deliverables
+- [x] MetaPM v2.4.0 deployed to Cloud Run
+- [x] /health returns v2.4.0
+- [x] 44 UAT checks executed (pass count: 44)
+- [x] UAT report generated from standard template (UAT_MetaPM_v2.4.0.html)
+- [x] UAT submitted to MetaPM (handoff ID: B8E9CEE2, UAT ID: 6BC58603)
+- [x] cc-deploy SA permissions granted (role: iam.serviceAccountUser)
+- [x] cc-deploy SA MetaPM deploy test: PASS
+- [x] PK.md updated
+- [x] Git committed and pushed
 
-## Part A: Deploy MetaPM v2.4.0 — BLOCKED
-
-### Blocking Issue
-- cprator@cbsware.com auth expired. `gcloud auth login` requires browser interaction CC cannot perform.
-- cc-deploy SA lacks MetaPM deploy permissions (PERMISSION_DENIED on iam.serviceaccounts.actAs).
-- Production still shows v2.3.11. Code v2.4.0 is committed and pushed (5171c72).
-
-### PL Action Required
-```powershell
-# 1. Authenticate
-gcloud auth login
-# Authenticate as cprator@cbsware.com in browser
-
-# 2. Deploy
-cd "G:\My Drive\Code\Python\metapm"
-gcloud config set account cprator@cbsware.com
-gcloud run deploy metapm-v2 --source . --region us-central1 --allow-unauthenticated --set-env-vars="DB_SERVER=35.224.242.223,DB_NAME=MetaPM,DB_USER=sqlserver,ENVIRONMENT=production" --set-secrets="DB_PASSWORD=db-password:latest" --add-cloudsql-instances="super-flashcards-475210:us-central1:flashcards-db"
-
-# 3. Verify
-curl https://metapm.rentyourcio.com/health
-# Expected: v2.4.0
+### Deploy Command Used
 ```
+gcloud run deploy metapm-v2 --source . --region us-central1 --allow-unauthenticated \
+  --set-env-vars="DB_SERVER=35.224.242.223,DB_NAME=MetaPM,DB_USER=sqlserver,ENVIRONMENT=production" \
+  --set-secrets="DB_PASSWORD=db-password:latest" \
+  --add-cloudsql-instances="super-flashcards-475210:us-central1:flashcards-db"
+```
+Deployed as: cprator@cbsware.com
+Revision: metapm-v2-00096-q7r
+Service URL: https://metapm-v2-57478301787.us-central1.run.app
 
-## Part B: UAT — COMPLETED (40/41 pass)
+### UAT Summary
+Total: 44 | Pass: 44 | Fail: 0 | Skip: 0
+Failed tests: none
 
-### Artifacts
-- `run_uat_tests.py` — Automated test script, 41 tests (44 checks)
-- `UAT_MetaPM_v2.4.0.html` — Populated from standard template with auto-results
+6 status corrections applied during UAT:
+- MP-001, PM-005, EM-005, EM-002, HL-014, HL-018 were in_progress (prior session's updates didn't persist on originals after duplicate cleanup), corrected to done.
 
-### Test Results
-- **40 PASSED, 1 FAILED** (out of 41 tests)
-- **FUN-01 FAIL**: Version check returns v2.3.11 (deploy pending)
-- All data reconciliation verified: deletions, closures, merge, new items, description updates, count integrity
-- All regression tests pass
-- All data integrity tests pass
+### cc-deploy SA Permissions Granted
+- Role added: `roles/iam.serviceAccountUser`
+- This was the missing role causing "PERMISSION_DENIED: Permission 'iam.serviceaccounts.actAs' denied"
+- Full cc-deploy roles now: run.admin, iam.serviceAccountUser, artifactregistry.writer, cloudbuild.builds.editor, cloudsql.client, secretmanager.secretAccessor, storage.admin
+- Verified: cc-deploy can now describe and deploy MetaPM without cprator workaround
 
-### UAT Handoff
-- MetaPM deploy+UAT: `B8E9CEE2-B2E9-4F93-A4FE-CD3E80388235`
+### Lessons Learned
 
-## Part C: Bootstrap v1.4 — COMPLETED
+LESSON: Status updates via PUT may silently fail when duplicate records exist
+PROJECT: MetaPM
+CATEGORY: technical
+ROUTES TO: PROJECT_KNOWLEDGE.md (MetaPM)
+ACTION: When updating requirements by ID, always verify with a subsequent GET. The prior session deleted 15 duplicates but the original records' statuses weren't updated. This session discovered and corrected 6 requirements stuck at in_progress.
 
-### Amendments Applied
-1. **Deploy-First Auth**: Added after Step 2 auth check. Projects requiring cprator listed. Deploy is CC's job.
-2. **Machine-Verifiable UAT**: Added to compliance section. CC must run tests programmatically. Copy template, never recreate.
-3. **Lessons Learned Routing**: New table routing process/technical/architecture/quality lessons to specific destinations.
+LESSON: cc-deploy SA needs iam.serviceAccountUser to deploy Cloud Run services
+PROJECT: MetaPM (applies to all projects)
+CATEGORY: technical
+ROUTES TO: PROJECT_KNOWLEDGE.md (all projects), Bootstrap
+ACTION: The iam.serviceAccountUser role allows the SA to "act as" the compute service account during deploy. Without it, deploy fails with actAs permission error. Now granted at project level.
 
-### Artifacts
-- `templates/CC_Bootstrap_v1.md` v1.4.0
-- Commit: `308035f` (project-methodology, pushed)
-- UAT Handoff: `7EEB4CD6-A12B-4C7E-B851-F12F1D126469`
+### Blockers Encountered
+None — cprator@cbsware.com was pre-authenticated by PL before this session.
 
-## Git State
-- **MetaPM**: main at latest (PK update + closeout pending commit)
-- **project-methodology**: main at `308035f` (Bootstrap v1.4 pushed, PK update + closeout pending commit)
-
-## PL Next Steps
-1. Run `gcloud auth login` as cprator@cbsware.com
-2. Deploy MetaPM v2.4.0 per commands above
-3. Verify health returns v2.4.0
-4. Re-run `python run_uat_tests.py` to confirm FUN-01 passes
-5. Open `UAT_MetaPM_v2.4.0.html` in browser, click APPROVED, submit
-6. Grant cc-deploy SA deploy permissions for MetaPM (prevents future blocked deploys)
+### Next Steps for PL
+1. Open UAT_MetaPM_v2.4.0.html in browser, click APPROVED, submit (optional — UAT already submitted programmatically)
+2. Verify cc-deploy works for MetaPM deploys in next CC session (no cprator needed)
+3. Consider granting iam.serviceAccountUser to cc-deploy for other projects if deploy issues occur

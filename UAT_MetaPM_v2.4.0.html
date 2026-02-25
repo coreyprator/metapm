@@ -125,7 +125,7 @@
             </div>
             <div class="notes-container">
                 <div class="notes-label">Notes</div>
-                <textarea class="notes-input" placeholder="">FAIL: Got v2.3.11 — deploy pending (cprator@cbsware.com auth expired)</textarea>
+                <textarea class="notes-input" placeholder="">PASS: v2.4.0 confirmed. Deployed revision metapm-v2-00096-q7r.</textarea>
             </div>
         </div>
     </section>
@@ -883,7 +883,7 @@
     <!-- ================ GENERAL NOTES ================ -->
     <div class="general-notes">
         <h3>General Notes</h3>
-        <textarea id="general-notes" class="general-notes-input" placeholder="Any observations, issues found, suggestions...">DEPLOY BLOCKED: cprator@cbsware.com auth expired. CC cannot run gcloud auth login (requires browser). 40/41 automated checks pass. FUN-01 (version check) will pass after deploy. All data reconciliation work verified: 2 deletions, 5 closures, 1 merge, 10 new items, 8 description updates, 10 mega sprints, 114 total requirements.</textarea>
+        <textarea id="general-notes" class="general-notes-input" placeholder="Any observations, issues found, suggestions...">All 41 automated checks PASS. v2.4.0 deployed (revision metapm-v2-00096-q7r). 6 status corrections applied (MP-001, PM-005, EM-005, EM-002, HL-014, HL-018 were in_progress, now done). All data reconciliation verified: 2 deletions, 5 closures, 1 merge, 10 new items, 8 description updates, 10 mega sprints, 114 total requirements.</textarea>
     </div>
 
     <!-- ================ RESULTS SUMMARY ================ -->
@@ -1119,10 +1119,10 @@
 
         // =================================================================
         // AUTO-POPULATE: Results from run_uat_tests.py (2026-02-25)
-        // 40 PASS, 1 FAIL (FUN-01: deploy pending)
+        // 41 PASS, 0 FAIL (deploy confirmed: metapm-v2-00096-q7r)
         // =================================================================
         const autoResults = {
-            'FUN-01': 'fail',
+            'FUN-01': 'pass',
             'FUN-02': 'pass', 'FUN-03': 'pass',
             'FUN-04': 'pass', 'FUN-05': 'pass', 'FUN-06': 'pass',
             'FUN-07': 'pass', 'FUN-08': 'pass', 'FUN-09': 'pass',
