@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.3.11"  # Data sprint: AF-030 Prompt Moderation Pre-Check requirement added
+    VERSION: str = "2.4.0"  # Roadmap data reconciliation: 2 deletions, 5 closures, 1 merge, 10 new items, 8 desc updates, mega sprints
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
