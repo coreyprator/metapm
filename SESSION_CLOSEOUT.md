@@ -1,60 +1,75 @@
-# Session Closeout: MP-DEPLOY-v2.4.0
-## Date: 2026-02-25
+# Session Closeout: PM-MS1 (Wave 0 CI/CD Foundation)
+## Date: 2026-02-26
 ## Model: Claude Opus 4.6 / Claude Code (VS Code extension)
 
 ### Deliverables
-- [x] MetaPM v2.4.0 deployed to Cloud Run
-- [x] /health returns v2.4.0
-- [x] 44 UAT checks executed (pass count: 44)
-- [x] UAT report generated from standard template (UAT_MetaPM_v2.4.0.html)
-- [x] UAT submitted to MetaPM (handoff ID: B8E9CEE2, UAT ID: 6BC58603)
-- [x] cc-deploy SA permissions granted (role: iam.serviceAccountUser)
-- [x] cc-deploy SA MetaPM deploy test: PASS
-- [x] PK.md updated
-- [x] Git committed and pushed
+- [x] MetaPM deploy.yml created (.github/workflows/deploy.yml)
+- [ ] MetaPM deploy.yml TESTED (BLOCKED: GCP_SA_KEY secret missing on repo)
+- [x] Super-Flashcards: health check step added, deploy verified (revision super-flashcards-00309-zv2)
+- [x] Etymython: health check step added, deploy verified (revision etymython-00190-prb)
+- [x] ArtForge: health check step added, deploy verified (revision artforge-00111-n6g)
+- [x] HarmonyLab: health check + workflow_dispatch added, deploy verified (revision harmonylab-00094-6h6)
+- [x] PROJECT_KNOWLEDGE.md updated with CI/CD section (all 5 repos)
+- [x] All 5 repos committed and pushed
+- [x] UAT submitted to MetaPM
 
-### Deploy Command Used
-```
-gcloud run deploy metapm-v2 --source . --region us-central1 --allow-unauthenticated \
-  --set-env-vars="DB_SERVER=35.224.242.223,DB_NAME=MetaPM,DB_USER=sqlserver,ENVIRONMENT=production" \
-  --set-secrets="DB_PASSWORD=db-password:latest" \
-  --add-cloudsql-instances="super-flashcards-475210:us-central1:flashcards-db"
-```
-Deployed as: cprator@cbsware.com
-Revision: metapm-v2-00096-q7r
-Service URL: https://metapm-v2-57478301787.us-central1.run.app
+### Verification Matrix
 
-### UAT Summary
-Total: 44 | Pass: 44 | Fail: 0 | Skip: 0
-Failed tests: none
+| Repo | Workflow Exists | Branch Correct | GCP Project Correct | Secret Set | Push Triggers Deploy | Health Check Passes |
+|------|----------------|----------------|---------------------|------------|---------------------|-------------------|
+| MetaPM | YES | main | super-flashcards-475210 | NO (BLOCKED) | YES (fails at auth) | N/A |
+| Super-Flashcards | YES | main | super-flashcards-475210 | YES | YES | YES |
+| Etymython | YES | main | super-flashcards-475210 | YES | YES | YES |
+| ArtForge | YES | main | super-flashcards-475210 | YES | YES | YES |
+| HarmonyLab | YES | main | super-flashcards-475210 | YES (WIF) | YES | YES |
 
-6 status corrections applied during UAT:
-- MP-001, PM-005, EM-005, EM-002, HL-014, HL-018 were in_progress (prior session's updates didn't persist on originals after duplicate cleanup), corrected to done.
+### Commits
+| Repo | Commit (workflow) | Commit (PK.md) |
+|------|-------------------|----------------|
+| metapm | c0bdf04 | 6bdf1ef |
+| Super-Flashcards | 09d2045 | 1cd1d6c |
+| etymython | 8cf64e7 | 5a20e29 |
+| artforge | 458c90d | 1ac6753 |
+| harmonylab | cc77e43 | d305eff |
 
-### cc-deploy SA Permissions Granted
-- Role added: `roles/iam.serviceAccountUser`
-- This was the missing role causing "PERMISSION_DENIED: Permission 'iam.serviceaccounts.actAs' denied"
-- Full cc-deploy roles now: run.admin, iam.serviceAccountUser, artifactregistry.writer, cloudbuild.builds.editor, cloudsql.client, secretmanager.secretAccessor, storage.admin
-- Verified: cc-deploy can now describe and deploy MetaPM without cprator workaround
+### Deviations From Reference Pattern
+1. **ArtForge**: Uses Docker build + GAR push, not `--source .`. Has hardcoded env vars in workflow. Not changed (would break existing deploy).
+2. **HarmonyLab**: Uses Workload Identity Federation (WIF_PROVIDER, WIF_SERVICE_ACCOUNT), not credentials_json. Not changed (would require adding GCP_SA_KEY secret and testing).
+3. **Etymython**: PROJECT_ID is super-flashcards-475210 (same as others), NOT etymython-project as sprint prompt stated. Left as-is since it deploys successfully.
 
 ### Lessons Learned
 
-LESSON: Status updates via PUT may silently fail when duplicate records exist
+LESSON: MetaPM GitHub repo has NO secrets configured
 PROJECT: MetaPM
 CATEGORY: technical
 ROUTES TO: PROJECT_KNOWLEDGE.md (MetaPM)
-ACTION: When updating requirements by ID, always verify with a subsequent GET. The prior session deleted 15 duplicates but the original records' statuses weren't updated. This session discovered and corrected 6 requirements stuck at in_progress.
+ACTION: PL must add GCP_SA_KEY secret to coreyprator/metapm on GitHub. The key is the cc-deploy SA JSON key at C:\venvs\cc-deploy-key.json. Without this, the CI/CD workflow will fail on every push.
 
-LESSON: cc-deploy SA needs iam.serviceAccountUser to deploy Cloud Run services
-PROJECT: MetaPM (applies to all projects)
+LESSON: HarmonyLab uses WIF, not credentials_json like other repos
+PROJECT: HarmonyLab
 CATEGORY: technical
-ROUTES TO: PROJECT_KNOWLEDGE.md (all projects), Bootstrap
-ACTION: The iam.serviceAccountUser role allows the SA to "act as" the compute service account during deploy. Without it, deploy fails with actAs permission error. Now granted at project level.
+ROUTES TO: PROJECT_KNOWLEDGE.md (HarmonyLab)
+ACTION: Consider migrating HarmonyLab to credentials_json (GCP_SA_KEY) for consistency. Current WIF auth works but is a different pattern from the other 4 repos.
+
+LESSON: Etymython deploys to super-flashcards-475210, not etymython-project
+PROJECT: Etymython
+CATEGORY: technical
+ROUTES TO: PROJECT_KNOWLEDGE.md (Etymython, project-methodology)
+ACTION: The sprint prompt stated Etymython uses a different GCP project (etymython-project) but the actual workflow and service both run on super-flashcards-475210. Update references.
+
+LESSON: Pushing docs-only changes to repos with CI/CD triggers full redeploys
+PROJECT: All
+CATEGORY: process
+ROUTES TO: Bootstrap, CAI memory
+ACTION: When CI/CD is active, pushing PK.md or INTENT.md updates triggers a full Cloud Run redeploy. Consider adding path filters to workflows (e.g., ignore *.md pushes) to avoid unnecessary deploys. Not critical but wasteful.
 
 ### Blockers Encountered
-None — cprator@cbsware.com was pre-authenticated by PL before this session.
+- MetaPM GCP_SA_KEY secret missing. Workflow created and committed but cannot be tested until PL adds the secret.
 
 ### Next Steps for PL
-1. Open UAT_MetaPM_v2.4.0.html in browser, click APPROVED, submit (optional — UAT already submitted programmatically)
-2. Verify cc-deploy works for MetaPM deploys in next CC session (no cprator needed)
-3. Consider granting iam.serviceAccountUser to cc-deploy for other projects if deploy issues occur
+1. **CRITICAL**: Add GCP_SA_KEY secret to MetaPM repo (coreyprator/metapm). Value = contents of C:\venvs\cc-deploy-key.json.
+2. After adding secret, trigger a manual deploy: go to Actions tab > "Deploy to Google Cloud Run" > "Run workflow"
+3. Verify MetaPM deploys successfully and health check passes
+4. **Optional**: Add GCP_SA_KEY to HarmonyLab repo and migrate from WIF to credentials_json for consistency
+5. **Optional**: Add path filters to deploy.yml files to skip deploys on docs-only pushes
+6. MetaPM version bump to v2.4.1 should happen after first successful CI/CD deploy
