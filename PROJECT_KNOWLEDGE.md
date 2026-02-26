@@ -669,6 +669,14 @@ Returns: `{"status": "healthy", "version": "2.3.0", "build": "..."}`
 
 Source: `app/main.py` lines 95-104
 
+## CI/CD
+- GitHub Actions: `.github/workflows/deploy.yml`
+- Trigger: push to `main` or manual `workflow_dispatch`
+- Auth: cc-deploy SA via `GCP_SA_KEY` secret
+- Deploy method: `--source .` (Cloud Run builds from source)
+- Health check: https://metapm.rentyourcio.com/health
+- **Status**: Workflow created 2026-02-26 (PM-MS1). Awaiting `GCP_SA_KEY` secret from PL.
+
 ---
 
 ## 10. TESTING
