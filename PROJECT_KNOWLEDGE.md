@@ -1,9 +1,26 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-26 — Sprint "MP-MS1 Mega Sprint" (v2.5.0)
+Updated: 2026-02-27 — Sprint "MP-MS1-FIX" (v2.5.1)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-02-26 (MP-MS1 MetaPM Mega Sprint, v2.5.0)
+### Latest Session Update — 2026-02-27 (MP-MS1-FIX UAT Failure Fixes, v2.5.1)
+
+- **Fix cycle: 4 UAT failures + 3 bugs + 2 cleanup items** from PL testing of v2.5.0
+- **Current Version**: v2.5.1 — **DEPLOYED** via GitHub Actions (commit `098da89`)
+- **Health**: `{"status":"healthy","version":"2.5.1"}`
+- **Fixes**:
+  - FAIL 1 (HIE-03): Test plan/case CRUD UI in drawer (create plans, add cases, update case status, delete plans)
+  - FAIL 2 (WF-01): `conditional_pass` added to all status dropdowns, RequirementStatus enum, and CSS badge
+  - FAIL 3 (WF-02): Dependency creation/deletion UI in detail panel with requirement selector
+  - FAIL 4 (WF-03): Auto-close now ONLY matches from `linked_requirements` array, never from free text
+  - BUG A: Code/Title labels made prominent in drawer (read-only/editable indicators)
+  - BUG B: Project filter dropdown shows requirement count per project
+  - BUG C: Tasks shown as siblings in own section, task title/status/priority editable via modal
+- **New API**: `POST /api/roadmap/test-plans/{id}/cases` for adding test cases to existing plans
+- **Cleanup**: MP-001 set to done (CI/CD completed), TT-00T test item deleted
+- **Backend fix**: `_link_requirement_codes_to_handoff()` replaces content parsing for UAT submissions
+
+### Prior Session Update — 2026-02-26 (MP-MS1 MetaPM Mega Sprint, v2.5.0)
 
 - **Mega Sprint: 13 requirements implemented in single session.** Transform MetaPM from basic dashboard into fully functional portfolio control tower.
 - **Current Version**: v2.5.0 — **DEPLOYED** via GitHub Actions (commit `4a58bf6`)
@@ -133,8 +150,8 @@ Purpose: Canonical reference for all AI sessions working on this project.
 **Repository**: github.com/coreyprator/metapm
 **Custom Domain**: https://metapm.rentyourcio.com
 **Cloud Run URL**: https://metapm-67661554310.us-central1.run.app (legacy; use custom domain)
-**Current Version**: v2.5.0 (per `app/core/config.py` line 15)
-**Latest Known Revision**: Deployed 2026-02-26 via GitHub Actions (commit `4a58bf6`, sprint MP-MS1)
+**Current Version**: v2.5.1 (per `app/core/config.py` line 15)
+**Latest Known Revision**: Deployed 2026-02-27 via GitHub Actions (commit `098da89`, sprint MP-MS1-FIX)
 **Owner**: Corey Prator
 
 ### Tech Stack
@@ -347,7 +364,7 @@ Sources: `scripts/schema.sql`, `scripts/backlog_schema.sql`, `app/core/migration
 **Roadmap Export (New 2026-02-20)**: GET /api/roadmap/export (public JSON snapshot with projects, nested requirements, sprints, and aggregate stats)
 **Categories (New v2.5.0)**: GET /api/roadmap/categories, POST /api/roadmap/categories, DELETE /api/roadmap/categories/{id}
 **Roadmap Tasks (New v2.5.0)**: GET /api/roadmap/tasks?requirement_id=X, POST /api/roadmap/tasks, PUT /api/roadmap/tasks/{id}, DELETE /api/roadmap/tasks/{id}
-**Test Plans (New v2.5.0)**: GET /api/roadmap/test-plans?requirement_id=X, POST /api/roadmap/test-plans, PUT /api/roadmap/test-cases/{id}, DELETE /api/roadmap/test-plans/{id}
+**Test Plans (New v2.5.0)**: GET /api/roadmap/test-plans?requirement_id=X, POST /api/roadmap/test-plans, POST /api/roadmap/test-plans/{id}/cases (v2.5.1), PUT /api/roadmap/test-cases/{id}, DELETE /api/roadmap/test-plans/{id}
 **Dependencies (New v2.5.0)**: GET /api/roadmap/dependencies?requirement_id=X, POST /api/roadmap/dependencies, DELETE /api/roadmap/dependencies/{id}
 **Auto-Close (New v2.5.0)**: POST /api/roadmap/requirements/{id}/auto-close (closes requirement when all tasks done)
 **UAT Submit (New 2026-02-18)**: POST /api/uat/submit (project derived from linked_requirements, 201 Created confirmed)
@@ -556,6 +573,14 @@ Sources: `app/main.py`, `app/api/*.py`, `PROJECT_STATUS.md`, `SPRINT3_IMPLEMENTA
   - Phase 2: Fixed /api/handoffs SQL ORDER BY bug. Created tests/test_ui_smoke.py (9 production tests).
   - Phase 3: Added conditional_pass to UATStatus enum (MP-007 → done).
   - Deployed revision: metapm-v2-00090-vtn
+- **Sprint "MP-MS1-FIX" (2026-02-27, v2.5.1)**:
+  - Fix cycle from PL UAT of v2.5.0 (17 pass, 4 fail, 1 skip)
+  - 4 failures fixed: test plan UI, conditional_pass, dependency UI, auto-close logic
+  - 3 bugs fixed: code/title visibility, project count in filter, task hierarchy
+  - 2 cleanup items: MP-001 → done, TT-00T deleted
+  - New endpoint: POST /api/roadmap/test-plans/{id}/cases
+  - Backend: auto-close now only uses explicit linked_requirements, not content text parsing
+  - Deployed commit: `098da89`
 - **Sprint "MP-MS1 Mega Sprint" (2026-02-26, v2.5.0)**:
   - 13 requirements implemented: MP-005, MP-007, MP-011-019, MP-021, MP-022
   - 6 already working (verified): MP-005, MP-011, MP-017, MP-018, MP-019, MP-016 (partial)
@@ -725,7 +750,7 @@ Source: `.gcloudignore`
 ```bash
 curl https://metapm.rentyourcio.com/health
 ```
-Returns: `{"status": "healthy", "version": "2.5.0", "build": "..."}`
+Returns: `{"status": "healthy", "version": "2.5.1", "build": "..."}`
 
 Source: `app/main.py` lines 95-104
 
