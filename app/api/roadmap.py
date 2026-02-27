@@ -635,6 +635,34 @@ async def update_requirement(requirement_id: str, update: RequirementUpdate):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/roadmap/next-code/{project_code}/{item_type}")
+async def get_next_roadmap_code(project_code: str, item_type: str):
+    """Get next sequential code for a type within a project. Returns e.g. BUG-004."""
+    try:
+        prefix_map = {
+            'feature': 'REQ', 'requirement': 'REQ', 'enhancement': 'REQ',
+            'bug': 'BUG', 'task': 'TSK', 'uat': 'UAT', 'sprint': 'SPR'
+        }
+        prefix = prefix_map.get(item_type.lower(), 'REQ')
+
+        result = execute_query("""
+            SELECT MAX(
+                TRY_CAST(
+                    SUBSTRING(r.code, CHARINDEX('-', r.code) + 1, LEN(r.code)) AS INT
+                )
+            ) as maxNum
+            FROM roadmap_requirements r
+            JOIN roadmap_projects p ON r.project_id = p.id
+            WHERE p.code = ? AND r.code LIKE ?
+        """, (project_code, f"{prefix}-%"), fetch="one")
+
+        next_num = (result['maxNum'] or 0) + 1 if result else 1
+        return {"code": f"{prefix}-{next_num:03d}", "prefix": prefix, "number": next_num}
+    except Exception as e:
+        logger.error(f"Error getting next code: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/requirements/{requirement_id}", status_code=204)
 @router.delete("/roadmap/requirements/{requirement_id}", status_code=204)
 async def delete_requirement(requirement_id: str):

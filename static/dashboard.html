@@ -182,6 +182,8 @@
     .status-done { color: #9de2b4; border-color: #2f6e46; }
     .status-in_progress { color: #9ec2ff; border-color: #34507c; }
     .status-conditional_pass { color: #f5d99a; border-color: #7a6a2f; }
+    .status-blocked { color: #ffb347; border-color: #7a5a2f; }
+    .status-superseded { color: #999; border-color: #555; text-decoration: line-through; }
     .task-row {
       display: grid;
       grid-template-columns: 1fr auto auto;
@@ -272,6 +274,87 @@
       align-items: center;
       gap: 6px;
     }
+
+    /* Responsive: Tablet (768–1023px) */
+    @media (max-width: 1023px) {
+      .controls { grid-template-columns: 1fr; }
+      .search-wrap { min-width: 100%; }
+      .drawer { width: 420px; right: -420px; }
+      select, input, button { min-height: 40px; }
+    }
+
+    /* Responsive: Mobile (<768px) */
+    @media (max-width: 767px) {
+      .app { padding: 6px 8px 90px; }
+      .header {
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+        padding: 10px 12px;
+        top: 0;
+      }
+      .title-wrap { justify-content: center; }
+      .header .actions-row {
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .header .actions-row button { font-size: 12px; padding: 8px 10px; }
+      .controls {
+        grid-template-columns: 1fr;
+        gap: 6px;
+        padding: 8px 10px;
+        top: auto;
+        position: relative;
+      }
+      .control-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .control-row label:first-child { display: none; }
+      .search-wrap {
+        min-width: 100%;
+        flex-direction: column;
+      }
+      .search-wrap input { min-width: 100%; }
+      select, input, textarea, button {
+        min-height: 44px;
+        font-size: 14px;
+        width: 100%;
+      }
+      .hierarchy { height: auto; min-height: 200px; }
+      .req-row {
+        grid-template-columns: 1fr;
+        gap: 4px;
+        padding: 10px;
+      }
+      .req-row > div:first-child { font-size: 14px; }
+      .project-head { padding: 12px; font-size: 14px; }
+      .drawer {
+        width: 100%;
+        right: -100%;
+        padding: 10px;
+      }
+      .drawer.open { right: 0; }
+      .modal-card {
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+        border-radius: 8px;
+      }
+      .grid2 { grid-template-columns: 1fr; }
+      .footer {
+        flex-direction: column;
+        gap: 4px;
+        font-size: 11px;
+        left: 8px;
+        right: 8px;
+        padding: 8px 10px;
+      }
+      .icon-btn { min-width: 44px; min-height: 44px; padding: 8px; font-size: 16px; }
+      .pill { font-size: 10px; padding: 2px 6px; }
+      .add-menu { min-width: 150px; }
+      .add-menu button { min-height: 44px; }
+    }
   </style>
 </head>
 <body>
@@ -303,7 +386,8 @@
         <select id="categoryFilter"><option value="">All Categories</option></select>
         <select id="projectFilter"><option value="">All Projects</option></select>
         <select id="priorityFilter"><option value="">All Priorities</option><option>P1</option><option>P2</option><option>P3</option></select>
-        <select id="statusFilter"><option value="">All Status</option><option value="not_done">Not Done</option><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="conditional_pass">conditional_pass</option><option value="done">done</option></select>
+        <select id="statusFilter"><option value="">All Status</option><option value="not_done">Not Done</option><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="blocked">blocked</option><option value="conditional_pass">conditional_pass</option><option value="superseded">superseded</option><option value="done">done</option></select>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="openItemsToggle" checked style="min-height:auto" /> Open Only</label>
         <button id="resetFiltersBtn" type="button" class="danger-btn">Reset Filters</button>
       </div>
       <div class="control-row">
@@ -313,7 +397,7 @@
           <input id="searchInput" placeholder="Search code, title, description, type, status..." />
         </div>
         <select id="sortBy"><option value="priority">Priority</option><option value="code">Code</option><option value="title">Title</option></select>
-        <select id="groupBy"><option value="project">By Project</option></select>
+        <select id="groupBy"><option value="project">By Project</option><option value="category">By Category</option><option value="priority">By Priority</option><option value="status">By Status</option><option value="type">By Type</option></select>
         <button id="expandAllBtn" type="button">Expand All</button>
         <button id="collapseAllBtn" type="button">Collapse All</button>
       </div>
@@ -338,11 +422,11 @@
     </div>
     <div class="grid2">
       <div>
-        <label>Code (read-only)</label>
-        <input id="dCode" readonly style="opacity:0.7;cursor:not-allowed" />
+        <label>Code</label>
+        <input id="dCode" />
       </div>
       <div>
-        <label>Title (editable)</label>
+        <label>Title</label>
         <input id="dTitle" style="font-weight:600" />
       </div>
       <div>
@@ -363,7 +447,7 @@
       </div>
       <div>
         <label>Status</label>
-        <select id="dStatus"><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="conditional_pass">conditional_pass</option><option value="done">done</option></select>
+        <select id="dStatus"><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="blocked">blocked</option><option value="conditional_pass" title="Works but has known limitations PL accepts for now">conditional_pass</option><option value="superseded">superseded</option><option value="done">done</option></select>
       </div>
       <div>
         <label>Target Version</label>
@@ -536,13 +620,44 @@
       qs('resetFiltersBtn').classList.toggle('active', filtersActive());
     }
 
+    function updateProjectFilterCounts() {
+      const pf = qs('projectFilter');
+      const current = pf.value;
+      pf.innerHTML = '<option value="">All Projects</option>';
+      // Count using all filters EXCEPT project filter
+      const category = qs('categoryFilter').value;
+      const priority = qs('priorityFilter').value;
+      const status = qs('statusFilter').value;
+      const search = (qs('searchInput').value || '').trim().toLowerCase();
+      const openOnly = qs('openItemsToggle').checked;
+      for (const p of state.projects) {
+        const count = state.requirements.filter(r => {
+          if (r.project_id !== p.id) return false;
+          if (openOnly && (r.status === 'done' || r.status === 'superseded')) return false;
+          if (category && p.category_id !== category) return false;
+          if (priority && r.priority !== priority) return false;
+          if (status === 'not_done' && r.status === 'done') return false;
+          if (status && status !== 'not_done' && r.status !== status) return false;
+          if (search) {
+            const haystack = `${r.code} ${r.title} ${r.description || ''} ${r.type || ''} ${r.status || ''}`.toLowerCase();
+            if (!haystack.includes(search)) return false;
+          }
+          return true;
+        }).length;
+        pf.insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.emoji || ''} ${p.name} (${count})</option>`);
+      }
+      if (current) pf.value = current;
+    }
+
     function getFilteredRequirements() {
       const category = qs('categoryFilter').value;
       const project = qs('projectFilter').value;
       const priority = qs('priorityFilter').value;
       const status = qs('statusFilter').value;
       const search = (qs('searchInput').value || '').trim().toLowerCase();
+      const openOnly = qs('openItemsToggle').checked;
       return state.requirements.filter((req) => {
+        if (openOnly && (req.status === 'done' || req.status === 'superseded')) return false;
         if (category) {
           const proj = state.projects.find(p => p.id === req.project_id);
           if (!proj || proj.category_id !== category) return false;
@@ -639,14 +754,32 @@
     }
 
     function render() {
+      updateProjectFilterCounts();
       const reqs = getFilteredRequirements();
       const hierarchy = qs('hierarchy');
       hierarchy.innerHTML = '';
+      const groupBy = qs('groupBy').value;
+
+      if (groupBy === 'project') {
+        renderByProject(hierarchy, reqs);
+      } else {
+        renderByField(hierarchy, reqs, groupBy);
+      }
+
+      if (!hierarchy.children.length) hierarchy.innerHTML = '<div class="project-summary">No matching requirements.</div>';
+      setSummary(reqs);
+      updateResetButtonState();
+      bindHierarchyEvents();
+    }
+
+    function renderByProject(container, reqs) {
       const categoryFilter = qs('categoryFilter').value;
+      const openOnly = qs('openItemsToggle').checked;
 
       for (const p of state.projects) {
         if (categoryFilter && p.category_id !== categoryFilter) continue;
         const pReqs = reqs.filter(r => r.project_id === p.id);
+        if (openOnly && pReqs.length === 0) continue;
 
         const done = pReqs.filter(r => r.status === 'done').length;
         const p1 = pReqs.filter(r => r.priority === 'P1').length;
@@ -661,7 +794,6 @@
           <div class="bucket"><div class="bucket-title">Sprint: ${sprintName(sid)}</div>${buckets.sprint[sid].map(rowHtml).join('')}</div>
         `).join('');
 
-        // Tasks for this project (siblings of requirements)
         const projectTasks = state.tasks.filter(t => {
           const parentReq = state.requirements.find(r => r.id === t.requirement_id);
           return parentReq && parentReq.project_id === p.id;
@@ -689,13 +821,68 @@
             </div>
           </section>`;
 
-        hierarchy.insertAdjacentHTML('beforeend', html);
+        container.insertAdjacentHTML('beforeend', html);
+      }
+    }
+
+    function renderByField(container, reqs, field) {
+      const groups = {};
+      for (const req of reqs) {
+        let key;
+        if (field === 'category') {
+          const proj = state.projects.find(p => p.id === req.project_id);
+          key = proj?.category_name || 'Uncategorized';
+        } else {
+          key = req[field] || 'Unknown';
+        }
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(req);
       }
 
-      if (!hierarchy.children.length) hierarchy.innerHTML = '<div class="project-summary">No matching requirements.</div>';
-      setSummary(reqs);
-      updateResetButtonState();
-      bindHierarchyEvents();
+      const sortedKeys = Object.keys(groups).sort((a, b) => {
+        if (field === 'priority') {
+          const w = { P1: 1, P2: 2, P3: 3 };
+          return (w[a] || 9) - (w[b] || 9);
+        }
+        if (field === 'status') {
+          const order = ['in_progress','uat','needs_fixes','planned','backlog','conditional_pass','blocked','superseded','done'];
+          return (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 99 : order.indexOf(b));
+        }
+        return a.localeCompare(b);
+      });
+
+      for (const key of sortedKeys) {
+        const items = groups[key].sort(compareReq);
+        const open = state.expanded.has(key);
+        const count = items.length;
+
+        const itemsHtml = items.map(req => {
+          const proj = state.projects.find(p => p.id === req.project_id);
+          const projLabel = field !== 'project' ? `<span class="pill">${proj?.emoji || ''} ${proj?.code || ''}</span>` : '';
+          return `<div class="req-row" data-req="${req.id}">
+            <div><strong>${req.code}</strong> ${req.title}</div>
+            ${projLabel}
+            <span class="pill ${req.priority.toLowerCase()}">${req.priority}</span>
+            <span class="pill status-${req.status}">${req.status}</span>
+            <span class="pill">${req.type}</span>
+            <div class="actions-row">
+              <button class="icon-btn" data-open-req="${req.id}" title="Edit">✏️</button>
+              <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete">🗑️</button>
+            </div>
+          </div>`;
+        }).join('');
+
+        const html = `
+          <section class="project" style="border-left-color:var(--info)">
+            <div class="project-head">
+              <div data-project="${key}">${open ? '▼' : '▶'} ${key} <span class="version-badge">${count}</span></div>
+            </div>
+            <div class="project-body ${open ? 'open' : ''}">
+              <div class="bucket">${itemsHtml}</div>
+            </div>
+          </section>`;
+        container.insertAdjacentHTML('beforeend', html);
+      }
     }
 
     function bindHierarchyEvents() {
@@ -923,6 +1110,7 @@
       }
 
       const payload = {
+        code: qs('dCode').value.trim(),
         title: qs('dTitle').value.trim(),
         priority: qs('dPriority').value,
         type: qs('dType').value,
@@ -1084,13 +1272,32 @@
             <div><label>Code</label><input id="aCode" placeholder="MP-018" /></div>
             <div><label>Title</label><input id="aTitle" placeholder="Title" /></div>
             <div><label>Priority</label><select id="aPriority"><option>P1</option><option selected>P2</option><option>P3</option></select></div>
-            <div><label>Status</label><select id="aStatus"><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="conditional_pass">conditional_pass</option><option value="done">done</option></select></div>
+            <div><label>Status</label><select id="aStatus"><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="blocked">blocked</option><option value="conditional_pass">conditional_pass</option><option value="superseded">superseded</option><option value="done">done</option></select></div>
             <div><label>Type</label><input id="aType" value="${type}" /></div>
           </div>
           <div><label>Description</label><textarea id="aDescription"></textarea></div>`;
       }
 
       qs('addModal').classList.add('open');
+
+      // Auto-number code for requirements/bugs/tasks
+      if (kind !== 'project' && kind !== 'sprint') {
+        autoFillCode();
+        const projSel = qs('aProject');
+        if (projSel) projSel.addEventListener('change', autoFillCode);
+      }
+    }
+
+    async function autoFillCode() {
+      const projId = qs('aProject')?.value;
+      const type = qs('aType')?.value || 'feature';
+      if (!projId) return;
+      const proj = state.projects.find(p => p.id === projId);
+      if (!proj) return;
+      try {
+        const res = await api(`/api/roadmap/next-code/${proj.code}/${type}`);
+        if (res?.code && qs('aCode')) qs('aCode').value = res.code;
+      } catch {}
     }
 
     async function saveAdd() {
@@ -1246,15 +1453,7 @@
       }
       if (currentCat) cf.value = currentCat;
 
-      // Populate project filter with requirement counts
-      const pf = qs('projectFilter');
-      const current = pf.value;
-      pf.innerHTML = '<option value="">All Projects</option>';
-      for (const p of state.projects) {
-        const reqCount = state.requirements.filter(r => r.project_id === p.id).length;
-        pf.insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.emoji || ''} ${p.name} (${reqCount})</option>`);
-      }
-      if (current) pf.value = current;
+      updateProjectFilterCounts();
 
       if (!state.expanded.size && state.projects.length) state.expanded.add(state.projects[0].id);
       render();
@@ -1267,6 +1466,10 @@
           render();
         };
       });
+      qs('openItemsToggle').onchange = () => {
+        updateResetButtonState();
+        render();
+      };
       qs('searchInput').addEventListener('input', () => {
         updateResetButtonState();
         render();
@@ -1290,6 +1493,7 @@
         qs('priorityFilter').value = '';
         qs('statusFilter').value = '';
         qs('searchInput').value = '';
+        qs('openItemsToggle').checked = true;
         updateResetButtonState();
         render();
       };
@@ -1313,7 +1517,18 @@
       qs('editSave').onclick = () => saveEdit().catch(err => showToast(err.message));
 
       qs('expandAllBtn').onclick = () => {
-        state.expanded = new Set(getFilteredRequirements().map((r) => r.project_id));
+        const groupBy = qs('groupBy').value;
+        const reqs = getFilteredRequirements();
+        if (groupBy === 'project') {
+          state.expanded = new Set(reqs.map(r => r.project_id));
+        } else if (groupBy === 'category') {
+          state.expanded = new Set(reqs.map(r => {
+            const proj = state.projects.find(p => p.id === r.project_id);
+            return proj?.category_name || 'Uncategorized';
+          }));
+        } else {
+          state.expanded = new Set(reqs.map(r => r[groupBy] || 'Unknown'));
+        }
         render();
       };
       qs('collapseAllBtn').onclick = () => {
