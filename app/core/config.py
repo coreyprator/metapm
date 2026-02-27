@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.5.0"  # MP-MS1 Mega Sprint: categories, tasks, test plans, dependencies, conditional_pass, auto-close, search, CRUD, LL routing
+    VERSION: str = "2.5.1"  # MP-MS1-FIX: UAT fixes (test plan UI, conditional_pass, dependency UI, auto-close logic, task hierarchy)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

@@ -181,6 +181,7 @@
     .p2 { color: #ffd18a; border-color: #7a5a2f; }
     .status-done { color: #9de2b4; border-color: #2f6e46; }
     .status-in_progress { color: #9ec2ff; border-color: #34507c; }
+    .status-conditional_pass { color: #f5d99a; border-color: #7a6a2f; }
     .task-row {
       display: grid;
       grid-template-columns: 1fr auto auto;
@@ -302,7 +303,7 @@
         <select id="categoryFilter"><option value="">All Categories</option></select>
         <select id="projectFilter"><option value="">All Projects</option></select>
         <select id="priorityFilter"><option value="">All Priorities</option><option>P1</option><option>P2</option><option>P3</option></select>
-        <select id="statusFilter"><option value="">All Status</option><option value="not_done">Not Done</option><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="done">done</option></select>
+        <select id="statusFilter"><option value="">All Status</option><option value="not_done">Not Done</option><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="conditional_pass">conditional_pass</option><option value="done">done</option></select>
         <button id="resetFiltersBtn" type="button" class="danger-btn">Reset Filters</button>
       </div>
       <div class="control-row">
@@ -337,12 +338,12 @@
     </div>
     <div class="grid2">
       <div>
-        <label>Code</label>
-        <input id="dCode" readonly />
+        <label>Code (read-only)</label>
+        <input id="dCode" readonly style="opacity:0.7;cursor:not-allowed" />
       </div>
       <div>
-        <label>Title</label>
-        <input id="dTitle" />
+        <label>Title (editable)</label>
+        <input id="dTitle" style="font-weight:600" />
       </div>
       <div>
         <label>Project</label>
@@ -362,7 +363,7 @@
       </div>
       <div>
         <label>Status</label>
-        <select id="dStatus"><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="done">done</option></select>
+        <select id="dStatus"><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="conditional_pass">conditional_pass</option><option value="done">done</option></select>
       </div>
       <div>
         <label>Target Version</label>
@@ -384,6 +385,10 @@
     <div>
       <label>Tasks</label>
       <div id="dTasks" style="font-size:13px;color:var(--muted)">None</div>
+    </div>
+    <div>
+      <label>Test Plans</label>
+      <div id="dTestPlans" style="font-size:13px;color:var(--muted)">None</div>
     </div>
   </aside>
 
@@ -601,16 +606,8 @@
     }
 
     function rowHtml(req) {
-      const reqTasks = state.tasks.filter(t => t.requirement_id === req.id);
-      const taskInfo = reqTasks.length ? ` <span class="pill">${reqTasks.filter(t=>t.status==='done').length}/${reqTasks.length} tasks</span>` : '';
-      const taskRows = reqTasks.map(t => `
-        <div class="task-row">
-          <div>${t.title}</div>
-          <span class="pill status-${t.status}">${t.status}</span>
-          <span class="pill ${t.priority.toLowerCase()}">${t.priority}</span>
-        </div>`).join('');
       return `<div class="req-row" data-req="${req.id}">
-        <div><strong>${req.code}</strong> ${req.title}${taskInfo}</div>
+        <div><strong>${req.code}</strong> ${req.title}</div>
         <span class="pill ${req.priority.toLowerCase()}">${req.priority}</span>
         <span class="pill status-${req.status}">${req.status}</span>
         <span class="pill">${req.type}</span>
@@ -618,7 +615,16 @@
           <button class="icon-btn" data-open-req="${req.id}" title="Edit Requirement">✏️</button>
           <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete Requirement">🗑️</button>
         </div>
-      </div>${taskRows}`;
+      </div>`;
+    }
+
+    function taskRowHtml(t) {
+      return `<div class="task-row" data-task="${t.id}">
+        <div>${t.title}</div>
+        <span class="pill status-${t.status}">${t.status}</span>
+        <span class="pill ${t.priority.toLowerCase()}">${t.priority}</span>
+        <button class="icon-btn" data-edit-task="${t.id}" title="Edit Task">✏️</button>
+      </div>`;
     }
 
     function sprintRowHtml(sprint, projectReqs) {
@@ -655,6 +661,15 @@
           <div class="bucket"><div class="bucket-title">Sprint: ${sprintName(sid)}</div>${buckets.sprint[sid].map(rowHtml).join('')}</div>
         `).join('');
 
+        // Tasks for this project (siblings of requirements)
+        const projectTasks = state.tasks.filter(t => {
+          const parentReq = state.requirements.find(r => r.id === t.requirement_id);
+          return parentReq && parentReq.project_id === p.id;
+        });
+        const taskSection = projectTasks.length
+          ? `<div class="bucket"><div class="bucket-title">Tasks (${projectTasks.filter(t=>t.status==='done').length}/${projectTasks.length} done)</div>${projectTasks.map(taskRowHtml).join('')}</div>`
+          : '';
+
         const html = `
           <section class="project" style="border-left-color:${color}">
             <div class="project-head">
@@ -669,6 +684,7 @@
               <div class="bucket"><div class="bucket-title">Sprints</div>${sprintRows}</div>
               ${sprintBlocks}
               <div class="bucket"><div class="bucket-title">Backlog (unassigned)</div>${buckets.backlog.map(rowHtml).join('') || '<div class="project-summary">None</div>'}</div>
+              ${taskSection}
               <div class="bucket"><div class="bucket-title">Done</div>${buckets.done.map(rowHtml).join('') || '<div class="project-summary">None</div>'}</div>
             </div>
           </section>`;
@@ -752,6 +768,14 @@
           await loadData();
         };
       });
+
+      // Task edit buttons
+      document.querySelectorAll('[data-edit-task]').forEach((el) => {
+        el.onclick = (e) => {
+          e.stopPropagation();
+          openEditTask(el.dataset.editTask);
+        };
+      });
     }
 
     function fillSelect(selectId, items, valueKey = 'id', labelKey = 'name', includeBlank = false, blankText = 'Unassigned') {
@@ -795,9 +819,28 @@
       // Load dependencies (MP-014)
       try {
         const deps = await api(`/api/roadmap/dependencies?requirement_id=${req.id}`);
-        qs('dDependencies').innerHTML = deps.dependencies?.length
-          ? deps.dependencies.map(d => `<div class="dep-link">${d.depends_on_project_code}-${d.depends_on_code}: ${d.depends_on_title}</div>`).join('')
-          : 'None';
+        if (deps.dependencies?.length) {
+          qs('dDependencies').innerHTML = deps.dependencies.map(d =>
+            `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+              <span class="dep-link" onclick="openRequirementByCode('${d.depends_on_code}')">${d.depends_on_project_code || ''} ${d.depends_on_code}: ${d.depends_on_title}</span>
+              <button class="icon-btn danger-btn" onclick="removeDependency('${d.id}')" title="Remove" style="font-size:10px">✕</button>
+            </div>`
+          ).join('');
+        } else {
+          qs('dDependencies').innerHTML = 'None';
+        }
+        // Add dependency selector
+        const reqOpts = state.requirements
+          .filter(r => r.id !== req.id)
+          .map(r => `<option value="${r.id}">${r.code}: ${r.title}</option>`)
+          .join('');
+        const addDepHtml = `<div style="margin-top:6px;display:flex;gap:4px">
+          <select id="addDepSelect" style="flex:1;font-size:11px"><option value="">Select requirement...</option>${reqOpts}</select>
+          <button style="font-size:11px;padding:4px 8px" onclick="addDependency()">+ Dep</button>
+        </div>`;
+        const existingDep = document.getElementById('addDepWrap');
+        if (existingDep) existingDep.remove();
+        qs('dDependencies').insertAdjacentHTML('afterend', `<div id="addDepWrap">${addDepHtml}</div>`);
       } catch {
         qs('dDependencies').textContent = 'None';
       }
@@ -805,12 +848,66 @@
       // Load tasks (MP-012)
       try {
         const tasksRes = await api(`/api/roadmap/tasks?requirement_id=${req.id}`);
-        qs('dTasks').innerHTML = tasksRes.tasks?.length
-          ? tasksRes.tasks.map(t => `<div style="margin-bottom:4px"><span class="pill status-${t.status}">${t.status}</span> ${t.title}</div>`).join('')
-          : 'None';
+        if (tasksRes.tasks?.length) {
+          qs('dTasks').innerHTML = tasksRes.tasks.map(t =>
+            `<div style="margin-bottom:4px;display:flex;align-items:center;gap:6px">
+              <span class="pill status-${t.status}">${t.status}</span> ${t.title}
+              <button class="icon-btn" onclick="openEditTask('${t.id}')" title="Edit">✏️</button>
+            </div>`
+          ).join('');
+        } else {
+          qs('dTasks').innerHTML = 'None';
+        }
       } catch {
         qs('dTasks').textContent = 'None';
       }
+
+      // Load test plans (MP-013)
+      try {
+        const tpRes = await api(`/api/roadmap/test-plans?requirement_id=${req.id}`);
+        if (tpRes.test_plans?.length) {
+          let tpHtml = '';
+          for (const tp of tpRes.test_plans) {
+            tpHtml += `<div style="margin-bottom:8px;border:1px solid var(--line);border-radius:6px;padding:6px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <strong>${tp.name}</strong>
+                <button class="icon-btn danger-btn" onclick="deleteTestPlan('${tp.id}')" title="Delete Plan">🗑️</button>
+              </div>`;
+            if (tp.test_cases?.length) {
+              for (const tc of tp.test_cases) {
+                const statusOpts = ['pending','pass','fail','conditional_pass'].map(s =>
+                  `<option value="${s}" ${tc.status===s?'selected':''}>${s}</option>`
+                ).join('');
+                tpHtml += `<div style="display:flex;align-items:center;gap:6px;margin:4px 0 4px 12px;font-size:12px">
+                  <select style="font-size:11px;padding:2px 4px" onchange="updateTestCase('${tc.id}',this.value)">${statusOpts}</select>
+                  <span>${tc.title}</span>
+                </div>`;
+              }
+            } else {
+              tpHtml += '<div style="margin-left:12px;font-size:12px;color:var(--muted)">No test cases</div>';
+            }
+            tpHtml += `<div style="margin-top:4px">
+              <input id="newCase_${tp.id}" placeholder="New test case title" style="font-size:11px;padding:4px;width:60%" />
+              <button style="font-size:11px;padding:4px 8px" onclick="addTestCase('${tp.id}')">+ Case</button>
+            </div></div>`;
+          }
+          qs('dTestPlans').innerHTML = tpHtml;
+        } else {
+          qs('dTestPlans').innerHTML = 'None';
+        }
+      } catch {
+        qs('dTestPlans').textContent = 'None';
+      }
+
+      // Add test plan button
+      const addTpBtn = `<div style="margin-top:6px">
+        <input id="newTestPlanName" placeholder="New test plan name" style="font-size:12px;padding:4px;width:60%" />
+        <button style="font-size:12px;padding:4px 8px" onclick="addTestPlan()">+ Plan</button>
+      </div>`;
+      qs('dTestPlans').insertAdjacentHTML('afterend', '');
+      const existing = document.getElementById('addTestPlanWrap');
+      if (existing) existing.remove();
+      qs('dTestPlans').insertAdjacentHTML('afterend', `<div id="addTestPlanWrap">${addTpBtn}</div>`);
 
       qs('drawer').classList.add('open');
     }
@@ -887,6 +984,35 @@
       qs('editModal').classList.add('open');
     }
 
+    function openEditTask(taskId) {
+      const task = state.tasks.find(t => t.id === taskId);
+      if (!task) return;
+      state.editKind = 'task';
+      state.editId = taskId;
+      qs('editTitle').textContent = 'Edit Task';
+      qs('editFields').innerHTML = `
+        <div class="grid2">
+          <div><label>Title</label><input id="eName" value="${(task.title || '').replace(/"/g, '&quot;')}" /></div>
+          <div><label>Status</label><select id="eStatus"><option value="backlog">backlog</option><option value="in_progress">in_progress</option><option value="done">done</option></select></div>
+          <div><label>Priority</label><select id="ePriority"><option>P1</option><option>P2</option><option>P3</option></select></div>
+          <div><label>Assignee</label><input id="eAssignee" value="${task.assignee || ''}" /></div>
+        </div>
+        <div><label>Description</label><textarea id="eDescription">${task.description || ''}</textarea></div>
+        <div style="margin-top:8px"><button class="danger-btn" id="deleteTaskBtn">Delete Task</button></div>`;
+      qs('eStatus').value = task.status || 'backlog';
+      qs('ePriority').value = task.priority || 'P2';
+      qs('editModal').classList.add('open');
+      // Bind delete task button
+      qs('deleteTaskBtn').onclick = async () => {
+        if (!confirm(`Delete task '${task.title}'?`)) return;
+        await api(`/api/roadmap/tasks/${taskId}`, { method: 'DELETE' });
+        qs('editModal').classList.remove('open');
+        state.editKind = null;
+        state.editId = null;
+        await loadData();
+      };
+    }
+
     async function saveEdit() {
       if (state.editKind === 'project' && state.editId) {
         await api(`/api/roadmap/projects/${state.editId}`, {
@@ -906,6 +1032,18 @@
           body: JSON.stringify({
             name: qs('eName').value.trim(),
             status: qs('eStatus').value
+          })
+        });
+      }
+      if (state.editKind === 'task' && state.editId) {
+        await api(`/api/roadmap/tasks/${state.editId}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            title: qs('eName').value.trim(),
+            status: qs('eStatus').value,
+            priority: qs('ePriority').value,
+            assignee: qs('eAssignee')?.value?.trim() || null,
+            description: qs('eDescription')?.value || null
           })
         });
       }
@@ -946,7 +1084,7 @@
             <div><label>Code</label><input id="aCode" placeholder="MP-018" /></div>
             <div><label>Title</label><input id="aTitle" placeholder="Title" /></div>
             <div><label>Priority</label><select id="aPriority"><option>P1</option><option selected>P2</option><option>P3</option></select></div>
-            <div><label>Status</label><select id="aStatus"><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="done">done</option></select></div>
+            <div><label>Status</label><select id="aStatus"><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="conditional_pass">conditional_pass</option><option value="done">done</option></select></div>
             <div><label>Type</label><input id="aType" value="${type}" /></div>
           </div>
           <div><label>Description</label><textarea id="aDescription"></textarea></div>`;
@@ -1010,6 +1148,80 @@
       await loadData();
     }
 
+    // Dependency CRUD helpers (MP-014)
+    async function addDependency() {
+      const req = state.selectedReq;
+      if (!req) return;
+      const depId = qs('addDepSelect')?.value;
+      if (!depId) { showToast('Select a requirement to depend on'); return; }
+      try {
+        await api('/api/roadmap/dependencies', {
+          method: 'POST',
+          body: JSON.stringify({ requirement_id: req.id, depends_on_id: depId })
+        });
+        await openRequirement(req.id);
+      } catch (err) { showToast(err.message); }
+    }
+
+    async function removeDependency(depId) {
+      if (!confirm('Remove this dependency?')) return;
+      try {
+        await api(`/api/roadmap/dependencies/${depId}`, { method: 'DELETE' });
+        if (state.selectedReq) await openRequirement(state.selectedReq.id);
+      } catch (err) { showToast(err.message); }
+    }
+
+    function openRequirementByCode(code) {
+      const req = state.requirements.find(r => r.code === code);
+      if (req) openRequirement(req.id);
+    }
+
+    // Test Plan/Case CRUD helpers (MP-013)
+    async function addTestPlan() {
+      const req = state.selectedReq;
+      if (!req) return;
+      const name = qs('newTestPlanName')?.value?.trim();
+      if (!name) { showToast('Enter a test plan name'); return; }
+      try {
+        await api('/api/roadmap/test-plans', {
+          method: 'POST',
+          body: JSON.stringify({ requirement_id: req.id, name, test_cases: [] })
+        });
+        await openRequirement(req.id);
+      } catch (err) { showToast(err.message); }
+    }
+
+    async function addTestCase(planId) {
+      const input = document.getElementById(`newCase_${planId}`);
+      const title = input?.value?.trim();
+      if (!title) { showToast('Enter a test case title'); return; }
+      try {
+        await api(`/api/roadmap/test-plans/${planId}/cases`, {
+          method: 'POST',
+          body: JSON.stringify({ title })
+        });
+        if (state.selectedReq) await openRequirement(state.selectedReq.id);
+      } catch (err) { showToast(err.message); }
+    }
+
+    async function updateTestCase(caseId, newStatus) {
+      try {
+        await api(`/api/roadmap/test-cases/${caseId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ status: newStatus })
+        });
+        showToast('Test case updated', 'success');
+      } catch (err) { showToast(err.message); }
+    }
+
+    async function deleteTestPlan(planId) {
+      if (!confirm('Delete this test plan and all its test cases?')) return;
+      try {
+        await api(`/api/roadmap/test-plans/${planId}`, { method: 'DELETE' });
+        if (state.selectedReq) await openRequirement(state.selectedReq.id);
+      } catch (err) { showToast(err.message); }
+    }
+
     async function loadData() {
       const [projectsRes, requirementsRes, sprintsRes, categoriesRes, tasksRes] = await Promise.all([
         api('/api/roadmap/projects?limit=200&offset=0'),
@@ -1034,12 +1246,13 @@
       }
       if (currentCat) cf.value = currentCat;
 
-      // Populate project filter
+      // Populate project filter with requirement counts
       const pf = qs('projectFilter');
       const current = pf.value;
       pf.innerHTML = '<option value="">All Projects</option>';
       for (const p of state.projects) {
-        pf.insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.name}</option>`);
+        const reqCount = state.requirements.filter(r => r.project_id === p.id).length;
+        pf.insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.emoji || ''} ${p.name} (${reqCount})</option>`);
       }
       if (current) pf.value = current;
 

@@ -16,7 +16,7 @@ from app.schemas.roadmap import (
     ProjectStatus, RequirementStatus, RequirementType, RequirementPriority, SprintStatus,
     CategoryResponse, CategoryCreate,
     RoadmapTaskCreate, RoadmapTaskUpdate, RoadmapTaskResponse,
-    TestPlanCreate, TestPlanResponse, TestCaseResponse, TestCaseUpdate,
+    TestPlanCreate, TestPlanResponse, TestCaseCreate, TestCaseResponse, TestCaseUpdate,
     DependencyCreate, DependencyResponse,
 )
 
@@ -1233,6 +1233,27 @@ async def update_test_case(case_id: str, update: TestCaseUpdate):
         raise
     except Exception as e:
         logger.error(f"Error updating test case: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/roadmap/test-plans/{plan_id}/cases", status_code=201)
+async def add_test_case(plan_id: str, case: TestCaseCreate):
+    """Add a test case to an existing test plan."""
+    try:
+        import uuid
+        tc_id = str(uuid.uuid4())
+        execute_query("""
+            INSERT INTO test_cases (id, test_plan_id, title, expected_result)
+            VALUES (?, ?, ?, ?)
+        """, (tc_id, plan_id, case.title, case.expected_result), fetch="none")
+
+        result = execute_query(
+            "SELECT id, test_plan_id, title, expected_result, status, executed_at FROM test_cases WHERE id = ?",
+            (tc_id,), fetch="one"
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error adding test case: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

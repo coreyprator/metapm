@@ -165,9 +165,8 @@ def _derive_project_from_requirements(requirement_codes: List[str]) -> str:
     return fallback or 'cross-portfolio'
 
 
-def _autolink_handoff_to_requirements(handoff_id: str, handoff_content: str) -> int:
-    """Parse requirement codes from handoff content and insert junction links."""
-    requirement_codes = _extract_requirement_ids(handoff_content)
+def _link_requirement_codes_to_handoff(handoff_id: str, requirement_codes: List[str], source: str = 'explicit') -> int:
+    """Link explicit requirement codes to a handoff via junction table."""
     if not requirement_codes:
         return 0
 
@@ -188,38 +187,47 @@ def _autolink_handoff_to_requirements(handoff_id: str, handoff_content: str) -> 
             )
             BEGIN
                 INSERT INTO roadmap_requirement_handoffs (requirement_id, handoff_id, source)
-                VALUES (?, ?, 'content_parse')
+                VALUES (?, ?, ?)
             END
-        """, (req['id'], handoff_id, req['id'], handoff_id), fetch="none")
+        """, (req['id'], handoff_id, req['id'], handoff_id, source), fetch="none")
         linked += 1
 
     if linked:
-        logger.info(f"Auto-linked handoff {handoff_id} to {linked} requirement(s)")
+        logger.info(f"Linked handoff {handoff_id} to {linked} requirement(s) via {source}")
     return linked
 
 
+def _autolink_handoff_to_requirements(handoff_id: str, handoff_content: str) -> int:
+    """Parse requirement codes from handoff content and insert junction links.
+    Used for non-UAT handoffs only. UAT submissions use _link_requirement_codes_to_handoff."""
+    requirement_codes = _extract_requirement_ids(handoff_content)
+    return _link_requirement_codes_to_handoff(handoff_id, requirement_codes, source='content_parse')
+
+
 def _auto_close_requirements_for_handoff(handoff_id: str, approved: bool) -> int:
-    """Set linked requirement statuses when UAT is approved/failed."""
+    """Set linked requirement statuses when UAT is approved/failed.
+    Only updates requirements linked via explicit linked_requirements array (source='uat_explicit')."""
     if approved:
         new_status = 'done'
     else:
         new_status = 'in_progress'
 
-    execute_query("""
-        UPDATE rr
-        SET rr.status = ?,
-            rr.updated_at = GETDATE()
+    # Only auto-close requirements linked via explicit array, not content parsing
+    rows = execute_query("""
+        SELECT rr.id, rr.code, rr.status as old_status
         FROM roadmap_requirements rr
         JOIN roadmap_requirement_handoffs rrh ON rr.id = rrh.requirement_id
-        WHERE rrh.handoff_id = ?
-    """, (new_status, handoff_id), fetch="none")
+        WHERE rrh.handoff_id = ? AND rrh.source = 'uat_explicit'
+    """, (handoff_id,), fetch="all") or []
 
-    count_row = execute_query(
-        "SELECT COUNT(*) as cnt FROM roadmap_requirement_handoffs WHERE handoff_id = ?",
-        (handoff_id,),
-        fetch="one"
-    )
-    return int((count_row or {}).get('cnt') or 0)
+    for row in rows:
+        execute_query("""
+            UPDATE roadmap_requirements SET status = ?, updated_at = GETDATE()
+            WHERE id = ?
+        """, (new_status, row['id']), fetch="none")
+        logger.info(f"Auto-close: {row['code']} {row['old_status']} -> {new_status} (handoff {handoff_id})")
+
+    return len(rows)
 
 
 # ============================================
@@ -839,7 +847,8 @@ async def submit_uat_direct(uat: UATDirectSubmit):
                 SET content = ?, updated_at = GETUTCDATE()
                 WHERE id = ?
             """, (content, handoff_id), fetch="none")
-            _autolink_handoff_to_requirements(handoff_id, content)
+            # MP-MS1-FIX WF-03: Link ONLY from explicit linked_requirements, never from content text
+            _link_requirement_codes_to_handoff(handoff_id, linked_requirement_codes, source='uat_explicit')
         else:
             # Create a new handoff for this UAT submission (using pre-built content)
             result = execute_query("""
@@ -862,7 +871,8 @@ async def submit_uat_direct(uat: UATDirectSubmit):
 
             handoff_id = str(result['id'])
             logger.info(f"Created new handoff {handoff_id} for {project_name} {version_db}")
-            _autolink_handoff_to_requirements(handoff_id, content)
+            # MP-MS1-FIX WF-03: Link ONLY from explicit linked_requirements, never from content text
+            _link_requirement_codes_to_handoff(handoff_id, linked_requirement_codes, source='uat_explicit')
 
         # Insert UAT result
         uat_result = execute_query("""

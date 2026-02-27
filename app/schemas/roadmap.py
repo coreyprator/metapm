@@ -36,6 +36,7 @@ class RequirementStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     UAT = "uat"
     NEEDS_FIXES = "needs_fixes"
+    CONDITIONAL_PASS = "conditional_pass"
     DONE = "done"
 
 
