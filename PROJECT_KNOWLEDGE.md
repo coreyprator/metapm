@@ -1,4 +1,5 @@
 # MetaPM -- Project Knowledge Document
+<!-- CHECKPOINT: MP-PK-4A2F -->
 Generated: 2026-02-15 by CC Session
 Updated: 2026-02-27 — Sprint "MP-MS1-FIX" (v2.5.1)
 Purpose: Canonical reference for all AI sessions working on this project.

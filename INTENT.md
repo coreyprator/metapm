@@ -1,4 +1,5 @@
 # INTENT.md -- MetaPM
+<!-- CHECKPOINT: MP-INTENT-7C1B -->
 
 ## Primary Intent
 MetaPM is Corey's single place for capturing, tracking, and acting on every idea in his life. Software projects and personal boondoggles. It exists because getting ideas out of his head and into a tracked system frees his mind for creative thinking.
