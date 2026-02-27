@@ -1,10 +1,35 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-4A2F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-27 — Sprint "MP-MS1-FIX" (v2.5.1)
+Updated: 2026-02-27 — Sprint "MP-MS2" (v2.6.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-02-27 (MP-MS1-FIX UAT Failure Fixes, v2.5.1)
+### Latest Session Update — 2026-02-27 (MP-MS2 MetaPM Mega Sprint 2, v2.6.0)
+
+- **Mega Sprint 2**: Fix UAT failures from MP-MS1-FIX + dashboard grid redesign + responsive mobile/tablet
+- **Current Version**: v2.6.0 — **DEPLOYED** via GitHub Actions
+- **Source**: PL UAT of MP-MS1-FIX (handoff 5D3F7A10, 6 pass / 7 fail / 1 skip)
+- **Fixes**:
+  - Migration 22: Expanded roadmap_requirements status CHECK constraint to include all 9 statuses (backlog, planned, in_progress, uat, needs_fixes, done, blocked, superseded, conditional_pass)
+  - F2-02/F3-02: conditional_pass and dependency 500 errors resolved by CHECK constraint fix
+  - BUG-01: Code field now editable with uniqueness validation (409 on duplicate)
+  - BUG-02: Project filter dropdown shows dynamic item counts reflecting active filters
+  - BUG-03: Auto-numbering endpoint `GET /api/roadmap/next-code/{project_code}/{item_type}` generates REQ-NNN, BUG-NNN, TSK-NNN, UAT-NNN, SPR-NNN
+  - blocked/superseded statuses: CSS pill styles, added to all 3 status dropdowns + RequirementStatus enum
+  - conditional_pass tooltip: "Works but has known limitations PL accepts for now"
+- **Dashboard Grid Redesign (MP-031)**:
+  - Group By dropdown: Project, Category, Priority, Status, Type
+  - Generic `renderByField()` grouper with smart sorting (P1→P2→P3, workflow order for status)
+  - "Open Items Only" toggle (default checked) — hides done/superseded items and empty projects
+  - Expand All / Collapse All works for all group-by modes
+  - Summary bar counts reflect current filter state
+- **Responsive Design**:
+  - Mobile (<768px): stacked filters, full-width dropdowns, 2-line item rows, full-screen drawer/modals, 44px touch targets
+  - Tablet (768–1023px): single-column filters, 420px drawer
+  - Desktop (≥1024px): existing layout preserved
+- **Commits**: `94d1f30` (Phase 1 backend), `e2831c6` (Phase 2-4 frontend)
+
+### Prior Session Update — 2026-02-27 (MP-MS1-FIX UAT Failure Fixes, v2.5.1)
 
 - **Fix cycle: 4 UAT failures + 3 bugs + 2 cleanup items** from PL testing of v2.5.0
 - **Current Version**: v2.5.1 — **DEPLOYED** via GitHub Actions (commit `098da89`)

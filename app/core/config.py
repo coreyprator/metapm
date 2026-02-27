@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.5.1"  # MP-MS1-FIX: UAT fixes (test plan UI, conditional_pass, dependency UI, auto-close logic, task hierarchy)
+    VERSION: str = "2.6.0"  # MP-MS2: CHECK constraint fix, grid redesign (group by/sort by/filter/open items), responsive mobile+tablet, auto-numbering, code editable
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
