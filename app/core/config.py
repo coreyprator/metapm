@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.4.0"  # Roadmap data reconciliation: 2 deletions, 5 closures, 1 merge, 10 new items, 8 desc updates, mega sprints
+    VERSION: str = "2.5.0"  # MP-MS1 Mega Sprint: categories, tasks, test plans, dependencies, conditional_pass, auto-close, search, CRUD, LL routing
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

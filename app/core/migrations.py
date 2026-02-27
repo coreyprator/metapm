@@ -594,4 +594,214 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 16 warning: {e}")
 
+    # Migration 17: Create roadmap_categories table + link to roadmap_projects (MP-021)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'roadmap_categories'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 17: Creating roadmap_categories table...")
+            execute_query("""
+                CREATE TABLE roadmap_categories (
+                    id NVARCHAR(36) PRIMARY KEY DEFAULT NEWID(),
+                    name NVARCHAR(100) NOT NULL UNIQUE,
+                    display_order INT DEFAULT 0,
+                    created_at DATETIME2 DEFAULT GETDATE()
+                )
+            """, fetch="none")
+            # Seed initial categories
+            execute_query("""
+                INSERT INTO roadmap_categories (id, name, display_order) VALUES
+                ('cat-software', 'software', 1),
+                ('cat-personal', 'personal', 2),
+                ('cat-infrastructure', 'infrastructure', 3)
+            """, fetch="none")
+            logger.info("  Migration 17: roadmap_categories table created and seeded.")
+        else:
+            logger.info("  Migration 17: roadmap_categories table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 17 warning: {e}")
+
+    # Migration 17b: Add category_id FK to roadmap_projects (MP-021)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'roadmap_projects' AND COLUMN_NAME = 'category_id'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 17b: Adding category_id to roadmap_projects...")
+            execute_query(
+                "ALTER TABLE roadmap_projects ADD category_id NVARCHAR(36) NULL",
+                fetch="none"
+            )
+            execute_query("""
+                IF NOT EXISTS (
+                    SELECT 1 FROM sys.foreign_keys
+                    WHERE name = 'FK_roadmap_projects_category'
+                )
+                BEGIN
+                    ALTER TABLE roadmap_projects
+                    ADD CONSTRAINT FK_roadmap_projects_category
+                    FOREIGN KEY (category_id) REFERENCES roadmap_categories(id)
+                END
+            """, fetch="none")
+            # Backfill existing projects with categories
+            execute_query("""
+                UPDATE roadmap_projects SET category_id = 'cat-software'
+                WHERE code IN ('HL', 'AF', 'EM', 'SF', 'MP')
+            """, fetch="none")
+            execute_query("""
+                UPDATE roadmap_projects SET category_id = 'cat-infrastructure'
+                WHERE code = 'PM'
+            """, fetch="none")
+            execute_query("""
+                UPDATE roadmap_projects SET category_id = 'cat-personal'
+                WHERE category_id IS NULL
+            """, fetch="none")
+            logger.info("  Migration 17b: category_id added and backfilled.")
+        else:
+            logger.info("  Migration 17b: roadmap_projects.category_id already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 17b warning: {e}")
+
+    # Migration 18: Create roadmap_tasks table (MP-012)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'roadmap_tasks'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 18: Creating roadmap_tasks table...")
+            execute_query("""
+                CREATE TABLE roadmap_tasks (
+                    id NVARCHAR(36) PRIMARY KEY DEFAULT NEWID(),
+                    requirement_id NVARCHAR(36) NOT NULL,
+                    title NVARCHAR(500) NOT NULL,
+                    description NVARCHAR(MAX),
+                    status NVARCHAR(20) DEFAULT 'backlog'
+                        CHECK (status IN ('backlog', 'in_progress', 'done')),
+                    priority NVARCHAR(10) DEFAULT 'P2'
+                        CHECK (priority IN ('P1', 'P2', 'P3')),
+                    assignee NVARCHAR(100),
+                    created_at DATETIME2 DEFAULT GETDATE(),
+                    updated_at DATETIME2 DEFAULT GETDATE(),
+                    CONSTRAINT FK_roadmap_tasks_req FOREIGN KEY (requirement_id)
+                        REFERENCES roadmap_requirements(id)
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_roadmap_tasks_req ON roadmap_tasks(requirement_id)", fetch="none")
+            execute_query("CREATE INDEX idx_roadmap_tasks_status ON roadmap_tasks(status)", fetch="none")
+            logger.info("  Migration 18: roadmap_tasks table created.")
+        else:
+            logger.info("  Migration 18: roadmap_tasks table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 18 warning: {e}")
+
+    # Migration 19: Create test_plans + test_cases tables (MP-013)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'test_plans'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 19: Creating test_plans and test_cases tables...")
+            execute_query("""
+                CREATE TABLE test_plans (
+                    id NVARCHAR(36) PRIMARY KEY DEFAULT NEWID(),
+                    requirement_id NVARCHAR(36) NOT NULL,
+                    name NVARCHAR(200) NOT NULL,
+                    created_at DATETIME2 DEFAULT GETDATE(),
+                    CONSTRAINT FK_test_plans_req FOREIGN KEY (requirement_id)
+                        REFERENCES roadmap_requirements(id)
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_test_plans_req ON test_plans(requirement_id)", fetch="none")
+            execute_query("""
+                CREATE TABLE test_cases (
+                    id NVARCHAR(36) PRIMARY KEY DEFAULT NEWID(),
+                    test_plan_id NVARCHAR(36) NOT NULL,
+                    title NVARCHAR(500) NOT NULL,
+                    expected_result NVARCHAR(MAX),
+                    status NVARCHAR(20) DEFAULT 'pending'
+                        CHECK (status IN ('pending', 'pass', 'fail', 'conditional_pass')),
+                    executed_at DATETIME2,
+                    CONSTRAINT FK_test_cases_plan FOREIGN KEY (test_plan_id)
+                        REFERENCES test_plans(id)
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_test_cases_plan ON test_cases(test_plan_id)", fetch="none")
+            logger.info("  Migration 19: test_plans and test_cases tables created.")
+        else:
+            logger.info("  Migration 19: test_plans table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 19 warning: {e}")
+
+    # Migration 20: Create requirement_dependencies table (MP-014)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'requirement_dependencies'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 20: Creating requirement_dependencies table...")
+            execute_query("""
+                CREATE TABLE requirement_dependencies (
+                    id NVARCHAR(36) PRIMARY KEY DEFAULT NEWID(),
+                    requirement_id NVARCHAR(36) NOT NULL,
+                    depends_on_id NVARCHAR(36) NOT NULL,
+                    created_at DATETIME2 DEFAULT GETDATE(),
+                    CONSTRAINT FK_reqdep_req FOREIGN KEY (requirement_id)
+                        REFERENCES roadmap_requirements(id),
+                    CONSTRAINT FK_reqdep_dep FOREIGN KEY (depends_on_id)
+                        REFERENCES roadmap_requirements(id),
+                    CONSTRAINT UQ_reqdep UNIQUE (requirement_id, depends_on_id)
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_reqdep_req ON requirement_dependencies(requirement_id)", fetch="none")
+            execute_query("CREATE INDEX idx_reqdep_dep ON requirement_dependencies(depends_on_id)", fetch="none")
+            logger.info("  Migration 20: requirement_dependencies table created.")
+        else:
+            logger.info("  Migration 20: requirement_dependencies table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 20 warning: {e}")
+
+    # Migration 21: Update uat_results status to include conditional_pass (MP-007)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM sys.check_constraints
+            WHERE parent_object_id = OBJECT_ID('uat_results')
+              AND definition LIKE '%conditional_pass%'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 21: Updating uat_results status for conditional_pass...")
+            execute_query("""
+                DECLARE @constraint_name NVARCHAR(128)
+                SELECT @constraint_name = name
+                FROM sys.check_constraints
+                WHERE parent_object_id = OBJECT_ID('uat_results')
+                  AND definition LIKE '%status%'
+
+                IF @constraint_name IS NOT NULL
+                BEGIN
+                    EXEC('ALTER TABLE uat_results DROP CONSTRAINT ' + @constraint_name)
+                END
+            """, fetch="none")
+            execute_query("""
+                ALTER TABLE uat_results
+                ADD CONSTRAINT CK_uat_results_status_v2
+                CHECK (status IN ('passed', 'failed', 'pending', 'conditional_pass'))
+            """, fetch="none")
+            logger.info("  Migration 21: uat_results now supports conditional_pass.")
+        else:
+            logger.info("  Migration 21: uat_results already supports conditional_pass.")
+    except Exception as e:
+        logger.warning(f"  Migration 21 warning: {e}")
+
     logger.info("Migrations complete.")

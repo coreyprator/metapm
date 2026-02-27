@@ -13,7 +13,11 @@ from app.schemas.roadmap import (
     SprintCreate, SprintUpdate, SprintResponse, SprintListResponse,
     RequirementCreate, RequirementUpdate, RequirementResponse, RequirementListResponse,
     ProjectRoadmapItem, RoadmapResponse,
-    ProjectStatus, RequirementStatus, RequirementType, RequirementPriority, SprintStatus
+    ProjectStatus, RequirementStatus, RequirementType, RequirementPriority, SprintStatus,
+    CategoryResponse, CategoryCreate,
+    RoadmapTaskCreate, RoadmapTaskUpdate, RoadmapTaskResponse,
+    TestPlanCreate, TestPlanResponse, TestCaseResponse, TestCaseUpdate,
+    DependencyCreate, DependencyResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,11 +69,13 @@ async def list_projects(
         # Get projects
         params.extend([offset, limit])
         results = execute_query(f"""
-            SELECT id, code, name, emoji, color, current_version, status,
-                   repo_url, deploy_url, created_at, updated_at
-            FROM roadmap_projects
+            SELECT p.id, p.code, p.name, p.emoji, p.color, p.current_version, p.status,
+                   p.repo_url, p.deploy_url, p.category_id, p.created_at, p.updated_at,
+                   c.name as category_name
+            FROM roadmap_projects p
+            LEFT JOIN roadmap_categories c ON p.category_id = c.id
             {where_clause}
-            ORDER BY name
+            ORDER BY p.name
             OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
         """, tuple(params), fetch="all")
 
@@ -85,6 +91,8 @@ async def list_projects(
                 status=ProjectStatus(row['status']) if row['status'] else ProjectStatus.ACTIVE,
                 repo_url=row['repo_url'],
                 deploy_url=row['deploy_url'],
+                category_id=row.get('category_id'),
+                category_name=row.get('category_name'),
                 created_at=row['created_at'],
                 updated_at=row['updated_at']
             ))
@@ -101,9 +109,12 @@ async def get_project(project_id: str):
     """Get a single project by ID."""
     try:
         result = execute_query("""
-            SELECT id, code, name, emoji, color, current_version, status,
-                   repo_url, deploy_url, created_at, updated_at
-            FROM roadmap_projects WHERE id = ?
+            SELECT p.id, p.code, p.name, p.emoji, p.color, p.current_version, p.status,
+                   p.repo_url, p.deploy_url, p.category_id, p.created_at, p.updated_at,
+                   c.name as category_name
+            FROM roadmap_projects p
+            LEFT JOIN roadmap_categories c ON p.category_id = c.id
+            WHERE p.id = ?
         """, (project_id,), fetch="one")
 
         if not result:
@@ -119,6 +130,8 @@ async def get_project(project_id: str):
             status=ProjectStatus(result['status']) if result['status'] else ProjectStatus.ACTIVE,
             repo_url=result['repo_url'],
             deploy_url=result['deploy_url'],
+            category_id=result.get('category_id'),
+            category_name=result.get('category_name'),
             created_at=result['created_at'],
             updated_at=result['updated_at']
         )
@@ -135,11 +148,12 @@ async def create_project(project: ProjectCreate):
     """Create a new project."""
     try:
         execute_query("""
-            INSERT INTO roadmap_projects (id, code, name, emoji, color, current_version, status, repo_url, deploy_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO roadmap_projects (id, code, name, emoji, color, current_version, status, repo_url, deploy_url, category_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             project.id, project.code, project.name, project.emoji, project.color,
-            project.current_version, project.status.value, project.repo_url, project.deploy_url
+            project.current_version, project.status.value, project.repo_url, project.deploy_url,
+            project.category_id
         ), fetch="none")
 
         return await get_project(project.id)
@@ -177,6 +191,9 @@ async def update_project(project_id: str, update: ProjectUpdate):
         if update.deploy_url is not None:
             set_clauses.append("deploy_url = ?")
             params.append(update.deploy_url)
+        if update.category_id is not None:
+            set_clauses.append("category_id = ?")
+            params.append(update.category_id if update.category_id else None)
 
         params.append(project_id)
 
@@ -931,4 +948,405 @@ async def seed_roadmap_data():
         return {"message": "Seed data created", "projects": len(projects), "requirements": len(requirements)}
     except Exception as e:
         logger.error(f"Error seeding data: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# CATEGORY ENDPOINTS (MP-021)
+# ============================================
+
+@router.get("/roadmap/categories")
+async def list_categories():
+    """List all roadmap categories."""
+    try:
+        results = execute_query("""
+            SELECT id, name, display_order, created_at
+            FROM roadmap_categories
+            ORDER BY display_order, name
+        """, fetch="all") or []
+        return {"categories": results, "total": len(results)}
+    except Exception as e:
+        logger.error(f"Error listing categories: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/roadmap/categories", status_code=201)
+async def create_category(cat: CategoryCreate):
+    """Create a new roadmap category."""
+    try:
+        import uuid
+        cat_id = f"cat-{cat.name.lower().replace(' ', '-')}"
+        execute_query("""
+            INSERT INTO roadmap_categories (id, name, display_order)
+            VALUES (?, ?, ?)
+        """, (cat_id, cat.name, cat.display_order), fetch="none")
+        result = execute_query(
+            "SELECT id, name, display_order, created_at FROM roadmap_categories WHERE id = ?",
+            (cat_id,), fetch="one"
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error creating category: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/roadmap/categories/{category_id}", status_code=204)
+async def delete_category(category_id: str):
+    """Delete a category if no projects reference it."""
+    try:
+        linked = execute_query(
+            "SELECT COUNT(*) as cnt FROM roadmap_projects WHERE category_id = ?",
+            (category_id,), fetch="one"
+        )
+        if linked and int(linked.get('cnt', 0)) > 0:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot delete category with {linked['cnt']} linked projects."
+            )
+        execute_query("DELETE FROM roadmap_categories WHERE id = ?", (category_id,), fetch="none")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting category: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# ROADMAP TASK ENDPOINTS (MP-012)
+# ============================================
+
+@router.get("/roadmap/tasks")
+async def list_roadmap_tasks(
+    requirement_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    limit: int = Query(100, le=500),
+    offset: int = Query(0)
+):
+    """List roadmap tasks, optionally filtered by requirement."""
+    try:
+        where_clauses = []
+        params = []
+
+        if requirement_id:
+            where_clauses.append("t.requirement_id = ?")
+            params.append(requirement_id)
+        if status:
+            where_clauses.append("t.status = ?")
+            params.append(status)
+
+        where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+        params.extend([offset, limit])
+        results = execute_query(f"""
+            SELECT t.id, t.requirement_id, t.title, t.description,
+                   t.status, t.priority, t.assignee, t.created_at, t.updated_at
+            FROM roadmap_tasks t
+            WHERE {where_sql}
+            ORDER BY
+                CASE t.priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 END,
+                t.created_at DESC
+            OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+        """, tuple(params), fetch="all") or []
+
+        return {"tasks": results, "total": len(results)}
+    except Exception as e:
+        logger.error(f"Error listing roadmap tasks: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/roadmap/tasks", status_code=201)
+async def create_roadmap_task(task: RoadmapTaskCreate):
+    """Create a new roadmap task under a requirement."""
+    try:
+        import uuid
+        task_id = task.id or str(uuid.uuid4())
+        execute_query("""
+            INSERT INTO roadmap_tasks (id, requirement_id, title, description, status, priority, assignee)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            task_id, task.requirement_id, task.title, task.description,
+            task.status.value, task.priority.value, task.assignee
+        ), fetch="none")
+
+        result = execute_query("""
+            SELECT id, requirement_id, title, description, status, priority, assignee,
+                   created_at, updated_at
+            FROM roadmap_tasks WHERE id = ?
+        """, (task_id,), fetch="one")
+        return result
+    except Exception as e:
+        logger.error(f"Error creating roadmap task: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/roadmap/tasks/{task_id}")
+async def update_roadmap_task(task_id: str, update: RoadmapTaskUpdate):
+    """Update a roadmap task."""
+    try:
+        set_clauses = ["updated_at = GETDATE()"]
+        params = []
+
+        if update.title is not None:
+            set_clauses.append("title = ?")
+            params.append(update.title)
+        if update.description is not None:
+            set_clauses.append("description = ?")
+            params.append(update.description)
+        if update.status is not None:
+            set_clauses.append("status = ?")
+            params.append(update.status.value)
+        if update.priority is not None:
+            set_clauses.append("priority = ?")
+            params.append(update.priority.value)
+        if update.assignee is not None:
+            set_clauses.append("assignee = ?")
+            params.append(update.assignee)
+
+        params.append(task_id)
+        execute_query(f"""
+            UPDATE roadmap_tasks SET {", ".join(set_clauses)} WHERE id = ?
+        """, tuple(params), fetch="none")
+
+        result = execute_query("""
+            SELECT id, requirement_id, title, description, status, priority, assignee,
+                   created_at, updated_at
+            FROM roadmap_tasks WHERE id = ?
+        """, (task_id,), fetch="one")
+        if not result:
+            raise HTTPException(status_code=404, detail="Task not found")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating roadmap task: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/roadmap/tasks/{task_id}", status_code=204)
+async def delete_roadmap_task(task_id: str):
+    """Delete a roadmap task."""
+    try:
+        execute_query("DELETE FROM roadmap_tasks WHERE id = ?", (task_id,), fetch="none")
+    except Exception as e:
+        logger.error(f"Error deleting roadmap task: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# TEST PLAN / TEST CASE ENDPOINTS (MP-013)
+# ============================================
+
+@router.get("/roadmap/test-plans")
+async def list_test_plans(requirement_id: Optional[str] = Query(None)):
+    """List test plans, optionally filtered by requirement."""
+    try:
+        if requirement_id:
+            plans = execute_query("""
+                SELECT id, requirement_id, name, created_at
+                FROM test_plans WHERE requirement_id = ?
+                ORDER BY created_at DESC
+            """, (requirement_id,), fetch="all") or []
+        else:
+            plans = execute_query("""
+                SELECT id, requirement_id, name, created_at
+                FROM test_plans ORDER BY created_at DESC
+            """, fetch="all") or []
+
+        for plan in plans:
+            cases = execute_query("""
+                SELECT id, test_plan_id, title, expected_result, status, executed_at
+                FROM test_cases WHERE test_plan_id = ?
+                ORDER BY title
+            """, (plan['id'],), fetch="all") or []
+            plan['test_cases'] = cases
+
+        return {"test_plans": plans, "total": len(plans)}
+    except Exception as e:
+        logger.error(f"Error listing test plans: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/roadmap/test-plans", status_code=201)
+async def create_test_plan(plan: TestPlanCreate):
+    """Create a test plan with optional test cases."""
+    try:
+        import uuid
+        plan_id = str(uuid.uuid4())
+        execute_query("""
+            INSERT INTO test_plans (id, requirement_id, name)
+            VALUES (?, ?, ?)
+        """, (plan_id, plan.requirement_id, plan.name), fetch="none")
+
+        for tc in plan.test_cases:
+            tc_id = str(uuid.uuid4())
+            execute_query("""
+                INSERT INTO test_cases (id, test_plan_id, title, expected_result)
+                VALUES (?, ?, ?, ?)
+            """, (tc_id, plan_id, tc.title, tc.expected_result), fetch="none")
+
+        result = execute_query(
+            "SELECT id, requirement_id, name, created_at FROM test_plans WHERE id = ?",
+            (plan_id,), fetch="one"
+        )
+        cases = execute_query(
+            "SELECT id, test_plan_id, title, expected_result, status, executed_at FROM test_cases WHERE test_plan_id = ?",
+            (plan_id,), fetch="all"
+        ) or []
+        result['test_cases'] = cases
+        return result
+    except Exception as e:
+        logger.error(f"Error creating test plan: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/roadmap/test-cases/{case_id}")
+async def update_test_case(case_id: str, update: TestCaseUpdate):
+    """Update a test case status."""
+    try:
+        set_clauses = []
+        params = []
+        if update.status is not None:
+            set_clauses.append("status = ?")
+            params.append(update.status.value)
+        if update.executed_at is not None:
+            set_clauses.append("executed_at = ?")
+            params.append(update.executed_at)
+        elif update.status is not None and update.status.value != 'pending':
+            set_clauses.append("executed_at = GETDATE()")
+
+        if not set_clauses:
+            raise HTTPException(status_code=400, detail="No fields to update")
+
+        params.append(case_id)
+        execute_query(f"""
+            UPDATE test_cases SET {", ".join(set_clauses)} WHERE id = ?
+        """, tuple(params), fetch="none")
+
+        result = execute_query(
+            "SELECT id, test_plan_id, title, expected_result, status, executed_at FROM test_cases WHERE id = ?",
+            (case_id,), fetch="one"
+        )
+        if not result:
+            raise HTTPException(status_code=404, detail="Test case not found")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating test case: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/roadmap/test-plans/{plan_id}", status_code=204)
+async def delete_test_plan(plan_id: str):
+    """Delete a test plan and its test cases."""
+    try:
+        execute_query("DELETE FROM test_cases WHERE test_plan_id = ?", (plan_id,), fetch="none")
+        execute_query("DELETE FROM test_plans WHERE id = ?", (plan_id,), fetch="none")
+    except Exception as e:
+        logger.error(f"Error deleting test plan: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# DEPENDENCY ENDPOINTS (MP-014)
+# ============================================
+
+@router.get("/roadmap/dependencies")
+async def list_dependencies(requirement_id: Optional[str] = Query(None)):
+    """List requirement dependencies."""
+    try:
+        if requirement_id:
+            results = execute_query("""
+                SELECT d.id, d.requirement_id, d.depends_on_id, d.created_at,
+                       r.code as depends_on_code, r.title as depends_on_title,
+                       p.code as depends_on_project_code
+                FROM requirement_dependencies d
+                JOIN roadmap_requirements r ON d.depends_on_id = r.id
+                JOIN roadmap_projects p ON r.project_id = p.id
+                WHERE d.requirement_id = ?
+                ORDER BY p.code, r.code
+            """, (requirement_id,), fetch="all") or []
+        else:
+            results = execute_query("""
+                SELECT d.id, d.requirement_id, d.depends_on_id, d.created_at,
+                       r.code as depends_on_code, r.title as depends_on_title,
+                       p.code as depends_on_project_code
+                FROM requirement_dependencies d
+                JOIN roadmap_requirements r ON d.depends_on_id = r.id
+                JOIN roadmap_projects p ON r.project_id = p.id
+                ORDER BY d.requirement_id, p.code, r.code
+            """, fetch="all") or []
+
+        return {"dependencies": results, "total": len(results)}
+    except Exception as e:
+        logger.error(f"Error listing dependencies: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/roadmap/dependencies", status_code=201)
+async def create_dependency(dep: DependencyCreate):
+    """Create a requirement dependency link."""
+    try:
+        if dep.requirement_id == dep.depends_on_id:
+            raise HTTPException(status_code=400, detail="A requirement cannot depend on itself")
+
+        import uuid
+        dep_id = str(uuid.uuid4())
+        execute_query("""
+            INSERT INTO requirement_dependencies (id, requirement_id, depends_on_id)
+            VALUES (?, ?, ?)
+        """, (dep_id, dep.requirement_id, dep.depends_on_id), fetch="none")
+
+        result = execute_query("""
+            SELECT d.id, d.requirement_id, d.depends_on_id, d.created_at,
+                   r.code as depends_on_code, r.title as depends_on_title,
+                   p.code as depends_on_project_code
+            FROM requirement_dependencies d
+            JOIN roadmap_requirements r ON d.depends_on_id = r.id
+            JOIN roadmap_projects p ON r.project_id = p.id
+            WHERE d.id = ?
+        """, (dep_id,), fetch="one")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating dependency: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/roadmap/dependencies/{dep_id}", status_code=204)
+async def delete_dependency(dep_id: str):
+    """Delete a requirement dependency."""
+    try:
+        execute_query("DELETE FROM requirement_dependencies WHERE id = ?", (dep_id,), fetch="none")
+    except Exception as e:
+        logger.error(f"Error deleting dependency: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# AUTO-CLOSE ON UAT APPROVAL (MP-015)
+# ============================================
+
+@router.post("/roadmap/requirements/{requirement_id}/auto-close")
+async def auto_close_requirement(requirement_id: str):
+    """Auto-close a requirement when its UAT is approved. Sets status to done."""
+    try:
+        req = execute_query(
+            "SELECT id, status FROM roadmap_requirements WHERE id = ?",
+            (requirement_id,), fetch="one"
+        )
+        if not req:
+            raise HTTPException(status_code=404, detail="Requirement not found")
+
+        execute_query("""
+            UPDATE roadmap_requirements SET status = 'done', updated_at = GETDATE()
+            WHERE id = ?
+        """, (requirement_id,), fetch="none")
+
+        return {"message": f"Requirement {requirement_id} auto-closed to done", "previous_status": req['status']}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error auto-closing requirement: {e}")
         raise HTTPException(status_code=500, detail=str(e))

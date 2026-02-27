@@ -56,6 +56,7 @@ class ProjectBase(BaseModel):
     status: ProjectStatus = ProjectStatus.ACTIVE
     repo_url: Optional[str] = None
     deploy_url: Optional[str] = None
+    category_id: Optional[str] = None
 
 
 class ProjectCreate(ProjectBase):
@@ -70,10 +71,13 @@ class ProjectUpdate(BaseModel):
     status: Optional[ProjectStatus] = None
     repo_url: Optional[str] = None
     deploy_url: Optional[str] = None
+    category_id: Optional[str] = None
 
 
 class ProjectResponse(ProjectBase):
     id: str
+    category_id: Optional[str] = None
+    category_name: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -186,3 +190,129 @@ class ProjectRoadmapItem(BaseModel):
 class RoadmapResponse(BaseModel):
     projects: List[ProjectRoadmapItem]
     stats: dict
+
+
+# Category schemas (MP-021)
+
+class CategoryResponse(BaseModel):
+    id: str
+    name: str
+    display_order: int = 0
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class CategoryCreate(BaseModel):
+    name: str = Field(..., max_length=100)
+    display_order: int = 0
+
+
+# Roadmap Task schemas (MP-012)
+
+class TaskStatus(str, Enum):
+    BACKLOG = "backlog"
+    IN_PROGRESS = "in_progress"
+    DONE = "done"
+
+
+class RoadmapTaskCreate(BaseModel):
+    id: Optional[str] = None
+    requirement_id: str
+    title: str = Field(..., max_length=500)
+    description: Optional[str] = None
+    status: TaskStatus = TaskStatus.BACKLOG
+    priority: RequirementPriority = RequirementPriority.P2
+    assignee: Optional[str] = None
+
+
+class RoadmapTaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[TaskStatus] = None
+    priority: Optional[RequirementPriority] = None
+    assignee: Optional[str] = None
+
+
+class RoadmapTaskResponse(BaseModel):
+    id: str
+    requirement_id: str
+    title: str
+    description: Optional[str] = None
+    status: str
+    priority: str
+    assignee: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Test Plan / Test Case schemas (MP-013)
+
+class TestCaseStatus(str, Enum):
+    PENDING = "pending"
+    PASS = "pass"
+    FAIL = "fail"
+    CONDITIONAL_PASS = "conditional_pass"
+
+
+class TestCaseCreate(BaseModel):
+    title: str = Field(..., max_length=500)
+    expected_result: Optional[str] = None
+
+
+class TestCaseUpdate(BaseModel):
+    status: Optional[TestCaseStatus] = None
+    executed_at: Optional[datetime] = None
+
+
+class TestCaseResponse(BaseModel):
+    id: str
+    test_plan_id: str
+    title: str
+    expected_result: Optional[str] = None
+    status: str = "pending"
+    executed_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TestPlanCreate(BaseModel):
+    requirement_id: str
+    name: str = Field(..., max_length=200)
+    test_cases: List[TestCaseCreate] = []
+
+
+class TestPlanResponse(BaseModel):
+    id: str
+    requirement_id: str
+    name: str
+    created_at: datetime
+    test_cases: List[TestCaseResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+# Dependency schemas (MP-014)
+
+class DependencyCreate(BaseModel):
+    requirement_id: str
+    depends_on_id: str
+
+
+class DependencyResponse(BaseModel):
+    id: str
+    requirement_id: str
+    depends_on_id: str
+    depends_on_code: Optional[str] = None
+    depends_on_title: Optional[str] = None
+    depends_on_project_code: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

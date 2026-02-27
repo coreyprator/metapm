@@ -181,6 +181,20 @@
     .p2 { color: #ffd18a; border-color: #7a5a2f; }
     .status-done { color: #9de2b4; border-color: #2f6e46; }
     .status-in_progress { color: #9ec2ff; border-color: #34507c; }
+    .task-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 6px;
+      align-items: center;
+      padding: 4px 8px 4px 24px;
+      border-radius: 4px;
+      border: 1px solid var(--line);
+      margin-bottom: 3px;
+      background: #0a1220;
+      font-size: 12px;
+    }
+    .task-row .pill { font-size: 10px; }
+    .dep-link { color: #9ec2ff; font-size: 12px; cursor: pointer; text-decoration: underline; }
     .drawer {
       position: fixed;
       top: 0;
@@ -285,6 +299,7 @@
     <div class="card controls">
       <div class="control-row">
         <label>Filter</label>
+        <select id="categoryFilter"><option value="">All Categories</option></select>
         <select id="projectFilter"><option value="">All Projects</option></select>
         <select id="priorityFilter"><option value="">All Priorities</option><option>P1</option><option>P2</option><option>P3</option></select>
         <select id="statusFilter"><option value="">All Status</option><option value="not_done">Not Done</option><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="done">done</option></select>
@@ -362,6 +377,14 @@
       <label>Linked Handoffs</label>
       <div id="dHandoffs" style="font-size:13px;color:var(--muted)">None</div>
     </div>
+    <div>
+      <label>Dependencies</label>
+      <div id="dDependencies" style="font-size:13px;color:var(--muted)">None</div>
+    </div>
+    <div>
+      <label>Tasks</label>
+      <div id="dTasks" style="font-size:13px;color:var(--muted)">None</div>
+    </div>
   </aside>
 
   <div class="modal" id="addModal">
@@ -399,6 +422,8 @@
       projects: [],
       requirements: [],
       sprints: [],
+      categories: [],
+      tasks: [],
       expanded: new Set(),
       selectedReq: null,
       contextProjectId: null,
@@ -494,6 +519,7 @@
 
     function filtersActive() {
       return Boolean(
+        qs('categoryFilter').value ||
         qs('projectFilter').value ||
         qs('priorityFilter').value ||
         qs('statusFilter').value ||
@@ -506,11 +532,16 @@
     }
 
     function getFilteredRequirements() {
+      const category = qs('categoryFilter').value;
       const project = qs('projectFilter').value;
       const priority = qs('priorityFilter').value;
       const status = qs('statusFilter').value;
       const search = (qs('searchInput').value || '').trim().toLowerCase();
       return state.requirements.filter((req) => {
+        if (category) {
+          const proj = state.projects.find(p => p.id === req.project_id);
+          if (!proj || proj.category_id !== category) return false;
+        }
         if (project && req.project_id !== project) return false;
         if (priority && req.priority !== priority) return false;
         if (status === 'not_done' && req.status === 'done') return false;
@@ -570,8 +601,16 @@
     }
 
     function rowHtml(req) {
+      const reqTasks = state.tasks.filter(t => t.requirement_id === req.id);
+      const taskInfo = reqTasks.length ? ` <span class="pill">${reqTasks.filter(t=>t.status==='done').length}/${reqTasks.length} tasks</span>` : '';
+      const taskRows = reqTasks.map(t => `
+        <div class="task-row">
+          <div>${t.title}</div>
+          <span class="pill status-${t.status}">${t.status}</span>
+          <span class="pill ${t.priority.toLowerCase()}">${t.priority}</span>
+        </div>`).join('');
       return `<div class="req-row" data-req="${req.id}">
-        <div><strong>${req.code}</strong> ${req.title}</div>
+        <div><strong>${req.code}</strong> ${req.title}${taskInfo}</div>
         <span class="pill ${req.priority.toLowerCase()}">${req.priority}</span>
         <span class="pill status-${req.status}">${req.status}</span>
         <span class="pill">${req.type}</span>
@@ -579,7 +618,7 @@
           <button class="icon-btn" data-open-req="${req.id}" title="Edit Requirement">✏️</button>
           <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete Requirement">🗑️</button>
         </div>
-      </div>`;
+      </div>${taskRows}`;
     }
 
     function sprintRowHtml(sprint, projectReqs) {
@@ -597,8 +636,10 @@
       const reqs = getFilteredRequirements();
       const hierarchy = qs('hierarchy');
       hierarchy.innerHTML = '';
+      const categoryFilter = qs('categoryFilter').value;
 
       for (const p of state.projects) {
+        if (categoryFilter && p.category_id !== categoryFilter) continue;
         const pReqs = reqs.filter(r => r.project_id === p.id);
 
         const done = pReqs.filter(r => r.status === 'done').length;
@@ -617,7 +658,7 @@
         const html = `
           <section class="project" style="border-left-color:${color}">
             <div class="project-head">
-              <div data-project="${p.id}">${open ? '▼' : '▶'} ${p.emoji || ''} ${p.name} ${p.current_version || ''}</div>
+              <div data-project="${p.id}">${open ? '▼' : '▶'} ${p.emoji || ''} ${p.name} ${p.current_version || ''}${p.category_name ? ` <span class="pill">${p.category_name}</span>` : ''}</div>
               <div class="actions-row">
                 <div class="project-summary">${done} done | ${p1} P1 | ${p2} P2</div>
                 <button class="icon-btn" data-edit-project="${p.id}" title="Edit Project">✏️</button>
@@ -751,6 +792,26 @@
         qs('dHandoffs').textContent = 'None';
       }
 
+      // Load dependencies (MP-014)
+      try {
+        const deps = await api(`/api/roadmap/dependencies?requirement_id=${req.id}`);
+        qs('dDependencies').innerHTML = deps.dependencies?.length
+          ? deps.dependencies.map(d => `<div class="dep-link">${d.depends_on_project_code}-${d.depends_on_code}: ${d.depends_on_title}</div>`).join('')
+          : 'None';
+      } catch {
+        qs('dDependencies').textContent = 'None';
+      }
+
+      // Load tasks (MP-012)
+      try {
+        const tasksRes = await api(`/api/roadmap/tasks?requirement_id=${req.id}`);
+        qs('dTasks').innerHTML = tasksRes.tasks?.length
+          ? tasksRes.tasks.map(t => `<div style="margin-bottom:4px"><span class="pill status-${t.status}">${t.status}</span> ${t.title}</div>`).join('')
+          : 'None';
+      } catch {
+        qs('dTasks').textContent = 'None';
+      }
+
       qs('drawer').classList.add('open');
     }
 
@@ -758,11 +819,17 @@
       const req = state.selectedReq;
       if (!req) return;
 
+      const newStatus = qs('dStatus').value;
+      // MP-016: Reopen confirmation guard
+      if (req.status === 'done' && newStatus !== 'done') {
+        if (!confirm(`Reopen requirement '${req.code}'? This will change status from done to ${newStatus}.`)) return;
+      }
+
       const payload = {
         title: qs('dTitle').value.trim(),
         priority: qs('dPriority').value,
         type: qs('dType').value,
-        status: qs('dStatus').value,
+        status: newStatus,
         sprint_id: qs('dSprint').value || null,
         description: qs('dDescription').value,
         target_version: qs('dVersion').value || null
@@ -790,6 +857,7 @@
       state.editKind = 'project';
       state.editId = projectId;
       qs('editTitle').textContent = 'Edit Project';
+      const catOpts = state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
       qs('editFields').innerHTML = `
         <div class="grid2">
           <div><label>Code</label><input id="eCode" value="${project.code || ''}" readonly /></div>
@@ -797,8 +865,10 @@
           <div><label>Emoji</label><input id="eEmoji" value="${project.emoji || ''}" /></div>
           <div><label>Version</label><input id="eVersion" value="${project.current_version || ''}" /></div>
           <div><label>Status</label><select id="eStatus"><option value="active">active</option><option value="stable">stable</option><option value="paused">paused</option><option value="archived">archived</option></select></div>
+          <div><label>Category</label><select id="eCategory"><option value="">None</option>${catOpts}</select></div>
         </div>`;
       qs('eStatus').value = project.status || 'active';
+      qs('eCategory').value = project.category_id || '';
       qs('editModal').classList.add('open');
     }
 
@@ -825,7 +895,8 @@
             name: qs('eName').value.trim(),
             emoji: qs('eEmoji').value.trim() || null,
             current_version: qs('eVersion').value.trim() || null,
-            status: qs('eStatus').value
+            status: qs('eStatus').value,
+            category_id: qs('eCategory')?.value || null
           })
         });
       }
@@ -850,12 +921,14 @@
       qs('addTitle').textContent = `Create ${kind}`;
 
       if (kind === 'project') {
+        const catOptions = state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
         qs('addFields').innerHTML = `
           <div class="grid2">
             <div><label>Code</label><input id="aCode" placeholder="MP" /></div>
             <div><label>Name</label><input id="aName" placeholder="MetaPM" /></div>
             <div><label>Emoji</label><input id="aEmoji" placeholder="🔴" /></div>
             <div><label>Version</label><input id="aVersion" placeholder="2.1.7" /></div>
+            <div><label>Category</label><select id="aCategory"><option value="">None</option>${catOptions}</select></div>
           </div>`;
       } else if (kind === 'sprint') {
         qs('addFields').innerHTML = `
@@ -894,6 +967,7 @@
               name: qs('aName').value.trim(),
               emoji: qs('aEmoji').value.trim() || null,
               current_version: qs('aVersion').value.trim() || null,
+              category_id: qs('aCategory')?.value || null,
               status: 'active'
             })
           });
@@ -937,16 +1011,30 @@
     }
 
     async function loadData() {
-      const [projectsRes, requirementsRes, sprintsRes] = await Promise.all([
+      const [projectsRes, requirementsRes, sprintsRes, categoriesRes, tasksRes] = await Promise.all([
         api('/api/roadmap/projects?limit=200&offset=0'),
         api('/api/roadmap/requirements?limit=500&offset=0'),
-        api('/api/roadmap/sprints?limit=200&offset=0')
+        api('/api/roadmap/sprints?limit=200&offset=0'),
+        api('/api/roadmap/categories').catch(() => ({ categories: [] })),
+        api('/api/roadmap/tasks?limit=500').catch(() => ({ tasks: [] }))
       ]);
 
       state.projects = projectsRes.projects || [];
       state.requirements = requirementsRes.requirements || [];
       state.sprints = sprintsRes.sprints || [];
+      state.categories = categoriesRes.categories || [];
+      state.tasks = tasksRes.tasks || [];
 
+      // Populate category filter
+      const cf = qs('categoryFilter');
+      const currentCat = cf.value;
+      cf.innerHTML = '<option value="">All Categories</option>';
+      for (const c of state.categories) {
+        cf.insertAdjacentHTML('beforeend', `<option value="${c.id}">${c.name}</option>`);
+      }
+      if (currentCat) cf.value = currentCat;
+
+      // Populate project filter
       const pf = qs('projectFilter');
       const current = pf.value;
       pf.innerHTML = '<option value="">All Projects</option>';
@@ -960,7 +1048,7 @@
     }
 
     function bindControls() {
-      ['projectFilter', 'priorityFilter', 'statusFilter', 'sortBy', 'groupBy'].forEach((id) => {
+      ['categoryFilter', 'projectFilter', 'priorityFilter', 'statusFilter', 'sortBy', 'groupBy'].forEach((id) => {
         qs(id).onchange = () => {
           updateResetButtonState();
           render();
@@ -984,6 +1072,7 @@
       qs('deleteReqBtn').onclick = () => deleteSelectedRequirement().catch(err => showToast(err.message));
 
       qs('resetFiltersBtn').onclick = () => {
+        qs('categoryFilter').value = '';
         qs('projectFilter').value = '';
         qs('priorityFilter').value = '';
         qs('statusFilter').value = '';
