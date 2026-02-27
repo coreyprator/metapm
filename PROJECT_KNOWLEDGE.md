@@ -1,9 +1,32 @@
 # MetaPM -- Project Knowledge Document
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-25 — Sprint "Roadmap Data Reconciliation" (v2.4.0)
+Updated: 2026-02-26 — Sprint "MP-MS1 Mega Sprint" (v2.5.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-02-25 (CC_MetaPM_v2.4.0_Deploy_UAT_SA_Permissions)
+### Latest Session Update — 2026-02-26 (MP-MS1 MetaPM Mega Sprint, v2.5.0)
+
+- **Mega Sprint: 13 requirements implemented in single session.** Transform MetaPM from basic dashboard into fully functional portfolio control tower.
+- **Current Version**: v2.5.0 — **DEPLOYED** via GitHub Actions (commit `4a58bf6`)
+- **Health**: `{"status":"healthy","version":"2.5.0"}`
+- **Features implemented**:
+  - MP-021: Categories system (roadmap_categories table, category filter dropdown, project category assignment)
+  - MP-012: Roadmap tasks as children of requirements (roadmap_tasks table, CRUD API, dashboard inline display)
+  - MP-013: Test plans/cases entity hierarchy (test_plans + test_cases tables, CRUD API, drawer display)
+  - MP-007: Conditional pass status added to test_cases and uat_results CHECK constraints
+  - MP-014: Cross-project dependency links (requirement_dependencies table, CRUD API, drawer display)
+  - MP-015: Auto-close endpoint (POST /api/roadmap/requirements/{id}/auto-close)
+  - MP-016: Reopen confirmation guard (confirm dialog when changing done → other status)
+  - MP-005: Full CRUD verified (already implemented, confirmed working)
+  - MP-017: Context-aware Add button (already implemented, confirmed working)
+  - MP-018: Full-text search (already implemented, confirmed working)
+  - MP-019: Expand/collapse all (already implemented, confirmed working)
+  - MP-011: Sprint entity with project_id FK (already implemented, confirmed working)
+  - MP-022: Bootstrap v1.4.2 with LL routing process (committed to project-methodology)
+- **Migrations added**: 17 (roadmap_categories + seed), 17b (projects.category_id), 18 (roadmap_tasks), 19 (test_plans + test_cases), 20 (requirement_dependencies), 21 (conditional_pass constraint)
+- **Deploy method**: GitHub Actions (.github/workflows/deploy.yml) — first automated deploy via CI/CD
+- **Bootstrap v1.4.2**: Committed to project-methodology (commit `546c4d7`). Adds formalized LL routing process.
+
+### Prior Session Update — 2026-02-25 (CC_MetaPM_v2.4.0_Deploy_UAT_SA_Permissions)
 
 - **Deploy + UAT + SA permissions sprint.** All 3 parts COMPLETE.
 - **Current Version**: v2.4.0 — **DEPLOYED** revision `metapm-v2-00096-q7r`
@@ -110,8 +133,8 @@ Purpose: Canonical reference for all AI sessions working on this project.
 **Repository**: github.com/coreyprator/metapm
 **Custom Domain**: https://metapm.rentyourcio.com
 **Cloud Run URL**: https://metapm-67661554310.us-central1.run.app (legacy; use custom domain)
-**Current Version**: v2.4.0 (per `app/core/config.py` line 15)
-**Latest Known Revision**: metapm-v2-00096-q7r _(deployed 2026-02-25, sprint MP-DEPLOY-v2.4.0)_
+**Current Version**: v2.5.0 (per `app/core/config.py` line 15)
+**Latest Known Revision**: Deployed 2026-02-26 via GitHub Actions (commit `4a58bf6`, sprint MP-MS1)
 **Owner**: Corey Prator
 
 ### Tech Stack
@@ -198,7 +221,7 @@ Source: `app/core/database.py`
 
 ### Migrations
 
-Idempotent startup migrations (13 total) run at application boot via `app/core/migrations.py`. They check `INFORMATION_SCHEMA` before applying changes. Migrations include:
+Idempotent startup migrations (21 total) run at application boot via `app/core/migrations.py`. They check `INFORMATION_SCHEMA` before applying changes. Migrations include:
 1. TaskType column on Tasks
 2. mcp_handoffs table
 3. mcp_tasks table
@@ -212,6 +235,13 @@ Idempotent startup migrations (13 total) run at application boot via `app/core/m
 11. uat_results status constraint update (allow 'pending')
 12. Handoff lifecycle tables (handoff_requests, handoff_completions, roadmap_handoffs)
 13. roadmap_sprints.project_id column + FK_roadmap_sprints_project FK constraint
+14-16. (Reserved)
+17. roadmap_categories table + seed data (software, personal, infrastructure)
+17b. roadmap_projects.category_id column + FK + backfill
+18. roadmap_tasks table (FK → roadmap_requirements)
+19. test_plans + test_cases tables
+20. requirement_dependencies table
+21. uat_results conditional_pass status constraint
 
 Source: `app/core/migrations.py`
 
@@ -249,9 +279,14 @@ Source: `app/core/migrations.py`
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
-| `roadmap_projects` | Project registry for roadmap | id, code, name, emoji, color, current_version, status |
+| `roadmap_projects` | Project registry for roadmap | id, code, name, emoji, color, current_version, status, category_id (FK) |
 | `roadmap_sprints` | Sprint definitions | id, name, project_id (FK → roadmap_projects.id), status, start_date, end_date |
 | `roadmap_requirements` | Requirements linked to projects/sprints | id, project_id, code, title, type, priority, status |
+| `roadmap_categories` | Category lookup for projects (MP-021) | id, name, display_order. Seeded: software, personal, infrastructure |
+| `roadmap_tasks` | Tasks as children of requirements (MP-012) | id, requirement_id (FK), title, description, status, priority, assignee |
+| `test_plans` | Test plan definitions (MP-013) | id, requirement_id (FK), name, created_at |
+| `test_cases` | Test cases within plans (MP-013) | id, test_plan_id (FK), title, expected_result, status (incl. conditional_pass) |
+| `requirement_dependencies` | Cross-project dependency links (MP-014) | id, requirement_id (FK), depends_on_id (FK), UNIQUE constraint |
 
 ### Handoff Lifecycle Tables (from `app/core/migrations.py`)
 
@@ -310,6 +345,11 @@ Sources: `scripts/schema.sql`, `scripts/backlog_schema.sql`, `app/core/migration
 **Roadmap** (`/api/projects`, `/api/sprints`, `/api/requirements`, `/api/roadmap`, `/api/roadmap/seed`)
 **Roadmap (New 2026-02-18)**: GET /api/roadmap/projects, GET /api/roadmap/requirements, GET /api/requirements?limit=N, POST /api/requirements, PATCH /api/requirements/:id, PUT /api/requirements/:id
 **Roadmap Export (New 2026-02-20)**: GET /api/roadmap/export (public JSON snapshot with projects, nested requirements, sprints, and aggregate stats)
+**Categories (New v2.5.0)**: GET /api/roadmap/categories, POST /api/roadmap/categories, DELETE /api/roadmap/categories/{id}
+**Roadmap Tasks (New v2.5.0)**: GET /api/roadmap/tasks?requirement_id=X, POST /api/roadmap/tasks, PUT /api/roadmap/tasks/{id}, DELETE /api/roadmap/tasks/{id}
+**Test Plans (New v2.5.0)**: GET /api/roadmap/test-plans?requirement_id=X, POST /api/roadmap/test-plans, PUT /api/roadmap/test-cases/{id}, DELETE /api/roadmap/test-plans/{id}
+**Dependencies (New v2.5.0)**: GET /api/roadmap/dependencies?requirement_id=X, POST /api/roadmap/dependencies, DELETE /api/roadmap/dependencies/{id}
+**Auto-Close (New v2.5.0)**: POST /api/roadmap/requirements/{id}/auto-close (closes requirement when all tasks done)
 **UAT Submit (New 2026-02-18)**: POST /api/uat/submit (project derived from linked_requirements, 201 Created confirmed)
 **Handoff Lifecycle** (`/api/handoffs`, `/api/handoffs/{id}`, `/api/handoffs/{id}/status`, `/api/handoffs/{id}/complete`, `/api/roadmap/{id}/handoffs`)
 
@@ -516,6 +556,15 @@ Sources: `app/main.py`, `app/api/*.py`, `PROJECT_STATUS.md`, `SPRINT3_IMPLEMENTA
   - Phase 2: Fixed /api/handoffs SQL ORDER BY bug. Created tests/test_ui_smoke.py (9 production tests).
   - Phase 3: Added conditional_pass to UATStatus enum (MP-007 → done).
   - Deployed revision: metapm-v2-00090-vtn
+- **Sprint "MP-MS1 Mega Sprint" (2026-02-26, v2.5.0)**:
+  - 13 requirements implemented: MP-005, MP-007, MP-011-019, MP-021, MP-022
+  - 6 already working (verified): MP-005, MP-011, MP-017, MP-018, MP-019, MP-016 (partial)
+  - 7 newly built: MP-021 (categories), MP-012 (tasks), MP-013 (test plans), MP-007 (conditional_pass), MP-014 (dependencies), MP-015 (auto-close), MP-016 (reopen guard)
+  - Migrations 17-21 added (roadmap_categories, roadmap_tasks, test_plans, test_cases, requirement_dependencies)
+  - Dashboard updated with category filter, inline task rows, drawer dependencies/tasks sections
+  - Bootstrap v1.4.2 committed to project-methodology (LL routing process)
+  - First deploy via GitHub Actions (run 22469435240, all steps pass)
+  - Deployed commit: `4a58bf6`
 - **Sprint "AF Requirements Data Sprint" (2026-02-23, v2.3.9 — data only, no deploy)**:
   - Inserted 14 new ArtForge requirements: AF-016 through AF-029 (PL UAT 2/22/2026 feedback).
   - ArtForge requirements total: 15 → 29 (proj-af).
@@ -528,25 +577,36 @@ Sources: `PROJECT_STATUS.md`, `SPRINT_4_CANCELED.md`, `handoffs/log/HANDOFF_LOG.
 
 ## 7. FEATURES -- PLANNED/IN PROGRESS
 
-### What's Next (per Roadmap, as of 2026-02-22)
+### What's Next (per Roadmap, as of 2026-02-26)
 
 | ID | Requirement | Priority | Notes |
 |----|------------|----------|-------|
-| MP-021 | Handoff/UAT CRUD visibility | P2 | PL: "clicking on handoff ID should open MetaPM to show and CRUD" |
-| MP-018 | Full-text search across all entities | P2 | No way to find anything except scrolling |
-| MP-014 | Cross-project dependency links | P2 | No API routes or UI — not started |
-| MP-012 | Task entity as child of requirement | P2 | New table needed |
-| MP-013 | Test Plan / UAT entity hierarchy | P2 | New table needed |
-| MP-011 | Sprint entity + assignment | P2 | Sprint project_id FK now exists |
-| MP-001 | GitHub Actions CI/CD | P1 | No .github dir — needs dedicated session |
+| MP-021 | Handoff/UAT CRUD visibility | P2 | PL: "clicking on handoff ID should open MetaPM to show and CRUD" — partially done (categories implemented, handoff visibility still needed) |
 | MP-029 | Quick Capture — Offline-First Messaging Interface | P2 | Backlog — offline-first idea intake, batch sync, AI structuring, review queue |
 | MP-030 | Automated Lessons Learned — AI-Extracted Insights | P2 | Backlog — shim layer, lessons_learned table, review queue, sprint context |
 | MP-031 | Adjacent Possible — Portfolio Technology Horizon Scanner | P3 | Backlog — strategic planning view, AI adjacency suggestions |
 
-### MetaPM Vision — Full Entity Hierarchy Needed
+### Completed in v2.5.0 (MP-MS1 Mega Sprint)
+| ID | Requirement | Status |
+|----|------------|--------|
+| MP-005 | Full CRUD for all entities | Done (verified) |
+| MP-007 | Conditional pass status | Done |
+| MP-011 | Sprint entity + assignment | Done (verified) |
+| MP-012 | Task entity as child of requirement | Done |
+| MP-013 | Test Plan / UAT entity hierarchy | Done |
+| MP-014 | Cross-project dependency links | Done |
+| MP-015 | Auto-close on UAT approval | Done |
+| MP-016 | Reopen confirmation guard | Done |
+| MP-017 | Context-aware Add button | Done (verified) |
+| MP-018 | Full-text search | Done (verified) |
+| MP-019 | Expand/collapse all | Done (verified) |
+
+### MetaPM Vision — Entity Hierarchy (Implemented v2.5.0)
 ```
-Project → Sprint → Requirement/Bug → Task → Test Case → Result
-Full-text search, expand/collapse all, handoff/UAT visibility, cross-project links
+Project (with category) → Sprint → Requirement → Task → Test Plan → Test Case
+                                    ↓
+                              Dependencies (cross-project links)
+Full-text search ✅, expand/collapse all ✅, categories ✅, cross-project links ✅
 ```
 
 ---
@@ -665,7 +725,7 @@ Source: `.gcloudignore`
 ```bash
 curl https://metapm.rentyourcio.com/health
 ```
-Returns: `{"status": "healthy", "version": "2.3.0", "build": "..."}`
+Returns: `{"status": "healthy", "version": "2.5.0", "build": "..."}`
 
 Source: `app/main.py` lines 95-104
 
@@ -675,7 +735,7 @@ Source: `app/main.py` lines 95-104
 - Auth: cc-deploy SA via `GCP_SA_KEY` secret
 - Deploy method: `--source .` (Cloud Run builds from source)
 - Health check: https://metapm.rentyourcio.com/health
-- **Status**: Workflow created 2026-02-26 (PM-MS1). Awaiting `GCP_SA_KEY` secret from PL.
+- **Status**: ACTIVE — first successful deploy via GitHub Actions on 2026-02-26 (commit `4a58bf6`, run 22469435240). All steps pass including health check.
 
 ---
 
@@ -770,11 +830,10 @@ Source: `app/api/mcp.py`, `app/api/handoff_lifecycle.py`, `app/services/handoff_
 
 ## 12. KNOWN ISSUES & TECHNICAL DEBT
 
-### Open Bugs (Current — as of 2026-02-19)
+### Open Bugs (Current — as of 2026-02-26)
 | ID | Issue | Severity | Impact |
 |----|-------|----------|--------|
-| MP-021 | Handoff/UAT data not visible in dashboard | P2 | Submit works but no UI to see/click/edit handoffs |
-| — | Dashboard hierarchy incomplete | P2 | Only Projects → Requirements (no Tasks, UATs, Sprints) |
+| MP-021 | Handoff/UAT data not visible in dashboard | P2 | Submit works but no UI to see/click/edit handoffs (categories part done) |
 | — | roadmap_handoffs type mismatch | P3 | Junction table has varchar/UUID type inconsistency |
 | — | backlog.py ReferenceURL column | P3 | Column referenced in INSERT/SELECT but missing from Requirements table schema; affects /api/backlog/requirements (NOT roadmap endpoints) |
 
@@ -981,7 +1040,7 @@ Source: `CLAUDE.md`, `.claude/settings.json`
 | `app/services/methodology_service.py` | Referenced in README but NOT FOUND |
 | `pyproject.toml` | NOT FOUND (uses requirements.txt instead) |
 | `package.json` | NOT FOUND (no Node.js frontend) |
-| `.github/` | NOT FOUND (uses Cloud Build instead of GitHub Actions) |
+| `.github/` | EXISTS — `deploy.yml` created 2026-02-26 (PM-MS1 CI/CD sprint) |
 | `docs/API.md` | NOT FOUND (docs/api/ has only .gitkeep) |
 | `docs/architecture/` | EXISTS but only has .gitkeep |
 | `alembic/` | NOT FOUND (uses custom migrations) |
