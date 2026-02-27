@@ -582,6 +582,17 @@ async def update_requirement(requirement_id: str, update: RequirementUpdate):
         set_clauses = ["updated_at = GETDATE()"]
         params = []
 
+        if update.code is not None:
+            # Validate code uniqueness within the same project
+            existing = execute_query("""
+                SELECT id FROM roadmap_requirements
+                WHERE project_id = (SELECT project_id FROM roadmap_requirements WHERE id = ?)
+                  AND code = ? AND id != ?
+            """, (requirement_id, update.code, requirement_id), fetch="one")
+            if existing:
+                raise HTTPException(status_code=409, detail=f"Code '{update.code}' already exists in this project")
+            set_clauses.append("code = ?")
+            params.append(update.code)
         if update.title is not None:
             set_clauses.append("title = ?")
             params.append(update.title)

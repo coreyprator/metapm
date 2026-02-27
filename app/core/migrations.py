@@ -804,4 +804,39 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 21 warning: {e}")
 
+    # Migration 22: Expand roadmap_requirements status CHECK to include conditional_pass, blocked, superseded (MP-MS2)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM sys.check_constraints
+            WHERE parent_object_id = OBJECT_ID('roadmap_requirements')
+              AND definition LIKE '%conditional_pass%'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 22: Expanding roadmap_requirements status CHECK constraint...")
+            # Drop the existing status constraint dynamically
+            execute_query("""
+                DECLARE @constraint_name NVARCHAR(128)
+                SELECT @constraint_name = name
+                FROM sys.check_constraints
+                WHERE parent_object_id = OBJECT_ID('roadmap_requirements')
+                  AND definition LIKE '%status%'
+
+                IF @constraint_name IS NOT NULL
+                BEGIN
+                    EXEC('ALTER TABLE roadmap_requirements DROP CONSTRAINT ' + @constraint_name)
+                END
+            """, fetch="none")
+            # Recreate with all valid statuses
+            execute_query("""
+                ALTER TABLE roadmap_requirements
+                ADD CONSTRAINT CK_roadmap_requirements_status
+                CHECK (status IN ('backlog', 'planned', 'in_progress', 'uat', 'needs_fixes', 'done', 'blocked', 'superseded', 'conditional_pass'))
+            """, fetch="none")
+            logger.info("  Migration 22: roadmap_requirements status constraint expanded.")
+        else:
+            logger.info("  Migration 22: roadmap_requirements status constraint already includes conditional_pass.")
+    except Exception as e:
+        logger.warning(f"  Migration 22 warning: {e}")
+
     logger.info("Migrations complete.")

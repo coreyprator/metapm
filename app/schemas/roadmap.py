@@ -36,8 +36,10 @@ class RequirementStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     UAT = "uat"
     NEEDS_FIXES = "needs_fixes"
-    CONDITIONAL_PASS = "conditional_pass"
     DONE = "done"
+    BLOCKED = "blocked"
+    SUPERSEDED = "superseded"
+    CONDITIONAL_PASS = "conditional_pass"
 
 
 class SprintStatus(str, Enum):
@@ -148,6 +150,7 @@ class RequirementCreate(RequirementBase):
 
 
 class RequirementUpdate(BaseModel):
+    code: Optional[str] = Field(None, max_length=20)
     title: Optional[str] = None
     description: Optional[str] = None
     type: Optional[RequirementType] = None
