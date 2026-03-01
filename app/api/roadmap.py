@@ -29,7 +29,7 @@ def _project_done_counts() -> dict:
     rows = execute_query("""
         SELECT project_id,
                COUNT(*) as total_count,
-               SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as done_count
+               SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as done_count
         FROM roadmap_requirements
         GROUP BY project_id
     """, fetch="all") or []
@@ -759,12 +759,16 @@ async def get_roadmap(
                 ORDER BY
                     CASE r.priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 END,
                     CASE r.status
-                        WHEN 'in_progress' THEN 1
-                        WHEN 'uat' THEN 2
-                        WHEN 'needs_fixes' THEN 3
-                        WHEN 'planned' THEN 4
-                        WHEN 'backlog' THEN 5
-                        WHEN 'done' THEN 6
+                        WHEN 'executing' THEN 1
+                        WHEN 'handoff' THEN 2
+                        WHEN 'uat' THEN 3
+                        WHEN 'needs_fixes' THEN 4
+                        WHEN 'approved' THEN 5
+                        WHEN 'prompt_ready' THEN 6
+                        WHEN 'draft' THEN 7
+                        WHEN 'backlog' THEN 8
+                        WHEN 'closed' THEN 9
+                        WHEN 'deferred' THEN 10
                     END
             """, (proj['id'],), fetch="all")
 
@@ -804,22 +808,30 @@ async def get_roadmap(
             SELECT
                 COUNT(*) as total,
                 SUM(CASE WHEN status = 'backlog' THEN 1 ELSE 0 END) as backlog,
-                SUM(CASE WHEN status = 'planned' THEN 1 ELSE 0 END) as planned,
-                SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
+                SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) as draft,
+                SUM(CASE WHEN status = 'prompt_ready' THEN 1 ELSE 0 END) as prompt_ready,
+                SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved,
+                SUM(CASE WHEN status = 'executing' THEN 1 ELSE 0 END) as executing,
+                SUM(CASE WHEN status = 'handoff' THEN 1 ELSE 0 END) as handoff,
                 SUM(CASE WHEN status = 'uat' THEN 1 ELSE 0 END) as uat,
+                SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as closed,
                 SUM(CASE WHEN status = 'needs_fixes' THEN 1 ELSE 0 END) as needs_fixes,
-                SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as done
+                SUM(CASE WHEN status = 'deferred' THEN 1 ELSE 0 END) as deferred
             FROM roadmap_requirements
         """, fetch="one")
 
         stats = {
             "total": stats_result['total'] or 0,
             "backlog": stats_result['backlog'] or 0,
-            "planned": stats_result['planned'] or 0,
-            "in_progress": stats_result['in_progress'] or 0,
+            "draft": stats_result['draft'] or 0,
+            "prompt_ready": stats_result['prompt_ready'] or 0,
+            "approved": stats_result['approved'] or 0,
+            "executing": stats_result['executing'] or 0,
+            "handoff": stats_result['handoff'] or 0,
             "uat": stats_result['uat'] or 0,
+            "closed": stats_result['closed'] or 0,
             "needs_fixes": stats_result['needs_fixes'] or 0,
-            "done": stats_result['done'] or 0
+            "deferred": stats_result['deferred'] or 0
         } if stats_result else {}
 
         return RoadmapResponse(projects=roadmap_items, stats=stats)
@@ -892,8 +904,8 @@ async def export_roadmap():
         stats_row = execute_query("""
             SELECT
                 COUNT(*) as total_requirements,
-                SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as done,
-                SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
+                SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as done,
+                SUM(CASE WHEN status = 'executing' THEN 1 ELSE 0 END) as in_progress,
                 SUM(CASE WHEN status = 'backlog' THEN 1 ELSE 0 END) as backlog,
                 SUM(CASE WHEN type = 'bug' THEN 1 ELSE 0 END) as bugs,
                 SUM(CASE WHEN type = 'feature' THEN 1 ELSE 0 END) as features,
@@ -959,7 +971,7 @@ async def seed_roadmap_data():
         # Seed requirements
         requirements = [
             # HarmonyLab
-            ('req-hl-001', 'proj-hl', 'HL-001', 'Quiz backend fix', 'bug', 'P1', 'done', '1.5.3'),
+            ('req-hl-001', 'proj-hl', 'HL-001', 'Quiz backend fix', 'bug', 'P1', 'closed', '1.5.3'),
             ('req-hl-002', 'proj-hl', 'HL-002', 'Complete audio UAT', 'task', 'P1', 'uat', '1.5.3'),
             ('req-hl-003', 'proj-hl', 'HL-003', 'Show intervals on chord display', 'enhancement', 'P3', 'backlog', '1.6.0'),
             ('req-hl-004', 'proj-hl', 'HL-004', 'Progression quiz (next chord)', 'feature', 'P3', 'backlog', '1.6.0'),
@@ -1400,11 +1412,11 @@ async def auto_close_requirement(requirement_id: str):
             raise HTTPException(status_code=404, detail="Requirement not found")
 
         execute_query("""
-            UPDATE roadmap_requirements SET status = 'done', updated_at = GETDATE()
+            UPDATE roadmap_requirements SET status = 'closed', updated_at = GETDATE()
             WHERE id = ?
         """, (requirement_id,), fetch="none")
 
-        return {"message": f"Requirement {requirement_id} auto-closed to done", "previous_status": req['status']}
+        return {"message": f"Requirement {requirement_id} auto-closed to closed", "previous_status": req['status']}
     except HTTPException:
         raise
     except Exception as e:

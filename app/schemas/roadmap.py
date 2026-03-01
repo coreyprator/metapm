@@ -32,14 +32,15 @@ class RequirementPriority(str, Enum):
 
 class RequirementStatus(str, Enum):
     BACKLOG = "backlog"
-    PLANNED = "planned"
-    IN_PROGRESS = "in_progress"
+    DRAFT = "draft"
+    PROMPT_READY = "prompt_ready"
+    APPROVED = "approved"
+    EXECUTING = "executing"
+    HANDOFF = "handoff"
     UAT = "uat"
+    CLOSED = "closed"
     NEEDS_FIXES = "needs_fixes"
-    DONE = "done"
-    BLOCKED = "blocked"
-    SUPERSEDED = "superseded"
-    CONDITIONAL_PASS = "conditional_pass"
+    DEFERRED = "deferred"
 
 
 class SprintStatus(str, Enum):

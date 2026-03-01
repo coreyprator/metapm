@@ -839,4 +839,150 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 22 warning: {e}")
 
+    # Migration 23: Migrate old status values to new pipeline states + update CHECK constraint (MP-MS3)
+    try:
+        # Check if migration already ran by looking for new status values in constraint
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM sys.check_constraints
+            WHERE parent_object_id = OBJECT_ID('roadmap_requirements')
+              AND definition LIKE '%executing%'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 23: Migrating status values to pipeline states...")
+
+            # Count before
+            before = execute_query("SELECT status, COUNT(*) as cnt FROM roadmap_requirements GROUP BY status", fetch="all") or []
+            total_before = sum(int(r.get('cnt', 0)) for r in before)
+            for r in before:
+                logger.info(f"    Before: {r['status']} = {r['cnt']}")
+            logger.info(f"    Total before: {total_before}")
+
+            # Migrate status values
+            execute_query("UPDATE roadmap_requirements SET status = 'executing' WHERE status = 'in_progress'", fetch="none")
+            execute_query("UPDATE roadmap_requirements SET status = 'closed' WHERE status = 'done'", fetch="none")
+            execute_query("UPDATE roadmap_requirements SET status = 'backlog' WHERE status = 'planned'", fetch="none")
+            execute_query("UPDATE roadmap_requirements SET status = 'needs_fixes' WHERE status = 'blocked'", fetch="none")
+            execute_query("UPDATE roadmap_requirements SET status = 'executing' WHERE status = 'active'", fetch="none")
+            execute_query("UPDATE roadmap_requirements SET status = 'deferred' WHERE status = 'superseded'", fetch="none")
+            execute_query("UPDATE roadmap_requirements SET status = 'uat' WHERE status = 'conditional_pass'", fetch="none")
+            # 'backlog' stays 'backlog', 'deferred' stays 'deferred'
+
+            # Drop old CHECK constraint
+            execute_query("""
+                DECLARE @constraint_name NVARCHAR(128)
+                SELECT @constraint_name = name
+                FROM sys.check_constraints
+                WHERE parent_object_id = OBJECT_ID('roadmap_requirements')
+                  AND definition LIKE '%status%'
+
+                IF @constraint_name IS NOT NULL
+                BEGIN
+                    EXEC('ALTER TABLE roadmap_requirements DROP CONSTRAINT ' + @constraint_name)
+                END
+            """, fetch="none")
+
+            # Add new CHECK constraint with 10 pipeline states
+            execute_query("""
+                ALTER TABLE roadmap_requirements
+                ADD CONSTRAINT CK_roadmap_requirements_status_v3
+                CHECK (status IN ('backlog','draft','prompt_ready','approved','executing','handoff','uat','closed','needs_fixes','deferred'))
+            """, fetch="none")
+
+            # Count after
+            after = execute_query("SELECT status, COUNT(*) as cnt FROM roadmap_requirements GROUP BY status", fetch="all") or []
+            total_after = sum(int(r.get('cnt', 0)) for r in after)
+            for r in after:
+                logger.info(f"    After: {r['status']} = {r['cnt']}")
+            logger.info(f"    Total after: {total_after}")
+
+            if total_before != total_after:
+                logger.error(f"  Migration 23: COUNT MISMATCH! Before={total_before}, After={total_after}")
+            else:
+                logger.info(f"  Migration 23: Status migration complete. {total_after} items, no data loss.")
+        else:
+            logger.info("  Migration 23: Status values already migrated to pipeline states.")
+    except Exception as e:
+        logger.warning(f"  Migration 23 warning: {e}")
+
+    # Migration 24: Add WIP tracking fields to roadmap_requirements (MP-MS3)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'roadmap_requirements' AND COLUMN_NAME = 'status_updated_at'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 24: Adding WIP tracking fields to roadmap_requirements...")
+            execute_query("ALTER TABLE roadmap_requirements ADD prompt_url NVARCHAR(500) NULL", fetch="none")
+            execute_query("ALTER TABLE roadmap_requirements ADD portfolio_rag_url NVARCHAR(500) NULL", fetch="none")
+            execute_query("ALTER TABLE roadmap_requirements ADD status_updated_at DATETIME2 DEFAULT GETDATE()", fetch="none")
+            logger.info("  Migration 24: WIP tracking fields added.")
+        else:
+            logger.info("  Migration 24: WIP tracking fields already exist.")
+    except Exception as e:
+        logger.warning(f"  Migration 24 warning: {e}")
+
+    # Migration 25: Create requirement_history table + auto-tracking trigger (MP-MS3)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'requirement_history'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 25: Creating requirement_history table...")
+            execute_query("""
+                CREATE TABLE requirement_history (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    requirement_id NVARCHAR(36) NOT NULL,
+                    changed_at DATETIME2 DEFAULT GETDATE(),
+                    changed_by NVARCHAR(50) NOT NULL DEFAULT 'system',
+                    field_name NVARCHAR(50) NOT NULL,
+                    old_value NVARCHAR(500) NULL,
+                    new_value NVARCHAR(500) NULL,
+                    sprint_id NVARCHAR(50) NULL,
+                    notes NVARCHAR(1000) NULL,
+                    CONSTRAINT FK_req_history_req FOREIGN KEY (requirement_id) REFERENCES roadmap_requirements(id)
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_req_history_req_id ON requirement_history(requirement_id)", fetch="none")
+            execute_query("CREATE INDEX idx_req_history_changed_at ON requirement_history(changed_at)", fetch="none")
+            logger.info("  Migration 25: requirement_history table created.")
+
+            # Create trigger for automatic history tracking
+            logger.info("  Migration 25: Creating auto-history trigger...")
+            execute_query("""
+                CREATE TRIGGER trg_requirement_history
+                ON roadmap_requirements
+                AFTER UPDATE
+                AS
+                BEGIN
+                    SET NOCOUNT ON;
+
+                    INSERT INTO requirement_history (requirement_id, changed_by, field_name, old_value, new_value)
+                    SELECT i.id, 'system', 'status', d.status, i.status
+                    FROM inserted i
+                    JOIN deleted d ON i.id = d.id
+                    WHERE ISNULL(i.status, '') != ISNULL(d.status, '');
+
+                    INSERT INTO requirement_history (requirement_id, changed_by, field_name, old_value, new_value)
+                    SELECT i.id, 'system', 'priority', d.priority, i.priority
+                    FROM inserted i
+                    JOIN deleted d ON i.id = d.id
+                    WHERE ISNULL(i.priority, '') != ISNULL(d.priority, '');
+
+                    UPDATE r SET status_updated_at = GETDATE()
+                    FROM roadmap_requirements r
+                    JOIN inserted i ON r.id = i.id
+                    JOIN deleted d ON r.id = d.id
+                    WHERE ISNULL(i.status, '') != ISNULL(d.status, '');
+                END
+            """, fetch="none")
+            logger.info("  Migration 25: Auto-history trigger created.")
+        else:
+            logger.info("  Migration 25: requirement_history table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 25 warning: {e}")
+
     logger.info("Migrations complete.")

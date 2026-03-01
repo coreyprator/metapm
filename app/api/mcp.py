@@ -208,9 +208,9 @@ def _auto_close_requirements_for_handoff(handoff_id: str, approved: bool) -> int
     """Set linked requirement statuses when UAT is approved/failed.
     Only updates requirements linked via explicit linked_requirements array (source='uat_explicit')."""
     if approved:
-        new_status = 'done'
+        new_status = 'closed'
     else:
-        new_status = 'in_progress'
+        new_status = 'executing'
 
     # Only auto-close requirements linked via explicit array, not content parsing
     rows = execute_query("""

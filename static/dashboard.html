@@ -179,11 +179,14 @@
     .pill { font-size: 11px; border-radius: 999px; padding: 2px 8px; border: 1px solid var(--line); color: var(--muted); }
     .p1 { color: #ff9a9a; border-color: #803c3c; }
     .p2 { color: #ffd18a; border-color: #7a5a2f; }
-    .status-done { color: #9de2b4; border-color: #2f6e46; }
-    .status-in_progress { color: #9ec2ff; border-color: #34507c; }
-    .status-conditional_pass { color: #f5d99a; border-color: #7a6a2f; }
-    .status-blocked { color: #ffb347; border-color: #7a5a2f; }
-    .status-superseded { color: #999; border-color: #555; text-decoration: line-through; }
+    .status-closed { color: #9de2b4; border-color: #2f6e46; }
+    .status-executing { color: #9ec2ff; border-color: #34507c; }
+    .status-draft { color: #d4a5f5; border-color: #6b3d8a; }
+    .status-prompt_ready { color: #7ee8e8; border-color: #2f7a7a; }
+    .status-approved { color: #7ecfa0; border-color: #2f6e46; }
+    .status-handoff { color: #a5b4fc; border-color: #3b4d8a; }
+    .status-needs_fixes { color: #ffb347; border-color: #7a5a2f; }
+    .status-deferred { color: #999; border-color: #555; font-style: italic; }
     .task-row {
       display: grid;
       grid-template-columns: 1fr auto auto;
@@ -365,6 +368,7 @@
         <span id="appVersion" class="version-badge">v-</span>
       </div>
       <div class="actions-row">
+        <button type="button" id="wipBtn" onclick="activateWipView()">📋 WIP</button>
         <a href="/static/roadmap-report.html" target="_blank" rel="noopener"><button type="button">📊 Roadmap Report</button></a>
         <a href="/architecture" target="_blank" rel="noopener"><button type="button">🏗️ Architecture</button></a>
         <div class="add-wrap">
@@ -386,7 +390,7 @@
         <select id="categoryFilter"><option value="">All Categories</option></select>
         <select id="projectFilter"><option value="">All Projects</option></select>
         <select id="priorityFilter"><option value="">All Priorities</option><option>P1</option><option>P2</option><option>P3</option></select>
-        <select id="statusFilter"><option value="">All Status</option><option value="not_done">Not Done</option><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="blocked">blocked</option><option value="conditional_pass">conditional_pass</option><option value="superseded">superseded</option><option value="done">done</option></select>
+        <select id="statusFilter"><option value="">All Status</option><option value="not_done">Not Done</option><option value="in_progress">In Progress</option><option value="backlog">backlog</option><option value="draft">draft</option><option value="prompt_ready">prompt_ready</option><option value="approved">approved</option><option value="executing">executing</option><option value="handoff">handoff</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="closed">closed</option><option value="deferred">deferred</option></select>
         <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="openItemsToggle" checked style="min-height:auto" /> Open Only</label>
         <button id="resetFiltersBtn" type="button" class="danger-btn">Reset Filters</button>
       </div>
@@ -406,7 +410,7 @@
     <div class="card hierarchy" id="hierarchy"></div>
 
     <div class="card footer" id="summary">
-      <div>Total: 0 | Done: 0 | In Progress: 0 | Backlog: 0 | Projects: 0</div>
+      <div>Total: 0 | Closed: 0 | Executing: 0 | Backlog: 0 | Projects: 0</div>
       <div id="openP1">Open P1s: 0</div>
     </div>
   </div>
@@ -447,7 +451,7 @@
       </div>
       <div>
         <label>Status</label>
-        <select id="dStatus"><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="blocked">blocked</option><option value="conditional_pass" title="Works but has known limitations PL accepts for now">conditional_pass</option><option value="superseded">superseded</option><option value="done">done</option></select>
+        <select id="dStatus"><option value="backlog">backlog</option><option value="draft">draft</option><option value="prompt_ready">prompt_ready</option><option value="approved">approved</option><option value="executing">executing</option><option value="handoff">handoff</option><option value="uat">uat</option><option value="closed">closed</option><option value="needs_fixes">needs_fixes</option><option value="deferred">deferred</option></select>
       </div>
       <div>
         <label>Target Version</label>
@@ -633,11 +637,14 @@
       for (const p of state.projects) {
         const count = state.requirements.filter(r => {
           if (r.project_id !== p.id) return false;
-          if (openOnly && (r.status === 'done' || r.status === 'superseded')) return false;
+          if (openOnly && (r.status === 'closed' || r.status === 'deferred')) return false;
           if (category && p.category_id !== category) return false;
           if (priority && r.priority !== priority) return false;
-          if (status === 'not_done' && r.status === 'done') return false;
-          if (status && status !== 'not_done' && r.status !== status) return false;
+          if (status && STATUS_GROUPS[status]) {
+            if (!STATUS_GROUPS[status].includes(r.status)) return false;
+          } else if (status) {
+            if (r.status !== status) return false;
+          }
           if (search) {
             const haystack = `${r.code} ${r.title} ${r.description || ''} ${r.type || ''} ${r.status || ''}`.toLowerCase();
             if (!haystack.includes(search)) return false;
@@ -649,6 +656,11 @@
       if (current) pf.value = current;
     }
 
+    const STATUS_GROUPS = {
+      'not_done': ['backlog','draft','needs_fixes','deferred'],
+      'in_progress': ['approved','executing','handoff','needs_fixes'],
+    };
+
     function getFilteredRequirements() {
       const category = qs('categoryFilter').value;
       const project = qs('projectFilter').value;
@@ -657,15 +669,18 @@
       const search = (qs('searchInput').value || '').trim().toLowerCase();
       const openOnly = qs('openItemsToggle').checked;
       return state.requirements.filter((req) => {
-        if (openOnly && (req.status === 'done' || req.status === 'superseded')) return false;
+        if (openOnly && (req.status === 'closed' || req.status === 'deferred')) return false;
         if (category) {
           const proj = state.projects.find(p => p.id === req.project_id);
           if (!proj || proj.category_id !== category) return false;
         }
         if (project && req.project_id !== project) return false;
         if (priority && req.priority !== priority) return false;
-        if (status === 'not_done' && req.status === 'done') return false;
-        if (status && status !== 'not_done' && req.status !== status) return false;
+        if (status && STATUS_GROUPS[status]) {
+          if (!STATUS_GROUPS[status].includes(req.status)) return false;
+        } else if (status) {
+          if (req.status !== status) return false;
+        }
         if (search) {
           const haystack = `${req.code} ${req.title} ${req.description || ''} ${req.type || ''} ${req.status || ''}`.toLowerCase();
           if (!haystack.includes(search)) return false;
@@ -686,12 +701,12 @@
 
     function setSummary(reqs) {
       const total = reqs.length;
-      const done = reqs.filter(r => r.status === 'done').length;
-      const inProgress = reqs.filter(r => r.status === 'in_progress').length;
+      const closed = reqs.filter(r => r.status === 'closed').length;
+      const executing = reqs.filter(r => r.status === 'executing').length;
       const backlog = reqs.filter(r => r.status === 'backlog').length;
       const projectCount = state.projects.length;
-      const openP1 = reqs.filter(r => r.priority === 'P1' && r.status !== 'done').length;
-      qs('summary').children[0].textContent = `Total: ${total} | Done: ${done} | In Progress: ${inProgress} | Backlog: ${backlog} | Projects: ${projectCount}`;
+      const openP1 = reqs.filter(r => r.priority === 'P1' && r.status !== 'closed').length;
+      qs('summary').children[0].textContent = `Total: ${total} | Closed: ${closed} | Executing: ${executing} | Backlog: ${backlog} | Projects: ${projectCount}`;
       qs('openP1').textContent = `Open P1s: ${openP1}`;
     }
 
@@ -710,7 +725,7 @@
       const list = reqs.filter(r => r.project_id === projectId).sort(compareReq);
       const buckets = { sprint: {}, backlog: [], done: [] };
       for (const req of list) {
-        if (req.status === 'done') buckets.done.push(req);
+        if (req.status === 'closed') buckets.done.push(req);
         else if (!req.sprint_id) buckets.backlog.push(req);
         else {
           if (!buckets.sprint[req.sprint_id]) buckets.sprint[req.sprint_id] = [];
@@ -743,7 +758,7 @@
     }
 
     function sprintRowHtml(sprint, projectReqs) {
-      const count = projectReqs.filter(r => r.sprint_id === sprint.id && r.status !== 'done').length;
+      const count = projectReqs.filter(r => r.sprint_id === sprint.id && r.status !== 'closed').length;
       return `<div class="sprint-row">
         <div><strong>${sprint.name}</strong> <span class="project-summary">(${count} active items)</span></div>
         <div class="actions-row">
@@ -751,6 +766,14 @@
           <button class="icon-btn danger-btn" data-delete-sprint="${sprint.id}" title="Delete Sprint">🗑️</button>
         </div>
       </div>`;
+    }
+
+    function activateWipView() {
+      qs('groupBy').value = 'status';
+      qs('statusFilter').value = '';
+      qs('openItemsToggle').checked = true;
+      state.expanded = new Set(['backlog','draft','prompt_ready','approved','executing','handoff','uat','needs_fixes']);
+      render();
     }
 
     function render() {
@@ -781,7 +804,7 @@
         const pReqs = reqs.filter(r => r.project_id === p.id);
         if (openOnly && pReqs.length === 0) continue;
 
-        const done = pReqs.filter(r => r.status === 'done').length;
+        const done = pReqs.filter(r => r.status === 'closed').length;
         const p1 = pReqs.filter(r => r.priority === 'P1').length;
         const p2 = pReqs.filter(r => r.priority === 'P2').length;
         const open = state.expanded.has(p.id);
@@ -845,7 +868,7 @@
           return (w[a] || 9) - (w[b] || 9);
         }
         if (field === 'status') {
-          const order = ['in_progress','uat','needs_fixes','planned','backlog','conditional_pass','blocked','superseded','done'];
+          const order = ['backlog','draft','prompt_ready','approved','executing','handoff','uat','closed','needs_fixes','deferred'];
           return (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 99 : order.indexOf(b));
         }
         return a.localeCompare(b);
@@ -1105,8 +1128,8 @@
 
       const newStatus = qs('dStatus').value;
       // MP-016: Reopen confirmation guard
-      if (req.status === 'done' && newStatus !== 'done') {
-        if (!confirm(`Reopen requirement '${req.code}'? This will change status from done to ${newStatus}.`)) return;
+      if (req.status === 'closed' && newStatus !== 'closed') {
+        if (!confirm(`Reopen requirement '${req.code}'? This will change status from closed to ${newStatus}.`)) return;
       }
 
       const payload = {
