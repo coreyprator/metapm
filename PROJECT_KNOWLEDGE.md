@@ -1,10 +1,28 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-4A2F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-27 — Sprint "MP-MS2" (v2.6.0)
+Updated: 2026-02-28 — Sprint "MP-MS3" (v2.7.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-02-27 (MP-MS2 MetaPM Mega Sprint 2, v2.6.0)
+### Latest Session Update — 2026-02-28 (MP-MS3 WIP Lifecycle Tracking, v2.7.0)
+
+- **Sprint MP-MS3**: WIP Lifecycle Tracking + Portfolio RAG Integration
+- **Current Version**: v2.7.0 — **DEPLOYED** to Cloud Run
+- **10 Pipeline Status Values**: backlog, draft, prompt_ready, approved, executing, handoff, uat, closed, needs_fixes, deferred
+- **Status Migration**: 135 items migrated (in_progress→executing, done→closed, no data loss)
+- **New Tables**: requirement_history, requirement_attachments, cc_prompts, requirement_links (migrations 23-28)
+- **Status Transition API**: PATCH /api/roadmap/requirements/{id}/status with validation + history tracking
+- **WIP Summary**: GET /api/roadmap/wip returns pipeline counts + active sprints
+- **Document Attachments**: POST/GET /api/roadmap/requirements/{id}/attachments (GCS upload to corey-handoff-bridge)
+- **CC Prompt Approval**: POST /api/roadmap/prompts, approve flow, handoff URL for CC consumption
+- **Portfolio RAG Proxy**: /api/rag/query, /api/rag/documents, /api/rag/latest/{type}, /api/rag/checkpoints
+- **Lesson Routing**: POST /api/lessons/apply (reads GitHub file, inserts lesson, commits via API)
+- **UAT Checkpoint**: sha256 verification hash on UAT submit (uat_checkpoint + uat_verification_hash fields)
+- **New Files**: app/api/rag.py, app/api/lessons.py
+- **Config**: PORTFOLIO_RAG_URL = https://portfolio-rag-57478301787.us-central1.run.app
+- **Key Lesson**: SQL CHECK constraints must be dropped BEFORE data migration UPDATEs
+
+### Previous: MP-MS2 MetaPM Mega Sprint 2, v2.6.0 (2026-02-27)
 
 - **Mega Sprint 2**: Fix UAT failures from MP-MS1-FIX + dashboard grid redesign + responsive mobile/tablet
 - **Current Version**: v2.6.0 — **DEPLOYED** via GitHub Actions

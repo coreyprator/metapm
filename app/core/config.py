@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.6.0"  # MP-MS2: CHECK constraint fix, grid redesign (group by/sort by/filter/open items), responsive mobile+tablet, auto-numbering, code editable
+    VERSION: str = "2.7.0"  # MP-MS3: WIP lifecycle tracking (10 pipeline states, status history, attachments, CC prompt approval, RAG proxy, lesson routing, UAT checkpoint verification)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
