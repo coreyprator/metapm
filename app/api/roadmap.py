@@ -1897,3 +1897,76 @@ async def get_prompt_handoff(prompt_id: int):
     except Exception as e:
         logger.error(f"Error getting prompt handoff: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# REQUIREMENT LINKS (MP-MS3 Phase 4)
+# ============================================
+
+@router.post("/roadmap/requirements/{requirement_id}/links")
+async def add_requirement_link(requirement_id: str, body: dict):
+    """Add a link to a requirement (handoff, RAG doc, external URL, etc.)."""
+    try:
+        req = execute_query(
+            "SELECT id FROM roadmap_requirements WHERE id = ?",
+            (requirement_id,), fetch="one"
+        )
+        if not req:
+            raise HTTPException(status_code=404, detail="Requirement not found")
+
+        url = body.get('url')
+        link_type = body.get('link_type', 'external')
+        description = body.get('description')
+
+        if not url:
+            raise HTTPException(status_code=400, detail="url is required")
+
+        execute_query("""
+            INSERT INTO requirement_links (requirement_id, url, link_type, description)
+            VALUES (?, ?, ?, ?)
+        """, (requirement_id, url, link_type, description), fetch="none")
+
+        link = execute_query("""
+            SELECT TOP 1 id, requirement_id, url, link_type, description, created_at
+            FROM requirement_links
+            WHERE requirement_id = ? AND url = ?
+            ORDER BY created_at DESC
+        """, (requirement_id, url), fetch="one")
+
+        return {
+            "id": link['id'],
+            "requirement_id": link['requirement_id'],
+            "url": link['url'],
+            "link_type": link['link_type'],
+            "description": link.get('description'),
+            "created_at": str(link['created_at']),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding link: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/roadmap/requirements/{requirement_id}/links")
+async def list_requirement_links(requirement_id: str):
+    """List all links for a requirement."""
+    try:
+        rows = execute_query("""
+            SELECT id, requirement_id, url, link_type, description, created_at
+            FROM requirement_links
+            WHERE requirement_id = ?
+            ORDER BY created_at DESC
+        """, (requirement_id,), fetch="all") or []
+
+        return {"links": [{
+            "id": r['id'],
+            "requirement_id": r['requirement_id'],
+            "url": r['url'],
+            "link_type": r['link_type'],
+            "description": r.get('description'),
+            "created_at": str(r['created_at']),
+        } for r in rows]}
+    except Exception as e:
+        logger.error(f"Error listing links: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

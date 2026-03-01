@@ -37,6 +37,9 @@ class Settings(BaseSettings):
 
     # GCS Handoff Bridge
     GCS_HANDOFF_BUCKET: str = "corey-handoff-bridge"
+
+    # Portfolio RAG
+    PORTFOLIO_RAG_URL: str = "https://portfolio-rag-57478301787.us-central1.run.app"
     
     # Application
     ENVIRONMENT: str = "development"

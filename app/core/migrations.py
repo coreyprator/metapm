@@ -1051,4 +1051,31 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 27 warning: {e}")
 
+    # Migration 28: Create requirement_links table (MP-MS3 Phase 4)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'requirement_links'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 28: Creating requirement_links table...")
+            execute_query("""
+                CREATE TABLE requirement_links (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    requirement_id NVARCHAR(36) NOT NULL,
+                    url NVARCHAR(500) NOT NULL,
+                    link_type NVARCHAR(50) NOT NULL,
+                    description NVARCHAR(500) NULL,
+                    created_at DATETIME2 DEFAULT GETDATE(),
+                    CONSTRAINT FK_req_links_req FOREIGN KEY (requirement_id) REFERENCES roadmap_requirements(id)
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_req_links_req_id ON requirement_links(requirement_id)", fetch="none")
+            logger.info("  Migration 28: requirement_links table created.")
+        else:
+            logger.info("  Migration 28: requirement_links table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 28 warning: {e}")
+
     logger.info("Migrations complete.")
