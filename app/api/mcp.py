@@ -4,6 +4,7 @@ Native REST endpoints for Model Context Protocol integration.
 Allows Claude Code to interact directly with handoffs and tasks.
 """
 
+import hashlib
 import json
 import logging
 import re
@@ -922,12 +923,23 @@ async def submit_uat_direct(uat: UATDirectSubmit):
 
         handoff_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{handoff_id}/content"
 
+        # Checkpoint verification (MP-MS3 Phase 6)
+        checkpoint_verified = None
+        if uat.uat_checkpoint and uat.uat_verification_hash:
+            # Recompute: sha256(checkpoint + project + version + total_tests)
+            verify_input = f"{uat.uat_checkpoint}{project_name}{version_full}{uat.total_tests}"
+            expected_hash = hashlib.sha256(verify_input.encode()).hexdigest()
+            checkpoint_verified = (expected_hash == uat.uat_verification_hash)
+            if not checkpoint_verified:
+                logger.warning(f"UAT checkpoint verification FAILED for {project_name} v{version_full}")
+
         return UATDirectSubmitResponse(
             handoff_id=handoff_id,
             uat_id=uat_id,
             status=uat.status.value,
             handoff_url=handoff_url,
-            message=f"UAT results recorded for {project_name} v{version_full}"
+            message=f"UAT results recorded for {project_name} v{version_full}",
+            checkpoint_verified=checkpoint_verified,
         )
     except HTTPException:
         raise

@@ -252,6 +252,8 @@ class UATDirectSubmit(BaseModel):
     checklist_path: Optional[str] = None
     url: Optional[str] = None
     tested_by: Optional[str] = Field(None, max_length=100)
+    uat_checkpoint: Optional[str] = Field(None, max_length=100)
+    uat_verification_hash: Optional[str] = Field(None, max_length=128)
 
     @model_validator(mode='before')
     @classmethod
@@ -399,6 +401,7 @@ class UATDirectSubmitResponse(BaseModel):
     status: str
     handoff_url: str
     message: str
+    checkpoint_verified: Optional[bool] = None
 
 
 class UATListItem(BaseModel):
