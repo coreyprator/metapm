@@ -321,3 +321,47 @@ class DependencyResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Status Transition schemas (MP-MS3)
+
+class StatusTransitionRequest(BaseModel):
+    status: RequirementStatus
+    changed_by: str = Field(..., max_length=50)
+    sprint_id: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class StatusTransitionResponse(BaseModel):
+    id: str
+    code: str
+    status: str
+    previous_status: str
+    transition_recorded: bool
+    history_id: Optional[int] = None
+
+
+class BatchStatusRequest(BaseModel):
+    ids: List[str]
+    status: RequirementStatus
+    changed_by: str = Field(..., max_length=50)
+    sprint_id: Optional[str] = None
+
+
+class HistoryEntry(BaseModel):
+    id: int
+    changed_at: datetime
+    changed_by: str
+    field_name: str
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    sprint_id: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class RequirementHistoryResponse(BaseModel):
+    requirement_id: str
+    code: str
+    title: str
+    current_status: str
+    history: List[HistoryEntry]

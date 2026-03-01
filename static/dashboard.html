@@ -478,6 +478,10 @@
       <label>Test Plans</label>
       <div id="dTestPlans" style="font-size:13px;color:var(--muted)">None</div>
     </div>
+    <div>
+      <label>History</label>
+      <div id="dHistory" style="font-size:12px;color:var(--muted)">Loading...</div>
+    </div>
   </aside>
 
   <div class="modal" id="addModal">
@@ -1118,6 +1122,28 @@
       const existing = document.getElementById('addTestPlanWrap');
       if (existing) existing.remove();
       qs('dTestPlans').insertAdjacentHTML('afterend', `<div id="addTestPlanWrap">${addTpBtn}</div>`);
+
+      // Load history timeline (MP-MS3)
+      try {
+        const histRes = await api(`/api/roadmap/requirements/${req.id}/history`);
+        if (histRes.history?.length) {
+          qs('dHistory').innerHTML = histRes.history.map(h => {
+            const d = new Date(h.changed_at);
+            const ts = `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+            const arrow = h.old_value && h.new_value ? `${h.old_value} → ${h.new_value}` : (h.new_value || '');
+            const note = h.notes ? ` — ${h.notes}` : '';
+            return `<div style="margin-bottom:4px;padding:2px 0;border-bottom:1px solid var(--line)">
+              <span style="color:var(--muted)">${ts}</span>
+              <span style="color:var(--info)">${h.changed_by}</span>
+              <strong>${h.field_name}</strong>: ${arrow}${note}
+            </div>`;
+          }).join('');
+        } else {
+          qs('dHistory').textContent = 'No history yet';
+        }
+      } catch {
+        qs('dHistory').textContent = 'No history yet';
+      }
 
       qs('drawer').classList.add('open');
     }

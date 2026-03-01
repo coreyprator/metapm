@@ -18,6 +18,8 @@ from app.schemas.roadmap import (
     RoadmapTaskCreate, RoadmapTaskUpdate, RoadmapTaskResponse,
     TestPlanCreate, TestPlanResponse, TestCaseCreate, TestCaseResponse, TestCaseUpdate,
     DependencyCreate, DependencyResponse,
+    StatusTransitionRequest, StatusTransitionResponse, BatchStatusRequest,
+    RequirementHistoryResponse, HistoryEntry,
 )
 
 logger = logging.getLogger(__name__)
@@ -1421,4 +1423,207 @@ async def auto_close_requirement(requirement_id: str):
         raise
     except Exception as e:
         logger.error(f"Error auto-closing requirement: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# STATUS TRANSITION + HISTORY (MP-MS3 Phase 2)
+# ============================================
+
+# Valid status transitions (pipeline order)
+VALID_TRANSITIONS = {
+    'backlog': ['draft', 'deferred'],
+    'draft': ['prompt_ready', 'backlog', 'deferred'],
+    'prompt_ready': ['approved', 'draft', 'deferred'],
+    'approved': ['executing', 'prompt_ready', 'deferred'],
+    'executing': ['handoff', 'needs_fixes', 'deferred'],
+    'handoff': ['uat', 'executing', 'deferred'],
+    'uat': ['closed', 'needs_fixes', 'deferred'],
+    'closed': ['backlog'],  # reopen
+    'needs_fixes': ['draft', 'prompt_ready', 'executing', 'deferred'],
+    'deferred': ['backlog', 'draft', 'prompt_ready', 'approved', 'executing'],
+}
+
+
+@router.patch("/roadmap/requirements/{requirement_id}/status", response_model=StatusTransitionResponse)
+async def transition_requirement_status(requirement_id: str, body: StatusTransitionRequest):
+    """Transition a requirement to a new pipeline status with validation and history tracking."""
+    try:
+        req = execute_query(
+            "SELECT id, code, status FROM roadmap_requirements WHERE id = ?",
+            (requirement_id,), fetch="one"
+        )
+        if not req:
+            raise HTTPException(status_code=404, detail="Requirement not found")
+
+        current_status = req['status']
+        new_status = body.status.value
+
+        if current_status == new_status:
+            return StatusTransitionResponse(
+                id=req['id'], code=req['code'], status=new_status,
+                previous_status=current_status, transition_recorded=False
+            )
+
+        # Validate transition
+        allowed = VALID_TRANSITIONS.get(current_status, [])
+        if new_status not in allowed:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid transition: {current_status} → {new_status}. Allowed: {', '.join(allowed)}"
+            )
+
+        # Update status
+        execute_query("""
+            UPDATE roadmap_requirements SET status = ?, updated_at = GETDATE()
+            WHERE id = ?
+        """, (new_status, requirement_id), fetch="none")
+
+        # Record history (overrides trigger's 'system' with actual changed_by)
+        history_result = execute_query("""
+            UPDATE requirement_history
+            SET changed_by = ?, sprint_id = ?, notes = ?
+            WHERE requirement_id = ? AND field_name = 'status'
+              AND old_value = ? AND new_value = ?
+              AND changed_at >= DATEADD(SECOND, -5, GETDATE())
+        """, (body.changed_by, body.sprint_id, body.notes,
+              requirement_id, current_status, new_status), fetch="none")
+
+        # Get the history entry ID
+        history_row = execute_query("""
+            SELECT TOP 1 id FROM requirement_history
+            WHERE requirement_id = ? AND field_name = 'status' AND new_value = ?
+            ORDER BY changed_at DESC
+        """, (requirement_id, new_status), fetch="one")
+
+        return StatusTransitionResponse(
+            id=req['id'], code=req['code'], status=new_status,
+            previous_status=current_status, transition_recorded=True,
+            history_id=history_row['id'] if history_row else None
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error transitioning status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/roadmap/requirements/status/batch")
+async def batch_transition_status(body: BatchStatusRequest):
+    """Batch update status for multiple requirements."""
+    try:
+        results = []
+        for req_id in body.ids:
+            req = execute_query(
+                "SELECT id, code, status FROM roadmap_requirements WHERE id = ?",
+                (req_id,), fetch="one"
+            )
+            if not req:
+                results.append({"id": req_id, "error": "not found"})
+                continue
+
+            current_status = req['status']
+            new_status = body.status.value
+
+            allowed = VALID_TRANSITIONS.get(current_status, [])
+            if new_status not in allowed:
+                results.append({"id": req_id, "code": req['code'], "error": f"Invalid: {current_status} → {new_status}"})
+                continue
+
+            execute_query("""
+                UPDATE roadmap_requirements SET status = ?, updated_at = GETDATE()
+                WHERE id = ?
+            """, (new_status, req_id), fetch="none")
+
+            # Update trigger history with changed_by
+            execute_query("""
+                UPDATE requirement_history
+                SET changed_by = ?, sprint_id = ?
+                WHERE requirement_id = ? AND field_name = 'status'
+                  AND old_value = ? AND new_value = ?
+                  AND changed_at >= DATEADD(SECOND, -5, GETDATE())
+            """, (body.changed_by, body.sprint_id, req_id, current_status, new_status), fetch="none")
+
+            results.append({"id": req_id, "code": req['code'], "status": new_status, "previous": current_status})
+
+        return {"updated": len([r for r in results if 'status' in r]), "results": results}
+    except Exception as e:
+        logger.error(f"Error batch updating status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/roadmap/requirements/{requirement_id}/history", response_model=RequirementHistoryResponse)
+async def get_requirement_history(requirement_id: str):
+    """Get the full change history for a requirement."""
+    try:
+        req = execute_query(
+            "SELECT id, code, title, status FROM roadmap_requirements WHERE id = ?",
+            (requirement_id,), fetch="one"
+        )
+        if not req:
+            raise HTTPException(status_code=404, detail="Requirement not found")
+
+        rows = execute_query("""
+            SELECT id, changed_at, changed_by, field_name, old_value, new_value, sprint_id, notes
+            FROM requirement_history
+            WHERE requirement_id = ?
+            ORDER BY changed_at ASC
+        """, (requirement_id,), fetch="all") or []
+
+        history = [HistoryEntry(
+            id=r['id'], changed_at=r['changed_at'], changed_by=r['changed_by'],
+            field_name=r['field_name'], old_value=r.get('old_value'),
+            new_value=r.get('new_value'), sprint_id=r.get('sprint_id'),
+            notes=r.get('notes')
+        ) for r in rows]
+
+        return RequirementHistoryResponse(
+            requirement_id=req['id'], code=req['code'], title=req['title'],
+            current_status=req['status'], history=history
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/roadmap/wip")
+async def get_wip_summary():
+    """Get WIP pipeline summary — counts by status and active sprints."""
+    try:
+        # Pipeline counts
+        status_rows = execute_query("""
+            SELECT status, COUNT(*) as cnt
+            FROM roadmap_requirements
+            GROUP BY status
+        """, fetch="all") or []
+        pipeline = {s: 0 for s in ['backlog','draft','prompt_ready','approved','executing','handoff','uat','closed','needs_fixes','deferred']}
+        for r in status_rows:
+            pipeline[r['status']] = int(r['cnt'])
+
+        # Active sprints (items with sprint_id in active states)
+        sprint_rows = execute_query("""
+            SELECT r.sprint_id, p.name as project_name, r.status, r.code
+            FROM roadmap_requirements r
+            JOIN roadmap_projects p ON r.project_id = p.id
+            WHERE r.sprint_id IS NOT NULL
+              AND r.status IN ('approved','executing','handoff','uat','needs_fixes')
+            ORDER BY r.sprint_id, r.code
+        """, fetch="all") or []
+
+        sprints_map = {}
+        for r in sprint_rows:
+            sid = r['sprint_id']
+            if sid not in sprints_map:
+                sprints_map[sid] = {"sprint_id": sid, "project": r['project_name'], "items": [], "status": r['status']}
+            sprints_map[sid]["items"].append(r['code'])
+
+        active_sprints = list(sprints_map.values())
+        for s in active_sprints:
+            s["item_count"] = len(s["items"])
+
+        return {"pipeline": pipeline, "active_sprints": active_sprints}
+    except Exception as e:
+        logger.error(f"Error getting WIP summary: {e}")
         raise HTTPException(status_code=500, detail=str(e))
