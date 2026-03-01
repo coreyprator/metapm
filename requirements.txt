@@ -12,6 +12,7 @@ python-multipart==0.0.9
 
 # Voice Pipeline
 google-cloud-storage==2.10.0
+google-cloud-secret-manager==2.26.0
 httpx==0.25.2
 google-api-python-client==2.111.0
 google-auth-oauthlib==1.2.0
