@@ -858,17 +858,7 @@ def run_migrations():
                 logger.info(f"    Before: {r['status']} = {r['cnt']}")
             logger.info(f"    Total before: {total_before}")
 
-            # Migrate status values
-            execute_query("UPDATE roadmap_requirements SET status = 'executing' WHERE status = 'in_progress'", fetch="none")
-            execute_query("UPDATE roadmap_requirements SET status = 'closed' WHERE status = 'done'", fetch="none")
-            execute_query("UPDATE roadmap_requirements SET status = 'backlog' WHERE status = 'planned'", fetch="none")
-            execute_query("UPDATE roadmap_requirements SET status = 'needs_fixes' WHERE status = 'blocked'", fetch="none")
-            execute_query("UPDATE roadmap_requirements SET status = 'executing' WHERE status = 'active'", fetch="none")
-            execute_query("UPDATE roadmap_requirements SET status = 'deferred' WHERE status = 'superseded'", fetch="none")
-            execute_query("UPDATE roadmap_requirements SET status = 'uat' WHERE status = 'conditional_pass'", fetch="none")
-            # 'backlog' stays 'backlog', 'deferred' stays 'deferred'
-
-            # Drop old CHECK constraint
+            # MUST drop old CHECK constraint FIRST — new values violate old constraint
             execute_query("""
                 DECLARE @constraint_name NVARCHAR(128)
                 SELECT @constraint_name = name
@@ -881,6 +871,17 @@ def run_migrations():
                     EXEC('ALTER TABLE roadmap_requirements DROP CONSTRAINT ' + @constraint_name)
                 END
             """, fetch="none")
+            logger.info("    Old CHECK constraint dropped.")
+
+            # Migrate status values (constraint-free now)
+            execute_query("UPDATE roadmap_requirements SET status = 'executing' WHERE status = 'in_progress'", fetch="none")
+            execute_query("UPDATE roadmap_requirements SET status = 'closed' WHERE status = 'done'", fetch="none")
+            execute_query("UPDATE roadmap_requirements SET status = 'backlog' WHERE status = 'planned'", fetch="none")
+            execute_query("UPDATE roadmap_requirements SET status = 'needs_fixes' WHERE status = 'blocked'", fetch="none")
+            execute_query("UPDATE roadmap_requirements SET status = 'executing' WHERE status = 'active'", fetch="none")
+            execute_query("UPDATE roadmap_requirements SET status = 'deferred' WHERE status = 'superseded'", fetch="none")
+            execute_query("UPDATE roadmap_requirements SET status = 'uat' WHERE status = 'conditional_pass'", fetch="none")
+            # 'backlog' stays 'backlog', 'deferred' stays 'deferred'
 
             # Add new CHECK constraint with 10 pipeline states
             execute_query("""
