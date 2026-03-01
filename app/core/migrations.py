@@ -986,4 +986,69 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 25 warning: {e}")
 
+    # Migration 26: Create requirement_attachments table (MP-MS3 Phase 3)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'requirement_attachments'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 26: Creating requirement_attachments table...")
+            execute_query("""
+                CREATE TABLE requirement_attachments (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    requirement_id NVARCHAR(36) NOT NULL,
+                    filename NVARCHAR(255) NOT NULL,
+                    content_type NVARCHAR(100) NOT NULL,
+                    file_size INT NOT NULL,
+                    storage_key NVARCHAR(500) NOT NULL,
+                    uploaded_by NVARCHAR(50) NOT NULL,
+                    description NVARCHAR(500) NULL,
+                    created_at DATETIME2 DEFAULT GETDATE(),
+                    CONSTRAINT FK_req_attach_req FOREIGN KEY (requirement_id) REFERENCES roadmap_requirements(id)
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_req_attach_req_id ON requirement_attachments(requirement_id)", fetch="none")
+            logger.info("  Migration 26: requirement_attachments table created.")
+        else:
+            logger.info("  Migration 26: requirement_attachments table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 26 warning: {e}")
+
+    # Migration 27: Create cc_prompts table (MP-MS3 Phase 3)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'cc_prompts'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 27: Creating cc_prompts table...")
+            execute_query("""
+                CREATE TABLE cc_prompts (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    sprint_id NVARCHAR(50) NOT NULL,
+                    project_id NVARCHAR(36) NOT NULL,
+                    content NVARCHAR(MAX) NOT NULL,
+                    status NVARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft','prompt_ready','approved','sent','completed')),
+                    version_before NVARCHAR(20) NULL,
+                    version_after NVARCHAR(20) NULL,
+                    estimated_hours DECIMAL(4,1) NULL,
+                    approved_at DATETIME2 NULL,
+                    approved_by NVARCHAR(50) NULL,
+                    handoff_id NVARCHAR(100) NULL,
+                    created_at DATETIME2 DEFAULT GETDATE(),
+                    updated_at DATETIME2 DEFAULT GETDATE(),
+                    CONSTRAINT FK_cc_prompts_project FOREIGN KEY (project_id) REFERENCES roadmap_projects(id)
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_cc_prompts_sprint ON cc_prompts(sprint_id)", fetch="none")
+            execute_query("CREATE INDEX idx_cc_prompts_status ON cc_prompts(status)", fetch="none")
+            logger.info("  Migration 27: cc_prompts table created.")
+        else:
+            logger.info("  Migration 27: cc_prompts table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 27 warning: {e}")
+
     logger.info("Migrations complete.")

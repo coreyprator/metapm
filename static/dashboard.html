@@ -479,6 +479,18 @@
       <div id="dTestPlans" style="font-size:13px;color:var(--muted)">None</div>
     </div>
     <div>
+      <label>Attachments 📎</label>
+      <div id="dAttachments" style="font-size:12px;color:var(--muted)">None</div>
+      <div id="attachUploadWrap" style="margin-top:6px;display:flex;gap:4px;align-items:center">
+        <input type="file" id="attachFileInput" style="font-size:11px;flex:1" />
+        <button style="font-size:11px;padding:4px 8px" onclick="uploadAttachment()">Upload</button>
+      </div>
+    </div>
+    <div id="dPromptSection" style="display:none">
+      <label>CC Prompt</label>
+      <div id="dPromptContent" style="font-size:12px;color:var(--muted)">None</div>
+    </div>
+    <div>
       <label>History</label>
       <div id="dHistory" style="font-size:12px;color:var(--muted)">Loading...</div>
     </div>
@@ -1123,6 +1135,53 @@
       if (existing) existing.remove();
       qs('dTestPlans').insertAdjacentHTML('afterend', `<div id="addTestPlanWrap">${addTpBtn}</div>`);
 
+      // Load attachments (MP-MS3 Phase 3)
+      try {
+        const attRes = await api(`/api/roadmap/requirements/${req.id}/attachments`);
+        if (attRes.attachments?.length) {
+          qs('dAttachments').innerHTML = attRes.attachments.map(a => {
+            const size = a.file_size > 1024*1024 ? `${(a.file_size/1024/1024).toFixed(1)}MB` : `${(a.file_size/1024).toFixed(0)}KB`;
+            return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+              <a style="color:#9ec2ff" href="${a.url}" target="_blank" rel="noopener">${a.filename}</a>
+              <span style="color:var(--muted)">(${size}, ${a.uploaded_by})</span>
+            </div>`;
+          }).join('');
+        } else {
+          qs('dAttachments').textContent = 'None';
+        }
+      } catch {
+        qs('dAttachments').textContent = 'None';
+      }
+
+      // Show prompt review for prompt_ready status (MP-MS3 Phase 3)
+      if (['prompt_ready','approved'].includes(req.status)) {
+        qs('dPromptSection').style.display = '';
+        try {
+          const promptRes = await api(`/api/roadmap/prompts/active`);
+          const proj = state.projects.find(p => p.id === req.project_id);
+          const matching = promptRes.prompts?.filter(p => p.project_id === req.project_id) || [];
+          if (matching.length) {
+            const p = matching[0];
+            let html = `<div style="border:1px solid var(--line);border-radius:6px;padding:6px;margin-bottom:4px">
+              <div><strong>${p.sprint_id}</strong> · ${p.status}</div>`;
+            if (p.status === 'draft' || p.status === 'prompt_ready') {
+              html += `<button style="font-size:11px;margin-top:4px" onclick="reviewPrompt(${p.id})">Review Prompt</button>`;
+            } else if (p.status === 'approved' || p.status === 'sent') {
+              const url = 'https://metapm.rentyourcio.com/api/roadmap/prompts/' + p.id + '/handoff';
+              html += `<div style="margin-top:4px"><button style="font-size:11px" onclick="copyToClipboard('${url}')">Copy CC Link</button></div>`;
+            }
+            html += '</div>';
+            qs('dPromptContent').innerHTML = html;
+          } else {
+            qs('dPromptContent').textContent = 'No prompts for this project';
+          }
+        } catch {
+          qs('dPromptContent').textContent = 'Error loading prompts';
+        }
+      } else {
+        qs('dPromptSection').style.display = 'none';
+      }
+
       // Load history timeline (MP-MS3)
       try {
         const histRes = await api(`/api/roadmap/requirements/${req.id}/history`);
@@ -1183,6 +1242,64 @@
       qs('drawer').classList.remove('open');
       state.selectedReq = null;
       await loadData();
+    }
+
+    async function uploadAttachment() {
+      const req = state.selectedReq;
+      if (!req) return;
+      const fileInput = qs('attachFileInput');
+      if (!fileInput.files.length) { alert('Select a file first'); return; }
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+      formData.append('uploaded_by', 'PL');
+      try {
+        const resp = await fetch(`/api/roadmap/requirements/${req.id}/attachments`, { method: 'POST', body: formData });
+        if (!resp.ok) throw new Error(await resp.text());
+        fileInput.value = '';
+        await openRequirement(req.id);
+      } catch (e) {
+        alert('Upload failed: ' + e.message);
+      }
+    }
+
+    async function reviewPrompt(promptId) {
+      try {
+        const res = await api(`/api/roadmap/prompts/${promptId}/content`);
+        const content = res.content || '';
+        const escaped = content.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        qs('dPromptContent').innerHTML = `
+          <div style="border:1px solid var(--line);border-radius:6px;padding:8px;max-height:300px;overflow:auto;white-space:pre-wrap;font-family:monospace;font-size:11px;background:var(--panel-soft)">${escaped}</div>
+          <div style="margin-top:6px;display:flex;gap:6px">
+            <button style="font-size:12px;background:#23a55a;border:none;padding:6px 12px" onclick="approvePrompt(${promptId})">Approve</button>
+          </div>`;
+      } catch (e) {
+        alert('Error loading prompt: ' + e.message);
+      }
+    }
+
+    async function approvePrompt(promptId) {
+      if (!confirm('Approve this CC prompt?')) return;
+      try {
+        const res = await api(`/api/roadmap/prompts/${promptId}/approve`, { method: 'POST', body: JSON.stringify({ approved_by: 'PL' }) });
+        const url = res.handoff_url;
+        qs('dPromptContent').innerHTML = `
+          <div style="color:var(--ok)">Approved!</div>
+          <div style="margin-top:4px">
+            <input id="handoffUrl" value="${url}" readonly style="width:100%;font-size:11px" />
+            <button style="font-size:11px;margin-top:4px" onclick="copyToClipboard('${url}')">Copy CC Link</button>
+          </div>`;
+      } catch (e) {
+        alert('Approve failed: ' + e.message);
+      }
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target;
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = orig, 1500);
+      });
     }
 
     function openEditProject(projectId) {

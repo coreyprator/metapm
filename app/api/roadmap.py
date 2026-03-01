@@ -4,8 +4,11 @@ Project, Requirement, and Sprint management endpoints.
 """
 
 import logging
+import uuid
+from datetime import datetime
 from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
+from fastapi.responses import PlainTextResponse
 
 from app.core.database import execute_query
 from app.schemas.roadmap import (
@@ -1626,4 +1629,271 @@ async def get_wip_summary():
         return {"pipeline": pipeline, "active_sprints": active_sprints}
     except Exception as e:
         logger.error(f"Error getting WIP summary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# ATTACHMENTS (MP-MS3 Phase 3)
+# ============================================
+
+@router.post("/roadmap/requirements/{requirement_id}/attachments")
+async def upload_attachment(
+    requirement_id: str,
+    file: UploadFile = File(...),
+    description: str = Form(""),
+    uploaded_by: str = Form("PL"),
+):
+    """Upload a file attachment to a requirement. Stores in GCS."""
+    try:
+        req = execute_query(
+            "SELECT id FROM roadmap_requirements WHERE id = ?",
+            (requirement_id,), fetch="one"
+        )
+        if not req:
+            raise HTTPException(status_code=404, detail="Requirement not found")
+
+        # Upload to GCS
+        from google.cloud import storage as gcs
+        client = gcs.Client()
+        bucket = client.bucket("corey-handoff-bridge")
+        storage_key = f"attachments/{requirement_id}/{file.filename}"
+        blob = bucket.blob(storage_key)
+        content = await file.read()
+        blob.upload_from_string(content, content_type=file.content_type)
+
+        # Record in DB
+        execute_query("""
+            INSERT INTO requirement_attachments
+                (requirement_id, filename, content_type, file_size, storage_key, uploaded_by, description)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (requirement_id, file.filename, file.content_type or "application/octet-stream",
+              len(content), storage_key, uploaded_by, description), fetch="none")
+
+        # Get the new attachment record
+        att = execute_query("""
+            SELECT TOP 1 id, filename, content_type, file_size, storage_key, created_at
+            FROM requirement_attachments
+            WHERE requirement_id = ? AND filename = ?
+            ORDER BY created_at DESC
+        """, (requirement_id, file.filename), fetch="one")
+
+        return {
+            "attachment_id": att['id'] if att else None,
+            "filename": file.filename,
+            "url": f"https://storage.googleapis.com/corey-handoff-bridge/{storage_key}",
+            "content_type": file.content_type,
+            "file_size": len(content),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading attachment: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/roadmap/requirements/{requirement_id}/attachments")
+async def list_attachments(requirement_id: str):
+    """List all attachments for a requirement."""
+    try:
+        rows = execute_query("""
+            SELECT id, filename, content_type, file_size, storage_key, uploaded_by, description, created_at
+            FROM requirement_attachments
+            WHERE requirement_id = ?
+            ORDER BY created_at DESC
+        """, (requirement_id,), fetch="all") or []
+
+        return {"attachments": [{
+            "id": r['id'],
+            "filename": r['filename'],
+            "content_type": r['content_type'],
+            "file_size": r['file_size'],
+            "url": f"https://storage.googleapis.com/corey-handoff-bridge/{r['storage_key']}",
+            "uploaded_by": r['uploaded_by'],
+            "description": r.get('description'),
+            "created_at": str(r['created_at']),
+        } for r in rows]}
+    except Exception as e:
+        logger.error(f"Error listing attachments: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# CC PROMPTS (MP-MS3 Phase 3)
+# ============================================
+
+@router.post("/roadmap/prompts")
+async def create_prompt(body: dict):
+    """Create a CC prompt for a sprint."""
+    try:
+        required = ['content', 'sprint_id', 'project_id']
+        for field in required:
+            if field not in body:
+                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
+
+        execute_query("""
+            INSERT INTO cc_prompts (sprint_id, project_id, content, status, version_before, version_after, estimated_hours)
+            VALUES (?, ?, ?, 'draft', ?, ?, ?)
+        """, (body['sprint_id'], body['project_id'], body['content'],
+              body.get('version_before'), body.get('version_after'),
+              body.get('estimated_hours')), fetch="none")
+
+        prompt = execute_query("""
+            SELECT TOP 1 id, sprint_id, status, created_at
+            FROM cc_prompts
+            WHERE sprint_id = ? AND project_id = ?
+            ORDER BY created_at DESC
+        """, (body['sprint_id'], body['project_id']), fetch="one")
+
+        prompt_id = prompt['id'] if prompt else None
+        return {
+            "prompt_id": prompt_id,
+            "sprint_id": body['sprint_id'],
+            "status": "draft",
+            "review_url": f"/api/roadmap/prompts/{prompt_id}/content" if prompt_id else None,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating prompt: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/roadmap/prompts")
+async def list_prompts(status: Optional[str] = None):
+    """List all CC prompts with optional status filter."""
+    try:
+        if status:
+            rows = execute_query("""
+                SELECT p.id, p.sprint_id, p.project_id, p.status, p.version_before, p.version_after,
+                       p.estimated_hours, p.approved_at, p.approved_by, p.created_at, p.updated_at,
+                       proj.name as project_name, proj.code as project_code
+                FROM cc_prompts p
+                JOIN roadmap_projects proj ON p.project_id = proj.id
+                WHERE p.status = ?
+                ORDER BY p.created_at DESC
+            """, (status,), fetch="all") or []
+        else:
+            rows = execute_query("""
+                SELECT p.id, p.sprint_id, p.project_id, p.status, p.version_before, p.version_after,
+                       p.estimated_hours, p.approved_at, p.approved_by, p.created_at, p.updated_at,
+                       proj.name as project_name, proj.code as project_code
+                FROM cc_prompts p
+                JOIN roadmap_projects proj ON p.project_id = proj.id
+                ORDER BY p.created_at DESC
+            """, fetch="all") or []
+
+        return {"prompts": [{
+            "id": r['id'], "sprint_id": r['sprint_id'], "project_id": r['project_id'],
+            "project_name": r.get('project_name'), "project_code": r.get('project_code'),
+            "status": r['status'], "version_before": r.get('version_before'),
+            "version_after": r.get('version_after'), "estimated_hours": r.get('estimated_hours'),
+            "approved_at": str(r['approved_at']) if r.get('approved_at') else None,
+            "approved_by": r.get('approved_by'),
+            "created_at": str(r['created_at']), "updated_at": str(r['updated_at']),
+        } for r in rows]}
+    except Exception as e:
+        logger.error(f"Error listing prompts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/roadmap/prompts/active")
+async def list_active_prompts():
+    """List non-completed prompts."""
+    try:
+        rows = execute_query("""
+            SELECT p.id, p.sprint_id, p.project_id, p.status, p.version_before, p.version_after,
+                   p.estimated_hours, p.created_at, proj.name as project_name, proj.code as project_code
+            FROM cc_prompts p
+            JOIN roadmap_projects proj ON p.project_id = proj.id
+            WHERE p.status IN ('draft', 'prompt_ready', 'approved', 'sent')
+            ORDER BY p.created_at DESC
+        """, fetch="all") or []
+
+        return {"prompts": [{
+            "id": r['id'], "sprint_id": r['sprint_id'], "project_name": r.get('project_name'),
+            "project_code": r.get('project_code'), "status": r['status'],
+            "version_before": r.get('version_before'), "version_after": r.get('version_after'),
+            "estimated_hours": r.get('estimated_hours'), "created_at": str(r['created_at']),
+        } for r in rows]}
+    except Exception as e:
+        logger.error(f"Error listing active prompts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/roadmap/prompts/{prompt_id}/content")
+async def get_prompt_content(prompt_id: int):
+    """Get the full content of a CC prompt for review."""
+    try:
+        prompt = execute_query(
+            "SELECT id, sprint_id, content, status FROM cc_prompts WHERE id = ?",
+            (prompt_id,), fetch="one"
+        )
+        if not prompt:
+            raise HTTPException(status_code=404, detail="Prompt not found")
+
+        return {"id": prompt['id'], "sprint_id": prompt['sprint_id'],
+                "content": prompt['content'], "status": prompt['status']}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting prompt content: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/roadmap/prompts/{prompt_id}/approve")
+async def approve_prompt(prompt_id: int, body: dict = None):
+    """Approve a CC prompt. Returns a handoff URL for CC."""
+    try:
+        prompt = execute_query(
+            "SELECT id, sprint_id, status FROM cc_prompts WHERE id = ?",
+            (prompt_id,), fetch="one"
+        )
+        if not prompt:
+            raise HTTPException(status_code=404, detail="Prompt not found")
+
+        approved_by = (body or {}).get('approved_by', 'PL')
+        execute_query("""
+            UPDATE cc_prompts SET status = 'approved', approved_at = GETDATE(),
+                   approved_by = ?, updated_at = GETDATE()
+            WHERE id = ?
+        """, (approved_by, prompt_id), fetch="none")
+
+        handoff_url = f"https://metapm.rentyourcio.com/api/roadmap/prompts/{prompt_id}/handoff"
+        return {
+            "approved": True,
+            "prompt_id": prompt_id,
+            "sprint_id": prompt['sprint_id'],
+            "handoff_url": handoff_url,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error approving prompt: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/roadmap/prompts/{prompt_id}/handoff", response_class=PlainTextResponse)
+async def get_prompt_handoff(prompt_id: int):
+    """Get raw markdown of an approved prompt. CC reads this URL directly."""
+    try:
+        prompt = execute_query(
+            "SELECT id, content, status FROM cc_prompts WHERE id = ?",
+            (prompt_id,), fetch="one"
+        )
+        if not prompt:
+            raise HTTPException(status_code=404, detail="Prompt not found")
+        if prompt['status'] not in ('approved', 'sent', 'completed'):
+            raise HTTPException(status_code=403, detail=f"Prompt not yet approved (status: {prompt['status']})")
+
+        # Mark as sent
+        execute_query(
+            "UPDATE cc_prompts SET status = 'sent', updated_at = GETDATE() WHERE id = ? AND status = 'approved'",
+            (prompt_id,), fetch="none"
+        )
+
+        return prompt['content']
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting prompt handoff: {e}")
         raise HTTPException(status_code=500, detail=str(e))
