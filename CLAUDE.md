@@ -1,4 +1,5 @@
 # CLAUDE.md - Project Instructions for Claude Code
+<!-- CHECKPOINT: MP-CL-4E9A -->
 
 ---
 
