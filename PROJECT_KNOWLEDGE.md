@@ -1,10 +1,19 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-4A2F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-02-28 — Sprint "MP-MS3" (v2.7.0)
+Updated: 2026-03-01 — Sprint "MP-MS3-FIX" (v2.7.1)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-02-28 (MP-MS3 WIP Lifecycle Tracking, v2.7.0)
+### Latest Session Update — 2026-03-01 (MP-MS3-FIX Bug Fixes, v2.7.1)
+
+- **Sprint MP-MS3-FIX**: WIP Polish + Prompt UI + Machine Tests
+- **Current Version**: v2.7.1 — **DEPLOYED** to Cloud Run
+- **Bug 1 Fix**: MetaPM title (top-left) now clickable to reset dashboard to default view (clears all filters, resets groupBy to project). `resetToHome()` function added.
+- **Bug 2 Fix**: Active Prompts panel added to dashboard top-level. Shows all prompts with status draft/prompt_ready/approved/sent. Review Prompt, Approve, and Copy CC Link buttons inline. Row-level prompt badge on prompt_ready items.
+- **Machine Tests**: 7/10 passed. LL-01/LL-02/LL-03 failed due to GitHub API rate limiting (transient, not code bug). Token in Secret Manager (`portfolio-rag-github-token`) is valid but rate-limited.
+- **Files Modified**: `static/dashboard.html` (UI fixes), `app/core/config.py` (version bump)
+
+### Previous: MP-MS3 WIP Lifecycle Tracking, v2.7.0 (2026-02-28)
 
 - **Sprint MP-MS3**: WIP Lifecycle Tracking + Portfolio RAG Integration
 - **Current Version**: v2.7.0 — **DEPLOYED** to Cloud Run
