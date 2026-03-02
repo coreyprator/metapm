@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.7.0"  # MP-MS3: WIP lifecycle tracking (10 pipeline states, status history, attachments, CC prompt approval, RAG proxy, lesson routing, UAT checkpoint verification)
+    VERSION: str = "2.7.1"  # MP-MS3-FIX: WIP home nav, prompt approval UI, machine test verification
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

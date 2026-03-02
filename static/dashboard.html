@@ -364,7 +364,7 @@
   <div class="app">
     <div class="card header">
       <div class="title-wrap">
-        <div class="title">🔴 MetaPM</div>
+        <div class="title" onclick="resetToHome()" style="cursor:pointer" title="Return to default dashboard">🔴 MetaPM</div>
         <span id="appVersion" class="version-badge">v-</span>
       </div>
       <div class="actions-row">
@@ -405,6 +405,14 @@
         <button id="expandAllBtn" type="button">Expand All</button>
         <button id="collapseAllBtn" type="button">Collapse All</button>
       </div>
+    </div>
+
+    <div class="card" id="promptsPanel" style="display:none;border-left:3px solid #f0b429">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong style="color:#f0b429">Active Prompts</strong>
+        <button class="icon-btn" onclick="qs('promptsPanel').style.display='none'" title="Dismiss">✕</button>
+      </div>
+      <div id="promptsList"></div>
     </div>
 
     <div class="card hierarchy" id="hierarchy"></div>
@@ -752,11 +760,15 @@
     }
 
     function rowHtml(req) {
+      const promptBtn = req.status === 'prompt_ready'
+        ? `<button class="icon-btn" data-open-req="${req.id}" title="Review Prompt" style="color:#f0b429">📝</button>`
+        : '';
       return `<div class="req-row" data-req="${req.id}">
         <div><strong>${req.code}</strong> ${req.title}</div>
         <span class="pill ${req.priority.toLowerCase()}">${req.priority}</span>
         <span class="pill status-${req.status}">${req.status}</span>
         <span class="pill">${req.type}</span>
+        ${promptBtn}
         <div class="actions-row">
           <button class="icon-btn" data-open-req="${req.id}" title="Edit Requirement">✏️</button>
           <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete Requirement">🗑️</button>
@@ -782,6 +794,20 @@
           <button class="icon-btn danger-btn" data-delete-sprint="${sprint.id}" title="Delete Sprint">🗑️</button>
         </div>
       </div>`;
+    }
+
+    function resetToHome() {
+      qs('categoryFilter').value = '';
+      qs('projectFilter').value = '';
+      qs('priorityFilter').value = '';
+      qs('statusFilter').value = '';
+      qs('searchInput').value = '';
+      qs('openItemsToggle').checked = true;
+      qs('groupBy').value = 'project';
+      qs('sortBy').value = 'priority';
+      state.expanded = new Set();
+      updateResetButtonState();
+      render();
     }
 
     function activateWipView() {
@@ -1302,6 +1328,70 @@
       });
     }
 
+    async function loadActivePrompts() {
+      try {
+        const res = await api('/api/roadmap/prompts/active');
+        const prompts = res.prompts || [];
+        const active = prompts.filter(p => ['draft','prompt_ready','approved','sent'].includes(p.status));
+        if (!active.length) {
+          qs('promptsPanel').style.display = 'none';
+          return;
+        }
+        qs('promptsPanel').style.display = '';
+        qs('promptsList').innerHTML = active.map(p => {
+          const proj = state.projects.find(pr => pr.id === p.project_id);
+          const projName = proj ? proj.name : p.project_id;
+          let actions = '';
+          if (p.status === 'draft' || p.status === 'prompt_ready') {
+            actions = `<button style="font-size:11px;padding:2px 8px" onclick="reviewPromptInline(${p.id})">Review Prompt</button>`;
+          } else if (p.status === 'approved' || p.status === 'sent') {
+            const url = 'https://metapm.rentyourcio.com/api/roadmap/prompts/' + p.id + '/handoff';
+            actions = `<button style="font-size:11px;padding:2px 8px" onclick="copyToClipboard('${url}')">Copy CC Link</button>`;
+          }
+          return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)">
+            <span class="pill status-${p.status}" style="font-size:10px">${p.status}</span>
+            <strong style="font-size:12px">${p.sprint_id}</strong>
+            <span style="font-size:12px;color:var(--muted)">${projName}</span>
+            ${actions}
+          </div>`;
+        }).join('');
+      } catch {
+        qs('promptsPanel').style.display = 'none';
+      }
+    }
+
+    async function reviewPromptInline(promptId) {
+      try {
+        const res = await api(`/api/roadmap/prompts/${promptId}/content`);
+        const content = res.content || '';
+        const escaped = content.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        qs('promptsList').innerHTML = `
+          <div style="border:1px solid var(--line);border-radius:6px;padding:8px;max-height:400px;overflow:auto;white-space:pre-wrap;font-family:monospace;font-size:11px;background:var(--panel-soft)">${escaped}</div>
+          <div style="margin-top:6px;display:flex;gap:6px">
+            <button style="font-size:12px;background:#23a55a;border:none;padding:6px 12px;color:#fff;border-radius:4px" onclick="approvePromptInline(${promptId})">Approve</button>
+            <button style="font-size:12px;padding:6px 12px;border-radius:4px" onclick="loadActivePrompts()">Back</button>
+          </div>`;
+      } catch (e) {
+        alert('Error loading prompt: ' + e.message);
+      }
+    }
+
+    async function approvePromptInline(promptId) {
+      if (!confirm('Approve this CC prompt?')) return;
+      try {
+        const res = await api(`/api/roadmap/prompts/${promptId}/approve`, { method: 'POST', body: JSON.stringify({ approved_by: 'PL' }) });
+        const url = res.handoff_url;
+        qs('promptsList').innerHTML = `
+          <div style="color:var(--ok);margin-bottom:6px">Approved!</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input value="${url}" readonly style="flex:1;font-size:11px;padding:4px" />
+            <button style="font-size:11px;padding:4px 8px" onclick="copyToClipboard('${url}')">Copy CC Link</button>
+          </div>`;
+      } catch (e) {
+        alert('Approve failed: ' + e.message);
+      }
+    }
+
     function openEditProject(projectId) {
       const project = state.projects.find(p => p.id === projectId);
       if (!project) return;
@@ -1709,7 +1799,7 @@
 
     bindControls();
     loadVersion();
-    loadData().catch((err) => {
+    loadData().then(() => loadActivePrompts()).catch((err) => {
       qs('hierarchy').innerHTML = `<div style="color:#ff9a9a">Failed to load data: ${err.message}</div>`;
     });
   </script>
