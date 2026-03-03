@@ -1,75 +1,81 @@
-# Session Closeout: PM-MS1 (Wave 0 CI/CD Foundation)
-## Date: 2026-02-26
-## Model: Claude Opus 4.6 / Claude Code (VS Code extension)
+# SESSION_CLOSEOUT — MP-MS4
 
-### Deliverables
-- [x] MetaPM deploy.yml created (.github/workflows/deploy.yml)
-- [ ] MetaPM deploy.yml TESTED (BLOCKED: GCP_SA_KEY secret missing on repo)
-- [x] Super-Flashcards: health check step added, deploy verified (revision super-flashcards-00309-zv2)
-- [x] Etymython: health check step added, deploy verified (revision etymython-00190-prb)
-- [x] ArtForge: health check step added, deploy verified (revision artforge-00111-n6g)
-- [x] HarmonyLab: health check + workflow_dispatch added, deploy verified (revision harmonylab-00094-6h6)
-- [x] PROJECT_KNOWLEDGE.md updated with CI/CD section (all 5 repos)
-- [x] All 5 repos committed and pushed
-- [x] UAT submitted to MetaPM
+**Sprint:** MP-MS4
+**Project:** MetaPM
+**Version:** v2.7.1 → v2.8.0
+**Date:** 2026-03-02
+**Cloud Run Revision:** metapm-v2-00130-wzl
+**Deploy Service:** metapm-v2 (NOT metapm — see Phase 0 findings)
 
-### Verification Matrix
+---
 
-| Repo | Workflow Exists | Branch Correct | GCP Project Correct | Secret Set | Push Triggers Deploy | Health Check Passes |
-|------|----------------|----------------|---------------------|------------|---------------------|-------------------|
-| MetaPM | YES | main | super-flashcards-475210 | NO (BLOCKED) | YES (fails at auth) | N/A |
-| Super-Flashcards | YES | main | super-flashcards-475210 | YES | YES | YES |
-| Etymython | YES | main | super-flashcards-475210 | YES | YES | YES |
-| ArtForge | YES | main | super-flashcards-475210 | YES | YES | YES |
-| HarmonyLab | YES | main | super-flashcards-475210 | YES (WIF) | YES | YES |
+## Phase 0 Findings
 
-### Commits
-| Repo | Commit (workflow) | Commit (PK.md) |
-|------|-------------------|----------------|
-| metapm | c0bdf04 | 6bdf1ef |
-| Super-Flashcards | 09d2045 | 1cd1d6c |
-| etymython | 8cf64e7 | 5a20e29 |
-| artforge | 458c90d | 1ac6753 |
-| harmonylab | cc77e43 | d305eff |
+### Attachment 409 Root Cause
+CAI's sprint prompt diagnosed attachment uploads as causing 409 conflicts via code collisions with REQ-001 patterns. **Investigation revealed this was incorrect.** Attachments use auto-increment integer IDs with no code generation — they cannot collide with requirement codes. The only existing 409 in the codebase was in `update_requirement()` at roadmap.py:598, which correctly prevents duplicate codes on update. The actual gap was that `create_requirement()` lacked the same uniqueness check, so duplicate codes could be inserted on creation. Fix: added code uniqueness validation to `create_requirement()`.
 
-### Deviations From Reference Pattern
-1. **ArtForge**: Uses Docker build + GAR push, not `--source .`. Has hardcoded env vars in workflow. Not changed (would break existing deploy).
-2. **HarmonyLab**: Uses Workload Identity Federation (WIF_PROVIDER, WIF_SERVICE_ACCOUNT), not credentials_json. Not changed (would require adding GCP_SA_KEY secret and testing).
-3. **Etymython**: PROJECT_ID is super-flashcards-475210 (same as others), NOT etymython-project as sprint prompt stated. Left as-is since it deploys successfully.
+### Cloud Run Service Name
+Domain `metapm.rentyourcio.com` maps to Cloud Run service `metapm-v2`, NOT `metapm`. Three deploys were wasted targeting the wrong service before this was discovered via `gcloud beta run domain-mappings list`. Confirmed with PINEAPPLE canary test.
 
-### Lessons Learned
+### Files Touched
+- `app/api/roadmap.py` — MP-028 code uniqueness check
+- `app/core/config.py` — version bump to 2.8.0
+- `static/dashboard.html` — MP-027 prompt badge, MP-030 Active Prompts helper text/tooltip
+- `project-methodology/templates/UAT_Template_v3.html` — MP-029 submit confirmation, MP-031 screenshot paste, MP-032 file attach
 
-LESSON: MetaPM GitHub repo has NO secrets configured
-PROJECT: MetaPM
-CATEGORY: technical
-ROUTES TO: PROJECT_KNOWLEDGE.md (MetaPM)
-ACTION: PL must add GCP_SA_KEY secret to coreyprator/metapm on GitHub. The key is the cc-deploy SA JSON key at C:\venvs\cc-deploy-key.json. Without this, the CI/CD workflow will fail on every push.
+---
 
-LESSON: HarmonyLab uses WIF, not credentials_json like other repos
-PROJECT: HarmonyLab
-CATEGORY: technical
-ROUTES TO: PROJECT_KNOWLEDGE.md (HarmonyLab)
-ACTION: Consider migrating HarmonyLab to credentials_json (GCP_SA_KEY) for consistency. Current WIF auth works but is a different pattern from the other 4 repos.
+## Requirements
 
-LESSON: Etymython deploys to super-flashcards-475210, not etymython-project
-PROJECT: Etymython
-CATEGORY: technical
-ROUTES TO: PROJECT_KNOWLEDGE.md (Etymython, project-methodology)
-ACTION: The sprint prompt stated Etymython uses a different GCP project (etymython-project) but the actual workflow and service both run on super-flashcards-475210. Update references.
+### MP-027 | Row-level prompt badge on prompt_ready items | DONE
+- **Root cause:** `rowHtml()` rendered the prompt badge as a separate grid item (6th child in a 5-column grid), causing layout overflow and the badge to wrap off-screen.
+- **Fix:** Moved badge inline with title text in the first grid column. Added `.has-prompt` CSS class with gold left border (`border-left: 3px solid #f0b429`).
+- **File:** `static/dashboard.html`
 
-LESSON: Pushing docs-only changes to repos with CI/CD triggers full redeploys
-PROJECT: All
-CATEGORY: process
-ROUTES TO: Bootstrap, CAI memory
-ACTION: When CI/CD is active, pushing PK.md or INTENT.md updates triggers a full Cloud Run redeploy. Consider adding path filters to workflows (e.g., ignore *.md pushes) to avoid unnecessary deploys. Not critical but wasteful.
+### MP-028 | Attachment upload 409 conflict fix | DONE
+- **Root cause:** See Phase 0 above. Not an attachment issue — `create_requirement()` lacked code uniqueness validation.
+- **Fix:** Added pre-insert check: `SELECT id FROM roadmap_requirements WHERE project_id = ? AND code = ?`. Returns 409 with descriptive message if duplicate code found.
+- **File:** `app/api/roadmap.py`
 
-### Blockers Encountered
-- MetaPM GCP_SA_KEY secret missing. Workflow created and committed but cannot be tested until PL adds the secret.
+### MP-029 | Restore UAT submit confirmation link | DONE
+- **Root cause:** Template had the link code but it was a single-line append easily missed. API does return `handoff_url`.
+- **Fix:** Replaced simple link with prominent green-bordered confirmation box showing success message, clickable "View in MetaPM" link, and handoff ID.
+- **File:** `project-methodology/templates/UAT_Template_v3.html`
 
-### Next Steps for PL
-1. **CRITICAL**: Add GCP_SA_KEY secret to MetaPM repo (coreyprator/metapm). Value = contents of C:\venvs\cc-deploy-key.json.
-2. After adding secret, trigger a manual deploy: go to Actions tab > "Deploy to Google Cloud Run" > "Run workflow"
-3. Verify MetaPM deploys successfully and health check passes
-4. **Optional**: Add GCP_SA_KEY to HarmonyLab repo and migrate from WIF to credentials_json for consistency
-5. **Optional**: Add path filters to deploy.yml files to skip deploys on docs-only pushes
-6. MetaPM version bump to v2.4.1 should happen after first successful CI/CD deploy
+### MP-030 | Active Prompts panel — tooltip and helper text | DONE
+- **Fix:** Added helper text div below panel title: "Prompts ready to deliver to a CC session. Copy the CC Link and paste it into your CC prompt." Added tooltip to Copy CC Link button.
+- **File:** `static/dashboard.html`
+
+### MP-031 | UAT template — paste screenshot per test item | DONE
+- **Fix:** Added paste zone (`contenteditable div`) per test item. Clipboard paste handler captures images, resizes to max 800px via canvas, stores as base64 in `mediaData` object. Thumbnail displayed inline. Included in POST payload as `screenshot` field per test item.
+- **File:** `project-methodology/templates/UAT_Template_v3.html`
+
+### MP-032 | UAT template — file attachment per test item | DONE
+- **Fix:** Added file attach button per test item. File handler validates type (jpg, png, pdf, zip, txt) and size (5MB limit). Filename displayed inline. Included in POST payload as `attachment` object with filename, mimetype, data fields.
+- **File:** `project-methodology/templates/UAT_Template_v3.html`
+
+---
+
+## Smoke Tests
+
+### Health Check
+```json
+{"status":"healthy","version":"2.8.0","build":"unknown"}
+```
+
+### UAT Submit
+```json
+{"handoff_id":"...","handoff_url":"https://metapm.rentyourcio.com/handoffs.html#...","status":"submitted"}
+```
+Returns `handoff_url` correctly — MP-029 confirmation link has data to work with.
+
+### Requirements API
+Requirements endpoint responds correctly. Code uniqueness check active on create.
+
+---
+
+## Deferred Items / Anomalies
+
+1. **Deploy account:** Used `cprator@cbsware.com` for Cloud Run deploy (cc-deploy SA lacks permission). Documented in PK.md.
+2. **PINEAPPLE canary:** Used to verify deploys were hitting correct service. Added then removed from `app/main.py`. Final deploy (revision metapm-v2-00130-wzl) has no canary.
+3. **Untracked sprint files:** MetaPM repo has ~40 untracked sprint prompt/UAT files accumulated over multiple sessions. Not committed — these are working documents, not source code.

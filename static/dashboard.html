@@ -183,6 +183,7 @@
     .status-executing { color: #9ec2ff; border-color: #34507c; }
     .status-draft { color: #d4a5f5; border-color: #6b3d8a; }
     .status-prompt_ready { color: #7ee8e8; border-color: #2f7a7a; }
+    .req-row.has-prompt { border-left: 3px solid #f0b429; }
     .status-approved { color: #7ecfa0; border-color: #2f6e46; }
     .status-handoff { color: #a5b4fc; border-color: #3b4d8a; }
     .status-needs_fixes { color: #ffb347; border-color: #7a5a2f; }
@@ -408,10 +409,11 @@
     </div>
 
     <div class="card" id="promptsPanel" style="display:none;border-left:3px solid #f0b429">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
         <strong style="color:#f0b429">Active Prompts</strong>
         <button class="icon-btn" onclick="qs('promptsPanel').style.display='none'" title="Dismiss">✕</button>
       </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Prompts ready to deliver to a CC session. Copy the CC Link and paste it into your CC prompt.</div>
       <div id="promptsList"></div>
     </div>
 
@@ -760,15 +762,15 @@
     }
 
     function rowHtml(req) {
-      const promptBtn = req.status === 'prompt_ready'
-        ? `<button class="icon-btn" data-open-req="${req.id}" title="Review Prompt" style="color:#f0b429">📝</button>`
+      const isPrompt = req.status === 'prompt_ready';
+      const promptBadge = isPrompt
+        ? `<span style="color:#f0b429;margin-left:6px;font-size:13px" title="Prompt ready to deliver">📝</span>`
         : '';
-      return `<div class="req-row" data-req="${req.id}">
-        <div><strong>${req.code}</strong> ${req.title}</div>
+      return `<div class="req-row${isPrompt ? ' has-prompt' : ''}" data-req="${req.id}">
+        <div><strong>${req.code}</strong> ${req.title}${promptBadge}</div>
         <span class="pill ${req.priority.toLowerCase()}">${req.priority}</span>
         <span class="pill status-${req.status}">${req.status}</span>
         <span class="pill">${req.type}</span>
-        ${promptBtn}
         <div class="actions-row">
           <button class="icon-btn" data-open-req="${req.id}" title="Edit Requirement">✏️</button>
           <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete Requirement">🗑️</button>
@@ -1346,7 +1348,7 @@
             actions = `<button style="font-size:11px;padding:2px 8px" onclick="reviewPromptInline(${p.id})">Review Prompt</button>`;
           } else if (p.status === 'approved' || p.status === 'sent') {
             const url = 'https://metapm.rentyourcio.com/api/roadmap/prompts/' + p.id + '/handoff';
-            actions = `<button style="font-size:11px;padding:2px 8px" onclick="copyToClipboard('${url}')">Copy CC Link</button>`;
+            actions = `<button style="font-size:11px;padding:2px 8px" onclick="copyToClipboard('${url}')" title="Copies the handoff URL for this prompt. Paste into your CC session to give CC direct access to this sprint.">Copy CC Link</button>`;
           }
           return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)">
             <span class="pill status-${p.status}" style="font-size:10px">${p.status}</span>

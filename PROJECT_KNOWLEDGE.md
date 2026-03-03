@@ -1,13 +1,25 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-4A2F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-01 — Sprint "MP-MS3-FIX" (v2.7.1)
+Updated: 2026-03-02 — Sprint "MP-MS4" (v2.8.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-01 (MP-MS3-FIX Bug Fixes, v2.7.1)
+### Latest Session Update — 2026-03-02 (MP-MS4, v2.8.0)
+
+- **Sprint MP-MS4**: Prompt badge, code uniqueness, UAT media attach, Active Prompts tooltip
+- **Current Version**: v2.8.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00129-56x)
+- **Cloud Run service name**: `metapm-v2` (NOT `metapm`). Custom domain `metapm.rentyourcio.com` maps to `metapm-v2`.
+- **MP-028 Fix**: Added code uniqueness validation to `create_requirement()` route. Prevents 409 when inserting duplicate codes within a project. (`app/api/roadmap.py`)
+- **MP-027 Fix**: Prompt badge on `prompt_ready` rows now inline with title (📝 icon + gold left border on row). Fixed grid overflow bug where badge was a separate grid item. (`static/dashboard.html`)
+- **MP-030**: Active Prompts panel has helper text explaining its purpose. Copy CC Link button has tooltip. (`static/dashboard.html`)
+- **MP-029**: UAT submit confirmation link made more prominent with green-bordered success box showing handoff ID and clickable MetaPM link. (`UAT_Template_v3.html`)
+- **MP-031/032**: UAT template now supports Ctrl+V screenshot paste and file attachment per test item. Screenshots resized to max 800px. Files limited to 5MB. Both included in POST payload. (`UAT_Template_v3.html`)
+- **Files Modified**: `app/api/roadmap.py`, `static/dashboard.html`, `app/core/config.py`, `app/main.py`, `project-methodology/templates/UAT_Template_v3.html`
+
+### Previous: MP-MS3-FIX Bug Fixes, v2.7.1 (2026-03-01)
 
 - **Sprint MP-MS3-FIX**: WIP Polish + Prompt UI + Machine Tests
-- **Current Version**: v2.7.1 — **DEPLOYED** to Cloud Run
+- **Version**: v2.7.1
 - **Bug 1 Fix**: MetaPM title (top-left) now clickable to reset dashboard to default view (clears all filters, resets groupBy to project). `resetToHome()` function added.
 - **Bug 2 Fix**: Active Prompts panel added to dashboard top-level. Shows all prompts with status draft/prompt_ready/approved/sent. Review Prompt, Approve, and Copy CC Link buttons inline. Row-level prompt badge on prompt_ready items.
 - **Machine Tests**: 7/10 passed. LL-01/LL-02/LL-03 failed due to GitHub API rate limiting (transient, not code bug). Token in Secret Manager (`portfolio-rag-github-token`) is valid but rate-limited.

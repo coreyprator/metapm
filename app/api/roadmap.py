@@ -564,6 +564,15 @@ async def get_requirement(requirement_id: str):
 async def create_requirement(req: RequirementCreate):
     """Create a new requirement."""
     try:
+        # Validate code uniqueness within the same project (MP-028)
+        if req.code:
+            existing = execute_query("""
+                SELECT id FROM roadmap_requirements
+                WHERE project_id = ? AND code = ?
+            """, (req.project_id, req.code), fetch="one")
+            if existing:
+                raise HTTPException(status_code=409, detail=f"Code '{req.code}' already exists in this project")
+
         execute_query("""
             INSERT INTO roadmap_requirements (id, project_id, code, title, description, type, priority, status, target_version, sprint_id, handoff_id, uat_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

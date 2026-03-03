@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.7.1"  # MP-MS3-FIX: WIP home nav, prompt approval UI, machine test verification
+    VERSION: str = "2.8.0"  # MP-MS4: Prompt badge, code uniqueness, UAT media attach, Active Prompts tooltip
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
