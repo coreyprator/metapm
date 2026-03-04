@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.8.1"  # MP-RECONCILE-001: Version labels, Done counter, code uniqueness loop, archive flag
+    VERSION: str = "2.8.2"  # MP-RECONCILE-002: UAT note limit, archive enum, done counts, attachment delete
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

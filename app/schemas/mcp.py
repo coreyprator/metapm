@@ -161,7 +161,7 @@ class UATResultItem(BaseModel):
     id: str
     title: str
     status: str
-    note: Optional[str] = Field(None, max_length=2000)
+    note: Optional[str] = Field(None, max_length=10000)
     linked_requirements: Optional[List[str]] = None
 
 
@@ -323,7 +323,7 @@ class UATDirectSubmit(BaseModel):
                     r_title = r.get('title', '')
                     lines.append(f"  {status_label}  {r_id}: {r_title}")
                     if r.get('note'):
-                        note = r['note'][:2000] if len(r.get('note', '')) > 2000 else r['note']
+                        note = r['note'][:10000] if len(r.get('note', '')) > 10000 else r['note']
                         lines.append(f"        Note: {note}")
                 data['results_text'] = "\n".join(lines)
 

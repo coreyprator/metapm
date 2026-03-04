@@ -83,7 +83,8 @@ async def list_projects(
         results = execute_query(f"""
             SELECT p.id, p.code, p.name, p.emoji, p.color, p.current_version, p.status,
                    p.repo_url, p.deploy_url, p.category_id, p.archived, p.created_at, p.updated_at,
-                   c.name as category_name
+                   c.name as category_name,
+                   (SELECT COUNT(*) FROM roadmap_requirements r WHERE r.project_id = p.id AND r.status = 'closed') as done_count
             FROM roadmap_projects p
             LEFT JOIN roadmap_categories c ON p.category_id = c.id
             {where_clause}
@@ -106,6 +107,7 @@ async def list_projects(
                 category_id=row.get('category_id'),
                 category_name=row.get('category_name'),
                 archived=bool(row.get('archived', 0)),
+                done_count=row.get('done_count', 0) or 0,
                 created_at=row['created_at'],
                 updated_at=row['updated_at']
             ))
@@ -199,6 +201,10 @@ async def update_project(project_id: str, update: ProjectUpdate):
         if update.status is not None:
             set_clauses.append("status = ?")
             params.append(update.status.value)
+            # Sync archived boolean with status enum (MP-036)
+            if update.archived is None:
+                set_clauses.append("archived = ?")
+                params.append(1 if update.status.value == "archived" else 0)
         if update.repo_url is not None:
             set_clauses.append("repo_url = ?")
             params.append(update.repo_url)
@@ -1778,6 +1784,39 @@ async def list_attachments(requirement_id: str):
         } for r in rows]}
     except Exception as e:
         logger.error(f"Error listing attachments: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/roadmap/requirements/{requirement_id}/attachments/{attachment_id}", status_code=204)
+async def delete_attachment(requirement_id: str, attachment_id: str):
+    """Delete an attachment from a requirement. Removes from GCS and DB."""
+    try:
+        att = execute_query("""
+            SELECT id, storage_key FROM requirement_attachments
+            WHERE id = ? AND requirement_id = ?
+        """, (attachment_id, requirement_id), fetch="one")
+        if not att:
+            raise HTTPException(status_code=404, detail="Attachment not found")
+
+        # Delete from GCS
+        try:
+            from google.cloud import storage as gcs
+            client = gcs.Client()
+            bucket = client.bucket("corey-handoff-bridge")
+            blob = bucket.blob(att['storage_key'])
+            blob.delete()
+        except Exception as gcs_err:
+            logger.warning(f"GCS delete failed (continuing): {gcs_err}")
+
+        # Delete from DB
+        execute_query(
+            "DELETE FROM requirement_attachments WHERE id = ?",
+            (attachment_id,), fetch="none"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting attachment: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

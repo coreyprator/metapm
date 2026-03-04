@@ -15,6 +15,7 @@ class ProjectStatus(str, Enum):
     STABLE = "stable"
     MAINTENANCE = "maintenance"
     PAUSED = "paused"
+    ARCHIVED = "archived"
 
 
 class RequirementType(str, Enum):
@@ -85,6 +86,7 @@ class ProjectResponse(ProjectBase):
     category_id: Optional[str] = None
     category_name: Optional[str] = None
     archived: bool = False
+    done_count: int = 0
     created_at: datetime
     updated_at: datetime
 

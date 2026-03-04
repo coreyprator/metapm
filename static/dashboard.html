@@ -852,7 +852,7 @@
         const pReqs = reqs.filter(r => r.project_id === p.id);
         if (openOnly && pReqs.length === 0) continue;
 
-        const done = state.requirements.filter(r => r.project_id === p.id && r.status === 'closed').length;
+        const done = p.done_count || state.requirements.filter(r => r.project_id === p.id && r.status === 'closed').length;
         const p1 = pReqs.filter(r => r.priority === 'P1').length;
         const p2 = pReqs.filter(r => r.priority === 'P2').length;
         const open = state.expanded.has(p.id);
@@ -1028,7 +1028,7 @@
           await api(`/api/roadmap/projects/${projId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ archived: !isArchived })
+            body: JSON.stringify({ archived: !isArchived, status: isArchived ? 'active' : 'archived' })
           });
           await loadData();
           render();
@@ -1196,8 +1196,17 @@
             return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
               <a style="color:#9ec2ff" href="${a.url}" target="_blank" rel="noopener">${a.filename}</a>
               <span style="color:var(--muted)">(${size}, ${a.uploaded_by})</span>
+              <span class="icon-btn danger-btn" style="cursor:pointer;font-size:11px;padding:1px 4px" data-delete-attachment="${a.id}" title="Delete attachment">✕</span>
             </div>`;
           }).join('');
+          // Bind attachment delete buttons (MP-040)
+          qs('dAttachments').querySelectorAll('[data-delete-attachment]').forEach(btn => {
+            btn.onclick = async () => {
+              if (!confirm('Delete this attachment?')) return;
+              await api(`/api/roadmap/requirements/${req.id}/attachments/${btn.dataset.deleteAttachment}`, { method: 'DELETE' });
+              await openRequirement(req.id);
+            };
+          });
         } else {
           qs('dAttachments').textContent = 'None';
         }
@@ -1431,7 +1440,7 @@
           <div><label>Name</label><input id="eName" value="${project.name || ''}" /></div>
           <div><label>Emoji</label><input id="eEmoji" value="${project.emoji || ''}" /></div>
           <div><label>Version</label><input id="eVersion" value="${project.current_version || ''}" /></div>
-          <div><label>Status</label><select id="eStatus"><option value="active">active</option><option value="stable">stable</option><option value="paused">paused</option><option value="archived">archived</option></select></div>
+          <div><label>Status</label><select id="eStatus"><option value="active">active</option><option value="stable">stable</option><option value="maintenance">maintenance</option><option value="paused">paused</option><option value="archived">archived</option></select></div>
           <div><label>Category</label><select id="eCategory"><option value="">None</option>${catOpts}</select></div>
         </div>`;
       qs('eStatus').value = project.status || 'active';
