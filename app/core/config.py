@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.8.0"  # MP-MS4: Prompt badge, code uniqueness, UAT media attach, Active Prompts tooltip
+    VERSION: str = "2.8.1"  # MP-RECONCILE-001: Version labels, Done counter, code uniqueness loop, archive flag
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

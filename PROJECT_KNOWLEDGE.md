@@ -1,10 +1,21 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-4A2F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-02 — Sprint "MP-MS4" (v2.8.0)
+Updated: 2026-03-03 — Sprint "MP-RECONCILE-001" (v2.8.1)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-02 (MP-MS4, v2.8.0)
+### Latest Session Update — 2026-03-03 (MP-RECONCILE-001, v2.8.1)
+
+- **Sprint MP-RECONCILE-001**: Data integrity fixes. Version labels, Done counter, code uniqueness loop, archive flag.
+- **Current Version**: v2.8.1 — **DEPLOYED** to Cloud Run (revision metapm-v2-00132-77m)
+- **MP-033**: All 6 active project version labels updated to match deployed versions (data fix via API).
+- **MP-034**: Done counter now uses unfiltered `state.requirements` for counts. Shows correct done count even with Open Only filter active.
+- **MP-035**: Code auto-generator (`get_next_roadmap_code`) now loops to verify uniqueness before returning. Diagnostic endpoint: `GET /api/roadmap/admin/duplicate-codes`.
+- **MP-036**: Projects have `archived` column (BIT, default 0). Archived projects hidden from default view. `include_archived=true` query param shows all. Dashboard has "Show Archived" toggle and archive/unarchive button per project.
+- **Known duplicate codes** (data debt, not renamed): EM-011x2, PM-001x2, PM-005x2, REQ-001x2 (in proj-mp), SF-021x2, SF-025x2.
+- **Files Modified**: `app/api/roadmap.py`, `app/schemas/roadmap.py`, `app/core/migrations.py`, `app/core/config.py`, `static/dashboard.html`
+
+### Previous: MP-MS4 (v2.8.0, 2026-03-02)
 
 - **Sprint MP-MS4**: Prompt badge, code uniqueness, UAT media attach, Active Prompts tooltip
 - **Current Version**: v2.8.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00129-56x)

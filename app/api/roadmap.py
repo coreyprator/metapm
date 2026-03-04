@@ -55,17 +55,24 @@ def _project_done_counts() -> dict:
 @router.get("/roadmap/projects", response_model=ProjectListResponse)
 async def list_projects(
     status: Optional[ProjectStatus] = Query(None),
-    limit: int = Query(20, le=500),
+    include_archived: bool = Query(False),
+    limit: int = Query(50, le=500),
     offset: int = Query(0)
 ):
-    """List all projects with optional status filter."""
+    """List all projects with optional status filter. Archived projects hidden by default."""
     try:
-        where_clause = "WHERE status = ?" if status else ""
-        params = [status.value] if status else []
+        conditions = []
+        params = []
+        if status:
+            conditions.append("p.status = ?")
+            params.append(status.value)
+        if not include_archived:
+            conditions.append("(p.archived = 0 OR p.archived IS NULL)")
+        where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
         # Get count
         count_result = execute_query(
-            f"SELECT COUNT(*) as total FROM roadmap_projects {where_clause}",
+            f"SELECT COUNT(*) as total FROM roadmap_projects p {where_clause}",
             tuple(params) if params else None,
             fetch="one"
         )
@@ -75,7 +82,7 @@ async def list_projects(
         params.extend([offset, limit])
         results = execute_query(f"""
             SELECT p.id, p.code, p.name, p.emoji, p.color, p.current_version, p.status,
-                   p.repo_url, p.deploy_url, p.category_id, p.created_at, p.updated_at,
+                   p.repo_url, p.deploy_url, p.category_id, p.archived, p.created_at, p.updated_at,
                    c.name as category_name
             FROM roadmap_projects p
             LEFT JOIN roadmap_categories c ON p.category_id = c.id
@@ -98,6 +105,7 @@ async def list_projects(
                 deploy_url=row['deploy_url'],
                 category_id=row.get('category_id'),
                 category_name=row.get('category_name'),
+                archived=bool(row.get('archived', 0)),
                 created_at=row['created_at'],
                 updated_at=row['updated_at']
             ))
@@ -115,7 +123,7 @@ async def get_project(project_id: str):
     try:
         result = execute_query("""
             SELECT p.id, p.code, p.name, p.emoji, p.color, p.current_version, p.status,
-                   p.repo_url, p.deploy_url, p.category_id, p.created_at, p.updated_at,
+                   p.repo_url, p.deploy_url, p.category_id, p.archived, p.created_at, p.updated_at,
                    c.name as category_name
             FROM roadmap_projects p
             LEFT JOIN roadmap_categories c ON p.category_id = c.id
@@ -137,6 +145,7 @@ async def get_project(project_id: str):
             deploy_url=result['deploy_url'],
             category_id=result.get('category_id'),
             category_name=result.get('category_name'),
+            archived=bool(result.get('archived', 0)),
             created_at=result['created_at'],
             updated_at=result['updated_at']
         )
@@ -199,6 +208,9 @@ async def update_project(project_id: str, update: ProjectUpdate):
         if update.category_id is not None:
             set_clauses.append("category_id = ?")
             params.append(update.category_id if update.category_id else None)
+        if update.archived is not None:
+            set_clauses.append("archived = ?")
+            params.append(1 if update.archived else 0)
 
         params.append(project_id)
 
@@ -659,6 +671,13 @@ async def get_next_roadmap_code(project_code: str, item_type: str):
         }
         prefix = prefix_map.get(item_type.lower(), 'REQ')
 
+        # Get project_id for this project_code
+        proj = execute_query(
+            "SELECT id FROM roadmap_projects WHERE code = ?",
+            (project_code,), fetch="one"
+        )
+        project_id = proj['id'] if proj else None
+
         result = execute_query("""
             SELECT MAX(
                 TRY_CAST(
@@ -671,9 +690,45 @@ async def get_next_roadmap_code(project_code: str, item_type: str):
         """, (project_code, f"{prefix}-%"), fetch="one")
 
         next_num = (result['maxNum'] or 0) + 1 if result else 1
+
+        # Verify uniqueness: skip over any existing codes (MP-035)
+        if project_id:
+            for _ in range(100):
+                candidate = f"{prefix}-{next_num:03d}"
+                existing = execute_query(
+                    "SELECT id FROM roadmap_requirements WHERE project_id = ? AND code = ?",
+                    (project_id, candidate), fetch="one"
+                )
+                if not existing:
+                    break
+                next_num += 1
+
         return {"code": f"{prefix}-{next_num:03d}", "prefix": prefix, "number": next_num}
     except Exception as e:
         logger.error(f"Error getting next code: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/roadmap/admin/duplicate-codes")
+async def get_duplicate_codes():
+    """Diagnostic: list all requirement codes that appear more than once within a project."""
+    try:
+        rows = execute_query("""
+            SELECT r.code, r.project_id, p.name as project_name, COUNT(*) as count
+            FROM roadmap_requirements r
+            LEFT JOIN roadmap_projects p ON r.project_id = p.id
+            GROUP BY r.code, r.project_id, p.name
+            HAVING COUNT(*) > 1
+            ORDER BY r.code
+        """, fetch="all") or []
+        duplicates = [
+            {"code": row["code"], "project_id": row["project_id"],
+             "project_name": row.get("project_name"), "count": row["count"]}
+            for row in rows
+        ]
+        return {"duplicates": duplicates, "total_duplicate_groups": len(duplicates)}
+    except Exception as e:
+        logger.error(f"Error checking duplicates: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -747,7 +802,7 @@ async def get_roadmap(
             project_where = "WHERE code = ?"
             project_params = (project_code,)
         else:
-            project_where = "WHERE status IN ('active', 'stable')"
+            project_where = "WHERE status IN ('active', 'stable') AND (archived = 0 OR archived IS NULL)"
             project_params = None
 
         projects_result = execute_query(f"""

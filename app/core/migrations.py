@@ -1078,4 +1078,22 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 28 warning: {e}")
 
+    # Migration 29: Add archived column to roadmap_projects (MP-036)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'roadmap_projects' AND COLUMN_NAME = 'archived'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 29: Adding archived column to roadmap_projects...")
+            execute_query("""
+                ALTER TABLE roadmap_projects ADD archived BIT DEFAULT 0 NOT NULL
+            """, fetch="none")
+            logger.info("  Migration 29: archived column added.")
+        else:
+            logger.info("  Migration 29: archived column already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 29 warning: {e}")
+
     logger.info("Migrations complete.")

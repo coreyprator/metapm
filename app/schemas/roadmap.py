@@ -61,6 +61,7 @@ class ProjectBase(BaseModel):
     repo_url: Optional[str] = None
     deploy_url: Optional[str] = None
     category_id: Optional[str] = None
+    archived: bool = False
 
 
 class ProjectCreate(ProjectBase):
@@ -76,12 +77,14 @@ class ProjectUpdate(BaseModel):
     repo_url: Optional[str] = None
     deploy_url: Optional[str] = None
     category_id: Optional[str] = None
+    archived: Optional[bool] = None
 
 
 class ProjectResponse(ProjectBase):
     id: str
     category_id: Optional[str] = None
     category_name: Optional[str] = None
+    archived: bool = False
     created_at: datetime
     updated_at: datetime
 

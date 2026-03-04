@@ -1,58 +1,78 @@
-# SESSION_CLOSEOUT — MP-MS4
+# SESSION_CLOSEOUT — MP-RECONCILE-001
 
-**Sprint:** MP-MS4
+**Sprint:** MP-RECONCILE-001
 **Project:** MetaPM
-**Version:** v2.7.1 → v2.8.0
-**Date:** 2026-03-02
-**Cloud Run Revision:** metapm-v2-00130-wzl
-**Deploy Service:** metapm-v2 (NOT metapm — see Phase 0 findings)
+**Version:** v2.8.0 → v2.8.1
+**Date:** 2026-03-03
+**Cloud Run Revision:** metapm-v2-00132-77m
+**Commit:** (pending)
 
 ---
 
 ## Phase 0 Findings
 
-### Attachment 409 Root Cause
-CAI's sprint prompt diagnosed attachment uploads as causing 409 conflicts via code collisions with REQ-001 patterns. **Investigation revealed this was incorrect.** Attachments use auto-increment integer IDs with no code generation — they cannot collide with requirement codes. The only existing 409 in the codebase was in `update_requirement()` at roadmap.py:598, which correctly prevents duplicate codes on update. The actual gap was that `create_requirement()` lacked the same uniqueness check, so duplicate codes could be inserted on creation. Fix: added code uniqueness validation to `create_requirement()`.
+### Done Counter Root Cause (MP-034)
+The "Open Only" checkbox in `dashboard.html:395` defaults to checked. `getFilteredRequirements()` at line 698 excludes closed items when checked: `if (openOnly && (req.status === 'closed' || req.status === 'deferred')) return false;`. Both `setSummary()` and `renderByProject()` received filtered data, so done counts were always 0 when Open Only was enabled (the default state).
 
-### Cloud Run Service Name
-Domain `metapm.rentyourcio.com` maps to Cloud Run service `metapm-v2`, NOT `metapm`. Three deploys were wasted targeting the wrong service before this was discovered via `gcloud beta run domain-mappings list`. Confirmed with PINEAPPLE canary test.
+### Duplicate Codes (MP-035)
+8 duplicate code groups found, 6 are within-project duplicates:
 
-### Files Touched
-- `app/api/roadmap.py` — MP-028 code uniqueness check
-- `app/core/config.py` — version bump to 2.8.0
-- `static/dashboard.html` — MP-027 prompt badge, MP-030 Active Prompts helper text/tooltip
-- `project-methodology/templates/UAT_Template_v3.html` — MP-029 submit confirmation, MP-031 screenshot paste, MP-032 file attach
+| Code | Project | Count | Titles |
+|------|---------|-------|--------|
+| EM-011 | Etymython | 2 | "Generate EM-MS1 formal CC prompt..." / "Shared etymology graph with SF" |
+| PM-001 | project-methodology | 2 | "Bootstrap v1" / "Lessons Learned Routing" |
+| PM-005 | project-methodology | 2 | "GitHub PAT rate limit fix..." / "Standardize DEPLOYMENT_CHECKLIST" |
+| REQ-001 | MetaPM | 2 | "Add the ability to attach files..." / "Persist the last project..." |
+| SF-021 | Super-Flashcards | 2 | "Generate SF-MS1 formal CC prompt..." / "manifest.json 404 error" |
+| SF-025 | Super-Flashcards | 2 | "Remove duplicate PK.md file" / "Batch enhance endpoint" |
+
+Cross-project REQ-001/REQ-002/REQ-003 duplicates are expected (REQ prefix is per-project). Not counted as duplicates.
+
+Root cause: Manual seeding by CAI/CC created items with explicit codes before the MP-028 uniqueness check was added. The auto-generator uses generic prefixes (REQ/BUG/TSK) and wouldn't create project-specific codes like EM-011.
+
+### Empty Projects
+20 projects in roadmap_projects. ~15 have zero requirements. All are real projects (adventures, videos, personal) but create noise in the dashboard.
+
+### Version Labels
+6 of 7 active project versions were stale:
+
+| Project | Was | Now (correct) |
+|---------|-----|--------------|
+| ArtForge | 2.2.1 | 2.4.1 |
+| Etymython | 1.2.0 | 0.2.2 |
+| HarmonyLab | 1.8.2 | 2.1.1 |
+| MetaPM | 2.4.0 | 2.8.0 |
+| Portfolio RAG | 0.1.0 | 1.0.0 |
+| Super Flashcards | 2.9.0 | 3.0.2 |
+| project-methodology | 3.17.0 | 3.17.0 (correct) |
 
 ---
 
 ## Requirements
 
-### MP-027 | Row-level prompt badge on prompt_ready items | DONE
-- **Root cause:** `rowHtml()` rendered the prompt badge as a separate grid item (6th child in a 5-column grid), causing layout overflow and the badge to wrap off-screen.
-- **Fix:** Moved badge inline with title text in the first grid column. Added `.has-prompt` CSS class with gold left border (`border-left: 3px solid #f0b429`).
-- **File:** `static/dashboard.html`
+### MP-033 | Fix project version labels | DONE
+- Updated 6 project versions via `PUT /api/roadmap/projects/{id}` with correct deployed versions.
+- Data fix only. No code changes.
 
-### MP-028 | Attachment upload 409 conflict fix | DONE
-- **Root cause:** See Phase 0 above. Not an attachment issue — `create_requirement()` lacked code uniqueness validation.
-- **Fix:** Added pre-insert check: `SELECT id FROM roadmap_requirements WHERE project_id = ? AND code = ?`. Returns 409 with descriptive message if duplicate code found.
-- **File:** `app/api/roadmap.py`
+### MP-034 | Fix Done counter | DONE
+- Root cause: Open Only filter excluded closed items from the data passed to summary/project renderers.
+- Fix: `setSummary()` now counts from `state.requirements` (unfiltered) instead of filtered `reqs`. Per-project done count also reads from `state.requirements`. Summary label changed from "Closed" to "Done" and added "Shown" count.
+- File: `static/dashboard.html`
 
-### MP-029 | Restore UAT submit confirmation link | DONE
-- **Root cause:** Template had the link code but it was a single-line append easily missed. API does return `handoff_url`.
-- **Fix:** Replaced simple link with prominent green-bordered confirmation box showing success message, clickable "View in MetaPM" link, and handoff ID.
-- **File:** `project-methodology/templates/UAT_Template_v3.html`
+### MP-035 | Fix duplicate code generator | DONE
+- Added uniqueness loop to `get_next_roadmap_code()` endpoint. After computing candidate code via MAX+1, verifies it doesn't already exist in the project. Loops up to 100 times to find a unique code.
+- Added diagnostic endpoint: `GET /api/roadmap/admin/duplicate-codes` returns all codes with more than one occurrence within the same project.
+- Existing duplicates documented above. Not renamed (would break references).
+- File: `app/api/roadmap.py`
 
-### MP-030 | Active Prompts panel — tooltip and helper text | DONE
-- **Fix:** Added helper text div below panel title: "Prompts ready to deliver to a CC session. Copy the CC Link and paste it into your CC prompt." Added tooltip to Copy CC Link button.
-- **File:** `static/dashboard.html`
-
-### MP-031 | UAT template — paste screenshot per test item | DONE
-- **Fix:** Added paste zone (`contenteditable div`) per test item. Clipboard paste handler captures images, resizes to max 800px via canvas, stores as base64 in `mediaData` object. Thumbnail displayed inline. Included in POST payload as `screenshot` field per test item.
-- **File:** `project-methodology/templates/UAT_Template_v3.html`
-
-### MP-032 | UAT template — file attachment per test item | DONE
-- **Fix:** Added file attach button per test item. File handler validates type (jpg, png, pdf, zip, txt) and size (5MB limit). Filename displayed inline. Included in POST payload as `attachment` object with filename, mimetype, data fields.
-- **File:** `project-methodology/templates/UAT_Template_v3.html`
+### MP-036 | Archive flag for empty projects | DONE
+- Migration 29: Added `archived BIT DEFAULT 0 NOT NULL` column to `roadmap_projects`.
+- Schema: Added `archived` field to `ProjectBase`, `ProjectUpdate`, `ProjectResponse`.
+- API: List endpoint filters archived projects by default. `include_archived=true` query param shows all. PUT endpoint handles `archived` field.
+- Roadmap aggregate endpoint filters `(archived = 0 OR archived IS NULL)` from default view.
+- UI: "Show Archived" checkbox in filter bar. Archive/Unarchive button on each project row. Reset filters unchecks Show Archived.
+- No projects auto-archived. PL archives manually.
+- Files: `app/core/migrations.py`, `app/schemas/roadmap.py`, `app/api/roadmap.py`, `static/dashboard.html`
 
 ---
 
@@ -60,22 +80,30 @@ Domain `metapm.rentyourcio.com` maps to Cloud Run service `metapm-v2`, NOT `meta
 
 ### Health Check
 ```json
-{"status":"healthy","version":"2.8.0","build":"unknown"}
+{"status":"healthy","version":"2.8.1","build":"unknown"}
 ```
 
-### UAT Submit
+### Version Labels
+```
+ArtForge: 2.4.1, archived: False
+HarmonyLab: 2.1.1, archived: False
+MetaPM: 2.8.0, archived: False
+```
+
+### Duplicate Codes Endpoint
 ```json
-{"handoff_id":"...","handoff_url":"https://metapm.rentyourcio.com/handoffs.html#...","status":"submitted"}
+{"duplicates":[...6 groups...],"total_duplicate_groups":6}
 ```
-Returns `handoff_url` correctly — MP-029 confirmation link has data to work with.
 
-### Requirements API
-Requirements endpoint responds correctly. Code uniqueness check active on create.
+### Roadmap Stats
+```json
+{"total":164,"backlog":43,"closed":101,"executing":20,...}
+```
 
 ---
 
-## Deferred Items / Anomalies
+## Deferred Items
 
-1. **Deploy account:** Used `cprator@cbsware.com` for Cloud Run deploy (cc-deploy SA lacks permission). Documented in PK.md.
-2. **PINEAPPLE canary:** Used to verify deploys were hitting correct service. Added then removed from `app/main.py`. Final deploy (revision metapm-v2-00130-wzl) has no canary.
-3. **Untracked sprint files:** MetaPM repo has ~40 untracked sprint prompt/UAT files accumulated over multiple sessions. Not committed — these are working documents, not source code.
+1. **Backlog API code generator** (`app/api/backlog.py`): Uses legacy tables (Bugs, Requirements). Not updated with uniqueness loop. Low risk since dashboard uses roadmap endpoints.
+2. **Existing duplicate codes**: 6 within-project duplicate groups documented above. Not renamed to avoid breaking references. Treated as data debt.
+3. **SF missing from projects list**: `proj-sf` exists in DB and is queryable directly, but doesn't appear in the paginated list. May be a limit/ordering issue. Version update via PUT succeeded.

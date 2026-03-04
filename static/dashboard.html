@@ -393,6 +393,7 @@
         <select id="priorityFilter"><option value="">All Priorities</option><option>P1</option><option>P2</option><option>P3</option></select>
         <select id="statusFilter"><option value="">All Status</option><option value="not_done">Not Done</option><option value="in_progress">In Progress</option><option value="backlog">backlog</option><option value="draft">draft</option><option value="prompt_ready">prompt_ready</option><option value="approved">approved</option><option value="executing">executing</option><option value="handoff">handoff</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="closed">closed</option><option value="deferred">deferred</option></select>
         <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="openItemsToggle" checked style="min-height:auto" /> Open Only</label>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="showArchivedToggle" style="min-height:auto" /> Show Archived</label>
         <button id="resetFiltersBtn" type="button" class="danger-btn">Reset Filters</button>
       </div>
       <div class="control-row">
@@ -726,13 +727,15 @@
     }
 
     function setSummary(reqs) {
-      const total = reqs.length;
-      const closed = reqs.filter(r => r.status === 'closed').length;
-      const executing = reqs.filter(r => r.status === 'executing').length;
-      const backlog = reqs.filter(r => r.status === 'backlog').length;
+      const all = state.requirements;
+      const total = all.length;
+      const closed = all.filter(r => r.status === 'closed').length;
+      const executing = all.filter(r => r.status === 'executing').length;
+      const backlog = all.filter(r => r.status === 'backlog').length;
       const projectCount = state.projects.length;
-      const openP1 = reqs.filter(r => r.priority === 'P1' && r.status !== 'closed').length;
-      qs('summary').children[0].textContent = `Total: ${total} | Closed: ${closed} | Executing: ${executing} | Backlog: ${backlog} | Projects: ${projectCount}`;
+      const openP1 = all.filter(r => r.priority === 'P1' && r.status !== 'closed').length;
+      const shown = reqs.length;
+      qs('summary').children[0].textContent = `Total: ${total} | Done: ${closed} | Executing: ${executing} | Backlog: ${backlog} | Shown: ${shown} | Projects: ${projectCount}`;
       qs('openP1').textContent = `Open P1s: ${openP1}`;
     }
 
@@ -805,11 +808,12 @@
       qs('statusFilter').value = '';
       qs('searchInput').value = '';
       qs('openItemsToggle').checked = true;
+      qs('showArchivedToggle').checked = false;
       qs('groupBy').value = 'project';
       qs('sortBy').value = 'priority';
       state.expanded = new Set();
       updateResetButtonState();
-      render();
+      loadData().then(() => render());
     }
 
     function activateWipView() {
@@ -848,7 +852,7 @@
         const pReqs = reqs.filter(r => r.project_id === p.id);
         if (openOnly && pReqs.length === 0) continue;
 
-        const done = pReqs.filter(r => r.status === 'closed').length;
+        const done = state.requirements.filter(r => r.project_id === p.id && r.status === 'closed').length;
         const p1 = pReqs.filter(r => r.priority === 'P1').length;
         const p2 = pReqs.filter(r => r.priority === 'P2').length;
         const open = state.expanded.has(p.id);
@@ -876,6 +880,7 @@
               <div class="actions-row">
                 <div class="project-summary">${done} done | ${p1} P1 | ${p2} P2</div>
                 <button class="icon-btn" data-edit-project="${p.id}" title="Edit Project">✏️</button>
+                <button class="icon-btn" data-archive-project="${p.id}" data-archived="${p.archived ? 1 : 0}" title="${p.archived ? 'Unarchive Project' : 'Archive Project'}">${p.archived ? '📤' : '📥'}</button>
                 <button class="icon-btn danger-btn" data-delete-project="${p.id}" title="Delete Project">🗑️</button>
               </div>
             </div>
@@ -1008,6 +1013,25 @@
           if (!confirm(`Delete project '${name}'? This project has ${reqCount} requirements.${warning}`)) return;
           await api(`/api/roadmap/projects/${el.dataset.deleteProject}`, { method: 'DELETE' });
           await loadData();
+        };
+      });
+
+      document.querySelectorAll('[data-archive-project]').forEach((el) => {
+        el.onclick = async (e) => {
+          e.stopPropagation();
+          const projId = el.dataset.archiveProject;
+          const isArchived = el.dataset.archived === '1';
+          const proj = state.projects.find(p => p.id === projId);
+          const name = proj?.name || projId;
+          const action = isArchived ? 'unarchive' : 'archive';
+          if (!confirm(`${isArchived ? 'Unarchive' : 'Archive'} project '${name}'?`)) return;
+          await api(`/api/roadmap/projects/${projId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ archived: !isArchived })
+          });
+          await loadData();
+          render();
         };
       });
 
@@ -1688,8 +1712,10 @@
     }
 
     async function loadData() {
+      const showArchived = qs('showArchivedToggle') && qs('showArchivedToggle').checked;
+      const archiveParam = showArchived ? '&include_archived=true' : '';
       const [projectsRes, requirementsRes, sprintsRes, categoriesRes, tasksRes] = await Promise.all([
-        api('/api/roadmap/projects?limit=200&offset=0'),
+        api('/api/roadmap/projects?limit=200&offset=0' + archiveParam),
         api('/api/roadmap/requirements?limit=500&offset=0'),
         api('/api/roadmap/sprints?limit=200&offset=0'),
         api('/api/roadmap/categories').catch(() => ({ categories: [] })),
@@ -1726,6 +1752,10 @@
       });
       qs('openItemsToggle').onchange = () => {
         updateResetButtonState();
+        render();
+      };
+      qs('showArchivedToggle').onchange = async () => {
+        await loadData();
         render();
       };
       qs('searchInput').addEventListener('input', () => {
