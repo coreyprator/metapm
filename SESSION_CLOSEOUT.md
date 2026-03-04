@@ -1,109 +1,103 @@
-# SESSION_CLOSEOUT — MP-RECONCILE-001
+# SESSION_CLOSEOUT — MP-RECONCILE-002
 
-**Sprint:** MP-RECONCILE-001
+**Sprint:** MP-RECONCILE-002
 **Project:** MetaPM
-**Version:** v2.8.0 → v2.8.1
-**Date:** 2026-03-03
-**Cloud Run Revision:** metapm-v2-00132-77m
-**Commit:** (pending)
+**Version:** v2.8.1 → v2.8.2
+**Date:** 2026-03-04
+**Cloud Run Revision:** metapm-v2-00137-t92
+**Commits:** metapm: 06d5111, 5e671c7 (migration 30), project-methodology: 7e06f2e
 
 ---
 
 ## Phase 0 Findings
 
-### Done Counter Root Cause (MP-034)
-The "Open Only" checkbox in `dashboard.html:395` defaults to checked. `getFilteredRequirements()` at line 698 excludes closed items when checked: `if (openOnly && (req.status === 'closed' || req.status === 'deferred')) return false;`. Both `setSummary()` and `renderByProject()` received filtered data, so done counts were always 0 when Open Only was enabled (the default state).
+### Version Labels (VER-01 / MP-033)
+| Project | Was | Updated To |
+|---------|-----|-----------|
+| ArtForge | 2.4.1 | 2.5.1 |
+| MetaPM | 2.8.0 | 2.8.2 |
+| Portfolio RAG | 1.0.0 | 2.0.0 |
+| project-methodology | 3.17.0 | 3.17 |
+| Etymython | 0.2.2 | (unchanged) |
+| HarmonyLab | 2.1.1 | (unchanged) |
+| Super-Flashcards | 3.0.2 | (unchanged) |
 
-### Duplicate Codes (MP-035)
-8 duplicate code groups found, 6 are within-project duplicates:
+### Archive Enum (ARC-01 / MP-036)
+PUT with `{"status":"archived"}` returned 422: "Input should be 'active', 'stable', 'maintenance' or 'paused'". Fixed by adding `ARCHIVED = "archived"` to ProjectStatus enum.
 
-| Code | Project | Count | Titles |
-|------|---------|-------|--------|
-| EM-011 | Etymython | 2 | "Generate EM-MS1 formal CC prompt..." / "Shared etymology graph with SF" |
-| PM-001 | project-methodology | 2 | "Bootstrap v1" / "Lessons Learned Routing" |
-| PM-005 | project-methodology | 2 | "GitHub PAT rate limit fix..." / "Standardize DEPLOYMENT_CHECKLIST" |
-| REQ-001 | MetaPM | 2 | "Add the ability to attach files..." / "Persist the last project..." |
-| SF-021 | Super-Flashcards | 2 | "Generate SF-MS1 formal CC prompt..." / "manifest.json 404 error" |
-| SF-025 | Super-Flashcards | 2 | "Remove duplicate PK.md file" / "Batch enhance endpoint" |
+### Done Count (CNT-02 / MP-034)
+Per-project done counts used client-side filtering from `state.requirements`. Added server-side `done_count` subquery to project list API. Dashboard uses API value with client-side fallback.
 
-Cross-project REQ-001/REQ-002/REQ-003 duplicates are expected (REQ prefix is per-project). Not counted as duplicates.
+### UAT Note Length (MP-038)
+`UATResultItem.note` had `max_length=2000` at `app/schemas/mcp.py:164`. Truncation at mcp.py:326 also capped at 2000. DB column is `NVARCHAR(MAX)` — no DB change needed.
 
-Root cause: Manual seeding by CAI/CC created items with explicit codes before the MP-028 uniqueness check was added. The auto-generator uses generic prefixes (REQ/BUG/TSK) and wouldn't create project-specific codes like EM-011.
-
-### Empty Projects
-20 projects in roadmap_projects. ~15 have zero requirements. All are real projects (adventures, videos, personal) but create noise in the dashboard.
-
-### Version Labels
-6 of 7 active project versions were stale:
-
-| Project | Was | Now (correct) |
-|---------|-----|--------------|
-| ArtForge | 2.2.1 | 2.4.1 |
-| Etymython | 1.2.0 | 0.2.2 |
-| HarmonyLab | 1.8.2 | 2.1.1 |
-| MetaPM | 2.4.0 | 2.8.0 |
-| Portfolio RAG | 0.1.0 | 1.0.0 |
-| Super Flashcards | 2.9.0 | 3.0.2 |
-| project-methodology | 3.17.0 | 3.17.0 (correct) |
+### Diagnostic Endpoint (DUP-02 / MP-035)
+GET /api/admin/duplicate-codes returned 200 OK with 6 duplicate groups. Endpoint working correctly.
 
 ---
 
-## Requirements
+## Requirements Seeded
 
-### MP-033 | Fix project version labels | DONE
-- Updated 6 project versions via `PUT /api/roadmap/projects/{id}` with correct deployed versions.
-- Data fix only. No code changes.
-
-### MP-034 | Fix Done counter | DONE
-- Root cause: Open Only filter excluded closed items from the data passed to summary/project renderers.
-- Fix: `setSummary()` now counts from `state.requirements` (unfiltered) instead of filtered `reqs`. Per-project done count also reads from `state.requirements`. Summary label changed from "Closed" to "Done" and added "Shown" count.
-- File: `static/dashboard.html`
-
-### MP-035 | Fix duplicate code generator | DONE
-- Added uniqueness loop to `get_next_roadmap_code()` endpoint. After computing candidate code via MAX+1, verifies it doesn't already exist in the project. Loops up to 100 times to find a unique code.
-- Added diagnostic endpoint: `GET /api/roadmap/admin/duplicate-codes` returns all codes with more than one occurrence within the same project.
-- Existing duplicates documented above. Not renamed (would break references).
-- File: `app/api/roadmap.py`
-
-### MP-036 | Archive flag for empty projects | DONE
-- Migration 29: Added `archived BIT DEFAULT 0 NOT NULL` column to `roadmap_projects`.
-- Schema: Added `archived` field to `ProjectBase`, `ProjectUpdate`, `ProjectResponse`.
-- API: List endpoint filters archived projects by default. `include_archived=true` query param shows all. PUT endpoint handles `archived` field.
-- Roadmap aggregate endpoint filters `(archived = 0 OR archived IS NULL)` from default view.
-- UI: "Show Archived" checkbox in filter bar. Archive/Unarchive button on each project row. Reset filters unchecks Show Archived.
-- No projects auto-archived. PL archives manually.
-- Files: `app/core/migrations.py`, `app/schemas/roadmap.py`, `app/api/roadmap.py`, `static/dashboard.html`
+| Code | ID | Title |
+|------|----|-------|
+| MP-037 | f6258e4d-4877-44ce-85de-405f291ceb85 | Vision Board view in MetaPM dashboard |
+| MP-038 | a6831d20-9cf8-4b55-9ae0-7a041d0fab3a | UAT submit fails when note field exceeds 2000 characters |
+| MP-039 | 923c6079-0196-42f1-be9f-c49fa94f80da | UAT Template: no delete button for attachment or pasted screenshot |
+| MP-040 | 67c1958f-5553-41b9-a2ed-46f13c0d16e0 | MetaPM item: no delete button for attachment or pasted screenshot |
 
 ---
 
-## Smoke Tests
+## Requirements Fixed
 
-### Health Check
-```json
-{"status":"healthy","version":"2.8.1","build":"unknown"}
-```
+### MP-038 | UAT submit note length limit | DONE
+- Raised `UATResultItem.note` max_length from 2000 to 10000
+- Updated truncation logic from 2000 to 10000
+- File: `app/schemas/mcp.py`
 
-### Version Labels
-```
-ArtForge: 2.4.1, archived: False
-HarmonyLab: 2.1.1, archived: False
-MetaPM: 2.8.0, archived: False
-```
+### MP-036 | Archive status enum | DONE
+- Added `ARCHIVED = "archived"` to `ProjectStatus` enum
+- Added `maintenance` to dashboard status dropdown (was missing)
+- Archive button now sends both `archived` boolean and `status: "archived"/"active"`
+- Sync: setting status to 'archived' auto-sets archived=true, and vice versa
+- Files: `app/schemas/roadmap.py`, `app/api/roadmap.py`, `static/dashboard.html`
 
-### Duplicate Codes Endpoint
-```json
-{"duplicates":[...6 groups...],"total_duplicate_groups":6}
-```
+### MP-034 | Per-project done counts | DONE
+- Added `done_count` subquery to project list SQL query
+- Added `done_count: int = 0` to `ProjectResponse` schema
+- Dashboard uses `p.done_count` from API with client-side fallback
+- Files: `app/api/roadmap.py`, `app/schemas/roadmap.py`, `static/dashboard.html`
 
-### Roadmap Stats
-```json
-{"total":164,"backlog":43,"closed":101,"executing":20,...}
-```
+### MP-033 | Version labels | DONE
+- Updated 4 project versions via PUT /api/roadmap/projects/{id}
+- Data fix only (same approach as MP-RECONCILE-001)
+
+### MP-035 | Diagnostic endpoint | VERIFIED
+- GET /api/roadmap/admin/duplicate-codes returns 200 with 6 groups
+- No code changes needed
+
+### MP-039 | UAT template attachment delete | DONE
+- Added visible "✕ Clear" button after screenshot paste (replaces click-to-remove on image)
+- Added visible "✕" delete button next to file attachment filename
+- Both clear media data and reset UI
+- File: `project-methodology/templates/UAT_Template_v3.html`
+
+### MP-040 | MetaPM item attachment delete | DONE
+- Added DELETE /api/roadmap/requirements/{id}/attachments/{aid} endpoint
+- Deletes from both GCS bucket and DB
+- Added "✕" delete button per attachment in item detail panel
+- Files: `app/api/roadmap.py`, `static/dashboard.html`
 
 ---
 
 ## Deferred Items
 
-1. **Backlog API code generator** (`app/api/backlog.py`): Uses legacy tables (Bugs, Requirements). Not updated with uniqueness loop. Low risk since dashboard uses roadmap endpoints.
-2. **Existing duplicate codes**: 6 within-project duplicate groups documented above. Not renamed to avoid breaking references. Treated as data debt.
-3. **SF missing from projects list**: `proj-sf` exists in DB and is queryable directly, but doesn't appear in the paginated list. May be a limit/ordering issue. Version update via PUT succeeded.
+1. **MP-037 (Vision Board)**: Seeded as backlog. Not implemented in this sprint — new feature, not a fix.
+2. **proj-sf missing from projects list**: Super Flashcards exists in DB but doesn't appear in paginated list endpoint. Noted in MP-RECONCILE-001, still unresolved.
+
+---
+
+## Lessons Learned
+
+1. **Boolean vs enum for archive**: MP-RECONCILE-001 added `archived` boolean column but didn't add 'archived' to the status enum. Both mechanisms needed to stay in sync — fixed by auto-syncing when status is set.
+2. **Server-side counts are more reliable**: Client-side done counts depended on filter state and data loading order. Adding `done_count` as a subquery to the project API eliminates this class of bugs.
+3. **Status dropdown completeness**: The dashboard project edit form was missing 'maintenance' from the status dropdown despite it being in the enum. UI forms need to match backend enums exactly.

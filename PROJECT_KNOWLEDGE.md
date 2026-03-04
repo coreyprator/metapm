@@ -1,19 +1,27 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-4A2F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-03 — Sprint "MP-RECONCILE-001" (v2.8.1)
+Updated: 2026-03-04 — Sprint "MP-RECONCILE-002" (v2.8.2)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-03 (MP-RECONCILE-001, v2.8.1)
+### Latest Session Update — 2026-03-04 (MP-RECONCILE-002, v2.8.2)
+
+- **Sprint MP-RECONCILE-002**: UAT failure fixes from MP-RECONCILE-001 + requirement seeding.
+- **Current Version**: v2.8.2 — **DEPLOYED** to Cloud Run (revision metapm-v2-00137-t92)
+- **MP-038**: UAT submit note max_length raised from 2000 to 10000. Truncation logic updated. DB is NVARCHAR(MAX), no schema change needed.
+- **MP-036**: `ARCHIVED = "archived"` added to `ProjectStatus` enum. Migration 30 updates DB CHECK constraint to include 'archived'. Archive button syncs both `archived` boolean and `status` field.
+- **MP-034**: `done_count` subquery added to project list API response. `ProjectResponse.done_count: int`.
+- **MP-033**: Version labels updated: ArtForge→2.5.1, MetaPM→2.8.2, Portfolio RAG→2.0.0, project-methodology→3.17.
+- **MP-040**: DELETE `/api/roadmap/requirements/{id}/attachments/{aid}` endpoint added. Removes from GCS + DB.
+- **MP-039**: UAT template: visible "✕ Clear" button for screenshots, "✕" delete button for file attachments.
+- **Seeded**: MP-037 (Vision Board backlog), MP-038, MP-039, MP-040.
+- **Files Modified**: `app/api/roadmap.py`, `app/schemas/roadmap.py`, `app/schemas/mcp.py`, `app/core/config.py`, `app/core/migrations.py`, `static/dashboard.html`, `project-methodology/templates/UAT_Template_v3.html`
+
+### Previous: MP-RECONCILE-001 (v2.8.1, 2026-03-03)
 
 - **Sprint MP-RECONCILE-001**: Data integrity fixes. Version labels, Done counter, code uniqueness loop, archive flag.
-- **Current Version**: v2.8.1 — **DEPLOYED** to Cloud Run (revision metapm-v2-00132-77m)
-- **MP-033**: All 6 active project version labels updated to match deployed versions (data fix via API).
-- **MP-034**: Done counter now uses unfiltered `state.requirements` for counts. Shows correct done count even with Open Only filter active.
-- **MP-035**: Code auto-generator (`get_next_roadmap_code`) now loops to verify uniqueness before returning. Diagnostic endpoint: `GET /api/roadmap/admin/duplicate-codes`.
-- **MP-036**: Projects have `archived` column (BIT, default 0). Archived projects hidden from default view. `include_archived=true` query param shows all. Dashboard has "Show Archived" toggle and archive/unarchive button per project.
-- **Known duplicate codes** (data debt, not renamed): EM-011x2, PM-001x2, PM-005x2, REQ-001x2 (in proj-mp), SF-021x2, SF-025x2.
-- **Files Modified**: `app/api/roadmap.py`, `app/schemas/roadmap.py`, `app/core/migrations.py`, `app/core/config.py`, `static/dashboard.html`
+- **Version**: v2.8.1 — Cloud Run revision metapm-v2-00132-77m
+- **Known duplicate codes** (data debt): EM-011x2, PM-001x2, PM-005x2, REQ-001x2 (in proj-mp), SF-021x2, SF-025x2.
 
 ### Previous: MP-MS4 (v2.8.0, 2026-03-02)
 
