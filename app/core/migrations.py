@@ -1096,4 +1096,35 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 29 warning: {e}")
 
+    # Migration 30: Update roadmap_projects status CHECK constraint to include 'archived' (MP-036/MP-RECONCILE-002)
+    try:
+        # Check if constraint already allows 'archived'
+        result = execute_query("""
+            SELECT cc.definition
+            FROM sys.check_constraints cc
+            JOIN sys.columns col ON cc.parent_object_id = col.object_id AND cc.parent_column_id = col.column_id
+            WHERE OBJECT_NAME(cc.parent_object_id) = 'roadmap_projects' AND col.name = 'status'
+        """, fetch="one")
+        if result and 'archived' not in (result.get('definition') or ''):
+            logger.info("  Migration 30: Updating roadmap_projects status CHECK to include 'archived'...")
+            # Find and drop the existing constraint
+            constraints = execute_query("""
+                SELECT cc.name
+                FROM sys.check_constraints cc
+                JOIN sys.columns col ON cc.parent_object_id = col.object_id AND cc.parent_column_id = col.column_id
+                WHERE OBJECT_NAME(cc.parent_object_id) = 'roadmap_projects' AND col.name = 'status'
+            """, fetch="all") or []
+            for c in constraints:
+                execute_query(f"ALTER TABLE roadmap_projects DROP CONSTRAINT [{c['name']}]", fetch="none")
+            # Add new constraint with 'archived'
+            execute_query("""
+                ALTER TABLE roadmap_projects ADD CONSTRAINT CK_roadmap_projects_status
+                CHECK (status IN ('active','stable','maintenance','paused','archived'))
+            """, fetch="none")
+            logger.info("  Migration 30: roadmap_projects status constraint updated to include 'archived'.")
+        else:
+            logger.info("  Migration 30: roadmap_projects status constraint already includes 'archived'.")
+    except Exception as e:
+        logger.warning(f"  Migration 30 warning: {e}")
+
     logger.info("Migrations complete.")
