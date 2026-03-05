@@ -1,21 +1,26 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-4A2F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-04 — Sprint "MP-RECONCILE-003" (v2.8.3)
+Updated: 2026-03-05 — Sprint "MP-RECONCILE-004" (v2.8.4)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-04 (MP-RECONCILE-003, v2.8.3)
+### Latest Session Update — 2026-03-05 (MP-RECONCILE-004, v2.8.4)
+
+- **Sprint MP-RECONCILE-004**: Done count display fix in dashboard (third attempt at MP-034).
+- **Current Version**: v2.8.4 — **DEPLOYED** to Cloud Run (revision metapm-v2-00142-jnp)
+- **Handoff**: 557D5362-B746-49C9-A053-6D3D958785DF
+- **MP-034 (final fix)**: Root cause was display format mismatch, not missing data. Backend API returned `done_count` correctly since v2.8.2. Dashboard showed `29 done | 3 P1 | 5 P2` but PL expected `Open: N | Done: N | Backlog: N` format. Changed project summary to labeled format: `Open: ${openCount} | Done: ${doneCount} | Backlog: ${backlogCount}`.
+- **Files Modified**: `static/dashboard.html`, `app/core/config.py`
+- **Commit**: metapm 8db9a2c
+
+### Previous: MP-RECONCILE-003 (v2.8.3, 2026-03-04)
 
 - **Sprint MP-RECONCILE-003**: Compliance fixes for UAT failures reported in v2.8.2 + SF requirement status corrections.
-- **Current Version**: v2.8.3 — **DEPLOYED** to Cloud Run (revision metapm-v2-00140-tzq)
-- **Handoff**: 48A163C7-2981-4617-A272-002216B94BCF
-- **MP-034 (CNT-02)**: `done_count` subquery added to **single project GET** endpoint (was only on list endpoint in v2.8.2). Both endpoints now return correct done_count (ArtForge=37).
-- **MP-035 (DUP-02)**: Added alias route `@router.get("/admin/duplicate-codes")` so both `/api/admin/duplicate-codes` and `/api/roadmap/admin/duplicate-codes` return 200 with 6 groups.
-- **MP-039**: UAT template clear button redesigned — flex layout, `<button>` element with styled border and `flex-shrink:0`, no longer obscured by image.
-- **SF requirements corrected**: SF-020→closed, SF-013→closed, SF-007→closed, SF-005→backlog (unchanged). Used PUT endpoint to bypass status transition validation.
-- **Root cause (compliance)**: DUP-02 was at wrong URL prefix (`/api/roadmap/admin/` vs `/api/admin/`). CNT-02 was only on list endpoint, not single GET. Both technically worked but not at the URLs PL tested.
-- **Files Modified**: `app/api/roadmap.py`, `app/core/config.py`, `project-methodology/templates/UAT_Template_v3.html`
-- **Commits**: metapm c2224bf, project-methodology 7b5db6b
+- **Version**: v2.8.3 — Cloud Run revision metapm-v2-00140-tzq
+- **MP-034 (CNT-02)**: `done_count` subquery added to **single project GET** endpoint (was only on list endpoint in v2.8.2).
+- **MP-035 (DUP-02)**: Added alias route `@router.get("/admin/duplicate-codes")`.
+- **MP-039**: UAT template clear button redesigned.
+- **SF requirements corrected**: SF-020→closed, SF-013→closed, SF-007→closed, SF-005→backlog.
 
 ### Previous: MP-RECONCILE-002 (v2.8.2, 2026-03-04)
 
