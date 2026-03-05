@@ -852,9 +852,10 @@
         const pReqs = reqs.filter(r => r.project_id === p.id);
         if (openOnly && pReqs.length === 0) continue;
 
-        const done = p.done_count || state.requirements.filter(r => r.project_id === p.id && r.status === 'closed').length;
-        const p1 = pReqs.filter(r => r.priority === 'P1').length;
-        const p2 = pReqs.filter(r => r.priority === 'P2').length;
+        const allProjectReqs = state.requirements.filter(r => r.project_id === p.id);
+        const doneCount = p.done_count || allProjectReqs.filter(r => r.status === 'closed').length;
+        const openCount = allProjectReqs.filter(r => !['closed','deferred','backlog','draft'].includes(r.status)).length;
+        const backlogCount = allProjectReqs.filter(r => r.status === 'backlog' || r.status === 'draft').length;
         const open = state.expanded.has(p.id);
         const color = PROJECT_COLORS[p.code] || p.color || '#4A90D9';
         const projectSprints = state.sprints.filter(s => !s.project_id || s.project_id === p.id);
@@ -878,7 +879,7 @@
             <div class="project-head">
               <div data-project="${p.id}">${open ? '▼' : '▶'} ${p.emoji || ''} ${p.name} ${p.current_version || ''}${p.category_name ? ` <span class="pill">${p.category_name}</span>` : ''}</div>
               <div class="actions-row">
-                <div class="project-summary">${done} done | ${p1} P1 | ${p2} P2</div>
+                <div class="project-summary">Open: ${openCount} | Done: ${doneCount} | Backlog: ${backlogCount}</div>
                 <button class="icon-btn" data-edit-project="${p.id}" title="Edit Project">✏️</button>
                 <button class="icon-btn" data-archive-project="${p.id}" data-archived="${p.archived ? 1 : 0}" title="${p.archived ? 'Unarchive Project' : 'Archive Project'}">${p.archived ? '📤' : '📥'}</button>
                 <button class="icon-btn danger-btn" data-delete-project="${p.id}" title="Delete Project">🗑️</button>
