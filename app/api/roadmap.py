@@ -126,7 +126,8 @@ async def get_project(project_id: str):
         result = execute_query("""
             SELECT p.id, p.code, p.name, p.emoji, p.color, p.current_version, p.status,
                    p.repo_url, p.deploy_url, p.category_id, p.archived, p.created_at, p.updated_at,
-                   c.name as category_name
+                   c.name as category_name,
+                   (SELECT COUNT(*) FROM roadmap_requirements r WHERE r.project_id = p.id AND r.status = 'closed') as done_count
             FROM roadmap_projects p
             LEFT JOIN roadmap_categories c ON p.category_id = c.id
             WHERE p.id = ?
@@ -148,6 +149,7 @@ async def get_project(project_id: str):
             category_id=result.get('category_id'),
             category_name=result.get('category_name'),
             archived=bool(result.get('archived', 0)),
+            done_count=result.get('done_count', 0) or 0,
             created_at=result['created_at'],
             updated_at=result['updated_at']
         )
@@ -716,6 +718,7 @@ async def get_next_roadmap_code(project_code: str, item_type: str):
 
 
 @router.get("/roadmap/admin/duplicate-codes")
+@router.get("/admin/duplicate-codes")
 async def get_duplicate_codes():
     """Diagnostic: list all requirement codes that appear more than once within a project."""
     try:
