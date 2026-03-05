@@ -1,13 +1,26 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-4A2F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-04 — Sprint "MP-RECONCILE-002" (v2.8.2)
+Updated: 2026-03-04 — Sprint "MP-RECONCILE-003" (v2.8.3)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-04 (MP-RECONCILE-002, v2.8.2)
+### Latest Session Update — 2026-03-04 (MP-RECONCILE-003, v2.8.3)
+
+- **Sprint MP-RECONCILE-003**: Compliance fixes for UAT failures reported in v2.8.2 + SF requirement status corrections.
+- **Current Version**: v2.8.3 — **DEPLOYED** to Cloud Run (revision metapm-v2-00140-tzq)
+- **Handoff**: 48A163C7-2981-4617-A272-002216B94BCF
+- **MP-034 (CNT-02)**: `done_count` subquery added to **single project GET** endpoint (was only on list endpoint in v2.8.2). Both endpoints now return correct done_count (ArtForge=37).
+- **MP-035 (DUP-02)**: Added alias route `@router.get("/admin/duplicate-codes")` so both `/api/admin/duplicate-codes` and `/api/roadmap/admin/duplicate-codes` return 200 with 6 groups.
+- **MP-039**: UAT template clear button redesigned — flex layout, `<button>` element with styled border and `flex-shrink:0`, no longer obscured by image.
+- **SF requirements corrected**: SF-020→closed, SF-013→closed, SF-007→closed, SF-005→backlog (unchanged). Used PUT endpoint to bypass status transition validation.
+- **Root cause (compliance)**: DUP-02 was at wrong URL prefix (`/api/roadmap/admin/` vs `/api/admin/`). CNT-02 was only on list endpoint, not single GET. Both technically worked but not at the URLs PL tested.
+- **Files Modified**: `app/api/roadmap.py`, `app/core/config.py`, `project-methodology/templates/UAT_Template_v3.html`
+- **Commits**: metapm c2224bf, project-methodology 7b5db6b
+
+### Previous: MP-RECONCILE-002 (v2.8.2, 2026-03-04)
 
 - **Sprint MP-RECONCILE-002**: UAT failure fixes from MP-RECONCILE-001 + requirement seeding.
-- **Current Version**: v2.8.2 — **DEPLOYED** to Cloud Run (revision metapm-v2-00137-t92)
+- **Version**: v2.8.2 — Cloud Run revision metapm-v2-00137-t92
 - **MP-038**: UAT submit note max_length raised from 2000 to 10000. Truncation logic updated. DB is NVARCHAR(MAX), no schema change needed.
 - **MP-036**: `ARCHIVED = "archived"` added to `ProjectStatus` enum. Migration 30 updates DB CHECK constraint to include 'archived'. Archive button syncs both `archived` boolean and `status` field.
 - **MP-034**: `done_count` subquery added to project list API response. `ProjectResponse.done_count: int`.
@@ -15,7 +28,6 @@ Purpose: Canonical reference for all AI sessions working on this project.
 - **MP-040**: DELETE `/api/roadmap/requirements/{id}/attachments/{aid}` endpoint added. Removes from GCS + DB.
 - **MP-039**: UAT template: visible "✕ Clear" button for screenshots, "✕" delete button for file attachments.
 - **Seeded**: MP-037 (Vision Board backlog), MP-038, MP-039, MP-040.
-- **Files Modified**: `app/api/roadmap.py`, `app/schemas/roadmap.py`, `app/schemas/mcp.py`, `app/core/config.py`, `app/core/migrations.py`, `static/dashboard.html`, `project-methodology/templates/UAT_Template_v3.html`
 
 ### Previous: MP-RECONCILE-001 (v2.8.1, 2026-03-03)
 
