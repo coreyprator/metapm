@@ -1,17 +1,28 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-4A2F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-05 — Sprint "MP-RECONCILE-004" (v2.8.4)
+Updated: 2026-03-05 — Sprint "MP-VISION-ITEM" (v2.9.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-05 (MP-RECONCILE-004, v2.8.4)
+### Latest Session Update — 2026-03-05 (MP-VISION-ITEM, v2.9.0)
+
+- **Sprint MP-VISION-ITEM**: Vision item type + Vision Board view + 7 seed visions.
+- **Current Version**: v2.9.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00145-ddd)
+- **Handoff**: 74620996-BC7A-41B4-BE35-E6DD10259549
+- **Vision type**: Added `VISION = "vision"` to `RequirementType` enum. Migration 31 updates DB CHECK constraint to include 'vision'. Types now: feature, bug, enhancement, task, vision.
+- **Vision Board**: Toggle button `👁 Vision Board` in dashboard nav. Shows per-project sections with vision text (truncated, click to expand), next action, open/done counts. Projects with P1 executing items sort first.
+- **Roadmap Report**: Vision items shown in purple-bordered section at top of each project, above requirements table.
+- **Seeded VIS-001 through VIS-007**: One vision per portfolio project (SF, AF, HL, EM, MP, EFG, PR). Descriptions verbatim from Portfolio Vision Framework.
+- **MP-037**: Closed (Vision Board requirement fulfilled).
+- **Deferred**: Auto-sync visions to Portfolio RAG — not in scope, deferred to PR-009.
+- **Files Modified**: `app/schemas/roadmap.py`, `app/core/migrations.py`, `app/core/config.py`, `static/dashboard.html`, `static/roadmap-report.html`
+- **Commit**: metapm eee6b9d
+
+### Previous: MP-RECONCILE-004 (v2.8.4, 2026-03-05)
 
 - **Sprint MP-RECONCILE-004**: Done count display fix in dashboard (third attempt at MP-034).
-- **Current Version**: v2.8.4 — **DEPLOYED** to Cloud Run (revision metapm-v2-00142-jnp)
-- **Handoff**: 557D5362-B746-49C9-A053-6D3D958785DF
+- **Version**: v2.8.4 — Cloud Run revision metapm-v2-00142-jnp
 - **MP-034 (final fix)**: Root cause was display format mismatch, not missing data. Backend API returned `done_count` correctly since v2.8.2. Dashboard showed `29 done | 3 P1 | 5 P2` but PL expected `Open: N | Done: N | Backlog: N` format. Changed project summary to labeled format: `Open: ${openCount} | Done: ${doneCount} | Backlog: ${backlogCount}`.
-- **Files Modified**: `static/dashboard.html`, `app/core/config.py`
-- **Commit**: metapm 8db9a2c
 
 ### Previous: MP-RECONCILE-003 (v2.8.3, 2026-03-04)
 

@@ -1,66 +1,55 @@
-# SESSION_CLOSEOUT — MP-RECONCILE-004
-
-**Sprint:** MP-RECONCILE-004
-**Project:** MetaPM
-**Version:** v2.8.3 → v2.8.4
-**Date:** 2026-03-05
-**Cloud Run Revision:** metapm-v2-00142-jnp
-**Commit:** metapm: 8db9a2c
-**Handoff:** 557D5362-B746-49C9-A053-6D3D958785DF
+# SESSION CLOSEOUT — MP-VISION-ITEM
+**Date**: 2026-03-05
+**Sprint**: MP-VISION-ITEM
+**Version**: v2.8.4 → v2.9.0
+**Revision**: metapm-v2-00145-ddd
+**Handoff ID**: 74620996-BC7A-41B4-BE35-E6DD10259549
+**UAT ID**: D7C4E3A1-4098-4E89-85DD-D18D9EE03113
 
 ---
 
-## Root Cause Analysis — MP-034 Done Count (Third Attempt)
+## Summary
+Added "vision" item type to the roadmap system, built Vision Board dashboard view, seeded 7 portfolio vision items, and updated the roadmap report.
 
-### Why previous attempts reported this as fixed when it wasn't
+## Migration
+- **Migration 31**: Dropped and recreated CHECK constraint on `roadmap_requirements.type`
+- Constraint now includes: `('feature','bug','enhancement','task','vision')`
+- Same pattern as Migration 30 (MP-RECONCILE-001 archived status)
 
-**v2.8.2 (MP-RECONCILE-002):** Added `done_count` subquery to the project list API endpoint. CC verified the API returned `done_count=37` for ArtForge — this was correct. However, CC verified the **API response**, not the **dashboard UI**. The dashboard code at that time rendered `${done} done | ${p1} P1 | ${p2} P2` in the project summary. The PL may not have recognized this as the "done count" because it wasn't labeled with "Done:" prefix.
+## Changes
+1. **Schema**: `RequirementType.VISION = "vision"` added to Pydantic enum (`app/schemas/roadmap.py`)
+2. **Migration 31**: CHECK constraint updated (`app/core/migrations.py`)
+3. **Dashboard** (`static/dashboard.html`):
+   - `.type-vision` CSS (purple theme: `#7c3aed`)
+   - Vision badge: `👁 Vision` in `rowHtml` and `renderByField`
+   - Add form: type changed from text input to select dropdown with all 5 types
+   - Add menu: Vision button added
+   - Edit form: vision option in type dropdown
+   - Vision Board toggle button in nav
+   - `toggleVisionBoard()` — hides standard view, shows vision board
+   - `renderVisionBoard()` — per-project sections with vision text, next action, open counts
+4. **Roadmap Report** (`static/roadmap-report.html`):
+   - Vision section with purple styling at top of each project
+   - Vision items separated from requirements table
+   - Full description text (not truncated)
+5. **Version**: 2.8.4 → 2.9.0 (`app/core/config.py`)
 
-**v2.8.3 (MP-RECONCILE-003):** Added `done_count` subquery to the single project GET endpoint for consistency. CC again verified the API response (`done_count=37`). The dashboard code still rendered `29 done | X P1 | Y P2`. Same display format issue.
+## Seed Verification
+| Code | Project | ID |
+|------|---------|-----|
+| VIS-001 | Super Flashcards (proj-sf) | vis-001-sf |
+| VIS-002 | ArtForge (proj-af) | vis-002-af |
+| VIS-003 | HarmonyLab (proj-hl) | vis-003-hl |
+| VIS-004 | Etymython (proj-em) | vis-004-em |
+| VIS-005 | MetaPM (proj-mp) | vis-005-mp |
+| VIS-006 | PIE Network Graph (proj-efg) | vis-006-efg |
+| VIS-007 | Portfolio RAG (02bccb1b-...) | vis-007-pr |
 
-### The actual root cause
+## Closed Requirements
+- **MP-037** (Vision Board): status → closed (id: f6258e4d-4877-44ce-85de-405f291ceb85)
 
-**The backend was correct since v2.8.2.** The API returns `done_count` for every project. ArtForge shows `done_count=29` (29 closed requirements confirmed against the DB).
+## Deferred
+- **Auto-sync to Portfolio RAG**: NOT implemented. Deferred to PR-009.
 
-**The frontend rendered the value but in an unexpected format.** The project summary showed `29 done | 3 P1 | 5 P2` — the number was there but not labeled clearly. The PL expected the format `Open: 7 | Done: 29 | Backlog: 12` with explicit labels.
-
-This was a **display format mismatch**, not a missing or broken feature. The data was correct and rendered, but the PL couldn't identify it as the "done count" in the UI.
-
-### Fix applied
-
-Changed the project summary from:
-```
-29 done | 3 P1 | 5 P2
-```
-to:
-```
-Open: 7 | Done: 29 | Backlog: 12
-```
-
-Variables:
-- `doneCount` = `p.done_count` from API (server-side subquery), with client-side fallback
-- `openCount` = requirements NOT in closed/deferred/backlog/draft status
-- `backlogCount` = requirements in backlog or draft status
-- All computed from full `state.requirements` (unfiltered), not the view-filtered set
-
-File modified: `static/dashboard.html`
-
----
-
-## Compliance Self-Check
-
-Verified against production BEFORE submitting handoff:
-- Health: v2.8.4, status: healthy
-- `GET /api/roadmap/projects?limit=200` → ArtForge done_count=29
-- Production dashboard.html (curl verified) contains: `Open: ${openCount} | Done: ${doneCount} | Backlog: ${backlogCount}`
-- All 7 portfolio projects return non-zero done_count from API
-
-**Visual verification note:** Cannot open browser in this environment. The dashboard HTML template string confirmed via curl to production. PL should hard-refresh (Ctrl+Shift+R) to bypass any browser cache.
-
----
-
-## Lessons Learned
-
-1. **Verify the UI, not just the API:** Previous attempts verified API responses showing correct data, but never confirmed the dashboard UI rendered it in a recognizable format. Always verify what the PL actually sees.
-2. **Match PL's expected format:** The PL expected labeled counts ("Done: N") not unlabeled numbers ("N done"). Display format matters as much as data correctness.
-3. **Three-strike pattern:** When a fix is reported done twice and PL says it's still broken, the problem is likely in a different layer than assumed. Step back and re-diagnose from scratch.
+## Commit
+- Code: eee6b9d — `v2.9.0: Vision item type, Vision Board view, roadmap report update [MP-037]`
