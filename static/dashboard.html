@@ -188,6 +188,20 @@
     .status-handoff { color: #a5b4fc; border-color: #3b4d8a; }
     .status-needs_fixes { color: #ffb347; border-color: #7a5a2f; }
     .status-deferred { color: #999; border-color: #555; font-style: italic; }
+    .type-vision { color: #c4b5fd; border-color: #7c3aed; background: rgba(124,58,237,0.15); }
+    .vb-section { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; padding: 12px 16px; background: var(--card); }
+    .vb-section .vb-head { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .vb-section .vb-head h3 { margin: 0; font-size: 15px; }
+    .vb-section .vb-body { margin-top: 10px; }
+    .vb-section .vb-body.collapsed { display: none; }
+    .vb-label { font-size: 11px; text-transform: uppercase; color: #7c3aed; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .vb-vision-text { color: var(--fg); font-size: 13px; line-height: 1.5; cursor: pointer; }
+    .vb-vision-text.truncated { max-height: 3.2em; overflow: hidden; }
+    .vb-next-action { margin-top: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; cursor: pointer; }
+    .vb-next-action:hover { background: rgba(255,255,255,0.05); }
+    .vb-counts { margin-top: 8px; font-size: 12px; color: var(--muted); }
+    #visionBoard { display: none; }
+    #visionBoardBtn.active { background: #7c3aed; color: white; border-color: #7c3aed; }
     .task-row {
       display: grid;
       grid-template-columns: 1fr auto auto;
@@ -370,6 +384,7 @@
       </div>
       <div class="actions-row">
         <button type="button" id="wipBtn" onclick="activateWipView()">📋 WIP</button>
+        <button type="button" id="visionBoardBtn" onclick="toggleVisionBoard()">👁 Vision Board</button>
         <a href="/static/roadmap-report.html" target="_blank" rel="noopener"><button type="button">📊 Roadmap Report</button></a>
         <a href="/architecture" target="_blank" rel="noopener"><button type="button">🏗️ Architecture</button></a>
         <div class="add-wrap">
@@ -380,6 +395,7 @@
             <button data-kind="requirement">Requirement</button>
             <button data-kind="bug">Bug</button>
             <button data-kind="task">Task</button>
+            <button data-kind="vision">Vision</button>
           </div>
         </div>
       </div>
@@ -419,6 +435,7 @@
     </div>
 
     <div class="card hierarchy" id="hierarchy"></div>
+    <div class="card" id="visionBoard"></div>
 
     <div class="card footer" id="summary">
       <div>Total: 0 | Closed: 0 | Executing: 0 | Backlog: 0 | Projects: 0</div>
@@ -458,7 +475,7 @@
       </div>
       <div>
         <label>Type</label>
-        <select id="dType"><option value="feature">feature</option><option value="bug">bug</option><option value="enhancement">enhancement</option><option value="task">task</option></select>
+        <select id="dType"><option value="feature">feature</option><option value="bug">bug</option><option value="enhancement">enhancement</option><option value="task">task</option><option value="vision">vision</option></select>
       </div>
       <div>
         <label>Status</label>
@@ -773,7 +790,7 @@
         <div><strong>${req.code}</strong> ${req.title}${promptBadge}</div>
         <span class="pill ${req.priority.toLowerCase()}">${req.priority}</span>
         <span class="pill status-${req.status}">${req.status}</span>
-        <span class="pill">${req.type}</span>
+        <span class="pill${req.type === 'vision' ? ' type-vision' : ''}">${req.type === 'vision' ? '👁 Vision' : req.type}</span>
         <div class="actions-row">
           <button class="icon-btn" data-open-req="${req.id}" title="Edit Requirement">✏️</button>
           <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete Requirement">🗑️</button>
@@ -822,6 +839,102 @@
       qs('openItemsToggle').checked = true;
       state.expanded = new Set(['backlog','draft','prompt_ready','approved','executing','handoff','uat','needs_fixes']);
       render();
+    }
+
+    let visionBoardActive = false;
+
+    function toggleVisionBoard() {
+      visionBoardActive = !visionBoardActive;
+      const btn = qs('visionBoardBtn');
+      const hierarchy = qs('hierarchy');
+      const vb = qs('visionBoard');
+      const controls = document.querySelector('.controls');
+      if (visionBoardActive) {
+        btn.classList.add('active');
+        hierarchy.style.display = 'none';
+        if (controls) controls.style.display = 'none';
+        vb.style.display = 'block';
+        renderVisionBoard();
+      } else {
+        btn.classList.remove('active');
+        hierarchy.style.display = '';
+        if (controls) controls.style.display = '';
+        vb.style.display = 'none';
+      }
+    }
+
+    function renderVisionBoard() {
+      const vb = qs('visionBoard');
+      const activeProjects = state.projects.filter(p => !p.archived && p.id.startsWith('proj-'));
+      const allReqs = state.requirements;
+
+      // Sort: projects with P1 executing first, then P2, then alphabetical
+      activeProjects.sort((a, b) => {
+        const aReqs = allReqs.filter(r => r.project_id === a.id && r.status === 'executing');
+        const bReqs = allReqs.filter(r => r.project_id === b.id && r.status === 'executing');
+        const aP1 = aReqs.some(r => r.priority === 'P1') ? 0 : aReqs.some(r => r.priority === 'P2') ? 1 : 2;
+        const bP1 = bReqs.some(r => r.priority === 'P1') ? 0 : bReqs.some(r => r.priority === 'P2') ? 1 : 2;
+        if (aP1 !== bP1) return aP1 - bP1;
+        return a.name.localeCompare(b.name);
+      });
+
+      let html = '';
+      for (const p of activeProjects) {
+        const pReqs = allReqs.filter(r => r.project_id === p.id);
+        const visions = pReqs.filter(r => r.type === 'vision');
+        const openReqs = pReqs.filter(r => !['closed','deferred'].includes(r.status) && r.type !== 'vision');
+        const p1Count = openReqs.filter(r => r.priority === 'P1').length;
+        const p2Count = openReqs.filter(r => r.priority === 'P2').length;
+        const p3Count = openReqs.filter(r => r.priority === 'P3').length;
+
+        // Next action: highest priority executing/backlog item
+        const nextAction = openReqs.sort((a, b) => {
+          const pw = {P1:1,P2:2,P3:3};
+          const sw = {executing:0,approved:1,handoff:2,uat:3,needs_fixes:4,backlog:5,draft:6,prompt_ready:7};
+          const sd = (sw[a.status] ?? 9) - (sw[b.status] ?? 9);
+          if (sd !== 0) return sd;
+          return (pw[a.priority]||9) - (pw[b.priority]||9);
+        })[0];
+
+        const color = p.color || '#4A90D9';
+        const visionHtml = visions.length > 0
+          ? visions.map(v => {
+              const desc = v.description || '';
+              const truncated = desc.length > 150;
+              return `<div class="vb-vision-text truncated" data-full="${desc.replace(/"/g,'&quot;')}" onclick="this.classList.toggle('truncated')">${truncated ? desc.substring(0,150) + '...' : desc}</div>`;
+            }).join('')
+          : '<div style="color:var(--muted);font-size:13px;font-style:italic">No vision defined</div>';
+
+        const nextHtml = nextAction
+          ? `<div class="vb-next-action" data-req="${nextAction.id}"><strong>${nextAction.code}</strong> <span class="pill ${nextAction.priority.toLowerCase()}">${nextAction.priority}</span> ${nextAction.title} <span class="pill status-${nextAction.status}">${nextAction.status}</span></div>`
+          : '<div style="color:var(--muted);font-size:13px">No open items</div>';
+
+        html += `
+          <div class="vb-section" style="border-left: 3px solid ${color}">
+            <div class="vb-head" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+              <h3>${p.emoji || ''} ${p.name} ${p.current_version || ''}</h3>
+              <span style="font-size:12px;color:var(--muted)">P1:${p1Count} P2:${p2Count} P3:${p3Count}</span>
+            </div>
+            <div class="vb-body">
+              <div class="vb-label">Vision</div>
+              ${visionHtml}
+              <div class="vb-label" style="margin-top:10px">Next Action</div>
+              ${nextHtml}
+              <div class="vb-counts">Open: ${openReqs.length} | Done: ${p.done_count || 0}</div>
+            </div>
+          </div>`;
+      }
+
+      vb.innerHTML = html;
+
+      // Bind next action clicks to open detail panel
+      vb.querySelectorAll('.vb-next-action[data-req]').forEach(el => {
+        el.addEventListener('click', () => {
+          const reqId = el.dataset.req;
+          const req = state.requirements.find(r => r.id === reqId);
+          if (req) openDrawer(req);
+        });
+      });
     }
 
     function render() {
@@ -937,7 +1050,7 @@
             ${projLabel}
             <span class="pill ${req.priority.toLowerCase()}">${req.priority}</span>
             <span class="pill status-${req.status}">${req.status}</span>
-            <span class="pill">${req.type}</span>
+            <span class="pill${req.type === 'vision' ? ' type-vision' : ''}">${req.type === 'vision' ? '👁 Vision' : req.type}</span>
             <div class="actions-row">
               <button class="icon-btn" data-open-req="${req.id}" title="Edit">✏️</button>
               <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete">🗑️</button>
@@ -1556,7 +1669,8 @@
             <div><label>Status</label><select id="aStatus"><option value="active">active</option><option value="planned">planned</option><option value="complete">complete</option></select></div>
           </div>`;
       } else {
-        const type = kind === 'bug' ? 'bug' : kind === 'task' ? 'task' : 'feature';
+        const type = kind === 'bug' ? 'bug' : kind === 'task' ? 'task' : kind === 'vision' ? 'vision' : 'feature';
+        const typeOptions = ['feature','bug','enhancement','task','vision'].map(t => `<option value="${t}"${t === type ? ' selected' : ''}>${t}</option>`).join('');
         qs('addFields').innerHTML = `
           <div class="grid2">
             <div><label>Project</label><select id="aProject">${state.projects.map(p => `<option value="${p.id}" ${p.id === projectDefault ? 'selected' : ''}>${p.name}</option>`).join('')}</select></div>
@@ -1565,7 +1679,7 @@
             <div><label>Title</label><input id="aTitle" placeholder="Title" /></div>
             <div><label>Priority</label><select id="aPriority"><option>P1</option><option selected>P2</option><option>P3</option></select></div>
             <div><label>Status</label><select id="aStatus"><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="blocked">blocked</option><option value="conditional_pass">conditional_pass</option><option value="superseded">superseded</option><option value="done">done</option></select></div>
-            <div><label>Type</label><input id="aType" value="${type}" /></div>
+            <div><label>Type</label><select id="aType">${typeOptions}</select></div>
           </div>
           <div><label>Description</label><textarea id="aDescription"></textarea></div>`;
       }

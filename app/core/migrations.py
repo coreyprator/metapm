@@ -1127,4 +1127,32 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 30 warning: {e}")
 
+    # Migration 31: Add 'vision' to roadmap_requirements type CHECK constraint (MP-VISION-ITEM)
+    try:
+        result = execute_query("""
+            SELECT cc.definition
+            FROM sys.check_constraints cc
+            JOIN sys.columns col ON cc.parent_object_id = col.object_id AND cc.parent_column_id = col.column_id
+            WHERE OBJECT_NAME(cc.parent_object_id) = 'roadmap_requirements' AND col.name = 'type'
+        """, fetch="one")
+        if result and 'vision' not in (result.get('definition') or ''):
+            logger.info("  Migration 31: Updating roadmap_requirements type CHECK to include 'vision'...")
+            constraints = execute_query("""
+                SELECT cc.name
+                FROM sys.check_constraints cc
+                JOIN sys.columns col ON cc.parent_object_id = col.object_id AND cc.parent_column_id = col.column_id
+                WHERE OBJECT_NAME(cc.parent_object_id) = 'roadmap_requirements' AND col.name = 'type'
+            """, fetch="all") or []
+            for c in constraints:
+                execute_query(f"ALTER TABLE roadmap_requirements DROP CONSTRAINT [{c['name']}]", fetch="none")
+            execute_query("""
+                ALTER TABLE roadmap_requirements ADD CONSTRAINT CK_roadmap_requirements_type
+                CHECK (type IN ('feature','bug','enhancement','task','vision'))
+            """, fetch="none")
+            logger.info("  Migration 31: roadmap_requirements type constraint updated to include 'vision'.")
+        else:
+            logger.info("  Migration 31: roadmap_requirements type constraint already includes 'vision'.")
+    except Exception as e:
+        logger.warning(f"  Migration 31 warning: {e}")
+
     logger.info("Migrations complete.")

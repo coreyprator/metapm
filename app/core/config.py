@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.8.4"  # MP-RECONCILE-004: done count visible in dashboard project headers
+    VERSION: str = "2.9.0"  # MP-VISION-ITEM: Vision type, Vision Board view, 7 seed visions
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

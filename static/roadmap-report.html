@@ -91,6 +91,12 @@
     .priority-P1 { color: var(--p1); }
     .priority-P2 { color: var(--p2); }
     .muted { color: var(--muted); }
+    .vision-section { margin-bottom: 10px; padding: 10px 12px; border: 1px solid #7c3aed40; border-radius: 8px; background: rgba(124,58,237,0.06); }
+    .vision-section .vision-label { font-size: 11px; text-transform: uppercase; color: #7c3aed; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .vision-section .vision-item { margin-bottom: 8px; }
+    .vision-section .vision-title { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+    .vision-section .vision-desc { font-size: 13px; line-height: 1.5; color: var(--muted); }
+    .type-vision { display: inline-block; padding: 2px 8px; border-radius: 4px; background: rgba(124,58,237,0.2); color: #c4b5fd; border: 1px solid #7c3aed; font-size: 11px; font-weight: 600; }
     .summary {
       position: fixed;
       left: 16px;
@@ -162,12 +168,26 @@
       const projects = [...(state.data.projects || [])].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 
       for (const project of projects) {
-        let reqs = [...(project.requirements || [])].sort(reqSorter);
+        const allReqs = [...(project.requirements || [])];
+        const visionItems = allReqs.filter(r => r.type === 'vision');
+        let reqs = allReqs.filter(r => r.type !== 'vision').sort(reqSorter);
         if (!state.showAll) reqs = reqs.filter(r => r.status !== 'done');
 
         const openCount = reqs.filter(r => r.status !== 'done').length;
-        const doneCount = (project.requirements || []).filter(r => r.status === 'done').length;
+        const doneCount = allReqs.filter(r => r.type !== 'vision' && r.status === 'done').length;
         const p1Count = reqs.filter(r => r.priority === 'P1' && r.status !== 'done').length;
+
+        const visionHtml = visionItems.length > 0 ? `
+          <div class="vision-section">
+            <div class="vision-label">👁 Vision</div>
+            ${visionItems.map(v => `
+              <div class="vision-item">
+                <div class="vision-title">${v.title || ''}</div>
+                <div class="vision-desc">${(v.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+              </div>
+            `).join('')}
+          </div>
+        ` : '';
 
         const rows = reqs.map(r => `
           <tr>
@@ -186,6 +206,7 @@
             <div class="project-name">${project.emoji || ''} ${project.name || ''} ${project.current_version || ''}</div>
             <div class="project-stats">Open: ${openCount} | Done: ${doneCount} | P1: ${p1Count}</div>
           </div>
+          ${visionHtml}
           <table>
             <thead>
               <tr>

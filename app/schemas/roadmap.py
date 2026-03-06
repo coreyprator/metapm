@@ -23,6 +23,7 @@ class RequirementType(str, Enum):
     BUG = "bug"
     ENHANCEMENT = "enhancement"
     TASK = "task"
+    VISION = "vision"
 
 
 class RequirementPriority(str, Enum):
