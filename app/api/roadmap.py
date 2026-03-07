@@ -675,7 +675,8 @@ async def get_next_roadmap_code(project_code: str, item_type: str):
     try:
         prefix_map = {
             'feature': 'REQ', 'requirement': 'REQ', 'enhancement': 'REQ',
-            'bug': 'BUG', 'task': 'TSK', 'uat': 'UAT', 'sprint': 'SPR'
+            'bug': 'BUG', 'task': 'TSK', 'uat': 'UAT', 'sprint': 'SPR',
+            'vision': 'VIS'
         }
         prefix = prefix_map.get(item_type.lower(), 'REQ')
 

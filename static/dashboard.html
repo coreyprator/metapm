@@ -195,8 +195,8 @@
     .vb-section .vb-body { margin-top: 10px; }
     .vb-section .vb-body.collapsed { display: none; }
     .vb-label { font-size: 11px; text-transform: uppercase; color: #7c3aed; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 4px; }
-    .vb-vision-text { color: var(--fg); font-size: 13px; line-height: 1.5; cursor: pointer; }
-    .vb-vision-text.truncated { max-height: 3.2em; overflow: hidden; }
+    .vb-vision-text { color: var(--fg); font-size: 13px; line-height: 1.5; cursor: pointer; transition: all 0.2s; }
+    .vb-vision-text:hover { opacity: 0.8; }
     .vb-next-action { margin-top: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; cursor: pointer; }
     .vb-next-action:hover { background: rgba(255,255,255,0.05); }
     .vb-counts { margin-top: 8px; font-size: 12px; color: var(--muted); }
@@ -848,24 +848,29 @@
       const btn = qs('visionBoardBtn');
       const hierarchy = qs('hierarchy');
       const vb = qs('visionBoard');
-      const controls = document.querySelector('.controls');
       if (visionBoardActive) {
         btn.classList.add('active');
         hierarchy.style.display = 'none';
-        if (controls) controls.style.display = 'none';
         vb.style.display = 'block';
         renderVisionBoard();
       } else {
         btn.classList.remove('active');
         hierarchy.style.display = '';
-        if (controls) controls.style.display = '';
         vb.style.display = 'none';
       }
     }
 
     function renderVisionBoard() {
       const vb = qs('visionBoard');
-      const activeProjects = state.projects.filter(p => !p.archived && p.id.startsWith('proj-'));
+      const showArchived = qs('showArchivedToggle')?.checked;
+      const projectFilter = qs('projectFilter')?.value || '';
+      const categoryFilter = qs('categoryFilter')?.value || '';
+      let activeProjects = state.projects.filter(p => {
+        if (!showArchived && p.archived) return false;
+        if (projectFilter && p.id !== projectFilter) return false;
+        if (categoryFilter && p.category_id !== categoryFilter) return false;
+        return true;
+      });
       const allReqs = state.requirements;
 
       // Sort: projects with P1 executing first, then P2, then alphabetical
@@ -887,27 +892,39 @@
         const p2Count = openReqs.filter(r => r.priority === 'P2').length;
         const p3Count = openReqs.filter(r => r.priority === 'P3').length;
 
-        // Next action: highest priority executing/backlog item
-        const nextAction = openReqs.sort((a, b) => {
+        // Active items: everything not done/closed/backlog/archived/deferred, sorted by priority then status
+        const priorityFilter = qs('priorityFilter')?.value || '';
+        const statusFilter = qs('statusFilter')?.value || '';
+        const search = (qs('searchInput')?.value || '').trim().toLowerCase();
+        const STATUS_GRP = typeof STATUS_GROUPS !== 'undefined' ? STATUS_GROUPS : {};
+        let activeItems = openReqs.filter(r => !['done','closed','backlog','archived','deferred','draft'].includes(r.status));
+        if (priorityFilter) activeItems = activeItems.filter(r => r.priority === priorityFilter);
+        if (statusFilter && STATUS_GRP[statusFilter]) {
+          activeItems = activeItems.filter(r => STATUS_GRP[statusFilter].includes(r.status));
+        } else if (statusFilter) {
+          activeItems = activeItems.filter(r => r.status === statusFilter);
+        }
+        if (search) activeItems = activeItems.filter(r => `${r.code} ${r.title} ${r.description||''} ${r.type||''} ${r.status||''}`.toLowerCase().includes(search));
+        activeItems.sort((a, b) => {
           const pw = {P1:1,P2:2,P3:3};
-          const sw = {executing:0,approved:1,handoff:2,uat:3,needs_fixes:4,backlog:5,draft:6,prompt_ready:7};
+          const sw = {executing:0,approved:1,handoff:2,uat:3,needs_fixes:4,prompt_ready:5};
           const sd = (sw[a.status] ?? 9) - (sw[b.status] ?? 9);
           if (sd !== 0) return sd;
           return (pw[a.priority]||9) - (pw[b.priority]||9);
-        })[0];
+        });
 
         const color = p.color || '#4A90D9';
         const visionHtml = visions.length > 0
           ? visions.map(v => {
-              const desc = v.description || '';
-              const truncated = desc.length > 150;
-              return `<div class="vb-vision-text truncated" data-full="${desc.replace(/"/g,'&quot;')}" onclick="this.classList.toggle('truncated')">${truncated ? desc.substring(0,150) + '...' : desc}</div>`;
+              const desc = (v.description || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+              const short = desc.length > 150 ? desc.substring(0,150) + '...' : desc;
+              return `<div class="vb-vision-text" data-full="${desc.replace(/"/g,'&quot;')}" data-short="${short.replace(/"/g,'&quot;')}" data-expanded="false" onclick="const ex=this.dataset.expanded==='true';this.innerHTML=ex?this.dataset.short:this.dataset.full;this.dataset.expanded=ex?'false':'true'">${short}</div>`;
             }).join('')
           : '<div style="color:var(--muted);font-size:13px;font-style:italic">No vision defined</div>';
 
-        const nextHtml = nextAction
-          ? `<div class="vb-next-action" data-req="${nextAction.id}"><strong>${nextAction.code}</strong> <span class="pill ${nextAction.priority.toLowerCase()}">${nextAction.priority}</span> ${nextAction.title} <span class="pill status-${nextAction.status}">${nextAction.status}</span></div>`
-          : '<div style="color:var(--muted);font-size:13px">No open items</div>';
+        const nextHtml = activeItems.length > 0
+          ? activeItems.map(item => `<div class="vb-next-action" data-req="${item.id}"><strong>${item.code}</strong> <span class="pill ${item.priority.toLowerCase()}">${item.priority}</span> ${item.title} <span class="pill status-${item.status}">${item.status}</span></div>`).join('')
+          : '<div style="color:var(--muted);font-size:13px">No active items</div>';
 
         html += `
           <div class="vb-section" style="border-left: 3px solid ${color}">
@@ -918,7 +935,7 @@
             <div class="vb-body">
               <div class="vb-label">Vision</div>
               ${visionHtml}
-              <div class="vb-label" style="margin-top:10px">Next Action</div>
+              <div class="vb-label" style="margin-top:10px">Active Items</div>
               ${nextHtml}
               <div class="vb-counts">Open: ${openReqs.length} | Done: ${p.done_count || 0}</div>
             </div>
@@ -939,6 +956,7 @@
 
     function render() {
       updateProjectFilterCounts();
+      if (visionBoardActive) { renderVisionBoard(); return; }
       const reqs = getFilteredRequirements();
       const hierarchy = qs('hierarchy');
       hierarchy.innerHTML = '';
@@ -1691,6 +1709,8 @@
         autoFillCode();
         const projSel = qs('aProject');
         if (projSel) projSel.addEventListener('change', autoFillCode);
+        const typeSel = qs('aType');
+        if (typeSel) typeSel.addEventListener('change', autoFillCode);
       }
     }
 
