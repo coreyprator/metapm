@@ -1,22 +1,30 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-4A2F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-05 — Sprint "MP-VISION-ITEM" (v2.9.0)
+Updated: 2026-03-06 — Sprint "MP-VB-FIX-001" (v2.9.1)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-05 (MP-VISION-ITEM, v2.9.0)
+### Latest Session Update — 2026-03-06 (MP-VB-FIX-001, v2.9.1)
+
+- **Sprint MP-VB-FIX-001**: Vision Board expand fix + UX improvements.
+- **Current Version**: v2.9.1 — **DEPLOYED** to Cloud Run (revision metapm-v2-00147-gft)
+- **Handoff**: 49BC8119-49E9-4ED3-AF64-C6E5323D5CF7
+- **VB-03 fix**: Vision text click-to-expand was broken (CSS toggle only, innerHTML stayed truncated). Fixed with data-attribute content swap.
+- **MP-049**: VIS-XXX auto-fill when type=vision selected. Added `'vision': 'VIS'` to `prefix_map` in `app/api/roadmap.py`. Type change listener in add form triggers auto-fill.
+- **MP-050**: Already satisfied — detail panel textarea shows full description.
+- **MP-051**: Vision Board "Active Items" shows all in-progress items per project (not just one next action). Excludes done/closed/backlog/archived/deferred/draft.
+- **MP-052**: Vision Board inherits dashboard filter/sort widgets. Controls stay visible in VB mode. `render()` delegates to `renderVisionBoard()` when VB active.
+- **Requirements registered**: MP-049, MP-050, MP-051, MP-052 (all closed).
+- **Commit**: metapm 9f765f1
+
+### Previous: MP-VISION-ITEM (v2.9.0, 2026-03-05)
 
 - **Sprint MP-VISION-ITEM**: Vision item type + Vision Board view + 7 seed visions.
-- **Current Version**: v2.9.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00145-ddd)
-- **Handoff**: 74620996-BC7A-41B4-BE35-E6DD10259549
+- **Version**: v2.9.0 — Cloud Run revision metapm-v2-00145-ddd
 - **Vision type**: Added `VISION = "vision"` to `RequirementType` enum. Migration 31 updates DB CHECK constraint to include 'vision'. Types now: feature, bug, enhancement, task, vision.
-- **Vision Board**: Toggle button `👁 Vision Board` in dashboard nav. Shows per-project sections with vision text (truncated, click to expand), next action, open/done counts. Projects with P1 executing items sort first.
-- **Roadmap Report**: Vision items shown in purple-bordered section at top of each project, above requirements table.
-- **Seeded VIS-001 through VIS-007**: One vision per portfolio project (SF, AF, HL, EM, MP, EFG, PR). Descriptions verbatim from Portfolio Vision Framework.
-- **MP-037**: Closed (Vision Board requirement fulfilled).
-- **Deferred**: Auto-sync visions to Portfolio RAG — not in scope, deferred to PR-009.
-- **Files Modified**: `app/schemas/roadmap.py`, `app/core/migrations.py`, `app/core/config.py`, `static/dashboard.html`, `static/roadmap-report.html`
-- **Commit**: metapm eee6b9d
+- **Vision Board**: Toggle button `👁 Vision Board` in dashboard nav. Shows per-project sections with vision text, active items, open/done counts.
+- **Seeded VIS-001 through VIS-007**: One vision per portfolio project (SF, AF, HL, EM, MP, EFG, PR).
+- **MP-037**: Closed.
 
 ### Previous: MP-RECONCILE-004 (v2.8.4, 2026-03-05)
 
