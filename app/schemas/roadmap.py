@@ -33,16 +33,23 @@ class RequirementPriority(str, Enum):
 
 
 class RequirementStatus(str, Enum):
+    # Legacy values
     BACKLOG = "backlog"
-    DRAFT = "draft"
-    PROMPT_READY = "prompt_ready"
-    APPROVED = "approved"
     EXECUTING = "executing"
-    HANDOFF = "handoff"
-    UAT = "uat"
     CLOSED = "closed"
-    NEEDS_FIXES = "needs_fixes"
-    DEFERRED = "deferred"
+    ARCHIVED = "archived"
+    # Lifecycle values (PF5-MS1)
+    REQ_CREATED = "req_created"
+    CAI_PROCESSING = "cai_processing"
+    CC_PROMPT_READY = "cc_prompt_ready"
+    APPROVED = "approved"
+    CC_PROCESSING = "cc_processing"
+    CC_HANDOFF_READY = "cc_handoff_ready"
+    CAI_REVIEW = "cai_review"
+    UAT_SUBMITTED = "uat_submitted"
+    CAI_FINAL_REVIEW = "cai_final_review"
+    DONE = "done"
+    REWORK = "rework"
 
 
 class SprintStatus(str, Enum):
@@ -145,7 +152,7 @@ class RequirementBase(BaseModel):
     description: Optional[str] = None
     type: RequirementType = RequirementType.TASK
     priority: RequirementPriority = RequirementPriority.P2
-    status: RequirementStatus = RequirementStatus.BACKLOG
+    status: RequirementStatus = RequirementStatus.REQ_CREATED
     target_version: Optional[str] = None
     sprint_id: Optional[str] = None
     handoff_id: Optional[str] = None
@@ -177,6 +184,9 @@ class RequirementResponse(RequirementBase):
     project_code: Optional[str] = None
     project_name: Optional[str] = None
     project_emoji: Optional[str] = None
+    # Checkpoint fields (PF5-MS1, populated only when include_checkpoint=true)
+    checkpoint: Optional[str] = None
+    checkpoint_message: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -352,6 +362,10 @@ class BatchStatusRequest(BaseModel):
     status: RequirementStatus
     changed_by: str = Field(..., max_length=50)
     sprint_id: Optional[str] = None
+
+
+class StateTransition(BaseModel):
+    status: str
 
 
 class HistoryEntry(BaseModel):

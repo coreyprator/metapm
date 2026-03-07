@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.9.1"  # MP-VB-FIX-001: Vision Board expand fix + UX improvements
+    VERSION: str = "2.10.0"  # PF5-MS1: Lifecycle state tracking, person filter, checkpoint API
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

@@ -188,6 +188,19 @@
     .status-handoff { color: #a5b4fc; border-color: #3b4d8a; }
     .status-needs_fixes { color: #ffb347; border-color: #7a5a2f; }
     .status-deferred { color: #999; border-color: #555; font-style: italic; }
+    .status-archived { color: #777; border-color: #444; font-style: italic; }
+    /* Lifecycle status badges (PF5-MS1) */
+    .status-req_created { color: #9ca3af; border-color: #6b7280; }
+    .status-cai_processing { color: #c4b5fd; border-color: #7c3aed; }
+    .status-cc_prompt_ready { color: #a78bfa; border-color: #7c3aed; background: rgba(124,58,237,0.12); }
+    .status-approved { color: #93c5fd; border-color: #2563eb; }
+    .status-cc_processing { color: #86efac; border-color: #16a34a; }
+    .status-cc_handoff_ready { color: #4ade80; border-color: #16a34a; background: rgba(22,163,74,0.12); }
+    .status-cai_review { color: #c4b5fd; border-color: #7c3aed; font-weight: 600; }
+    .status-uat_submitted { color: #fdba74; border-color: #ea580c; }
+    .status-cai_final_review { color: #c4b5fd; border-color: #7c3aed; font-style: italic; font-weight: 600; }
+    .status-done { background: #16a34a; color: #fff; border-color: #16a34a; }
+    .status-rework { background: #dc2626; color: #fff; border-color: #dc2626; font-weight: 700; }
     .type-vision { color: #c4b5fd; border-color: #7c3aed; background: rgba(124,58,237,0.15); }
     .vb-section { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; padding: 12px 16px; background: var(--card); }
     .vb-section .vb-head { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
@@ -407,7 +420,28 @@
         <select id="categoryFilter"><option value="">All Categories</option></select>
         <select id="projectFilter"><option value="">All Projects</option></select>
         <select id="priorityFilter"><option value="">All Priorities</option><option>P1</option><option>P2</option><option>P3</option></select>
-        <select id="statusFilter"><option value="">All Status</option><option value="not_done">Not Done</option><option value="in_progress">In Progress</option><option value="backlog">backlog</option><option value="draft">draft</option><option value="prompt_ready">prompt_ready</option><option value="approved">approved</option><option value="executing">executing</option><option value="handoff">handoff</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="closed">closed</option><option value="deferred">deferred</option></select>
+        <select id="statusFilter">
+          <option value="">All Status</option>
+          <optgroup label="── Lifecycle ──">
+            <option value="req_created">REQ Created</option>
+            <option value="cai_processing">CAI Processing</option>
+            <option value="cc_prompt_ready">CC Prompt Ready</option>
+            <option value="approved">Approved</option>
+            <option value="cc_processing">CC Processing</option>
+            <option value="cc_handoff_ready">CC Handoff Ready</option>
+            <option value="cai_review">CAI Review</option>
+            <option value="uat_submitted">UAT Submitted</option>
+            <option value="cai_final_review">CAI Final Review</option>
+            <option value="done">Done</option>
+            <option value="rework">Rework</option>
+          </optgroup>
+          <optgroup label="── Legacy ──">
+            <option value="backlog">Backlog</option>
+            <option value="executing">Executing</option>
+            <option value="closed">Closed</option>
+          </optgroup>
+        </select>
+        <select id="personFilter"><option value="">All Persons</option><option value="PL">PL</option><option value="CAI">CAI</option><option value="CC">CC</option></select>
         <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="openItemsToggle" checked style="min-height:auto" /> Open Only</label>
         <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="showArchivedToggle" style="min-height:auto" /> Show Archived</label>
         <button id="resetFiltersBtn" type="button" class="danger-btn">Reset Filters</button>
@@ -418,7 +452,7 @@
           <label for="searchInput">Full Text Search</label>
           <input id="searchInput" placeholder="Search code, title, description, type, status..." />
         </div>
-        <select id="sortBy"><option value="priority">Priority</option><option value="code">Code</option><option value="title">Title</option></select>
+        <select id="sortBy"><option value="priority">Priority</option><option value="lifecycle">Lifecycle State</option><option value="code">Code</option><option value="title">Title</option></select>
         <select id="groupBy"><option value="project">By Project</option><option value="category">By Category</option><option value="priority">By Priority</option><option value="status">By Status</option><option value="type">By Type</option></select>
         <button id="expandAllBtn" type="button">Expand All</button>
         <button id="collapseAllBtn" type="button">Collapse All</button>
@@ -479,7 +513,28 @@
       </div>
       <div>
         <label>Status</label>
-        <select id="dStatus"><option value="backlog">backlog</option><option value="draft">draft</option><option value="prompt_ready">prompt_ready</option><option value="approved">approved</option><option value="executing">executing</option><option value="handoff">handoff</option><option value="uat">uat</option><option value="closed">closed</option><option value="needs_fixes">needs_fixes</option><option value="deferred">deferred</option></select>
+        <select id="dStatus">
+          <optgroup label="── Lifecycle ──">
+            <option value="req_created">REQ Created</option>
+            <option value="cai_processing">CAI Processing</option>
+            <option value="cc_prompt_ready">CC Prompt Ready</option>
+            <option value="approved">Approved</option>
+            <option value="cc_processing">CC Processing</option>
+            <option value="cc_handoff_ready">CC Handoff Ready</option>
+            <option value="cai_review">CAI Review</option>
+            <option value="uat_submitted">UAT Submitted</option>
+            <option value="cai_final_review">CAI Final Review</option>
+            <option value="done">Done</option>
+            <option value="rework">Rework</option>
+          </optgroup>
+          <optgroup label="── Legacy ──">
+            <option value="backlog">backlog</option>
+            <option value="executing">executing</option>
+            <option value="closed">closed</option>
+            <option value="archived">archived</option>
+          </optgroup>
+        </select>
+        <div id="dCheckpoint" style="display:none;margin-top:4px;font-size:11px;color:#86efac;font-family:monospace"></div>
       </div>
       <div>
         <label>Target Version</label>
@@ -660,6 +715,7 @@
         qs('projectFilter').value ||
         qs('priorityFilter').value ||
         qs('statusFilter').value ||
+        qs('personFilter').value ||
         (qs('searchInput').value || '').trim()
       );
     }
@@ -676,19 +732,17 @@
       const category = qs('categoryFilter').value;
       const priority = qs('priorityFilter').value;
       const status = qs('statusFilter').value;
+      const person = qs('personFilter').value;
       const search = (qs('searchInput').value || '').trim().toLowerCase();
       const openOnly = qs('openItemsToggle').checked;
       for (const p of state.projects) {
         const count = state.requirements.filter(r => {
           if (r.project_id !== p.id) return false;
-          if (openOnly && (r.status === 'closed' || r.status === 'deferred')) return false;
+          if (openOnly && CLOSED_STATUSES.includes(r.status)) return false;
           if (category && p.category_id !== category) return false;
           if (priority && r.priority !== priority) return false;
-          if (status && STATUS_GROUPS[status]) {
-            if (!STATUS_GROUPS[status].includes(r.status)) return false;
-          } else if (status) {
-            if (r.status !== status) return false;
-          }
+          if (status && r.status !== status) return false;
+          if (person && PERSON_FILTER_MAP[person] && !PERSON_FILTER_MAP[person].includes(r.status)) return false;
           if (search) {
             const haystack = `${r.code} ${r.title} ${r.description || ''} ${r.type || ''} ${r.status || ''}`.toLowerCase();
             if (!haystack.includes(search)) return false;
@@ -700,31 +754,51 @@
       if (current) pf.value = current;
     }
 
-    const STATUS_GROUPS = {
-      'not_done': ['backlog','draft','needs_fixes','deferred'],
-      'in_progress': ['approved','executing','handoff','needs_fixes'],
+    const STATUS_GROUPS = {};
+
+    const LIFECYCLE_STATUSES = ['req_created','cai_processing','cc_prompt_ready','approved',
+      'cc_processing','cc_handoff_ready','cai_review','uat_submitted','cai_final_review','done','rework'];
+
+    const LIFECYCLE_LABELS = {
+      req_created: 'REQ', cai_processing: 'CAI', cc_prompt_ready: 'PROMPT',
+      approved: 'APPROVED', cc_processing: 'CC', cc_handoff_ready: 'HANDOFF',
+      cai_review: 'REVIEW', uat_submitted: 'UAT', cai_final_review: 'FINAL',
+      done: 'DONE', rework: 'REWORK'
     };
+
+    const LIFECYCLE_ORDER = {
+      rework: 0, req_created: 1, cai_processing: 2, cc_prompt_ready: 3,
+      approved: 4, cc_processing: 5, cc_handoff_ready: 6, cai_review: 7,
+      uat_submitted: 8, cai_final_review: 9, done: 10,
+      backlog: 11, executing: 12, closed: 13, archived: 14
+    };
+
+    const PERSON_FILTER_MAP = {
+      PL:  ['req_created','cc_prompt_ready','approved','cc_handoff_ready','uat_submitted'],
+      CAI: ['cai_processing','cai_review','cai_final_review','rework'],
+      CC:  ['cc_processing'],
+    };
+
+    const CLOSED_STATUSES = ['closed', 'archived', 'done'];
 
     function getFilteredRequirements() {
       const category = qs('categoryFilter').value;
       const project = qs('projectFilter').value;
       const priority = qs('priorityFilter').value;
       const status = qs('statusFilter').value;
+      const person = qs('personFilter').value;
       const search = (qs('searchInput').value || '').trim().toLowerCase();
       const openOnly = qs('openItemsToggle').checked;
       return state.requirements.filter((req) => {
-        if (openOnly && (req.status === 'closed' || req.status === 'deferred')) return false;
+        if (openOnly && CLOSED_STATUSES.includes(req.status)) return false;
         if (category) {
           const proj = state.projects.find(p => p.id === req.project_id);
           if (!proj || proj.category_id !== category) return false;
         }
         if (project && req.project_id !== project) return false;
         if (priority && req.priority !== priority) return false;
-        if (status && STATUS_GROUPS[status]) {
-          if (!STATUS_GROUPS[status].includes(req.status)) return false;
-        } else if (status) {
-          if (req.status !== status) return false;
-        }
+        if (status && req.status !== status) return false;
+        if (person && PERSON_FILTER_MAP[person] && !PERSON_FILTER_MAP[person].includes(req.status)) return false;
         if (search) {
           const haystack = `${req.code} ${req.title} ${req.description || ''} ${req.type || ''} ${req.status || ''}`.toLowerCase();
           if (!haystack.includes(search)) return false;
@@ -738,6 +812,11 @@
       if (by === 'priority') {
         const weight = { P1: 1, P2: 2, P3: 3 };
         return (weight[a.priority] || 9) - (weight[b.priority] || 9) || a.code.localeCompare(b.code);
+      }
+      if (by === 'lifecycle') {
+        const oa = LIFECYCLE_ORDER[a.status] !== undefined ? LIFECYCLE_ORDER[a.status] : 99;
+        const ob = LIFECYCLE_ORDER[b.status] !== undefined ? LIFECYCLE_ORDER[b.status] : 99;
+        return oa - ob || a.code.localeCompare(b.code);
       }
       if (by === 'title') return a.title.localeCompare(b.title);
       return a.code.localeCompare(b.code);
@@ -782,14 +861,12 @@
     }
 
     function rowHtml(req) {
-      const isPrompt = req.status === 'prompt_ready';
-      const promptBadge = isPrompt
-        ? `<span style="color:#f0b429;margin-left:6px;font-size:13px" title="Prompt ready to deliver">📝</span>`
-        : '';
-      return `<div class="req-row${isPrompt ? ' has-prompt' : ''}" data-req="${req.id}">
-        <div><strong>${req.code}</strong> ${req.title}${promptBadge}</div>
+      const isRework = req.status === 'rework';
+      const statusLabel = LIFECYCLE_LABELS[req.status] || req.status;
+      return `<div class="req-row${isRework ? ' has-prompt' : ''}" data-req="${req.id}">
+        <div><strong>${req.code}</strong> ${req.title}</div>
         <span class="pill ${req.priority.toLowerCase()}">${req.priority}</span>
-        <span class="pill status-${req.status}">${req.status}</span>
+        <span class="pill status-${req.status}">${statusLabel}</span>
         <span class="pill${req.type === 'vision' ? ' type-vision' : ''}">${req.type === 'vision' ? '👁 Vision' : req.type}</span>
         <div class="actions-row">
           <button class="icon-btn" data-open-req="${req.id}" title="Edit Requirement">✏️</button>
@@ -1067,7 +1144,7 @@
             <div><strong>${req.code}</strong> ${req.title}</div>
             ${projLabel}
             <span class="pill ${req.priority.toLowerCase()}">${req.priority}</span>
-            <span class="pill status-${req.status}">${req.status}</span>
+            <span class="pill status-${req.status}">${LIFECYCLE_LABELS[req.status] || req.status}</span>
             <span class="pill${req.type === 'vision' ? ' type-vision' : ''}">${req.type === 'vision' ? '👁 Vision' : req.type}</span>
             <div class="actions-row">
               <button class="icon-btn" data-open-req="${req.id}" title="Edit">✏️</button>
@@ -1213,8 +1290,32 @@
       qs('dPriority').value = req.priority;
       qs('dType').value = req.type;
       qs('dStatus').value = req.status;
+      qs('dCheckpoint').style.display = 'none';
+      qs('dCheckpoint').textContent = '';
       qs('dVersion').value = req.target_version || '';
       qs('dDescription').value = req.description || '';
+
+      // State transition via PATCH /state — immediate, no Save needed
+      qs('dStatus').onchange = async function() {
+        const newStatus = this.value;
+        const targetReq = state.selectedReq;
+        if (!targetReq) return;
+        try {
+          const result = await api(`/api/roadmap/requirements/${targetReq.id}/state`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: newStatus })
+          });
+          const cp = qs('dCheckpoint');
+          cp.textContent = `Checkpoint: ${result.checkpoint}`;
+          cp.style.display = 'block';
+          // Update local state
+          const r = state.requirements.find(x => x.id === targetReq.id);
+          if (r) r.status = newStatus;
+          state.selectedReq.status = newStatus;
+        } catch (err) {
+          showToast('State update failed: ' + (err.message || err));
+        }
+      };
 
       try {
         const links = await api(`/api/roadmap/requirements/${req.id}/handoffs`);
@@ -1696,7 +1797,7 @@
             <div><label>Code</label><input id="aCode" placeholder="MP-018" /></div>
             <div><label>Title</label><input id="aTitle" placeholder="Title" /></div>
             <div><label>Priority</label><select id="aPriority"><option>P1</option><option selected>P2</option><option>P3</option></select></div>
-            <div><label>Status</label><select id="aStatus"><option value="backlog">backlog</option><option value="planned">planned</option><option value="in_progress">in_progress</option><option value="uat">uat</option><option value="needs_fixes">needs_fixes</option><option value="blocked">blocked</option><option value="conditional_pass">conditional_pass</option><option value="superseded">superseded</option><option value="done">done</option></select></div>
+            <div><label>Status</label><select id="aStatus"><optgroup label="── Lifecycle ──"><option value="req_created" selected>REQ Created</option><option value="cai_processing">CAI Processing</option><option value="cc_prompt_ready">CC Prompt Ready</option><option value="approved">Approved</option><option value="cc_processing">CC Processing</option><option value="cc_handoff_ready">CC Handoff Ready</option><option value="cai_review">CAI Review</option><option value="uat_submitted">UAT Submitted</option><option value="cai_final_review">CAI Final Review</option><option value="done">Done</option><option value="rework">Rework</option></optgroup><optgroup label="── Legacy ──"><option value="backlog">backlog</option><option value="executing">executing</option><option value="closed">closed</option><option value="archived">archived</option></optgroup></select></div>
             <div><label>Type</label><select id="aType">${typeOptions}</select></div>
           </div>
           <div><label>Description</label><textarea id="aDescription"></textarea></div>`;
@@ -1888,7 +1989,7 @@
     }
 
     function bindControls() {
-      ['categoryFilter', 'projectFilter', 'priorityFilter', 'statusFilter', 'sortBy', 'groupBy'].forEach((id) => {
+      ['categoryFilter', 'projectFilter', 'priorityFilter', 'statusFilter', 'personFilter', 'sortBy', 'groupBy'].forEach((id) => {
         qs(id).onchange = () => {
           updateResetButtonState();
           render();
@@ -1924,6 +2025,7 @@
         qs('projectFilter').value = '';
         qs('priorityFilter').value = '';
         qs('statusFilter').value = '';
+        qs('personFilter').value = '';
         qs('searchInput').value = '';
         qs('openItemsToggle').checked = true;
         updateResetButtonState();

@@ -1155,4 +1155,37 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 31 warning: {e}")
 
+    # Migration 32: PF5-MS1 — Extend status CHECK to include lifecycle values
+    try:
+        result = execute_query("""
+            SELECT cc.definition
+            FROM sys.check_constraints cc
+            JOIN sys.columns col ON cc.parent_object_id = col.object_id AND cc.parent_column_id = col.column_id
+            WHERE OBJECT_NAME(cc.parent_object_id) = 'roadmap_requirements' AND col.name = 'status'
+        """, fetch="one")
+        if result and 'req_created' not in (result.get('definition') or ''):
+            logger.info("  Migration 32: Extending roadmap_requirements status CHECK to lifecycle values (PF5-MS1)...")
+            constraints = execute_query("""
+                SELECT cc.name
+                FROM sys.check_constraints cc
+                JOIN sys.columns col ON cc.parent_object_id = col.object_id AND cc.parent_column_id = col.column_id
+                WHERE OBJECT_NAME(cc.parent_object_id) = 'roadmap_requirements' AND col.name = 'status'
+            """, fetch="all") or []
+            for c in constraints:
+                execute_query(f"ALTER TABLE roadmap_requirements DROP CONSTRAINT [{c['name']}]", fetch="none")
+            execute_query("""
+                ALTER TABLE roadmap_requirements ADD CONSTRAINT chk_req_status
+                CHECK (status IN (
+                    'backlog', 'executing', 'closed', 'archived',
+                    'req_created', 'cai_processing', 'cc_prompt_ready', 'approved',
+                    'cc_processing', 'cc_handoff_ready', 'cai_review',
+                    'uat_submitted', 'cai_final_review', 'done', 'rework'
+                ))
+            """, fetch="none")
+            logger.info("  Migration 32: status constraint extended to include lifecycle values.")
+        else:
+            logger.info("  Migration 32: status constraint already includes lifecycle values.")
+    except Exception as e:
+        logger.warning(f"  Migration 32 warning: {e}")
+
     logger.info("Migrations complete.")

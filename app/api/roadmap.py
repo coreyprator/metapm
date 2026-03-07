@@ -3,6 +3,7 @@ MetaPM Roadmap API Router
 Project, Requirement, and Sprint management endpoints.
 """
 
+import hashlib
 import logging
 import uuid
 from datetime import datetime
@@ -23,6 +24,7 @@ from app.schemas.roadmap import (
     DependencyCreate, DependencyResponse,
     StatusTransitionRequest, StatusTransitionResponse, BatchStatusRequest,
     RequirementHistoryResponse, HistoryEntry,
+    StateTransition,
 )
 
 logger = logging.getLogger(__name__)
@@ -536,8 +538,8 @@ async def list_requirements(
 
 @router.get("/requirements/{requirement_id}", response_model=RequirementResponse)
 @router.get("/roadmap/requirements/{requirement_id}", response_model=RequirementResponse)
-async def get_requirement(requirement_id: str):
-    """Get a single requirement by ID."""
+async def get_requirement(requirement_id: str, include_checkpoint: bool = Query(False)):
+    """Get a single requirement by ID. Pass include_checkpoint=true to receive a proof-of-reading hash."""
     try:
         result = execute_query("""
             SELECT r.id, r.project_id, r.code, r.title, r.description,
@@ -553,6 +555,13 @@ async def get_requirement(requirement_id: str):
         if not result:
             raise HTTPException(status_code=404, detail="Requirement not found")
 
+        status_val = result['status'] or 'req_created'
+        checkpoint = None
+        checkpoint_message = None
+        if include_checkpoint:
+            checkpoint = hashlib.sha256(f"{requirement_id}:{status_val}".encode()).hexdigest()[:4].upper()
+            checkpoint_message = f"Confirm you read this by returning checkpoint {checkpoint}"
+
         return RequirementResponse(
             id=result['id'],
             project_id=result['project_id'],
@@ -561,7 +570,7 @@ async def get_requirement(requirement_id: str):
             description=result['description'],
             type=RequirementType(result['type']) if result['type'] else RequirementType.TASK,
             priority=RequirementPriority(result['priority']) if result['priority'] else RequirementPriority.P2,
-            status=RequirementStatus(result['status']) if result['status'] else RequirementStatus.BACKLOG,
+            status=RequirementStatus(status_val) if status_val in [s.value for s in RequirementStatus] else RequirementStatus.REQ_CREATED,
             target_version=result['target_version'],
             sprint_id=result['sprint_id'],
             handoff_id=str(result['handoff_id']) if result['handoff_id'] else None,
@@ -570,7 +579,9 @@ async def get_requirement(requirement_id: str):
             updated_at=result['updated_at'],
             project_code=result['project_code'],
             project_name=result['project_name'],
-            project_emoji=result['project_emoji']
+            project_emoji=result['project_emoji'],
+            checkpoint=checkpoint,
+            checkpoint_message=checkpoint_message,
         )
     except HTTPException:
         raise
@@ -1626,6 +1637,41 @@ async def batch_transition_status(body: BatchStatusRequest):
         return {"updated": len([r for r in results if 'status' in r]), "results": results}
     except Exception as e:
         logger.error(f"Error batch updating status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# LIFECYCLE STATE TRANSITION (PF5-MS1)
+# ============================================
+
+_VALID_STATUSES = {s.value for s in RequirementStatus}
+
+
+@router.patch("/roadmap/requirements/{req_id}/state")
+async def update_requirement_state(req_id: str, body: StateTransition):
+    """Explicit lifecycle state transition. No state machine enforcement. Returns checkpoint hash."""
+    try:
+        if body.status not in _VALID_STATUSES:
+            raise HTTPException(status_code=400, detail=f"Invalid status: '{body.status}'. Valid: {sorted(_VALID_STATUSES)}")
+
+        req = execute_query(
+            "SELECT id FROM roadmap_requirements WHERE id = ?",
+            (req_id,), fetch="one"
+        )
+        if not req:
+            raise HTTPException(status_code=404, detail="Requirement not found")
+
+        execute_query(
+            "UPDATE roadmap_requirements SET status = ?, updated_at = GETDATE() WHERE id = ?",
+            (body.status, req_id), fetch="none"
+        )
+
+        checkpoint = hashlib.sha256(f"{req_id}:{body.status}".encode()).hexdigest()[:4].upper()
+        return {"id": req_id, "status": body.status, "checkpoint": checkpoint}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating requirement state: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

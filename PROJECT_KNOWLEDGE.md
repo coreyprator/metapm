@@ -1,10 +1,31 @@
 # MetaPM -- Project Knowledge Document
-<!-- CHECKPOINT: MP-PK-4A2F -->
+<!-- CHECKPOINT: MP-PK-9E3F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-06 — Sprint "MP-VB-FIX-001" (v2.9.1)
+Updated: 2026-03-06 — Sprint "PF5-MS1" (v2.10.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-06 (MP-VB-FIX-001, v2.9.1)
+### Latest Session Update — 2026-03-06 (PF5-MS1, v2.10.0)
+
+- **Sprint PF5-MS1**: Lifecycle state tracking, person filter, checkpoint API.
+- **Current Version**: v2.10.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00149-9ws)
+- **Migration 32**: Extended `roadmap_requirements` status CHECK constraint. Old name: `CK_roadmap_requirements_status_v3`. New name: `chk_req_status`. Now includes 15 values: 4 legacy + 11 lifecycle.
+- **Status values** (15 total):
+  - Legacy: `backlog`, `executing`, `closed`, `archived`
+  - Lifecycle: `req_created`, `cai_processing`, `cc_prompt_ready`, `approved`, `cc_processing`, `cc_handoff_ready`, `cai_review`, `uat_submitted`, `cai_final_review`, `done`, `rework`
+- **Default status** for new requirements: `req_created` (changed from `backlog`)
+- **Checkpoint hash formula**: `hashlib.sha256(f"{req_id}:{status}".encode()).hexdigest()[:4].upper()`
+- **New API endpoint**: `PATCH /api/roadmap/requirements/{req_id}/state` — free state transition, returns `{id, status, checkpoint}`. No state machine enforcement.
+- **GET checkpoint**: `GET /api/roadmap/requirements/{id}?include_checkpoint=true` returns `checkpoint` and `checkpoint_message` fields.
+- **Person filter mapping**:
+  - PL: `req_created`, `cc_prompt_ready`, `approved`, `cc_handoff_ready`, `uat_submitted`
+  - CAI: `cai_processing`, `cai_review`, `cai_final_review`, `rework`
+  - CC: `cc_processing`
+- **LIFECYCLE_ORDER** (dashboard sort): rework=0, req_created=1 … done=10, backlog=11 … archived=14
+- **CLOSED_STATUSES** (for openItemsToggle filter): `['closed', 'archived', 'done']`
+- **Seeded**: VIS-008 (proj-pm, vision, executing), MP-045 (P1), MP-046 (P2), MP-047 (P2), MP-048 (P1) — all `req_created`
+- **Next sprint**: PF5-MS2 (MP-045 + MP-048) — prompt storage and MetaPM-rendered UAT
+
+### Previous: MP-VB-FIX-001 (v2.9.1, 2026-03-06)
 
 - **Sprint MP-VB-FIX-001**: Vision Board expand fix + UX improvements.
 - **Current Version**: v2.9.1 — **DEPLOYED** to Cloud Run (revision metapm-v2-00147-gft)
