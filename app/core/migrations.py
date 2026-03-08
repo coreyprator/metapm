@@ -1188,4 +1188,53 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 32 warning: {e}")
 
+    # Migration 33: PF5-MS1 v2 — Update status CHECK to new 11 lifecycle states
+    try:
+        result = execute_query("""
+            SELECT cc.definition
+            FROM sys.check_constraints cc
+            JOIN sys.columns col ON cc.parent_object_id = col.object_id AND cc.parent_column_id = col.column_id
+            WHERE OBJECT_NAME(cc.parent_object_id) = 'roadmap_requirements' AND col.name = 'status'
+        """, fetch="one")
+        if result and 'req_approved' not in (result.get('definition') or ''):
+            logger.info("  Migration 33: Updating status CHECK to new lifecycle states (PF5-MS1 v2)...")
+            constraints = execute_query("""
+                SELECT cc.name
+                FROM sys.check_constraints cc
+                JOIN sys.columns col ON cc.parent_object_id = col.object_id AND cc.parent_column_id = col.column_id
+                WHERE OBJECT_NAME(cc.parent_object_id) = 'roadmap_requirements' AND col.name = 'status'
+            """, fetch="all") or []
+            for c in constraints:
+                execute_query(f"ALTER TABLE roadmap_requirements DROP CONSTRAINT [{c['name']}]", fetch="none")
+            # First migrate existing data from old lifecycle states to new ones
+            migrations_map = {
+                'cai_processing': 'cai_designing',
+                'approved': 'req_approved',
+                'cc_processing': 'cc_executing',
+                'cc_handoff_ready': 'cc_complete',
+                'cai_review': 'uat_ready',
+                'uat_submitted': 'uat_pass',
+                'cai_final_review': 'uat_fail',
+                'archived': 'closed',
+            }
+            for old_val, new_val in migrations_map.items():
+                execute_query(
+                    f"UPDATE roadmap_requirements SET status = ? WHERE status = ?",
+                    (new_val, old_val), fetch="none"
+                )
+            execute_query("""
+                ALTER TABLE roadmap_requirements ADD CONSTRAINT chk_req_status_v2
+                CHECK (status IN (
+                    'req_created', 'req_approved', 'cai_designing', 'cc_prompt_ready',
+                    'cc_executing', 'cc_complete', 'uat_ready', 'uat_pass', 'uat_fail',
+                    'done', 'rework',
+                    'backlog', 'executing', 'closed'
+                ))
+            """, fetch="none")
+            logger.info("  Migration 33: status constraint updated to new lifecycle states.")
+        else:
+            logger.info("  Migration 33: status constraint already has new lifecycle states.")
+    except Exception as e:
+        logger.warning(f"  Migration 33 warning: {e}")
+
     logger.info("Migrations complete.")

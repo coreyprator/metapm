@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.10.0"  # PF5-MS1: Lifecycle state tracking, person filter, checkpoint API
+    VERSION: str = "2.11.0"  # PF5-MS1 v2: Lifecycle state badges, transition validation, phase groups
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

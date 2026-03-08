@@ -1518,18 +1518,23 @@ async def auto_close_requirement(requirement_id: str):
 # STATUS TRANSITION + HISTORY (MP-MS3 Phase 2)
 # ============================================
 
-# Valid status transitions (pipeline order)
+# Valid status transitions — uses lifecycle transitions; legacy statuses allow any
 VALID_TRANSITIONS = {
-    'backlog': ['draft', 'deferred'],
-    'draft': ['prompt_ready', 'backlog', 'deferred'],
-    'prompt_ready': ['approved', 'draft', 'deferred'],
-    'approved': ['executing', 'prompt_ready', 'deferred'],
-    'executing': ['handoff', 'needs_fixes', 'deferred'],
-    'handoff': ['uat', 'executing', 'deferred'],
-    'uat': ['closed', 'needs_fixes', 'deferred'],
-    'closed': ['backlog'],  # reopen
-    'needs_fixes': ['draft', 'prompt_ready', 'executing', 'deferred'],
-    'deferred': ['backlog', 'draft', 'prompt_ready', 'approved', 'executing'],
+    "req_created":     ["req_approved", "backlog", "closed"],
+    "req_approved":    ["cai_designing", "req_created"],
+    "cai_designing":   ["cc_prompt_ready", "req_approved"],
+    "cc_prompt_ready": ["cc_executing", "cai_designing"],
+    "cc_executing":    ["cc_complete", "cc_prompt_ready"],
+    "cc_complete":     ["uat_ready", "cc_executing"],
+    "uat_ready":       ["uat_pass", "uat_fail"],
+    "uat_pass":        ["done"],
+    "uat_fail":        ["cc_prompt_ready", "rework"],
+    "done":            ["rework"],
+    "rework":          ["cc_prompt_ready"],
+    # Legacy: allow any transition
+    "backlog": None,
+    "executing": None,
+    "closed": None,
 }
 
 
@@ -1553,9 +1558,9 @@ async def transition_requirement_status(requirement_id: str, body: StatusTransit
                 previous_status=current_status, transition_recorded=False
             )
 
-        # Validate transition
-        allowed = VALID_TRANSITIONS.get(current_status, [])
-        if new_status not in allowed:
+        # Validate transition (None = legacy, allow any)
+        allowed = VALID_TRANSITIONS.get(current_status)
+        if allowed is not None and new_status not in allowed:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid transition: {current_status} → {new_status}. Allowed: {', '.join(allowed)}"
@@ -1613,8 +1618,8 @@ async def batch_transition_status(body: BatchStatusRequest):
             current_status = req['status']
             new_status = body.status.value
 
-            allowed = VALID_TRANSITIONS.get(current_status, [])
-            if new_status not in allowed:
+            allowed = VALID_TRANSITIONS.get(current_status)
+            if allowed is not None and new_status not in allowed:
                 results.append({"id": req_id, "code": req['code'], "error": f"Invalid: {current_status} → {new_status}"})
                 continue
 
@@ -1641,33 +1646,86 @@ async def batch_transition_status(body: BatchStatusRequest):
 
 
 # ============================================
-# LIFECYCLE STATE TRANSITION (PF5-MS1)
+# LIFECYCLE STATES METADATA (PF5-MS1 v2)
 # ============================================
+
+LIFECYCLE_STATES = [
+    {"id": "req_created",     "label": "Req Created",    "color": "#6B7280", "phase": "definition"},
+    {"id": "req_approved",    "label": "Req Approved",   "color": "#2563EB", "phase": "definition"},
+    {"id": "cai_designing",   "label": "CAI Designing",  "color": "#7C3AED", "phase": "design"},
+    {"id": "cc_prompt_ready", "label": "Prompt Ready",   "color": "#D97706", "phase": "design"},
+    {"id": "cc_executing",    "label": "CC Executing",   "color": "#EA580C", "phase": "build"},
+    {"id": "cc_complete",     "label": "CC Complete",    "color": "#0891B2", "phase": "build"},
+    {"id": "uat_ready",       "label": "UAT Ready",      "color": "#0284C7", "phase": "validate"},
+    {"id": "uat_pass",        "label": "UAT Pass",       "color": "#16A34A", "phase": "validate"},
+    {"id": "uat_fail",        "label": "UAT Fail",       "color": "#DC2626", "phase": "validate"},
+    {"id": "done",            "label": "Done",           "color": "#15803D", "phase": "complete"},
+    {"id": "rework",          "label": "Rework",         "color": "#9F1239", "phase": "complete"},
+    {"id": "backlog",         "label": "Backlog",        "color": "#9CA3AF", "phase": "legacy"},
+    {"id": "executing",       "label": "Executing",      "color": "#F59E0B", "phase": "legacy"},
+    {"id": "closed",          "label": "Closed",         "color": "#374151", "phase": "legacy"},
+]
+
+LIFECYCLE_VALID_TRANSITIONS = {
+    "req_created":     ["req_approved", "backlog", "closed"],
+    "req_approved":    ["cai_designing", "req_created"],
+    "cai_designing":   ["cc_prompt_ready", "req_approved"],
+    "cc_prompt_ready": ["cc_executing", "cai_designing"],
+    "cc_executing":    ["cc_complete", "cc_prompt_ready"],
+    "cc_complete":     ["uat_ready", "cc_executing"],
+    "uat_ready":       ["uat_pass", "uat_fail"],
+    "uat_pass":        ["done"],
+    "uat_fail":        ["cc_prompt_ready", "rework"],
+    "done":            ["rework"],
+    "rework":          ["cc_prompt_ready"],
+    "backlog": None,   # legacy: allow any transition
+    "executing": None,
+    "closed": None,
+}
+
+
+@router.get("/v1/lifecycle/states")
+async def get_lifecycle_states():
+    """Return all lifecycle states with colors and phase groupings."""
+    return {"states": LIFECYCLE_STATES}
+
 
 _VALID_STATUSES = {s.value for s in RequirementStatus}
 
 
 @router.patch("/roadmap/requirements/{req_id}/state")
 async def update_requirement_state(req_id: str, body: StateTransition):
-    """Explicit lifecycle state transition. No state machine enforcement. Returns checkpoint hash."""
+    """Lifecycle state transition with validation. Returns checkpoint hash."""
     try:
         if body.status not in _VALID_STATUSES:
             raise HTTPException(status_code=400, detail=f"Invalid status: '{body.status}'. Valid: {sorted(_VALID_STATUSES)}")
 
         req = execute_query(
-            "SELECT id FROM roadmap_requirements WHERE id = ?",
+            "SELECT id, status FROM roadmap_requirements WHERE id = ?",
             (req_id,), fetch="one"
         )
         if not req:
             raise HTTPException(status_code=404, detail="Requirement not found")
 
+        current_status = req['status']
+        new_status = body.status
+
+        # Validate transition
+        if new_status != current_status:
+            allowed = LIFECYCLE_VALID_TRANSITIONS.get(current_status)
+            if allowed is not None and new_status not in allowed:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid transition: {current_status} -> {new_status}. Allowed: {allowed}"
+                )
+
         execute_query(
             "UPDATE roadmap_requirements SET status = ?, updated_at = GETDATE() WHERE id = ?",
-            (body.status, req_id), fetch="none"
+            (new_status, req_id), fetch="none"
         )
 
-        checkpoint = hashlib.sha256(f"{req_id}:{body.status}".encode()).hexdigest()[:4].upper()
-        return {"id": req_id, "status": body.status, "checkpoint": checkpoint}
+        checkpoint = hashlib.sha256(f"{req_id}:{new_status}".encode()).hexdigest()[:4].upper()
+        return {"id": req_id, "status": new_status, "checkpoint": checkpoint}
     except HTTPException:
         raise
     except Exception as e:

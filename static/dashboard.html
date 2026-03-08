@@ -179,28 +179,28 @@
     .pill { font-size: 11px; border-radius: 999px; padding: 2px 8px; border: 1px solid var(--line); color: var(--muted); }
     .p1 { color: #ff9a9a; border-color: #803c3c; }
     .p2 { color: #ffd18a; border-color: #7a5a2f; }
-    .status-closed { color: #9de2b4; border-color: #2f6e46; }
-    .status-executing { color: #9ec2ff; border-color: #34507c; }
-    .status-draft { color: #d4a5f5; border-color: #6b3d8a; }
-    .status-prompt_ready { color: #7ee8e8; border-color: #2f7a7a; }
     .req-row.has-prompt { border-left: 3px solid #f0b429; }
-    .status-approved { color: #7ecfa0; border-color: #2f6e46; }
-    .status-handoff { color: #a5b4fc; border-color: #3b4d8a; }
-    .status-needs_fixes { color: #ffb347; border-color: #7a5a2f; }
-    .status-deferred { color: #999; border-color: #555; font-style: italic; }
-    .status-archived { color: #777; border-color: #444; font-style: italic; }
-    /* Lifecycle status badges (PF5-MS1) */
-    .status-req_created { color: #9ca3af; border-color: #6b7280; }
-    .status-cai_processing { color: #c4b5fd; border-color: #7c3aed; }
-    .status-cc_prompt_ready { color: #a78bfa; border-color: #7c3aed; background: rgba(124,58,237,0.12); }
-    .status-approved { color: #93c5fd; border-color: #2563eb; }
-    .status-cc_processing { color: #86efac; border-color: #16a34a; }
-    .status-cc_handoff_ready { color: #4ade80; border-color: #16a34a; background: rgba(22,163,74,0.12); }
-    .status-cai_review { color: #c4b5fd; border-color: #7c3aed; font-weight: 600; }
-    .status-uat_submitted { color: #fdba74; border-color: #ea580c; }
-    .status-cai_final_review { color: #c4b5fd; border-color: #7c3aed; font-style: italic; font-weight: 600; }
-    .status-done { background: #16a34a; color: #fff; border-color: #16a34a; }
-    .status-rework { background: #dc2626; color: #fff; border-color: #dc2626; font-weight: 700; }
+    /* Lifecycle status badges (PF5-MS1 v2) */
+    .status-req_created     { color: #374151; background: #F3F4F6; border-color: #9CA3AF; }
+    .status-req_approved    { color: #1D4ED8; background: #EFF6FF; border-color: #93C5FD; }
+    .status-cai_designing   { color: #6D28D9; background: #F5F3FF; border-color: #C4B5FD; }
+    .status-cc_prompt_ready { color: #92400E; background: #FEF3C7; border-color: #FCD34D; }
+    .status-cc_executing    { color: #C2410C; background: #FFF7ED; border-color: #FDBA74; }
+    .status-cc_complete     { color: #0E7490; background: #ECFEFF; border-color: #A5F3FC; }
+    .status-uat_ready       { color: #1E40AF; background: #EFF6FF; border-color: #93C5FD; }
+    .status-uat_pass        { color: #15803D; background: #F0FDF4; border-color: #86EFAC; }
+    .status-uat_fail        { color: #B91C1C; background: #FEF2F2; border-color: #FCA5A5; }
+    .status-done            { color: #166534; background: #F0FDF4; border-color: #4ADE80; font-weight: 600; }
+    .status-rework          { color: #9F1239; background: #FFF1F2; border-color: #FDA4AF; font-weight: 700; }
+    /* Legacy status badges */
+    .status-backlog         { color: #6B7280; background: #F9FAFB; border-color: #E5E7EB; }
+    .status-executing       { color: #B45309; background: #FFFBEB; border-color: #FDE68A; }
+    .status-closed          { color: #4B5563; background: #F3F4F6; border-color: #D1D5DB; }
+    /* Phase group bar */
+    .phase-bar { display: flex; gap: 4px; padding: 6px 16px; margin-bottom: 6px; flex-wrap: wrap; }
+    .phase-chip { font-size: 11px; padding: 3px 10px; border-radius: 999px; cursor: pointer; border: 1px solid var(--line); color: var(--muted); background: var(--panel-soft); transition: background 0.15s; }
+    .phase-chip:hover { background: var(--panel); }
+    .phase-chip.active { background: var(--info); color: #fff; border-color: var(--info); }
     .type-vision { color: #c4b5fd; border-color: #7c3aed; background: rgba(124,58,237,0.15); }
     .vb-section { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; padding: 12px 16px; background: var(--card); }
     .vb-section .vb-head { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
@@ -422,16 +422,24 @@
         <select id="priorityFilter"><option value="">All Priorities</option><option>P1</option><option>P2</option><option>P3</option></select>
         <select id="statusFilter">
           <option value="">All Status</option>
-          <optgroup label="── Lifecycle ──">
-            <option value="req_created">REQ Created</option>
-            <option value="cai_processing">CAI Processing</option>
-            <option value="cc_prompt_ready">CC Prompt Ready</option>
-            <option value="approved">Approved</option>
-            <option value="cc_processing">CC Processing</option>
-            <option value="cc_handoff_ready">CC Handoff Ready</option>
-            <option value="cai_review">CAI Review</option>
-            <option value="uat_submitted">UAT Submitted</option>
-            <option value="cai_final_review">CAI Final Review</option>
+          <optgroup label="── Definition ──">
+            <option value="req_created">Req Created</option>
+            <option value="req_approved">Req Approved</option>
+          </optgroup>
+          <optgroup label="── Design ──">
+            <option value="cai_designing">CAI Designing</option>
+            <option value="cc_prompt_ready">Prompt Ready</option>
+          </optgroup>
+          <optgroup label="── Build ──">
+            <option value="cc_executing">CC Executing</option>
+            <option value="cc_complete">CC Complete</option>
+          </optgroup>
+          <optgroup label="── Validate ──">
+            <option value="uat_ready">UAT Ready</option>
+            <option value="uat_pass">UAT Pass</option>
+            <option value="uat_fail">UAT Fail</option>
+          </optgroup>
+          <optgroup label="── Complete ──">
             <option value="done">Done</option>
             <option value="rework">Rework</option>
           </optgroup>
@@ -468,6 +476,7 @@
       <div id="promptsList"></div>
     </div>
 
+    <div class="phase-bar" id="phaseBar"></div>
     <div class="card hierarchy" id="hierarchy"></div>
     <div class="card" id="visionBoard"></div>
 
@@ -514,24 +523,31 @@
       <div>
         <label>Status</label>
         <select id="dStatus">
-          <optgroup label="── Lifecycle ──">
-            <option value="req_created">REQ Created</option>
-            <option value="cai_processing">CAI Processing</option>
-            <option value="cc_prompt_ready">CC Prompt Ready</option>
-            <option value="approved">Approved</option>
-            <option value="cc_processing">CC Processing</option>
-            <option value="cc_handoff_ready">CC Handoff Ready</option>
-            <option value="cai_review">CAI Review</option>
-            <option value="uat_submitted">UAT Submitted</option>
-            <option value="cai_final_review">CAI Final Review</option>
+          <optgroup label="── Definition ──">
+            <option value="req_created">Req Created</option>
+            <option value="req_approved">Req Approved</option>
+          </optgroup>
+          <optgroup label="── Design ──">
+            <option value="cai_designing">CAI Designing</option>
+            <option value="cc_prompt_ready">Prompt Ready</option>
+          </optgroup>
+          <optgroup label="── Build ──">
+            <option value="cc_executing">CC Executing</option>
+            <option value="cc_complete">CC Complete</option>
+          </optgroup>
+          <optgroup label="── Validate ──">
+            <option value="uat_ready">UAT Ready</option>
+            <option value="uat_pass">UAT Pass</option>
+            <option value="uat_fail">UAT Fail</option>
+          </optgroup>
+          <optgroup label="── Complete ──">
             <option value="done">Done</option>
             <option value="rework">Rework</option>
           </optgroup>
           <optgroup label="── Legacy ──">
-            <option value="backlog">backlog</option>
-            <option value="executing">executing</option>
-            <option value="closed">closed</option>
-            <option value="archived">archived</option>
+            <option value="backlog">Backlog</option>
+            <option value="executing">Executing</option>
+            <option value="closed">Closed</option>
           </optgroup>
         </select>
         <div id="dCheckpoint" style="display:none;margin-top:4px;font-size:11px;color:#86efac;font-family:monospace"></div>
@@ -756,30 +772,38 @@
 
     const STATUS_GROUPS = {};
 
-    const LIFECYCLE_STATUSES = ['req_created','cai_processing','cc_prompt_ready','approved',
-      'cc_processing','cc_handoff_ready','cai_review','uat_submitted','cai_final_review','done','rework'];
+    const LIFECYCLE_STATUSES = ['req_created','req_approved','cai_designing','cc_prompt_ready',
+      'cc_executing','cc_complete','uat_ready','uat_pass','uat_fail','done','rework'];
 
     const LIFECYCLE_LABELS = {
-      req_created: 'REQ', cai_processing: 'CAI', cc_prompt_ready: 'PROMPT',
-      approved: 'APPROVED', cc_processing: 'CC', cc_handoff_ready: 'HANDOFF',
-      cai_review: 'REVIEW', uat_submitted: 'UAT', cai_final_review: 'FINAL',
-      done: 'DONE', rework: 'REWORK'
+      req_created: 'Req Created', req_approved: 'Approved', cai_designing: 'CAI Design',
+      cc_prompt_ready: 'Prompt Ready', cc_executing: 'CC Exec', cc_complete: 'CC Done',
+      uat_ready: 'UAT Ready', uat_pass: 'UAT Pass', uat_fail: 'UAT Fail',
+      done: 'Done', rework: 'Rework',
+      backlog: 'Backlog', executing: 'Executing', closed: 'Closed'
     };
 
     const LIFECYCLE_ORDER = {
-      rework: 0, req_created: 1, cai_processing: 2, cc_prompt_ready: 3,
-      approved: 4, cc_processing: 5, cc_handoff_ready: 6, cai_review: 7,
-      uat_submitted: 8, cai_final_review: 9, done: 10,
-      backlog: 11, executing: 12, closed: 13, archived: 14
+      rework: 0, req_created: 1, req_approved: 2, cai_designing: 3, cc_prompt_ready: 4,
+      cc_executing: 5, cc_complete: 6, uat_ready: 7, uat_pass: 8, uat_fail: 9, done: 10,
+      backlog: 11, executing: 12, closed: 13
+    };
+
+    const PHASE_GROUPS = {
+      "Definition":  ["req_created", "req_approved"],
+      "Design":      ["cai_designing", "cc_prompt_ready"],
+      "Build":       ["cc_executing", "cc_complete"],
+      "Validate":    ["uat_ready", "uat_pass", "uat_fail"],
+      "Complete":    ["done", "rework"],
     };
 
     const PERSON_FILTER_MAP = {
-      PL:  ['req_created','cc_prompt_ready','approved','cc_handoff_ready','uat_submitted'],
-      CAI: ['cai_processing','cai_review','cai_final_review','rework'],
-      CC:  ['cc_processing'],
+      PL:  ['req_created','req_approved','uat_ready','uat_pass','uat_fail'],
+      CAI: ['cai_designing','rework'],
+      CC:  ['cc_prompt_ready','cc_executing','cc_complete'],
     };
 
-    const CLOSED_STATUSES = ['closed', 'archived', 'done'];
+    const CLOSED_STATUSES = ['closed', 'done'];
 
     function getFilteredRequirements() {
       const category = qs('categoryFilter').value;
@@ -825,13 +849,12 @@
     function setSummary(reqs) {
       const all = state.requirements;
       const total = all.length;
-      const closed = all.filter(r => r.status === 'closed').length;
-      const executing = all.filter(r => r.status === 'executing').length;
-      const backlog = all.filter(r => r.status === 'backlog').length;
+      const done = all.filter(r => CLOSED_STATUSES.includes(r.status)).length;
+      const building = all.filter(r => ['cc_executing','cc_complete'].includes(r.status)).length;
       const projectCount = state.projects.length;
-      const openP1 = all.filter(r => r.priority === 'P1' && r.status !== 'closed').length;
+      const openP1 = all.filter(r => r.priority === 'P1' && !CLOSED_STATUSES.includes(r.status)).length;
       const shown = reqs.length;
-      qs('summary').children[0].textContent = `Total: ${total} | Done: ${closed} | Executing: ${executing} | Backlog: ${backlog} | Shown: ${shown} | Projects: ${projectCount}`;
+      qs('summary').children[0].textContent = `Total: ${total} | Done: ${done} | Building: ${building} | Shown: ${shown} | Projects: ${projectCount}`;
       qs('openP1').textContent = `Open P1s: ${openP1}`;
     }
 
@@ -850,7 +873,7 @@
       const list = reqs.filter(r => r.project_id === projectId).sort(compareReq);
       const buckets = { sprint: {}, backlog: [], done: [] };
       for (const req of list) {
-        if (req.status === 'closed') buckets.done.push(req);
+        if (CLOSED_STATUSES.includes(req.status)) buckets.done.push(req);
         else if (!req.sprint_id) buckets.backlog.push(req);
         else {
           if (!buckets.sprint[req.sprint_id]) buckets.sprint[req.sprint_id] = [];
@@ -885,7 +908,7 @@
     }
 
     function sprintRowHtml(sprint, projectReqs) {
-      const count = projectReqs.filter(r => r.sprint_id === sprint.id && r.status !== 'closed').length;
+      const count = projectReqs.filter(r => r.sprint_id === sprint.id && !CLOSED_STATUSES.includes(r.status)).length;
       return `<div class="sprint-row">
         <div><strong>${sprint.name}</strong> <span class="project-summary">(${count} active items)</span></div>
         <div class="actions-row">
@@ -914,7 +937,7 @@
       qs('groupBy').value = 'status';
       qs('statusFilter').value = '';
       qs('openItemsToggle').checked = true;
-      state.expanded = new Set(['backlog','draft','prompt_ready','approved','executing','handoff','uat','needs_fixes']);
+      state.expanded = new Set(['req_created','req_approved','cai_designing','cc_prompt_ready','cc_executing','cc_complete','uat_ready','uat_pass','uat_fail','rework','backlog']);
       render();
     }
 
@@ -964,7 +987,7 @@
       for (const p of activeProjects) {
         const pReqs = allReqs.filter(r => r.project_id === p.id);
         const visions = pReqs.filter(r => r.type === 'vision');
-        const openReqs = pReqs.filter(r => !['closed','deferred'].includes(r.status) && r.type !== 'vision');
+        const openReqs = pReqs.filter(r => !CLOSED_STATUSES.includes(r.status) && r.type !== 'vision');
         const p1Count = openReqs.filter(r => r.priority === 'P1').length;
         const p2Count = openReqs.filter(r => r.priority === 'P2').length;
         const p3Count = openReqs.filter(r => r.priority === 'P3').length;
@@ -974,7 +997,7 @@
         const statusFilter = qs('statusFilter')?.value || '';
         const search = (qs('searchInput')?.value || '').trim().toLowerCase();
         const STATUS_GRP = typeof STATUS_GROUPS !== 'undefined' ? STATUS_GROUPS : {};
-        let activeItems = openReqs.filter(r => !['done','closed','backlog','archived','deferred','draft'].includes(r.status));
+        let activeItems = openReqs.filter(r => !CLOSED_STATUSES.includes(r.status) && r.status !== 'backlog');
         if (priorityFilter) activeItems = activeItems.filter(r => r.priority === priorityFilter);
         if (statusFilter && STATUS_GRP[statusFilter]) {
           activeItems = activeItems.filter(r => STATUS_GRP[statusFilter].includes(r.status));
@@ -1031,6 +1054,39 @@
       });
     }
 
+    function renderPhaseBar() {
+      const bar = qs('phaseBar');
+      const allReqs = state.requirements;
+      const currentStatus = qs('statusFilter').value;
+      let html = '';
+      for (const [phase, statuses] of Object.entries(PHASE_GROUPS)) {
+        const count = allReqs.filter(r => statuses.includes(r.status)).length;
+        const isActive = statuses.includes(currentStatus);
+        html += `<span class="phase-chip${isActive ? ' active' : ''}" data-phase="${phase}">${phase}(${count})</span>`;
+      }
+      const legacyCount = allReqs.filter(r => ['backlog','executing','closed'].includes(r.status)).length;
+      if (legacyCount > 0) {
+        const isActive = ['backlog','executing','closed'].includes(currentStatus);
+        html += `<span class="phase-chip${isActive ? ' active' : ''}" data-phase="Legacy">Legacy(${legacyCount})</span>`;
+      }
+      bar.innerHTML = html;
+      bar.querySelectorAll('.phase-chip').forEach(chip => {
+        chip.onclick = () => {
+          const phase = chip.dataset.phase;
+          const sf = qs('statusFilter');
+          const statuses = phase === 'Legacy' ? ['backlog','executing','closed'] : PHASE_GROUPS[phase];
+          // If clicking the active phase, clear filter
+          if (statuses && statuses.includes(sf.value)) {
+            sf.value = '';
+          } else if (statuses && statuses.length) {
+            sf.value = statuses[0];
+          }
+          updateResetButtonState();
+          render();
+        };
+      });
+    }
+
     function render() {
       updateProjectFilterCounts();
       if (visionBoardActive) { renderVisionBoard(); return; }
@@ -1046,6 +1102,7 @@
       }
 
       if (!hierarchy.children.length) hierarchy.innerHTML = '<div class="project-summary">No matching requirements.</div>';
+      renderPhaseBar();
       setSummary(reqs);
       updateResetButtonState();
       bindHierarchyEvents();
@@ -1061,9 +1118,9 @@
         if (openOnly && pReqs.length === 0) continue;
 
         const allProjectReqs = state.requirements.filter(r => r.project_id === p.id);
-        const doneCount = p.done_count || allProjectReqs.filter(r => r.status === 'closed').length;
-        const openCount = allProjectReqs.filter(r => !['closed','deferred','backlog','draft'].includes(r.status)).length;
-        const backlogCount = allProjectReqs.filter(r => r.status === 'backlog' || r.status === 'draft').length;
+        const doneCount = p.done_count || allProjectReqs.filter(r => CLOSED_STATUSES.includes(r.status)).length;
+        const openCount = allProjectReqs.filter(r => !CLOSED_STATUSES.includes(r.status) && r.status !== 'backlog').length;
+        const backlogCount = allProjectReqs.filter(r => r.status === 'backlog' || r.status === 'req_created').length;
         const open = state.expanded.has(p.id);
         const color = PROJECT_COLORS[p.code] || p.color || '#4A90D9';
         const projectSprints = state.sprints.filter(s => !s.project_id || s.project_id === p.id);
@@ -1126,7 +1183,7 @@
           return (w[a] || 9) - (w[b] || 9);
         }
         if (field === 'status') {
-          const order = ['backlog','draft','prompt_ready','approved','executing','handoff','uat','closed','needs_fixes','deferred'];
+          const order = Object.keys(LIFECYCLE_ORDER);
           return (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 99 : order.indexOf(b));
         }
         return a.localeCompare(b);
@@ -1447,8 +1504,8 @@
         qs('dAttachments').textContent = 'None';
       }
 
-      // Show prompt review for prompt_ready status (MP-MS3 Phase 3)
-      if (['prompt_ready','approved'].includes(req.status)) {
+      // Show prompt review for cc_prompt_ready status
+      if (['cc_prompt_ready','cc_executing'].includes(req.status)) {
         qs('dPromptSection').style.display = '';
         try {
           const promptRes = await api(`/api/roadmap/prompts/active`);

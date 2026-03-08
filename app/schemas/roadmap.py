@@ -33,23 +33,22 @@ class RequirementPriority(str, Enum):
 
 
 class RequirementStatus(str, Enum):
+    # Lifecycle states (PF5-MS1 v2)
+    REQ_CREATED = "req_created"
+    REQ_APPROVED = "req_approved"
+    CAI_DESIGNING = "cai_designing"
+    CC_PROMPT_READY = "cc_prompt_ready"
+    CC_EXECUTING = "cc_executing"
+    CC_COMPLETE = "cc_complete"
+    UAT_READY = "uat_ready"
+    UAT_PASS = "uat_pass"
+    UAT_FAIL = "uat_fail"
+    DONE = "done"
+    REWORK = "rework"
     # Legacy values
     BACKLOG = "backlog"
     EXECUTING = "executing"
     CLOSED = "closed"
-    ARCHIVED = "archived"
-    # Lifecycle values (PF5-MS1)
-    REQ_CREATED = "req_created"
-    CAI_PROCESSING = "cai_processing"
-    CC_PROMPT_READY = "cc_prompt_ready"
-    APPROVED = "approved"
-    CC_PROCESSING = "cc_processing"
-    CC_HANDOFF_READY = "cc_handoff_ready"
-    CAI_REVIEW = "cai_review"
-    UAT_SUBMITTED = "uat_submitted"
-    CAI_FINAL_REVIEW = "cai_final_review"
-    DONE = "done"
-    REWORK = "rework"
 
 
 class SprintStatus(str, Enum):
