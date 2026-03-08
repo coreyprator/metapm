@@ -1,13 +1,32 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-9E3F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-07 — Sprint "PF5-MS1 v2" (v2.11.0)
+Updated: 2026-03-08 — Sprint "MP-LL-001" (v2.12.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-07 (PF5-MS1 v2, v2.11.0)
+### Latest Session Update — 2026-03-08 (MP-LL-001, v2.12.0)
+
+- **Sprint MP-LL-001**: Lessons Learned Fast-Routing infrastructure.
+- **Current Version**: v2.12.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00154-s5t)
+- **Migration 34**: Creates `lessons_learned` table with CHECK constraints (category, target, status, proposed_by), 3 indexes.
+- **Table schema**: id (PK, NVARCHAR(20)), project, category, lesson (NVARCHAR(MAX)), source_sprint, target, target_file, status (default 'draft'), proposed_by (default 'cc'), created_at, approved_at, applied_at, applied_in_sprint, rag_ingested (BIT), rag_ingested_at.
+- **Lessons API** (7 endpoints):
+  - `POST /api/lessons` — create with auto-increment LL-NNN, triggers best-effort RAG ingest
+  - `GET /api/lessons` — filterable (project, category, status, target) with pagination
+  - `GET /api/lessons/pending` — approved + unapplied
+  - `GET /api/lessons/stats` — counts by status/project/category
+  - `GET /api/lessons/recent` — legacy top 20
+  - `GET /api/lessons/{id}` — single lesson
+  - `PATCH /api/lessons/{id}` — update status with auto-timestamps
+- **Dashboard**: Lessons nav button with draft badge count, filter bar (category, status, project), lesson cards with approve/reject actions.
+- **Backfill**: 49 lessons total (LL-001 through LL-049). 48 applied, 1 approved. Covers 7 projects, 4 categories.
+- **RAG deviation**: Portfolio RAG `/ingest/custom` endpoint does not exist (404). `_rag_ingest_lesson()` gracefully fails. Needs future PR sprint.
+- **Handoff**: 77F76B3F | Checkpoint: F155
+
+### Previous: PF5-MS1 v2 (v2.11.0, 2026-03-07)
 
 - **Sprint PF5-MS1 v2**: Lifecycle state badges, transition validation, phase-grouped count bar.
-- **Current Version**: v2.11.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00151-dq7)
+- **Current Version**: v2.11.0 — Cloud Run (revision metapm-v2-00151-dq7)
 - **Migration 33**: Updated `roadmap_requirements` status CHECK constraint. New name: `chk_req_status_v2`. Migrated old lifecycle state values to new names. Now includes 14 values: 3 legacy + 11 lifecycle.
 - **Status values** (14 total):
   - Lifecycle: `req_created`, `req_approved`, `cai_designing`, `cc_prompt_ready`, `cc_executing`, `cc_complete`, `uat_ready`, `uat_pass`, `uat_fail`, `done`, `rework`

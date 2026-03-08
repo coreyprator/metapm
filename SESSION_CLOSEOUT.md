@@ -1,33 +1,52 @@
-# SESSION CLOSEOUT — MP-VB-FIX-001
-**Date**: 2026-03-06
-**Sprint**: MP-VB-FIX-001
-**Version**: v2.9.0 → v2.9.1
-**Revision**: metapm-v2-00147-gft
-**Handoff ID**: 49BC8119-49E9-4ED3-AF64-C6E5323D5CF7
-**UAT ID**: 4F9CA8C8-C79C-4069-8201-BDB2A8BBA140
-
----
+# SESSION CLOSEOUT — MP-LL-001
+**Date**: 2026-03-08
+**Sprint**: MP-LL-001 (Lessons Learned Fast-Routing)
+**Version**: v2.11.0 -> v2.12.0
+**Revision**: metapm-v2-00154-s5t
+**Handoff**: 77F76B3F | Checkpoint: F155
 
 ## Summary
-Fixed VB-03 UAT failure (vision text expand) and delivered 4 UX improvements from PL feedback.
+Built the Lessons Learned Fast-Routing infrastructure for MetaPM: database table, 7 CRUD API endpoints, dashboard Lessons section with filtering and approve/reject workflow, and backfilled 49 lessons from sprint specs and SESSION_CLOSEOUT files.
 
-## Changes
-1. **VB-03 (UAT fix)**: Vision text click-to-expand was broken because onclick only toggled CSS class but innerHTML was already truncated to 150 chars. Fixed by storing full and short text in data attributes, swapping innerHTML on click.
-2. **MP-049**: Added `'vision': 'VIS'` to `prefix_map` in `/api/roadmap/next-code` endpoint. Added type change listener in add form to trigger auto-fill when type changes.
-3. **MP-050**: Already satisfied — detail panel uses `<textarea>` which shows full description without truncation.
-4. **MP-051**: Changed Vision Board from showing one "Next Action" to showing all "Active Items" (status NOT IN done/closed/backlog/archived/deferred/draft). Sorted by status priority then P1/P2/P3.
-5. **MP-052**: Removed `controls.style.display = 'none'` from VB toggle. Added filter awareness to `renderVisionBoard()`: project, category, priority, status, and search filters applied. `render()` now delegates to `renderVisionBoard()` when VB active, so filter changes re-render VB.
+## What Was Built
+1. **Migration 34**: `lessons_learned` table with CHECK constraints on category (process/technical/architecture/quality), target (bootstrap/pk.md/cai_memory/standards), status (draft/approved/applied/rejected), proposed_by (cc/cai/pl). Three indexes.
+2. **API Endpoints** (app/api/lessons.py — full rewrite):
+   - POST /api/lessons — auto-increment LL-NNN, best-effort RAG ingest
+   - GET /api/lessons — filterable list with pagination
+   - GET /api/lessons/pending — approved + unapplied queue
+   - GET /api/lessons/stats — aggregated counts
+   - GET /api/lessons/recent — legacy top 20
+   - GET /api/lessons/{id} — single lesson detail
+   - PATCH /api/lessons/{id} — status transitions with auto-timestamps
+3. **Dashboard** (static/dashboard.html):
+   - Lessons nav button with draft badge counter
+   - Filter bar: category, status, project dropdowns
+   - Lesson cards with status/category color coding
+   - Approve/reject buttons on draft lessons
+4. **Backfill**: 49 lessons (LL-001 through LL-049)
+   - 16 seed lessons from sprint spec (backfill_lessons.py)
+   - 32 extracted from SESSION_CLOSEOUT files (backfill_lessons_wave2.py)
+   - 1 test lesson (LL-001, status: approved)
+   - Covers 7 projects, 4 categories
+
+## Deviations
+- **Portfolio RAG integration**: `/ingest/custom` endpoint returns 404. The `_rag_ingest_lesson()` function is implemented with graceful fallback (logs warning, continues). All `rag_ingested` flags remain 0. Requires future Portfolio RAG sprint to add the custom ingest endpoint.
 
 ## Files Modified
-- `static/dashboard.html` — VB expand fix, filter inheritance, active items list
-- `app/api/roadmap.py` — VIS prefix in next-code endpoint
-- `app/core/config.py` — Version 2.9.1
+- `app/core/config.py` — VERSION bump to 2.12.0
+- `app/core/migrations.py` — Migration 34 (lessons_learned table)
+- `app/api/lessons.py` — Full rewrite with 7 endpoints
+- `static/dashboard.html` — Lessons nav, CSS, filter bar, card rendering, approve/reject
+- `backfill_lessons.py` — 16 seed lessons script
+- `backfill_lessons_wave2.py` — 32 SESSION_CLOSEOUT lessons script
+- `PROJECT_KNOWLEDGE.md` — Updated to v2.12.0
 
-## Requirements Registered & Closed
-- MP-049: Auto-fill VIS-XXX code
-- MP-050: Full description in detail panel
-- MP-051: Vision Board all active items
-- MP-052: Vision Board filter inheritance
+## MetaPM State
+- MP-054 (Lessons Learned Fast-Routing): cc_complete (F155)
+- Total lessons: 49 (48 applied, 1 approved)
+- UAT: Submitted, handoff 77F76B3F
 
-## Commit
-- Code: 9f765f1 — `v2.9.1: Vision Board expand fix + UX improvements [MP-049-052]`
+## Next Sprint Candidates
+- Portfolio RAG: Add `/ingest/custom` endpoint for lesson ingestion
+- Lesson application workflow: Auto-PR to target files when lesson is approved
+- PF5-MS2: Prompt storage + MetaPM-rendered UAT (MP-045 + MP-048)
