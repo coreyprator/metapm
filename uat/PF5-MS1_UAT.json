@@ -1,0 +1,177 @@
+{
+  "uat_version": "2.2",
+  "generated_by": "cc",
+  "generated_at": "2026-03-07T22:00:00Z",
+  "handoff_id": "HO-PF5MS1",
+  "project": {
+    "name": "MetaPM",
+    "emoji": "\ud83d\udd34",
+    "version": "2.11.0",
+    "app_url": "https://metapm.rentyourcio.com",
+    "health_url": "https://metapm-v2-57478301787.us-central1.run.app/health",
+    "deployed_revision": "metapm-v2-00151-dq7"
+  },
+  "context": {
+    "summary": "Added lifecycle state badges with color-coded pills, phase-grouped count bar, transition validation, and new lifecycle states API endpoint.",
+    "root_cause": null,
+    "files_modified": [
+      "app/schemas/roadmap.py",
+      "app/api/roadmap.py",
+      "app/core/migrations.py",
+      "app/core/config.py",
+      "static/dashboard.html"
+    ],
+    "commit": "46633ab",
+    "risk_areas": ["Status badge colors may need adjustment for dark theme readability", "Data migration of old status values"]
+  },
+  "sections": [
+    {
+      "id": "section-1",
+      "title": "Health & Version",
+      "tests": [
+        {
+          "id": "PF01-01",
+          "title": "Health check returns 2.11.0",
+          "description": "Open https://metapm.rentyourcio.com/health in browser",
+          "expected": "JSON shows version: 2.11.0",
+          "category": "fix_verification",
+          "priority": "critical"
+        }
+      ]
+    },
+    {
+      "id": "section-2",
+      "title": "Lifecycle States API",
+      "tests": [
+        {
+          "id": "PF01-02",
+          "title": "Lifecycle states endpoint returns all states",
+          "description": "Open https://metapm.rentyourcio.com/api/v1/lifecycle/states in browser",
+          "expected": "JSON with 14 states, each having id, label, color, and phase fields. Phases: definition, design, build, validate, complete, legacy",
+          "category": "fix_verification",
+          "priority": "critical"
+        }
+      ]
+    },
+    {
+      "id": "section-3",
+      "title": "Status Badges",
+      "tests": [
+        {
+          "id": "PF01-03",
+          "title": "Status badges visible on requirements list",
+          "description": "Open https://metapm.rentyourcio.com, expand a project. Look at requirement rows.",
+          "expected": "Each requirement shows a color-coded pill badge for its status. Colors should match the lifecycle states spec (e.g., req_created is gray, done is green, rework is red/pink).",
+          "category": "fix_verification",
+          "priority": "critical"
+        },
+        {
+          "id": "PF01-04",
+          "title": "Status badges readable on dark background",
+          "description": "Scan several requirements across different statuses.",
+          "expected": "All status badge text is readable against the dark dashboard background. No washed-out or invisible text.",
+          "category": "exploratory",
+          "priority": "high"
+        }
+      ]
+    },
+    {
+      "id": "section-4",
+      "title": "Transition Validation",
+      "tests": [
+        {
+          "id": "PF01-05",
+          "title": "Invalid transition rejected",
+          "description": "Open a requirement at 'done' status. Try changing it to 'req_created' via the status dropdown.",
+          "expected": "Toast error appears: 'State update failed' with message about invalid transition. Only 'rework' should be allowed from 'done'.",
+          "category": "fix_verification",
+          "priority": "critical"
+        },
+        {
+          "id": "PF01-06",
+          "title": "Valid transition accepted",
+          "description": "Open a requirement at 'req_created' status. Change it to 'req_approved' via the status dropdown.",
+          "expected": "Checkpoint code appears below the dropdown. Status updates immediately without needing to click Save.",
+          "category": "fix_verification",
+          "priority": "critical"
+        }
+      ]
+    },
+    {
+      "id": "section-5",
+      "title": "Phase-Grouped Count Bar",
+      "tests": [
+        {
+          "id": "PF01-07",
+          "title": "Phase bar visible above requirements list",
+          "description": "Open https://metapm.rentyourcio.com dashboard.",
+          "expected": "A row of phase chips appears above the requirements list showing: Definition(N) Design(N) Build(N) Validate(N) Complete(N) and optionally Legacy(N). Each shows a count.",
+          "category": "fix_verification",
+          "priority": "critical"
+        },
+        {
+          "id": "PF01-08",
+          "title": "Phase chip click filters requirements",
+          "description": "Click the 'Definition' chip in the phase bar.",
+          "expected": "Status filter changes to first status in that phase (req_created). Requirements list filters to show only Definition-phase items.",
+          "category": "fix_verification",
+          "priority": "high"
+        }
+      ]
+    },
+    {
+      "id": "section-6",
+      "title": "Status Filter Dropdown",
+      "tests": [
+        {
+          "id": "PF01-09",
+          "title": "Status filter groups options by phase",
+          "description": "Click the Status filter dropdown in the controls area.",
+          "expected": "Options are grouped into optgroups: Definition, Design, Build, Validate, Complete, Legacy. Each group contains the appropriate lifecycle states.",
+          "category": "fix_verification",
+          "priority": "critical"
+        },
+        {
+          "id": "PF01-10",
+          "title": "Detail panel status dropdown also grouped",
+          "description": "Click a requirement to open the detail drawer. Look at the Status dropdown.",
+          "expected": "Same phase grouping as the main filter: Definition, Design, Build, Validate, Complete, Legacy.",
+          "category": "fix_verification",
+          "priority": "high"
+        }
+      ]
+    },
+    {
+      "id": "section-7",
+      "title": "Regression",
+      "tests": [
+        {
+          "id": "PF01-11",
+          "title": "Open Only toggle still works",
+          "description": "Toggle 'Open Only' checkbox off and on.",
+          "expected": "Off: shows done/closed items. On: hides them. No errors.",
+          "category": "regression",
+          "priority": "high"
+        },
+        {
+          "id": "PF01-12",
+          "title": "Person filter still works",
+          "description": "Select 'CC' from person filter.",
+          "expected": "Shows only requirements in CC-owned states (cc_prompt_ready, cc_executing, cc_complete).",
+          "category": "regression",
+          "priority": "medium"
+        },
+        {
+          "id": "PF01-13",
+          "title": "Version badge shows 2.11.0",
+          "description": "Check the version badge in the top header bar.",
+          "expected": "Shows v2.11.0",
+          "category": "regression",
+          "priority": "medium"
+        }
+      ]
+    }
+  ],
+  "test_data_notes": "All existing requirements should have been migrated from old lifecycle states to new ones by migration 33. Check that no requirements show old state names (cai_processing, cc_processing, etc.).",
+  "cc_observations": "Status badge colors use light backgrounds with dark text, which may look different on the dark dashboard theme. The badges render as pills with background colors. Visual review needed to confirm readability."
+}
