@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.11.0"  # PF5-MS1 v2: Lifecycle state badges, transition validation, phase groups
+    VERSION: str = "2.12.0"  # MP-LL-001: Lessons Learned Fast-Routing infrastructure
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

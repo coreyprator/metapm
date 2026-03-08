@@ -214,6 +214,33 @@
     .vb-next-action:hover { background: rgba(255,255,255,0.05); }
     .vb-counts { margin-top: 8px; font-size: 12px; color: var(--muted); }
     #visionBoard { display: none; }
+    #lessonsPanel { display: none; }
+    #lessonsBtn.active { background: #854d0e; color: #fde68a; border-color: #854d0e; }
+    .ll-filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; padding: 10px; }
+    .ll-filter-bar select { background: var(--panel-soft); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+    .lesson-card { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 8px; background: var(--panel-soft); }
+    .lesson-header { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
+    .ll-code { font-weight: 700; font-size: 13px; color: var(--fg); }
+    .ll-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; }
+    .ll-project-badge { background: rgba(74,144,217,0.2); color: #9ec2ff; }
+    .ll-cat-process { background: rgba(249,115,22,0.2); color: #f97316; }
+    .ll-cat-technical { background: rgba(168,85,247,0.2); color: #a855f7; }
+    .ll-cat-architecture { background: rgba(20,184,166,0.2); color: #14b8a6; }
+    .ll-cat-quality { background: rgba(239,68,68,0.2); color: #ef4444; }
+    .ll-target-badge { color: var(--muted); font-size: 11px; }
+    .ll-status-draft { background: #854d0e; color: #fde68a; }
+    .ll-status-approved { background: #1e3a5f; color: #93c5fd; }
+    .ll-status-applied { background: #14532d; color: #86efac; }
+    .ll-status-rejected { background: #374151; color: #d1d5db; }
+    .ll-rag-badge { font-size: 10px; color: #86efac; }
+    .ll-text { font-size: 13px; line-height: 1.5; color: var(--fg); margin: 6px 0; }
+    .lesson-meta { font-size: 11px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; }
+    .lesson-actions { margin-top: 8px; display: flex; gap: 6px; }
+    .lesson-actions button { font-size: 11px; padding: 4px 10px; border-radius: 5px; cursor: pointer; border: 1px solid var(--line); }
+    .btn-approve { background: #14532d; color: #86efac; border-color: #14532d !important; }
+    .btn-approve:hover { background: #166534; }
+    .btn-reject { background: #374151; color: #d1d5db; border-color: #374151 !important; }
+    .btn-reject:hover { background: #4b5563; }
     #visionBoardBtn.active { background: #7c3aed; color: white; border-color: #7c3aed; }
     .task-row {
       display: grid;
@@ -398,6 +425,7 @@
       <div class="actions-row">
         <button type="button" id="wipBtn" onclick="activateWipView()">📋 WIP</button>
         <button type="button" id="visionBoardBtn" onclick="toggleVisionBoard()">👁 Vision Board</button>
+        <button type="button" id="lessonsBtn" onclick="toggleLessonsView()">📚 Lessons <span id="lessonsDraftBadge" style="display:none;background:#854d0e;color:#fde68a;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:3px"></span></button>
         <a href="/static/roadmap-report.html" target="_blank" rel="noopener"><button type="button">📊 Roadmap Report</button></a>
         <a href="/architecture" target="_blank" rel="noopener"><button type="button">🏗️ Architecture</button></a>
         <div class="add-wrap">
@@ -479,6 +507,16 @@
     <div class="phase-bar" id="phaseBar"></div>
     <div class="card hierarchy" id="hierarchy"></div>
     <div class="card" id="visionBoard"></div>
+    <div class="card" id="lessonsPanel">
+      <div class="ll-filter-bar">
+        <select id="ll-filter-project"><option value="">All Projects</option></select>
+        <select id="ll-filter-status"><option value="">All Status</option><option value="draft">Draft</option><option value="approved">Approved</option><option value="applied">Applied</option><option value="rejected">Rejected</option></select>
+        <select id="ll-filter-category"><option value="">All Categories</option><option value="process">Process</option><option value="technical">Technical</option><option value="architecture">Architecture</option><option value="quality">Quality</option></select>
+        <select id="ll-filter-target"><option value="">All Targets</option><option value="bootstrap">Bootstrap</option><option value="pk.md">PK.md</option><option value="cai_memory">CAI Memory</option><option value="standards">Standards</option></select>
+      </div>
+      <div id="lessonsStats" style="padding:0 10px 8px;font-size:12px;color:var(--muted)"></div>
+      <div id="lessonsList"></div>
+    </div>
 
     <div class="card footer" id="summary">
       <div>Total: 0 | Closed: 0 | Executing: 0 | Backlog: 0 | Projects: 0</div>
@@ -1086,6 +1124,131 @@
         };
       });
     }
+
+    // ── Lessons Learned Section ──────────────────────────────────────
+    let lessonsActive = false;
+    let lessonsData = [];
+
+    function toggleLessonsView() {
+      lessonsActive = !lessonsActive;
+      const btn = qs('lessonsBtn');
+      const panel = qs('lessonsPanel');
+      const hierarchy = qs('hierarchy');
+      const vb = qs('visionBoard');
+      if (lessonsActive) {
+        // Deactivate other views
+        if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); vb.style.display = 'none'; }
+        btn.classList.add('active');
+        hierarchy.style.display = 'none';
+        panel.style.display = 'block';
+        refreshLessons();
+      } else {
+        btn.classList.remove('active');
+        hierarchy.style.display = '';
+        panel.style.display = 'none';
+      }
+    }
+
+    async function refreshLessons() {
+      const project = qs('ll-filter-project').value;
+      const status = qs('ll-filter-status').value;
+      const category = qs('ll-filter-category').value;
+      const target = qs('ll-filter-target').value;
+      const params = new URLSearchParams();
+      if (project) params.set('project', project);
+      if (status) params.set('status', status);
+      if (category) params.set('category', category);
+      if (target) params.set('target', target);
+      params.set('limit', '200');
+      try {
+        const res = await fetch(`/api/lessons?${params}`);
+        const data = await res.json();
+        lessonsData = data.lessons || [];
+        renderLessons();
+        // Update stats
+        const statsRes = await fetch('/api/lessons/stats');
+        const stats = await statsRes.json();
+        qs('lessonsStats').textContent = `Total: ${stats.total} | Draft: ${stats.by_status?.draft||0} | Approved: ${stats.by_status?.approved||0} | Applied: ${stats.by_status?.applied||0} | Rejected: ${stats.by_status?.rejected||0}`;
+        // Update draft badge
+        const draftCount = stats.pending_approval || 0;
+        const badge = qs('lessonsDraftBadge');
+        if (draftCount > 0) { badge.textContent = draftCount; badge.style.display = 'inline'; }
+        else { badge.style.display = 'none'; }
+        // Populate project filter if empty
+        const pf = qs('ll-filter-project');
+        if (pf.options.length <= 1 && stats.by_project) {
+          for (const p of Object.keys(stats.by_project).sort()) {
+            pf.insertAdjacentHTML('beforeend', `<option value="${p}">${p}</option>`);
+          }
+        }
+      } catch (e) { console.error('Lessons load error:', e); }
+    }
+
+    function renderLessons() {
+      const list = qs('lessonsList');
+      if (!lessonsData.length) { list.innerHTML = '<div style="padding:10px;color:var(--muted)">No lessons found.</div>'; return; }
+      list.innerHTML = lessonsData.map(l => {
+        const catClass = `ll-cat-${l.category}`;
+        const statusClass = `ll-status-${l.status}`;
+        const ragBadge = l.rag_ingested ? '<span class="ll-rag-badge" title="In RAG">RAG ✓</span>' : '';
+        const actions = l.status === 'draft' ? `
+          <div class="lesson-actions">
+            <button class="btn-approve" onclick="approveLesson('${l.id}')">✓ Approve</button>
+            <button class="btn-reject" onclick="rejectLesson('${l.id}')">✗ Reject</button>
+          </div>` : '';
+        return `<div class="lesson-card" data-id="${l.id}" data-status="${l.status}">
+          <div class="lesson-header">
+            <span class="ll-code">${l.id}</span>
+            <span class="ll-badge ll-project-badge">${l.project}</span>
+            <span class="ll-badge ${catClass}">${l.category}</span>
+            <span class="ll-target-badge">→ ${l.target}</span>
+            <span class="ll-badge ${statusClass}">${l.status.toUpperCase()}</span>
+            ${ragBadge}
+          </div>
+          <p class="ll-text">${(l.lesson||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>
+          <div class="lesson-meta">
+            ${l.source_sprint ? `<span>Sprint: ${l.source_sprint}</span>` : ''}
+            <span>by: ${l.proposed_by}</span>
+            <span>${l.created_at ? new Date(l.created_at).toLocaleDateString() : ''}</span>
+            ${l.applied_in_sprint ? `<span>Applied in: ${l.applied_in_sprint}</span>` : ''}
+          </div>
+          ${actions}
+        </div>`;
+      }).join('');
+    }
+
+    async function approveLesson(id) {
+      const res = await fetch(`/api/lessons/${id}`, {
+        method: 'PATCH', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status: 'approved'})
+      });
+      if (res.ok) await refreshLessons();
+      else showToast('Failed to approve lesson');
+    }
+
+    async function rejectLesson(id) {
+      if (!confirm('Reject this lesson?')) return;
+      const res = await fetch(`/api/lessons/${id}`, {
+        method: 'PATCH', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status: 'rejected'})
+      });
+      if (res.ok) await refreshLessons();
+      else showToast('Failed to reject lesson');
+    }
+
+    // Bind Lessons filter changes
+    document.addEventListener('DOMContentLoaded', () => {
+      ['ll-filter-project','ll-filter-status','ll-filter-category','ll-filter-target'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.onchange = () => refreshLessons();
+      });
+      // Load draft badge on initial load
+      fetch('/api/lessons/stats').then(r=>r.json()).then(stats => {
+        const draftCount = stats.pending_approval || 0;
+        const badge = qs('lessonsDraftBadge');
+        if (draftCount > 0) { badge.textContent = draftCount; badge.style.display = 'inline'; }
+      }).catch(() => {});
+    });
 
     function render() {
       updateProjectFilterCounts();

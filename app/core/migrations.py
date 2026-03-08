@@ -1237,4 +1237,45 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 33 warning: {e}")
 
+    # Migration 34: Create lessons_learned table (MP-LL-001)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'lessons_learned'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 34: Creating lessons_learned table...")
+            execute_query("""
+                CREATE TABLE lessons_learned (
+                    id                NVARCHAR(20)   PRIMARY KEY,
+                    project           NVARCHAR(50)   NOT NULL,
+                    category          NVARCHAR(20)   NOT NULL
+                        CHECK (category IN ('process','technical','architecture','quality')),
+                    lesson            NVARCHAR(MAX)  NOT NULL,
+                    source_sprint     NVARCHAR(50)   NULL,
+                    target            NVARCHAR(30)   NOT NULL
+                        CHECK (target IN ('bootstrap','pk.md','cai_memory','standards')),
+                    target_file       NVARCHAR(255)  NULL,
+                    status            NVARCHAR(20)   NOT NULL DEFAULT 'draft'
+                        CHECK (status IN ('draft','approved','applied','rejected')),
+                    proposed_by       NVARCHAR(10)   NOT NULL DEFAULT 'cc'
+                        CHECK (proposed_by IN ('cc','cai','pl')),
+                    created_at        DATETIME       NOT NULL DEFAULT GETDATE(),
+                    approved_at       DATETIME       NULL,
+                    applied_at        DATETIME       NULL,
+                    applied_in_sprint NVARCHAR(50)   NULL,
+                    rag_ingested      BIT            NOT NULL DEFAULT 0,
+                    rag_ingested_at   DATETIME       NULL
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX ix_ll_project ON lessons_learned(project)", fetch="none")
+            execute_query("CREATE INDEX ix_ll_status ON lessons_learned(status)", fetch="none")
+            execute_query("CREATE INDEX ix_ll_project_status ON lessons_learned(project, status)", fetch="none")
+            logger.info("  Migration 34: lessons_learned table created with indexes.")
+        else:
+            logger.info("  Migration 34: lessons_learned table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 34 warning: {e}")
+
     logger.info("Migrations complete.")
