@@ -508,11 +508,38 @@
     <div class="card hierarchy" id="hierarchy"></div>
     <div class="card" id="visionBoard"></div>
     <div class="card" id="lessonsPanel">
-      <div class="ll-filter-bar">
+      <div class="ll-filter-bar" style="align-items:center">
         <select id="ll-filter-project"><option value="">All Projects</option></select>
         <select id="ll-filter-status"><option value="">All Status</option><option value="draft">Draft</option><option value="approved">Approved</option><option value="applied">Applied</option><option value="rejected">Rejected</option></select>
         <select id="ll-filter-category"><option value="">All Categories</option><option value="process">Process</option><option value="technical">Technical</option><option value="architecture">Architecture</option><option value="quality">Quality</option></select>
         <select id="ll-filter-target"><option value="">All Targets</option><option value="bootstrap">Bootstrap</option><option value="pk.md">PK.md</option><option value="cai_memory">CAI Memory</option><option value="standards">Standards</option></select>
+        <button type="button" onclick="toggleNewLessonForm()" style="margin-left:auto;background:#22c55e;color:white;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-weight:600;font-size:12px">+ New Lesson</button>
+      </div>
+      <div id="newLessonForm" style="display:none;padding:12px;background:var(--panel-soft);border-radius:8px;margin:0 10px 12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <select id="nl-project" style="padding:6px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px">
+            <option value="">Project *</option>
+            <option value="metapm">metapm</option><option value="etymython">etymython</option><option value="super-flashcards">super-flashcards</option>
+            <option value="artforge">artforge</option><option value="harmonylab">harmonylab</option><option value="pie-network-graph">pie-network-graph</option>
+            <option value="portfolio-rag">portfolio-rag</option><option value="project-methodology">project-methodology</option>
+          </select>
+          <select id="nl-category" style="padding:6px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px">
+            <option value="">Category *</option>
+            <option value="process">process</option><option value="technical">technical</option><option value="architecture">architecture</option><option value="quality">quality</option>
+          </select>
+          <select id="nl-target" style="padding:6px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px">
+            <option value="bootstrap">bootstrap</option><option value="pk.md">pk.md</option><option value="cai_memory">cai_memory</option><option value="standards">standards</option>
+          </select>
+          <select id="nl-proposed-by" style="padding:6px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px">
+            <option value="pl">pl</option><option value="cai">cai</option><option value="cc">cc</option>
+          </select>
+        </div>
+        <input id="nl-source-sprint" placeholder="Source sprint (optional)" style="width:100%;padding:6px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px;margin-bottom:8px;box-sizing:border-box">
+        <textarea id="nl-lesson" placeholder="Lesson text (min 20 chars) *" rows="4" maxlength="2000" style="width:100%;padding:8px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px;resize:vertical;box-sizing:border-box"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button type="button" onclick="submitNewLesson()" style="background:#22c55e;color:white;border:none;border-radius:4px;padding:6px 16px;cursor:pointer;font-weight:600;font-size:12px">Submit Lesson</button>
+          <button type="button" onclick="toggleNewLessonForm()" style="background:#374151;color:#d1d5db;border:none;border-radius:4px;padding:6px 16px;cursor:pointer;font-size:12px">Cancel</button>
+        </div>
       </div>
       <div id="lessonsStats" style="padding:0 10px 8px;font-size:12px;color:var(--muted)"></div>
       <div id="lessonsList"></div>
@@ -1191,11 +1218,14 @@
         const catClass = `ll-cat-${l.category}`;
         const statusClass = `ll-status-${l.status}`;
         const ragBadge = l.rag_ingested ? '<span class="ll-rag-badge" title="In RAG">RAG ✓</span>' : '';
-        const actions = l.status === 'draft' ? `
-          <div class="lesson-actions">
-            <button class="btn-approve" onclick="approveLesson('${l.id}')">✓ Approve</button>
-            <button class="btn-reject" onclick="rejectLesson('${l.id}')">✗ Reject</button>
-          </div>` : '';
+        const approveReject = l.status === 'draft' ? `
+            <button class="btn-approve" onclick="approveLesson('${l.id}')">Approve</button>
+            <button class="btn-reject" onclick="rejectLesson('${l.id}')">Reject</button>` : '';
+        const actions = `<div class="lesson-actions">
+            ${approveReject}
+            <button style="background:#374151;color:#d1d5db;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:11px" onclick="copyLessonJson('${l.id}')">Copy JSON</button>
+            <a href="/lessons/${l.id}" target="_blank" style="color:#60a5fa;font-size:11px;text-decoration:none;padding:4px 6px">View</a>
+          </div>`;
         return `<div class="lesson-card" data-id="${l.id}" data-status="${l.status}">
           <div class="lesson-header">
             <span class="ll-code">${l.id}</span>
@@ -1234,6 +1264,47 @@
       });
       if (res.ok) await refreshLessons();
       else showToast('Failed to reject lesson');
+    }
+
+    function copyLessonJson(id) {
+      const l = lessonsData.find(x => x.id === id);
+      if (!l) return;
+      const payload = {project: l.project, category: l.category, lesson: l.lesson, target: l.target, source_sprint: l.source_sprint || '', proposed_by: l.proposed_by};
+      navigator.clipboard.writeText(JSON.stringify(payload, null, 2)).then(() => showToast('JSON copied'));
+    }
+
+    function toggleNewLessonForm() {
+      const form = qs('newLessonForm');
+      form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async function submitNewLesson() {
+      const project = qs('nl-project').value;
+      const category = qs('nl-category').value;
+      const lesson = qs('nl-lesson').value.trim();
+      const target = qs('nl-target').value;
+      const proposed_by = qs('nl-proposed-by').value;
+      const source_sprint = qs('nl-source-sprint').value.trim();
+      if (!project) { showToast('Project required'); return; }
+      if (!category) { showToast('Category required'); return; }
+      if (lesson.length < 20) { showToast('Lesson must be at least 20 characters'); return; }
+      try {
+        const res = await fetch('/api/lessons', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({project, category, lesson, target, proposed_by, source_sprint: source_sprint || undefined, status: 'draft'})
+        });
+        if (res.ok) {
+          const data = await res.json();
+          showToast(`Lesson ${data.id} created`);
+          qs('nl-lesson').value = '';
+          qs('nl-source-sprint').value = '';
+          toggleNewLessonForm();
+          await refreshLessons();
+        } else {
+          const err = await res.json();
+          showToast('Error: ' + (err.detail || res.status));
+        }
+      } catch (e) { showToast('Network error: ' + e.message); }
     }
 
     // Bind Lessons filter changes

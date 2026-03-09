@@ -1,13 +1,29 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-9E3F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-09 — Sprint "MP-UAT-GEN" (v2.13.0)
+Updated: 2026-03-09 — Sprint "MP-LL-UI-001" (v2.14.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-09 (MP-UAT-GEN, v2.13.0)
+### Latest Session Update — 2026-03-09 (MP-LL-UI-001, v2.14.0)
+
+- **Sprint MP-LL-UI-001**: Lessons UI enhancements.
+- **Current Version**: v2.14.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00158-8fr)
+- **New endpoints**:
+  - `GET/POST /api/lessons/{id}/approve` — one-click approve, returns HTML confirmation
+  - `GET/POST /api/lessons/{id}/reject` — one-click reject, returns HTML confirmation
+  - `GET /lessons/{id}` — standalone lesson detail page with Approve/Reject buttons
+- **Dashboard Lessons tab enhancements**:
+  - "+ New Lesson" button with inline form (project, category, lesson text, target, proposed_by, source sprint)
+  - "Copy JSON" button on every lesson card (copies ready-to-POST payload)
+  - "View" link on every lesson card (opens /lessons/{id} in new tab)
+- **CAI one-click URL format**: `https://metapm.rentyourcio.com/lessons/LL-051`
+- **Smoke test**: LL-050 rejected (duplicate), LL-051 approved via one-click endpoint
+- **Handoff**: 77F76B3F | Checkpoint: A16E
+
+### Previous: MP-UAT-GEN (v2.13.0, 2026-03-09)
 
 - **Sprint MP-UAT-GEN**: Server-Side UAT Generation.
-- **Current Version**: v2.13.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00156-xvl)
+- **Current Version**: v2.13.0 — Cloud Run (revision metapm-v2-00156-xvl)
 - **Migration 35**: Creates `uat_pages` table (id UNIQUEIDENTIFIER PK, handoff_id, project, sprint_code, pth, version, deploy_url, test_cases_json, cai_review_json, html_content, status CHECK ready/in_progress/submitted, created_at, submitted_at). 2 indexes.
 - **UAT Generation API**:
   - `POST /api/uat/generate` — generates UAT page from handoff + requirements. Upsert on handoff_id. Returns {uat_id, uat_url, test_count}.

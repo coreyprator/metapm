@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.13.0"  # MP-UAT-GEN: Server-Side UAT Generation
+    VERSION: str = "2.14.0"  # MP-LL-UI-001: Lessons UI enhancements
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

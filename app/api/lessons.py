@@ -18,6 +18,7 @@ from typing import Optional, List
 from pydantic import BaseModel
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import HTMLResponse
 import httpx
 
 from app.core.config import settings
@@ -274,6 +275,54 @@ async def recent_lessons():
         SELECT TOP 20 * FROM lessons_learned ORDER BY created_at DESC
     """, fetch="all") or []
     return {"lessons": [_row_to_dict(r) for r in rows]}
+
+
+# ── GET/POST /api/lessons/{id}/approve ─────────────────────────────────
+
+def _lesson_action_html(lesson_id: str, action: str, lesson_text: str) -> str:
+    """Render a simple confirmation HTML page for approve/reject."""
+    icon = "Approved" if action == "approved" else "Rejected"
+    color = "#22c55e" if action == "approved" else "#ef4444"
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{lesson_id} {icon}</title>
+<style>body{{font-family:-apple-system,sans-serif;max-width:600px;margin:60px auto;padding:20px;background:#1a1a2e;color:#e5e5e5;text-align:center}}
+.card{{background:#252538;border-radius:12px;padding:30px;border:2px solid {color}}}
+h1{{color:{color};font-size:2rem;margin-bottom:12px}}
+.lesson{{text-align:left;background:#1e1e32;padding:16px;border-radius:8px;margin:16px 0;font-size:0.9rem;line-height:1.6}}
+a{{color:#60a5fa;text-decoration:none;font-weight:600}}
+a:hover{{text-decoration:underline}}</style></head>
+<body><div class="card"><h1>{icon}</h1>
+<p><strong>{lesson_id}</strong> has been {action}.</p>
+<div class="lesson">{lesson_text[:500]}</div>
+<p style="margin-top:20px"><a href="/static/dashboard.html">Back to Dashboard</a></p>
+</div></body></html>"""
+
+
+@router.get("/lessons/{lesson_id}/approve")
+@router.post("/lessons/{lesson_id}/approve")
+async def approve_lesson_shortcut(lesson_id: str):
+    """One-click approve. Returns HTML confirmation page."""
+    row = execute_query("SELECT * FROM lessons_learned WHERE id = ?", (lesson_id,), fetch="one")
+    if not row:
+        raise HTTPException(404, f"Lesson {lesson_id} not found")
+    execute_query("""
+        UPDATE lessons_learned SET status = 'approved', approved_at = GETDATE() WHERE id = ?
+    """, (lesson_id,), fetch="none")
+    return HTMLResponse(_lesson_action_html(lesson_id, "approved", row["lesson"]))
+
+
+@router.get("/lessons/{lesson_id}/reject")
+@router.post("/lessons/{lesson_id}/reject")
+async def reject_lesson_shortcut(lesson_id: str):
+    """One-click reject. Returns HTML confirmation page."""
+    row = execute_query("SELECT * FROM lessons_learned WHERE id = ?", (lesson_id,), fetch="one")
+    if not row:
+        raise HTTPException(404, f"Lesson {lesson_id} not found")
+    execute_query("""
+        UPDATE lessons_learned SET status = 'rejected' WHERE id = ?
+    """, (lesson_id,), fetch="none")
+    return HTMLResponse(_lesson_action_html(lesson_id, "rejected", row["lesson"]))
 
 
 # ── GET /api/lessons/{id} ─────────────────────────────────────────────

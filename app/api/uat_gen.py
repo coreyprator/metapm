@@ -245,3 +245,65 @@ async def list_uat_pages(
         })
 
     return {"pages": results, "count": len(results)}
+
+
+# ── GET /lessons/{id} — Standalone lesson detail page ──────────────────
+
+@router.get("/lessons/{lesson_id}")
+async def serve_lesson_page(lesson_id: str):
+    """Standalone lesson detail page with Approve/Reject buttons."""
+    from html import escape
+    row = execute_query(
+        "SELECT * FROM lessons_learned WHERE id = ?",
+        (lesson_id,), fetch="one"
+    )
+    if not row:
+        raise HTTPException(404, f"Lesson {lesson_id} not found")
+
+    status = row["status"]
+    status_color = {"draft": "#d97706", "approved": "#3b82f6", "applied": "#22c55e", "rejected": "#ef4444"}.get(status, "#6b7280")
+    cat_color = {"process": "#f97316", "technical": "#a855f7", "architecture": "#06b6d4", "quality": "#ef4444"}.get(row["category"], "#6b7280")
+
+    actions = ""
+    if status == "draft":
+        actions = f'''
+        <div style="display:flex;gap:12px;justify-content:center;margin-top:24px">
+            <a href="/api/lessons/{escape(lesson_id)}/approve" style="background:#22c55e;color:white;padding:12px 32px;border-radius:8px;font-size:1rem;font-weight:600;text-decoration:none">Approve</a>
+            <a href="/api/lessons/{escape(lesson_id)}/reject" style="background:#991b1b;color:white;padding:12px 32px;border-radius:8px;font-size:1rem;font-weight:600;text-decoration:none">Reject</a>
+        </div>'''
+
+    html = f'''<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{escape(lesson_id)} - Lesson Detail</title>
+<style>
+body{{font-family:-apple-system,sans-serif;max-width:700px;margin:40px auto;padding:20px;background:#1a1a2e;color:#e5e5e5;line-height:1.6}}
+.card{{background:#252538;border-radius:12px;padding:30px;margin-bottom:16px}}
+h1{{font-size:1.5rem;margin-bottom:16px}}
+.badge{{display:inline-block;padding:3px 10px;border-radius:4px;font-size:0.8rem;font-weight:600;margin-right:6px}}
+.lesson-text{{background:#1e1e32;padding:20px;border-radius:8px;margin:16px 0;font-size:0.95rem;line-height:1.7}}
+.meta{{font-size:0.85rem;color:#9ca3af;margin-top:12px}}
+.meta span{{margin-right:16px}}
+a.back{{color:#60a5fa;text-decoration:none;font-weight:600;display:inline-block;margin-top:20px}}
+a.back:hover{{text-decoration:underline}}
+</style></head>
+<body>
+<div class="card">
+    <h1>{escape(lesson_id)}</h1>
+    <div>
+        <span class="badge" style="background:{status_color};color:white">{escape(status.upper())}</span>
+        <span class="badge" style="background:{cat_color};color:white">{escape(row["category"])}</span>
+        <span class="badge" style="background:#374151;color:#d1d5db">{escape(row["project"])}</span>
+        <span class="badge" style="background:#374151;color:#d1d5db">-&gt; {escape(row["target"])}</span>
+    </div>
+    <div class="lesson-text">{escape(row["lesson"])}</div>
+    <div class="meta">
+        <span>Proposed by: {escape(row.get("proposed_by","?"))}</span>
+        {f'<span>Source: {escape(row.get("source_sprint",""))}</span>' if row.get("source_sprint") else ''}
+        <span>Created: {str(row.get("created_at",""))[:10]}</span>
+        {f'<span>Applied in: {escape(row.get("applied_in_sprint",""))}</span>' if row.get("applied_in_sprint") else ''}
+    </div>
+    {actions}
+    <a class="back" href="/static/dashboard.html">&larr; Back to Dashboard</a>
+</div>
+</body></html>'''
+    return HTMLResponse(html)
