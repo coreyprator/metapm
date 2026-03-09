@@ -1,13 +1,21 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-9E3F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-09 — Sprint "MP-LL-UI-001" (v2.14.0)
+Updated: 2026-03-09 — Sprint "MP-LL-UI-FIX-001" (v2.14.1)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-09 (MP-LL-UI-001, v2.14.0)
+### Latest Session Update — 2026-03-09 (MP-LL-UI-FIX-001, v2.14.1)
+
+- **Sprint MP-LL-UI-FIX-001**: Fix /lessons/{id} detail page buttons.
+- **Current Version**: v2.14.1 — **DEPLOYED** to Cloud Run
+- **Fix 1**: /lessons/{id} detail page now shows Approve/Reject buttons for both `draft` AND `approved` statuses (was draft-only). Buttons use JS fetch + inline DOM update instead of link navigation.
+- **Fix 2**: LL-001 ("Test lesson - DELETE") rejected via API.
+- **MetaPM code**: MP-058
+
+### Previous: MP-LL-UI-001 (v2.14.0, 2026-03-09)
 
 - **Sprint MP-LL-UI-001**: Lessons UI enhancements.
-- **Current Version**: v2.14.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00158-8fr)
+- **Version**: v2.14.0 (revision metapm-v2-00158-8fr)
 - **New endpoints**:
   - `GET/POST /api/lessons/{id}/approve` — one-click approve, returns HTML confirmation
   - `GET/POST /api/lessons/{id}/reject` — one-click reject, returns HTML confirmation

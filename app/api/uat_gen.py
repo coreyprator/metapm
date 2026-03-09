@@ -265,12 +265,35 @@ async def serve_lesson_page(lesson_id: str):
     cat_color = {"process": "#f97316", "technical": "#a855f7", "architecture": "#06b6d4", "quality": "#ef4444"}.get(row["category"], "#6b7280")
 
     actions = ""
-    if status == "draft":
+    if status in ("draft", "approved"):
         actions = f'''
-        <div style="display:flex;gap:12px;justify-content:center;margin-top:24px">
-            <a href="/api/lessons/{escape(lesson_id)}/approve" style="background:#22c55e;color:white;padding:12px 32px;border-radius:8px;font-size:1rem;font-weight:600;text-decoration:none">Approve</a>
-            <a href="/api/lessons/{escape(lesson_id)}/reject" style="background:#991b1b;color:white;padding:12px 32px;border-radius:8px;font-size:1rem;font-weight:600;text-decoration:none">Reject</a>
-        </div>'''
+        <div class="lesson-actions" id="lesson-actions" style="display:flex;gap:12px;justify-content:center;margin-top:24px">
+            <button onclick="approveLesson('{escape(lesson_id)}')" style="background:#22c55e;color:white;padding:12px 32px;border-radius:8px;font-size:1rem;font-weight:600;border:none;cursor:pointer">Approve</button>
+            <button onclick="rejectLesson('{escape(lesson_id)}')" style="background:#991b1b;color:white;padding:12px 32px;border-radius:8px;font-size:1rem;font-weight:600;border:none;cursor:pointer">Reject</button>
+        </div>
+        <div id="action-result" style="display:none;text-align:center;margin-top:24px;font-size:1.1rem;font-weight:600"></div>
+        <script>
+        async function approveLesson(id) {{
+            const res = await fetch('/api/lessons/' + id + '/approve', {{method: 'POST'}});
+            if (res.ok) {{
+                document.getElementById('lesson-actions').style.display = 'none';
+                const r = document.getElementById('action-result');
+                r.textContent = 'Lesson approved.';
+                r.style.color = '#22c55e';
+                r.style.display = 'block';
+            }}
+        }}
+        async function rejectLesson(id) {{
+            const res = await fetch('/api/lessons/' + id + '/reject', {{method: 'POST'}});
+            if (res.ok) {{
+                document.getElementById('lesson-actions').style.display = 'none';
+                const r = document.getElementById('action-result');
+                r.textContent = 'Lesson rejected.';
+                r.style.color = '#ef4444';
+                r.style.display = 'block';
+            }}
+        }}
+        </script>'''
 
     html = f'''<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">

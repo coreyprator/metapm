@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.14.0"  # MP-LL-UI-001: Lessons UI enhancements
+    VERSION: str = "2.14.1"  # MP-LL-UI-FIX-001: Fix lessons detail page buttons
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
