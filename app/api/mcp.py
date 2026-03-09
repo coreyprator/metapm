@@ -963,6 +963,21 @@ async def submit_uat_direct(uat: UATDirectSubmit):
 
         handoff_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{handoff_id}/content"
 
+        # MP-VERIFY-001: Store evidence_json and trigger auto-verification
+        if uat.requirements:
+            evidence_json = json.dumps(uat.requirements)
+            execute_query("""
+                UPDATE mcp_handoffs SET evidence_json = ? WHERE id = ?
+            """, (evidence_json, handoff_id), fetch="none")
+            logger.info(f"Stored evidence for {len(uat.requirements)} requirements on handoff {handoff_id}")
+            # Auto-verify in background
+            import asyncio
+            try:
+                from app.services.verification_service import verify_handoff as _verify
+                asyncio.create_task(_verify(handoff_id))
+            except Exception as ve:
+                logger.warning(f"Auto-verification trigger failed (non-blocking): {ve}")
+
         # Checkpoint verification (MP-MS3 Phase 6)
         checkpoint_verified = None
         if uat.uat_checkpoint and uat.uat_verification_hash:

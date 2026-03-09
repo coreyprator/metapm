@@ -1313,4 +1313,46 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 35 warning: {e}")
 
+    # Migration 36: Create handoff_verifications table + add columns to mcp_handoffs (MP-VERIFY-001)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'handoff_verifications'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 36: Creating handoff_verifications table...")
+            execute_query("""
+                CREATE TABLE handoff_verifications (
+                    id                  UNIQUEIDENTIFIER  PRIMARY KEY DEFAULT NEWID(),
+                    handoff_id          UNIQUEIDENTIFIER  NOT NULL,
+                    verification_status NVARCHAR(20)      NOT NULL DEFAULT 'pending'
+                        CHECK (verification_status IN ('pending','verified','mismatch','partial','skipped')),
+                    results_json        NVARCHAR(MAX)     NULL,
+                    verified_at         DATETIME2         NULL,
+                    created_at          DATETIME2         NOT NULL DEFAULT GETDATE()
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX ix_handoff_verif ON handoff_verifications(handoff_id)", fetch="none")
+            logger.info("  Migration 36: handoff_verifications table created.")
+        else:
+            logger.info("  Migration 36: handoff_verifications table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 36 warning: {e}")
+
+    # Migration 37: Add verification_status and evidence_json columns to mcp_handoffs (MP-VERIFY-001)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'verification_status'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 37: Adding verification columns to mcp_handoffs...")
+            execute_query("ALTER TABLE mcp_handoffs ADD verification_status NVARCHAR(20) NULL", fetch="none")
+            execute_query("ALTER TABLE mcp_handoffs ADD evidence_json NVARCHAR(MAX) NULL", fetch="none")
+            logger.info("  Migration 37: verification columns added.")
+        else:
+            logger.info("  Migration 37: verification columns already exist.")
+    except Exception as e:
+        logger.warning(f"  Migration 37 warning: {e}")
+
     logger.info("Migrations complete.")

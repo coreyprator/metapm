@@ -1,13 +1,30 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-9E3F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-09 — Sprint "MP-LL-UI-FIX-001" (v2.14.1)
+Updated: 2026-03-09 — Sprint "MP-VERIFY-001" (v2.15.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-09 (MP-LL-UI-FIX-001, v2.14.1)
+### Latest Session Update — 2026-03-09 (MP-VERIFY-001, v2.15.0)
+
+- **Sprint MP-VERIFY-001**: Anti-fabrication handoff verification system.
+- **Current Version**: v2.15.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00162-x87)
+- **Part A (project-methodology)**: Applied COMPLETION RULES + HANDOFF EVIDENCE REQUIREMENTS to Bootstrap v1.5.1, Canary Test + Intent Boundaries to zccout standard v1.2. Committed as v3.19.0 (6965e1b).
+- **Part B (MetaPM)**:
+  - **Migration 36**: `handoff_verifications` table (verification_status CHECK pending/verified/mismatch/partial/skipped)
+  - **Migration 37**: Added `verification_status` and `evidence_json` columns to `mcp_handoffs`
+  - **Schema validation**: UATDirectSubmit now accepts optional `requirements[]` with evidence. Complete reqs without evidence return 422.
+  - **Verification engine**: `app/services/verification_service.py` — httpx-based async endpoint prober, compares claimed vs actual HTTP status
+  - **POST /api/uat/verify**: Runs verification, returns per-endpoint match results
+  - **GET /api/uat/verify/{handoff_id}**: Returns stored verification status
+  - **Auto-verification**: Triggers on UAT submit when requirements with evidence are provided
+  - **Dashboard**: Verification badges (VERIFIED green, MISMATCH red, PARTIAL yellow, UNVERIFIED gray) + View Details + Re-verify button
+- **Canary test**: Fabricated evidence (claimed 200 on nonexistent endpoint) correctly detected as MISMATCH
+- **MetaPM codes**: MP-059 (56F5), PM-013 (E846)
+
+### Previous: MP-LL-UI-FIX-001 (v2.14.1, 2026-03-09)
 
 - **Sprint MP-LL-UI-FIX-001**: Fix /lessons/{id} detail page buttons.
-- **Current Version**: v2.14.1 — **DEPLOYED** to Cloud Run
+- **Version**: v2.14.1 (revision metapm-v2-00160-dms)
 - **Fix 1**: /lessons/{id} detail page now shows Approve/Reject buttons for both `draft` AND `approved` statuses (was draft-only). Buttons use JS fetch + inline DOM update instead of link navigation.
 - **Fix 2**: LL-001 ("Test lesson - DELETE") rejected via API.
 - **MetaPM code**: MP-058

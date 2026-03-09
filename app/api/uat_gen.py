@@ -330,3 +330,38 @@ a.back:hover{{text-decoration:underline}}
 </div>
 </body></html>'''
     return HTMLResponse(html)
+
+
+# ── POST /api/uat/verify — Handoff verification endpoint (MP-VERIFY-001) ──
+
+class VerifyRequest(BaseModel):
+    handoff_id: str
+
+@router.post("/api/uat/verify")
+async def verify_handoff_endpoint(body: VerifyRequest):
+    """Verify endpoints claimed in a handoff's evidence."""
+    from app.services.verification_service import verify_handoff
+    result = await verify_handoff(body.handoff_id)
+    if "error" in result:
+        raise HTTPException(404, result["error"])
+    return result
+
+
+@router.get("/api/uat/verify/{handoff_id}")
+async def get_verification_status(handoff_id: str):
+    """Get the latest verification result for a handoff."""
+    row = execute_query("""
+        SELECT verification_status, results_json, verified_at
+        FROM handoff_verifications
+        WHERE handoff_id = ?
+        ORDER BY created_at DESC
+    """, (handoff_id,), fetch="one")
+    if not row:
+        return {"handoff_id": handoff_id, "verification_status": "none", "results": []}
+    results = json.loads(row["results_json"]) if row.get("results_json") else []
+    return {
+        "handoff_id": handoff_id,
+        "verification_status": row["verification_status"],
+        "results": results,
+        "verified_at": str(row["verified_at"]) if row.get("verified_at") else None
+    }

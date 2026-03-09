@@ -254,6 +254,7 @@ class UATDirectSubmit(BaseModel):
     tested_by: Optional[str] = Field(None, max_length=100)
     uat_checkpoint: Optional[str] = Field(None, max_length=100)
     uat_verification_hash: Optional[str] = Field(None, max_length=128)
+    requirements: Optional[List[dict]] = Field(None, description="Requirements with evidence for verification")
 
     @model_validator(mode='before')
     @classmethod
@@ -390,6 +391,19 @@ class UATDirectSubmit(BaseModel):
             # Append general notes if provided
             if data.get('notes') and data.get('results_text'):
                 data['results_text'] = data['results_text'] + f"\n\nGeneral Notes:\n{data['notes']}"
+
+            # MP-VERIFY-001: Validate requirements evidence
+            reqs = data.get('requirements')
+            if isinstance(reqs, list):
+                for req in reqs:
+                    if not isinstance(req, dict):
+                        continue
+                    if req.get('status') == 'complete' and not req.get('evidence'):
+                        raise PydanticCustomError(
+                            'missing_evidence',
+                            f"Requirement '{req.get('code', '?')}' is marked 'complete' but has no 'evidence' object. "
+                            "Complete requirements must include evidence (curl_command, http_status, response_preview)."
+                        )
 
         return data
 
