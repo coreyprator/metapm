@@ -264,6 +264,46 @@ async def create_handoff(
 
         handoff_id = str(result['id'])
         _autolink_handoff_to_requirements(handoff_id, handoff.content)
+
+        # MP-UAT-GEN: Best-effort auto-generate UAT page
+        try:
+            from app.services.uat_generator import generate_test_cases, render_uat_html
+            import re as _re
+            # Extract requirement codes from content
+            req_codes = list(set(_re.findall(r'[A-Z]{2,}-\d{3}', handoff.content or '')))
+            work_items = []
+            for code in req_codes[:20]:
+                req = execute_query(
+                    "SELECT code, title, description, type FROM roadmap_requirements WHERE code = ?",
+                    (code,), fetch="one"
+                )
+                if req:
+                    work_items.append(req)
+            if work_items:
+                version = None
+                if handoff.metadata and isinstance(handoff.metadata, dict):
+                    version = handoff.metadata.get('version')
+                test_cases = generate_test_cases(work_items, handoff.project, version or '?')
+                # Insert uat_pages record
+                uat_result = execute_query("""
+                    INSERT INTO uat_pages (handoff_id, project, test_cases_json, html_content)
+                    OUTPUT INSERTED.id
+                    VALUES (?, ?, ?, 'placeholder')
+                """, (handoff_id, handoff.project, json.dumps(test_cases)), fetch="one")
+                if uat_result:
+                    uat_id = str(uat_result['id'])
+                    html = render_uat_html(
+                        uat_id=uat_id, project=handoff.project, sprint_code=None,
+                        pth=None, version=version, deploy_url=None,
+                        handoff_id=handoff_id, test_cases=test_cases,
+                        linked_requirements=[w.get('code','') for w in work_items if w.get('code')]
+                    )
+                    execute_query("UPDATE uat_pages SET html_content = ? WHERE id = ?",
+                                  (html, uat_id), fetch="none")
+                    logger.info(f"Auto-generated UAT page {uat_id} for handoff {handoff_id}")
+        except Exception as autogen_err:
+            logger.warning(f"UAT auto-gen failed (non-blocking): {autogen_err}")
+
         public_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{handoff_id}/content"
 
         return HandoffResponse(

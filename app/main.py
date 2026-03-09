@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
 
-from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor, rag, lessons
+from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor, rag, lessons, uat_gen
 from app.core.config import settings
 from app.core.migrations import run_migrations
 from app.schemas.mcp import UATDirectSubmit, UATDirectSubmitResponse
@@ -105,6 +105,7 @@ app.include_router(handoff_lifecycle.router, prefix="/api", tags=["Handoff Lifec
 app.include_router(conductor.router, tags=["Conductor"])
 app.include_router(rag.router, prefix="/api", tags=["Portfolio RAG"])
 app.include_router(lessons.router, prefix="/api", tags=["Lessons"])
+app.include_router(uat_gen.router, tags=["UAT Generation"])
 
 
 # Define static_dir early for use in routes

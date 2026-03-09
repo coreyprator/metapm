@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.12.0"  # MP-LL-001: Lessons Learned Fast-Routing infrastructure
+    VERSION: str = "2.13.0"  # MP-UAT-GEN: Server-Side UAT Generation
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

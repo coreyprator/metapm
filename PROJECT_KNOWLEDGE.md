@@ -1,13 +1,29 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-9E3F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-08 — Sprint "MP-LL-001" (v2.12.0)
+Updated: 2026-03-09 — Sprint "MP-UAT-GEN" (v2.13.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-08 (MP-LL-001, v2.12.0)
+### Latest Session Update — 2026-03-09 (MP-UAT-GEN, v2.13.0)
+
+- **Sprint MP-UAT-GEN**: Server-Side UAT Generation.
+- **Current Version**: v2.13.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00156-xvl)
+- **Migration 35**: Creates `uat_pages` table (id UNIQUEIDENTIFIER PK, handoff_id, project, sprint_code, pth, version, deploy_url, test_cases_json, cai_review_json, html_content, status CHECK ready/in_progress/submitted, created_at, submitted_at). 2 indexes.
+- **UAT Generation API**:
+  - `POST /api/uat/generate` — generates UAT page from handoff + requirements. Upsert on handoff_id. Returns {uat_id, uat_url, test_count}.
+  - `GET /uat/{uat_id}` — serves UAT HTML page. Marks status in_progress on first view.
+  - `GET /api/uat/pages` — list UAT pages, filterable by handoff_id and project.
+- **Test case generation**: Auto-generates DV (deploy verify), SM (smoke), AC (acceptance from parsed description), BF (bug fix), CF (CAI focus), RC (risk check), RG (regression) categories.
+- **HTML renderer**: Matches UAT_Template_v3 dark theme. Pass/Fail/Skip buttons, notes, screenshot paste, submit to /api/uat/submit, category color-coded badges.
+- **Auto-generation**: Hooks into POST /mcp/handoffs. Extracts requirement codes from content, generates test cases, creates uat_pages record. Best-effort, non-blocking.
+- **Dashboard**: Handoff links in detail panel show "UAT READY" badge and "Run UAT" link when uat_pages record exists.
+- **Handoff**: 77F76B3F | Checkpoint: BD34
+- **Smoke test UAT URL**: https://metapm.rentyourcio.com/uat/DE6049D6-47F5-4C5B-B534-66FC055B8995
+
+### Previous: MP-LL-001 (v2.12.0, 2026-03-08)
 
 - **Sprint MP-LL-001**: Lessons Learned Fast-Routing infrastructure.
-- **Current Version**: v2.12.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00154-s5t)
+- **Current Version**: v2.12.0 — Cloud Run (revision metapm-v2-00154-s5t)
 - **Migration 34**: Creates `lessons_learned` table with CHECK constraints (category, target, status, proposed_by), 3 indexes.
 - **Table schema**: id (PK, NVARCHAR(20)), project, category, lesson (NVARCHAR(MAX)), source_sprint, target, target_file, status (default 'draft'), proposed_by (default 'cc'), created_at, approved_at, applied_at, applied_in_sprint, rag_ingested (BIT), rag_ingested_at.
 - **Lessons API** (7 endpoints):

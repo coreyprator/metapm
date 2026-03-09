@@ -1539,10 +1539,25 @@
 
       try {
         const links = await api(`/api/roadmap/requirements/${req.id}/handoffs`);
-        const out = links.handoffs?.length
-          ? links.handoffs.map((h) => `<div><a style="color:#9ec2ff" href="${h.url}" target="_blank" rel="noopener">${h.id}</a> · ${h.status || '-'} · ${h.task || ''}</div>`).join('')
-          : 'None';
-        qs('dHandoffs').innerHTML = out;
+        if (links.handoffs?.length) {
+          let handoffHtml = '';
+          for (const h of links.handoffs) {
+            handoffHtml += `<div style="margin-bottom:4px"><a style="color:#9ec2ff" href="${h.url}" target="_blank" rel="noopener">${h.id}</a> · ${h.status || '-'} · ${h.task || ''}`;
+            // Check for UAT page
+            try {
+              const uatPages = await api(`/api/uat/pages?handoff_id=${h.id}`);
+              if (uatPages.pages?.length) {
+                const p = uatPages.pages[0];
+                const badge = p.status === 'submitted' ? '<span style="background:#166534;color:#bbf7d0;padding:1px 6px;border-radius:3px;font-size:10px;margin-left:6px">SUBMITTED</span>' : '<span style="background:#166534;color:#bbf7d0;padding:1px 6px;border-radius:3px;font-size:10px;margin-left:6px">UAT READY</span>';
+                handoffHtml += ` ${badge} <a href="${p.uat_url}" target="_blank" style="color:#4ade80;font-size:11px;margin-left:4px;font-weight:600">Run UAT</a>`;
+              }
+            } catch {}
+            handoffHtml += '</div>';
+          }
+          qs('dHandoffs').innerHTML = handoffHtml;
+        } else {
+          qs('dHandoffs').innerHTML = 'None';
+        }
       } catch {
         qs('dHandoffs').textContent = 'None';
       }

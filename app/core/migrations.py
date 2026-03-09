@@ -1278,4 +1278,39 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 34 warning: {e}")
 
+    # Migration 35: Create uat_pages table (MP-UAT-GEN)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'uat_pages'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 35: Creating uat_pages table...")
+            execute_query("""
+                CREATE TABLE uat_pages (
+                    id               UNIQUEIDENTIFIER  PRIMARY KEY DEFAULT NEWID(),
+                    handoff_id       UNIQUEIDENTIFIER  NOT NULL,
+                    project          NVARCHAR(50)      NOT NULL,
+                    sprint_code      NVARCHAR(50)      NULL,
+                    pth              NVARCHAR(10)      NULL,
+                    version          NVARCHAR(20)      NULL,
+                    deploy_url       NVARCHAR(500)     NULL,
+                    test_cases_json  NVARCHAR(MAX)     NOT NULL,
+                    cai_review_json  NVARCHAR(MAX)     NULL,
+                    html_content     NVARCHAR(MAX)     NOT NULL,
+                    status           NVARCHAR(20)      NOT NULL DEFAULT 'ready'
+                        CHECK (status IN ('ready','in_progress','submitted')),
+                    created_at       DATETIME2         NOT NULL DEFAULT GETDATE(),
+                    submitted_at     DATETIME2         NULL
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX ix_uat_pages_handoff ON uat_pages(handoff_id)", fetch="none")
+            execute_query("CREATE INDEX ix_uat_pages_project ON uat_pages(project)", fetch="none")
+            logger.info("  Migration 35: uat_pages table created with indexes.")
+        else:
+            logger.info("  Migration 35: uat_pages table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 35 warning: {e}")
+
     logger.info("Migrations complete.")
