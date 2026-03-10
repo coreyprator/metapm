@@ -496,7 +496,7 @@ async def list_requirements(
         results = execute_query(f"""
             SELECT r.id, r.project_id, r.code, r.title, r.description,
                    r.type, r.priority, r.status, r.target_version,
-                   r.sprint_id, r.handoff_id, r.uat_id,
+                   r.sprint_id, r.handoff_id, r.uat_id, r.uat_url,
                    r.created_at, r.updated_at,
                    p.code as project_code, p.name as project_name, p.emoji as project_emoji
             FROM roadmap_requirements r
@@ -523,6 +523,7 @@ async def list_requirements(
                 sprint_id=row['sprint_id'],
                 handoff_id=str(row['handoff_id']) if row['handoff_id'] else None,
                 uat_id=str(row['uat_id']) if row['uat_id'] else None,
+                uat_url=row.get('uat_url'),
                 created_at=row['created_at'],
                 updated_at=row['updated_at'],
                 project_code=row['project_code'],
@@ -544,7 +545,7 @@ async def get_requirement(requirement_id: str, include_checkpoint: bool = Query(
         result = execute_query("""
             SELECT r.id, r.project_id, r.code, r.title, r.description,
                    r.type, r.priority, r.status, r.target_version,
-                   r.sprint_id, r.handoff_id, r.uat_id,
+                   r.sprint_id, r.handoff_id, r.uat_id, r.uat_url,
                    r.created_at, r.updated_at,
                    p.code as project_code, p.name as project_name, p.emoji as project_emoji
             FROM roadmap_requirements r
@@ -575,6 +576,7 @@ async def get_requirement(requirement_id: str, include_checkpoint: bool = Query(
             sprint_id=result['sprint_id'],
             handoff_id=str(result['handoff_id']) if result['handoff_id'] else None,
             uat_id=str(result['uat_id']) if result['uat_id'] else None,
+            uat_url=result.get('uat_url'),
             created_at=result['created_at'],
             updated_at=result['updated_at'],
             project_code=result['project_code'],

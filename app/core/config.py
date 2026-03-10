@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.15.0"  # MP-VERIFY-001: Anti-fabrication handoff verification
+    VERSION: str = "2.16.0"  # MP-UAT-TAB-001: UAT tab, cai_review fix, title inheritance
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

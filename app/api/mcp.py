@@ -292,11 +292,13 @@ async def create_handoff(
                 """, (handoff_id, handoff.project, json.dumps(test_cases)), fetch="one")
                 if uat_result:
                     uat_id = str(uat_result['id'])
+                    feature_title = getattr(handoff, 'title', None) or handoff.task or None
                     html = render_uat_html(
                         uat_id=uat_id, project=handoff.project, sprint_code=None,
                         pth=None, version=version, deploy_url=None,
                         handoff_id=handoff_id, test_cases=test_cases,
-                        linked_requirements=[w.get('code','') for w in work_items if w.get('code')]
+                        linked_requirements=[w.get('code','') for w in work_items if w.get('code')],
+                        feature_title=feature_title
                     )
                     execute_query("UPDATE uat_pages SET html_content = ? WHERE id = ?",
                                   (html, uat_id), fetch="none")

@@ -195,15 +195,19 @@ def render_uat_html(
     deploy_url: Optional[str],
     handoff_id: str,
     test_cases: List[Dict],
-    linked_requirements: List[str]
+    linked_requirements: List[str],
+    feature_title: Optional[str] = None
 ) -> str:
     """Render a complete UAT HTML page matching UAT_Template_v3 visual pattern."""
     emoji = PROJECT_EMOJIS.get(project, "")
     color = PROJECT_COLORS.get(project, "#6366f1")
     project_display = project.replace("-", " ").title()
-    title = f"{emoji} {project_display} v{version or '?'}"
-    if sprint_code:
-        title += f" - UAT: {sprint_code}"
+    if feature_title:
+        title = f"{emoji} {feature_title}"
+    else:
+        title = f"{emoji} {project_display} v{version or '?'}"
+        if sprint_code:
+            title += f" - UAT: {sprint_code}"
     subtitle_parts = []
     if sprint_code:
         subtitle_parts.append(f"Sprint: {sprint_code}")

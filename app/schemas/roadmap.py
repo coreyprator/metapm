@@ -183,6 +183,8 @@ class RequirementResponse(RequirementBase):
     project_code: Optional[str] = None
     project_name: Optional[str] = None
     project_emoji: Optional[str] = None
+    # UAT link (MP-UAT-TAB-001)
+    uat_url: Optional[str] = None
     # Checkpoint fields (PF5-MS1, populated only when include_checkpoint=true)
     checkpoint: Optional[str] = None
     checkpoint_message: Optional[str] = None

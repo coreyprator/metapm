@@ -1355,4 +1355,19 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 37 warning: {e}")
 
+    # Migration 38: Add uat_url column to roadmap_requirements (MP-UAT-TAB-001)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'roadmap_requirements' AND COLUMN_NAME = 'uat_url'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 38: Adding uat_url column to roadmap_requirements...")
+            execute_query("ALTER TABLE roadmap_requirements ADD uat_url NVARCHAR(500) NULL", fetch="none")
+            logger.info("  Migration 38: uat_url column added.")
+        else:
+            logger.info("  Migration 38: uat_url column already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 38 warning: {e}")
+
     logger.info("Migrations complete.")

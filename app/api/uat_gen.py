@@ -56,7 +56,7 @@ async def generate_uat(body: UATGenerateRequest):
 
     # 1. Validate handoff exists in mcp_handoffs
     handoff = execute_query(
-        "SELECT id, project, version, title FROM mcp_handoffs WHERE id = ?",
+        "SELECT id, project, version, title, task FROM mcp_handoffs WHERE id = ?",
         (body.handoff_id,), fetch="one"
     )
     if not handoff:
@@ -82,6 +82,7 @@ async def generate_uat(body: UATGenerateRequest):
     # Use handoff version if not provided
     version = body.version or handoff.get("version") or "?"
     project = body.project or handoff.get("project", "unknown")
+    feature_title = handoff.get("title") or handoff.get("task") or None
 
     # 3. Generate test cases
     test_cases = generate_test_cases(
@@ -109,7 +110,8 @@ async def generate_uat(body: UATGenerateRequest):
             deploy_url=body.deploy_url,
             handoff_id=body.handoff_id,
             test_cases=test_cases,
-            linked_requirements=linked_requirements
+            linked_requirements=linked_requirements,
+            feature_title=feature_title
         )
         execute_query("""
             UPDATE uat_pages
@@ -163,7 +165,8 @@ async def generate_uat(body: UATGenerateRequest):
             deploy_url=body.deploy_url,
             handoff_id=body.handoff_id,
             test_cases=test_cases,
-            linked_requirements=linked_requirements
+            linked_requirements=linked_requirements,
+            feature_title=feature_title
         )
         execute_query(
             "UPDATE uat_pages SET html_content = ? WHERE id = ?",
@@ -208,30 +211,45 @@ async def list_uat_pages(
     offset: int = Query(0)
 ):
     """List UAT pages with optional filters."""
+    import re as _re
     where_clauses = []
     params = []
 
     if handoff_id:
-        where_clauses.append("handoff_id = ?")
+        where_clauses.append("u.handoff_id = ?")
         params.append(handoff_id)
     if project:
-        where_clauses.append("project = ?")
+        where_clauses.append("u.project = ?")
         params.append(project)
 
     where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
+    # Get total count
+    count_row = execute_query(f"""
+        SELECT COUNT(*) as total FROM uat_pages u WHERE {where_sql}
+    """, tuple(params), fetch="one")
+    total = count_row["total"] if count_row else 0
+
     rows = execute_query(f"""
-        SELECT id, handoff_id, project, sprint_code, version, status,
-               test_cases_json, created_at
-        FROM uat_pages
+        SELECT u.id, u.handoff_id, u.project, u.sprint_code, u.version, u.status,
+               u.test_cases_json, u.created_at, u.pth,
+               h.title as handoff_title, h.task as handoff_task
+        FROM uat_pages u
+        LEFT JOIN mcp_handoffs h ON u.handoff_id = h.id
         WHERE {where_sql}
-        ORDER BY created_at DESC
+        ORDER BY u.created_at DESC
         OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
     """, (*params, offset, limit), fetch="all")
 
     results = []
     for row in (rows or []):
         test_cases = json.loads(row["test_cases_json"]) if row.get("test_cases_json") else []
+        title = row.get("handoff_title") or row.get("handoff_task") or f"UAT - {row['project']} v{row.get('version','?')}"
+        # Extract PTH from title or from stored pth column
+        pth = row.get("pth")
+        if not pth:
+            m = _re.search(r'PTH-([A-Z0-9]{4})', title or '')
+            pth = m.group(1) if m else None
         results.append({
             "uat_id": str(row["id"]),
             "handoff_id": str(row["handoff_id"]),
@@ -241,10 +259,12 @@ async def list_uat_pages(
             "status": row["status"],
             "test_count": len(test_cases),
             "created_at": str(row["created_at"]),
-            "uat_url": f"https://metapm.rentyourcio.com/uat/{row['id']}"
+            "uat_url": f"https://metapm.rentyourcio.com/uat/{row['id']}",
+            "title": title,
+            "pth": pth
         })
 
-    return {"pages": results, "count": len(results)}
+    return {"pages": results, "total": total, "count": len(results), "limit": limit, "offset": offset}
 
 
 # ── GET /lessons/{id} — Standalone lesson detail page ──────────────────

@@ -1,10 +1,24 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-9E3F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-09 — Sprint "MP-VERIFY-001" (v2.15.0)
+Updated: 2026-03-09 — Sprint "MP-UAT-TAB-001" (v2.16.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-09 (MP-VERIFY-001, v2.15.0)
+### Latest Session Update — 2026-03-09 (MP-UAT-TAB-001, v2.16.0)
+
+- **Sprint MP-UAT-TAB-001**: UAT tab + dashboard visibility + cai_review fix.
+- **Current Version**: v2.16.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00165-n95)
+- **Migration 38**: Added `uat_url NVARCHAR(500) NULL` to `roadmap_requirements`
+- **UAT Tab**: 🧪 UAT button in dashboard nav; table listing all UAT pages with PTH search, project filter, status filter
+- **UAT title inheritance**: `render_uat_html()` accepts `feature_title` param; uses handoff title/task instead of hardcoded project+version
+- **cai_review**: Already accepted correctly (was NOT broken — only returned 404 on fake handoff_id)
+- **PTH extraction**: `/api/uat/pages` JOIN with mcp_handoffs, regex `PTH-([A-Z0-9]{4})` from title
+- **uat_url field**: RequirementResponse includes `uat_url`, roadmap list/get endpoints return it, dashboard shows [Run UAT →] button when set
+- **mcp.py auto-gen**: Now passes `feature_title` from handoff to render_uat_html
+- **Canary results**: 5 UAT pages, PTH=2C5F found, cai_review accepted (uat_id=DB08A794), UAT tab in nav HTML
+- **MetaPM code**: MP-060 (5F38)
+
+### Previous: MP-VERIFY-001 (v2.15.0, 2026-03-09)
 
 - **Sprint MP-VERIFY-001**: Anti-fabrication handoff verification system.
 - **Current Version**: v2.15.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00162-x87)

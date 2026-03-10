@@ -426,6 +426,7 @@
         <button type="button" id="wipBtn" onclick="activateWipView()">📋 WIP</button>
         <button type="button" id="visionBoardBtn" onclick="toggleVisionBoard()">👁 Vision Board</button>
         <button type="button" id="lessonsBtn" onclick="toggleLessonsView()">📚 Lessons <span id="lessonsDraftBadge" style="display:none;background:#854d0e;color:#fde68a;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:3px"></span></button>
+        <button type="button" id="uatTabBtn" onclick="toggleUatTab()">🧪 UAT</button>
         <a href="/static/roadmap-report.html" target="_blank" rel="noopener"><button type="button">📊 Roadmap Report</button></a>
         <a href="/architecture" target="_blank" rel="noopener"><button type="button">🏗️ Architecture</button></a>
         <div class="add-wrap">
@@ -543,6 +544,19 @@
       </div>
       <div id="lessonsStats" style="padding:0 10px 8px;font-size:12px;color:var(--muted)"></div>
       <div id="lessonsList"></div>
+    </div>
+
+    <div class="card" id="uatPanel" style="display:none">
+      <div class="ll-filter-bar" style="align-items:center">
+        <input id="uat-search-pth" placeholder="Search by PTH..." style="padding:6px 10px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px;width:120px">
+        <select id="uat-filter-project"><option value="">All Projects</option>
+          <option value="metapm">metapm</option><option value="etymython">etymython</option><option value="super-flashcards">super-flashcards</option>
+          <option value="artforge">artforge</option><option value="harmonylab">harmonylab</option><option value="pie-network-graph">pie-network-graph</option>
+          <option value="portfolio-rag">portfolio-rag</option><option value="project-methodology">project-methodology</option>
+        </select>
+        <select id="uat-filter-status"><option value="">All Status</option><option value="ready">Pending</option><option value="in_progress">In Progress</option><option value="submitted">Submitted</option></select>
+      </div>
+      <div id="uatList" style="padding:8px"></div>
     </div>
 
     <div class="card footer" id="summary">
@@ -956,6 +970,7 @@
         <span class="pill ${req.priority.toLowerCase()}">${req.priority}</span>
         <span class="pill status-${req.status}">${statusLabel}</span>
         <span class="pill${req.type === 'vision' ? ' type-vision' : ''}">${req.type === 'vision' ? '👁 Vision' : req.type}</span>
+        ${req.uat_url ? `<a href="${req.uat_url}" target="_blank" class="pill" style="background:#059669;color:#fff;text-decoration:none;font-size:0.75rem;padding:2px 8px;cursor:pointer">Run UAT →</a>` : ''}
         <div class="actions-row">
           <button class="icon-btn" data-open-req="${req.id}" title="Edit Requirement">✏️</button>
           <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete Requirement">🗑️</button>
@@ -1152,6 +1167,89 @@
       });
     }
 
+    // ── UAT Tab Section (MP-UAT-TAB-001) ──────────────────────────────
+    let uatTabActive = false;
+    let uatPagesData = [];
+    const PROJECT_EMOJIS_JS = {metapm:'🔴',etymython:'🟣','super-flashcards':'🟡',artforge:'🟠',harmonylab:'🔵','pie-network-graph':'🔷','portfolio-rag':'📦','project-methodology':'🟢'};
+
+    function toggleUatTab() {
+      uatTabActive = !uatTabActive;
+      const btn = qs('uatTabBtn');
+      const panel = qs('uatPanel');
+      const hierarchy = qs('hierarchy');
+      const vb = qs('visionBoard');
+      const lp = qs('lessonsPanel');
+      if (uatTabActive) {
+        if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); vb.style.display = 'none'; }
+        if (lessonsActive) { lessonsActive = false; qs('lessonsBtn').classList.remove('active'); lp.style.display = 'none'; }
+        btn.classList.add('active');
+        hierarchy.style.display = 'none';
+        panel.style.display = 'block';
+        refreshUatPages();
+      } else {
+        btn.classList.remove('active');
+        hierarchy.style.display = '';
+        panel.style.display = 'none';
+      }
+    }
+
+    async function refreshUatPages() {
+      try {
+        const project = qs('uat-filter-project').value;
+        let url = '/api/uat/pages?limit=50';
+        if (project) url += '&project=' + encodeURIComponent(project);
+        const data = await api(url);
+        uatPagesData = data.pages || [];
+        renderUatPages();
+      } catch (e) { console.error('UAT pages load error:', e); }
+    }
+
+    function renderUatPages() {
+      const container = qs('uatList');
+      const search = (qs('uat-search-pth').value || '').toUpperCase().trim();
+      const statusFilter = qs('uat-filter-status').value;
+      let filtered = uatPagesData;
+      if (search) filtered = filtered.filter(p => (p.pth || '').includes(search) || (p.title || '').toUpperCase().includes(search));
+      if (statusFilter) filtered = filtered.filter(p => p.status === statusFilter);
+
+      if (!filtered.length) {
+        container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">No UAT pages found. UAT pages are generated automatically when handoffs are submitted.</div>';
+        return;
+      }
+
+      let html = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="border-bottom:1px solid var(--line);text-align:left">';
+      html += '<th style="padding:6px">PTH</th><th style="padding:6px">Project</th><th style="padding:6px">Version</th><th style="padding:6px">Title</th><th style="padding:6px">Status</th><th style="padding:6px">Date</th><th style="padding:6px">Action</th></tr></thead><tbody>';
+      for (const p of filtered) {
+        const emoji = PROJECT_EMOJIS_JS[p.project] || '';
+        const statusBadge = p.status === 'submitted' ? '<span style="background:#166534;color:#bbf7d0;padding:1px 6px;border-radius:3px">PASS</span>'
+          : p.status === 'in_progress' ? '<span style="background:#854d0e;color:#fde68a;padding:1px 6px;border-radius:3px">In Progress</span>'
+          : '<span style="background:#374151;color:#d1d5db;padding:1px 6px;border-radius:3px">Pending</span>';
+        const dateStr = (p.created_at || '').substring(0, 10);
+        const titleShort = (p.title || '').length > 50 ? (p.title || '').substring(0, 47) + '...' : (p.title || '');
+        html += `<tr style="border-bottom:1px solid var(--line);cursor:pointer" onclick="window.open('${p.uat_url}','_blank')">`;
+        html += `<td style="padding:6px;font-weight:700;color:#60a5fa">${p.pth || '-'}</td>`;
+        html += `<td style="padding:6px">${emoji} ${p.project}</td>`;
+        html += `<td style="padding:6px">${p.version || '?'}</td>`;
+        html += `<td style="padding:6px" title="${(p.title||'').replace(/"/g,'&quot;')}">${titleShort}</td>`;
+        html += `<td style="padding:6px">${statusBadge}</td>`;
+        html += `<td style="padding:6px">${dateStr}</td>`;
+        html += `<td style="padding:6px"><a href="${p.uat_url}" target="_blank" style="color:#4ade80;font-weight:600;text-decoration:none" onclick="event.stopPropagation()">Open</a></td>`;
+        html += '</tr>';
+      }
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    // UAT tab filter event listeners
+    document.addEventListener('DOMContentLoaded', () => {
+      const pthSearch = document.getElementById('uat-search-pth');
+      if (pthSearch) pthSearch.addEventListener('input', renderUatPages);
+      const uatProjectFilter = document.getElementById('uat-filter-project');
+      if (uatProjectFilter) uatProjectFilter.addEventListener('change', refreshUatPages);
+      const uatStatusFilter = document.getElementById('uat-filter-status');
+      if (uatStatusFilter) uatStatusFilter.addEventListener('change', renderUatPages);
+    });
+
     // ── Lessons Learned Section ──────────────────────────────────────
     let lessonsActive = false;
     let lessonsData = [];
@@ -1165,6 +1263,7 @@
       if (lessonsActive) {
         // Deactivate other views
         if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); vb.style.display = 'none'; }
+        if (uatTabActive) { uatTabActive = false; qs('uatTabBtn').classList.remove('active'); qs('uatPanel').style.display = 'none'; }
         btn.classList.add('active');
         hierarchy.style.display = 'none';
         panel.style.display = 'block';
