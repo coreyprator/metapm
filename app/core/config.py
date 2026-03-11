@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.17.0"  # MP-CLOSEOUT-GATE-001: Closeout gate, evidence unconfirmed, UAT project type fix
+    VERSION: str = "2.18.0"  # MP-LESSON-INBOX-001: Lessons field validation, CRUD, LL-id in POST response
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

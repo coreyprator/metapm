@@ -512,8 +512,8 @@
       <div class="ll-filter-bar" style="align-items:center">
         <select id="ll-filter-project"><option value="">All Projects</option></select>
         <select id="ll-filter-status"><option value="">All Status</option><option value="draft">Draft</option><option value="approved">Approved</option><option value="applied">Applied</option><option value="rejected">Rejected</option></select>
-        <select id="ll-filter-category"><option value="">All Categories</option><option value="process">Process</option><option value="technical">Technical</option><option value="architecture">Architecture</option><option value="quality">Quality</option></select>
-        <select id="ll-filter-target"><option value="">All Targets</option><option value="bootstrap">Bootstrap</option><option value="pk.md">PK.md</option><option value="cai_memory">CAI Memory</option><option value="standards">Standards</option></select>
+        <select id="ll-filter-category"><option value="">All Categories</option><option value="process">Process</option><option value="technical">Technical</option><option value="architecture">Architecture</option><option value="quality">Quality</option><option value="bootstrap">Bootstrap</option><option value="pk.md">PK.md</option><option value="cai_memory">CAI Memory</option><option value="standards">Standards</option></select>
+        <select id="ll-filter-target"><option value="">All Targets</option><option value="bootstrap">Bootstrap</option><option value="pk.md">PK.md</option><option value="cai_memory">CAI Memory</option><option value="standards">Standards</option><option value="pl">PL</option><option value="cai">CAI</option><option value="cc">CC</option></select>
         <button type="button" onclick="toggleNewLessonForm()" style="margin-left:auto;background:#22c55e;color:white;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-weight:600;font-size:12px">+ New Lesson</button>
       </div>
       <div id="newLessonForm" style="display:none;padding:12px;background:var(--panel-soft);border-radius:8px;margin:0 10px 12px">
@@ -526,10 +526,10 @@
           </select>
           <select id="nl-category" style="padding:6px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px">
             <option value="">Category *</option>
-            <option value="process">process</option><option value="technical">technical</option><option value="architecture">architecture</option><option value="quality">quality</option>
+            <option value="process">process</option><option value="technical">technical</option><option value="architecture">architecture</option><option value="quality">quality</option><option value="bootstrap">bootstrap</option><option value="pk.md">pk.md</option><option value="cai_memory">cai_memory</option><option value="standards">standards</option>
           </select>
           <select id="nl-target" style="padding:6px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px">
-            <option value="bootstrap">bootstrap</option><option value="pk.md">pk.md</option><option value="cai_memory">cai_memory</option><option value="standards">standards</option>
+            <option value="bootstrap">bootstrap</option><option value="pk.md">pk.md</option><option value="cai_memory">cai_memory</option><option value="standards">standards</option><option value="pl">pl</option><option value="cai">cai</option><option value="cc">cc</option>
           </select>
           <select id="nl-proposed-by" style="padding:6px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px">
             <option value="pl">pl</option><option value="cai">cai</option><option value="cc">cc</option>
@@ -1323,6 +1323,8 @@
         const actions = `<div class="lesson-actions">
             ${approveReject}
             <button style="background:#374151;color:#d1d5db;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:11px" onclick="copyLessonJson('${l.id}')">Copy JSON</button>
+            <button style="background:#2563eb;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:11px" onclick="startEditLesson('${l.id}')">Edit</button>
+            <button style="background:#991b1b;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:11px" onclick="deleteLesson('${l.id}')">Delete</button>
             <a href="/lessons/${l.id}" target="_blank" style="color:#60a5fa;font-size:11px;text-decoration:none;padding:4px 6px">View</a>
           </div>`;
         return `<div class="lesson-card" data-id="${l.id}" data-status="${l.status}">
@@ -1381,6 +1383,63 @@
       if (!l) return;
       const payload = {project: l.project, category: l.category, lesson: l.lesson, target: l.target, source_sprint: l.source_sprint || '', proposed_by: l.proposed_by};
       navigator.clipboard.writeText(JSON.stringify(payload, null, 2)).then(() => showToast('JSON copied'));
+    }
+
+    async function deleteLesson(id) {
+      if (!confirm('Delete this lesson? (soft delete)')) return;
+      try {
+        const res = await fetch(`/api/lessons/${id}`, { method: 'DELETE' });
+        if (res.ok) { showToast('Lesson deleted'); await refreshLessons(); }
+        else { const err = await res.json(); showToast('Delete failed: ' + (err.detail || res.status)); }
+      } catch (e) { showToast('Delete error: ' + e.message); }
+    }
+
+    function startEditLesson(id) {
+      const l = lessonsData.find(x => x.id === id);
+      if (!l) return;
+      const card = document.querySelector(`.lesson-card[data-id="${id}"]`);
+      if (!card) return;
+      const catOpts = ['process','technical','architecture','quality','bootstrap','pk.md','cai_memory','standards'].map(v => `<option value="${v}"${v===l.category?' selected':''}>${v}</option>`).join('');
+      const tgtOpts = ['bootstrap','pk.md','cai_memory','standards','pl','cai','cc'].map(v => `<option value="${v}"${v===l.target?' selected':''}>${v}</option>`).join('');
+      const byOpts = ['pl','cai','cc'].map(v => `<option value="${v}"${v===l.proposed_by?' selected':''}>${v}</option>`).join('');
+      const ss = (l.lesson||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+      card.innerHTML = `<div style="padding:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px">
+          <select id="edit-cat-${id}" style="padding:4px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:11px">${catOpts}</select>
+          <select id="edit-tgt-${id}" style="padding:4px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:11px">${tgtOpts}</select>
+          <select id="edit-by-${id}" style="padding:4px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:11px">${byOpts}</select>
+        </div>
+        <input id="edit-sprint-${id}" value="${l.source_sprint||''}" placeholder="Source sprint" style="width:100%;padding:4px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:11px;margin-bottom:6px;box-sizing:border-box">
+        <textarea id="edit-text-${id}" rows="3" style="width:100%;padding:6px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:11px;resize:vertical;box-sizing:border-box">${ss}</textarea>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button onclick="saveEditLesson('${id}')" style="background:#22c55e;color:#fff;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px;font-weight:600">Save</button>
+          <button onclick="renderLessons()" style="background:#374151;color:#d1d5db;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:11px">Cancel</button>
+        </div>
+      </div>`;
+    }
+
+    async function saveEditLesson(id) {
+      const body = {};
+      const cat = document.getElementById(`edit-cat-${id}`);
+      const tgt = document.getElementById(`edit-tgt-${id}`);
+      const by = document.getElementById(`edit-by-${id}`);
+      const sprint = document.getElementById(`edit-sprint-${id}`);
+      const text = document.getElementById(`edit-text-${id}`);
+      const l = lessonsData.find(x => x.id === id);
+      if (cat && cat.value !== l.category) body.category = cat.value;
+      if (tgt && tgt.value !== l.target) body.target = tgt.value;
+      if (by && by.value !== l.proposed_by) body.proposed_by = by.value;
+      if (sprint && sprint.value !== (l.source_sprint||'')) body.source_sprint = sprint.value;
+      if (text && text.value !== l.lesson) body.lesson = text.value;
+      if (!Object.keys(body).length) { renderLessons(); return; }
+      try {
+        const res = await fetch(`/api/lessons/${id}`, {
+          method: 'PATCH', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(body)
+        });
+        if (res.ok) { showToast('Lesson updated'); await refreshLessons(); }
+        else { const err = await res.json(); showToast('Update failed: ' + (err.detail || res.status)); }
+      } catch (e) { showToast('Update error: ' + e.message); }
     }
 
     function toggleNewLessonForm() {

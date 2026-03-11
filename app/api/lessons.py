@@ -15,7 +15,8 @@ import hashlib
 import uuid
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel
+from enum import Enum
+from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import HTMLResponse
@@ -28,25 +29,69 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# ── Enums ─────────────────────────────────────────────────────────────
+
+class LessonCategory(str, Enum):
+    process = "process"
+    technical = "technical"
+    architecture = "architecture"
+    quality = "quality"
+    bootstrap = "bootstrap"
+    pk_md = "pk.md"
+    cai_memory = "cai_memory"
+    standards = "standards"
+
+
+class LessonTarget(str, Enum):
+    bootstrap = "bootstrap"
+    pk_md = "pk.md"
+    cai_memory = "cai_memory"
+    standards = "standards"
+    pl = "pl"
+    cai = "cai"
+    cc = "cc"
+
+
+class LessonBy(str, Enum):
+    pl = "pl"
+    cai = "cai"
+    cc = "cc"
+
+
+class LessonStatus(str, Enum):
+    draft = "draft"
+    approved = "approved"
+    applied = "applied"
+    rejected = "rejected"
+
+
 # ── Pydantic models ───────────────────────────────────────────────────
 
 class LessonCreate(BaseModel):
-    project: str
-    category: str           # process | technical | architecture | quality
-    lesson: str             # one sentence, actionable
+    project: str = Field(..., min_length=1)
+    category: LessonCategory
+    lesson: str = Field(..., min_length=20, alias="text")
     source_sprint: Optional[str] = None
-    target: str             # bootstrap | pk.md | cai_memory | standards
+    target: LessonTarget
     target_file: Optional[str] = None
-    status: str = "draft"
-    proposed_by: str = "cc"
+    status: LessonStatus = LessonStatus.draft
+    proposed_by: LessonBy = Field(LessonBy.cc, alias="by")
     applied_in_sprint: Optional[str] = None
+
+    class Config:
+        populate_by_name = True
 
 
 class LessonUpdate(BaseModel):
-    status: Optional[str] = None
+    status: Optional[LessonStatus] = None
     applied_in_sprint: Optional[str] = None
     lesson: Optional[str] = None
     target_file: Optional[str] = None
+    category: Optional[LessonCategory] = None
+    target: Optional[LessonTarget] = None
+    project: Optional[str] = None
+    proposed_by: Optional[LessonBy] = None
+    source_sprint: Optional[str] = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -120,24 +165,19 @@ async def _rag_ingest_lesson(lesson_dict: dict):
 
 # ── POST /api/lessons ─────────────────────────────────────────────────
 
-@router.post("/lessons")
+@router.post("/lessons", status_code=201)
 async def create_lesson(body: LessonCreate):
     """Create a draft lesson with auto-generated LL-NNN id."""
-    # Validate enums
-    if body.category not in ("process", "technical", "architecture", "quality"):
-        raise HTTPException(400, f"Invalid category: {body.category}")
-    if body.target not in ("bootstrap", "pk.md", "cai_memory", "standards"):
-        raise HTTPException(400, f"Invalid target: {body.target}")
-    if body.proposed_by not in ("cc", "cai", "pl"):
-        raise HTTPException(400, f"Invalid proposed_by: {body.proposed_by}")
-    if body.status not in ("draft", "approved", "applied", "rejected"):
-        raise HTTPException(400, f"Invalid status: {body.status}")
-
     ll_id = _next_ll_id()
 
+    status_val = body.status.value
+    category_val = body.category.value
+    target_val = body.target.value
+    proposed_by_val = body.proposed_by.value
+
     # Set timestamps based on status
-    approved_at = "GETDATE()" if body.status in ("approved", "applied") else "NULL"
-    applied_at = "GETDATE()" if body.status == "applied" else "NULL"
+    approved_at = "GETDATE()" if status_val in ("approved", "applied") else "NULL"
+    applied_at = "GETDATE()" if status_val == "applied" else "NULL"
 
     execute_query(f"""
         INSERT INTO lessons_learned
@@ -147,9 +187,9 @@ async def create_lesson(body: LessonCreate):
             (?, ?, ?, ?, ?, ?, ?,
              ?, ?, GETDATE(), {approved_at}, {applied_at}, ?)
     """, (
-        ll_id, body.project, body.category, body.lesson,
-        body.source_sprint, body.target, body.target_file,
-        body.status, body.proposed_by, body.applied_in_sprint
+        ll_id, body.project, category_val, body.lesson,
+        body.source_sprint, target_val, body.target_file,
+        status_val, proposed_by_val, body.applied_in_sprint
     ), fetch="none")
 
     row = execute_query("SELECT * FROM lessons_learned WHERE id = ?", (ll_id,), fetch="one")
@@ -159,7 +199,7 @@ async def create_lesson(body: LessonCreate):
     await _rag_ingest_lesson(lesson_dict)
 
     # Checkpoint
-    ck = hashlib.sha256(f"{ll_id}:{body.status}".encode()).hexdigest()[:4].upper()
+    ck = hashlib.sha256(f"{ll_id}:{status_val}".encode()).hexdigest()[:4].upper()
     lesson_dict["checkpoint"] = ck
     return lesson_dict
 
@@ -195,7 +235,8 @@ async def list_lessons(
         conditions.append("proposed_by = ?")
         params.append(proposed_by)
 
-    where = " AND ".join(conditions) if conditions else "1=1"
+    conditions.append("(deleted IS NULL OR deleted = 0)")
+    where = " AND ".join(conditions)
     params.extend([offset, limit])
 
     rows = execute_query(f"""
@@ -207,7 +248,7 @@ async def list_lessons(
 
     count_row = execute_query(f"""
         SELECT COUNT(*) as total FROM lessons_learned WHERE {where}
-    """, tuple(params[:-2]) if conditions else None, fetch="one")
+    """, tuple(params[:-2]) if params[:-2] else None, fetch="one")
     total = count_row["total"] if count_row else len(rows)
 
     return {"lessons": [_row_to_dict(r) for r in rows], "total": total}
@@ -219,7 +260,7 @@ async def list_lessons(
 async def pending_lessons(project: Optional[str] = None):
     """Lessons approved but not yet applied. Called by CC in Phase 0."""
     params = []
-    where = "status = 'approved' AND applied_at IS NULL"
+    where = "status = 'approved' AND applied_at IS NULL AND (deleted IS NULL OR deleted = 0)"
     if project:
         where += " AND project = ?"
         params.append(project)
@@ -238,21 +279,21 @@ async def pending_lessons(project: Optional[str] = None):
 @router.get("/lessons/stats")
 async def lesson_stats():
     """Aggregate counts by status, project, category."""
-    total_row = execute_query("SELECT COUNT(*) as total FROM lessons_learned", fetch="one")
+    total_row = execute_query("SELECT COUNT(*) as total FROM lessons_learned WHERE (deleted IS NULL OR deleted = 0)", fetch="one")
     total = total_row["total"] if total_row else 0
 
     status_rows = execute_query("""
-        SELECT status, COUNT(*) as cnt FROM lessons_learned GROUP BY status
+        SELECT status, COUNT(*) as cnt FROM lessons_learned WHERE (deleted IS NULL OR deleted = 0) GROUP BY status
     """, fetch="all") or []
     by_status = {r["status"]: r["cnt"] for r in status_rows}
 
     project_rows = execute_query("""
-        SELECT project, COUNT(*) as cnt FROM lessons_learned GROUP BY project
+        SELECT project, COUNT(*) as cnt FROM lessons_learned WHERE (deleted IS NULL OR deleted = 0) GROUP BY project
     """, fetch="all") or []
     by_project = {r["project"]: r["cnt"] for r in project_rows}
 
     category_rows = execute_query("""
-        SELECT category, COUNT(*) as cnt FROM lessons_learned GROUP BY category
+        SELECT category, COUNT(*) as cnt FROM lessons_learned WHERE (deleted IS NULL OR deleted = 0) GROUP BY category
     """, fetch="all") or []
     by_category = {r["category"]: r["cnt"] for r in category_rows}
 
@@ -272,7 +313,7 @@ async def lesson_stats():
 async def recent_lessons():
     """Return the last 20 lessons (legacy endpoint, reads from lessons_learned)."""
     rows = execute_query("""
-        SELECT TOP 20 * FROM lessons_learned ORDER BY created_at DESC
+        SELECT TOP 20 * FROM lessons_learned WHERE (deleted IS NULL OR deleted = 0) ORDER BY created_at DESC
     """, fetch="all") or []
     return {"lessons": [_row_to_dict(r) for r in rows]}
 
@@ -330,7 +371,10 @@ async def reject_lesson_shortcut(lesson_id: str):
 @router.get("/lessons/{lesson_id}")
 async def get_lesson(lesson_id: str):
     """Get a single lesson by ID."""
-    row = execute_query("SELECT * FROM lessons_learned WHERE id = ?", (lesson_id,), fetch="one")
+    row = execute_query(
+        "SELECT * FROM lessons_learned WHERE id = ? AND (deleted IS NULL OR deleted = 0)",
+        (lesson_id,), fetch="one"
+    )
     if not row:
         raise HTTPException(404, f"Lesson {lesson_id} not found")
     return _row_to_dict(row)
@@ -340,37 +384,58 @@ async def get_lesson(lesson_id: str):
 
 @router.patch("/lessons/{lesson_id}")
 async def update_lesson(lesson_id: str, body: LessonUpdate):
-    """Update lesson status/text. Auto-sets timestamps."""
-    row = execute_query("SELECT * FROM lessons_learned WHERE id = ?", (lesson_id,), fetch="one")
+    """Update lesson fields. Auto-sets timestamps on status change."""
+    row = execute_query(
+        "SELECT * FROM lessons_learned WHERE id = ? AND (deleted IS NULL OR deleted = 0)",
+        (lesson_id,), fetch="one"
+    )
     if not row:
         raise HTTPException(404, f"Lesson {lesson_id} not found")
 
     updates = []
     params = []
 
-    if body.status:
-        if body.status not in ("draft", "approved", "applied", "rejected"):
-            raise HTTPException(400, f"Invalid status: {body.status}")
+    if body.status is not None:
         updates.append("status = ?")
-        params.append(body.status)
-        if body.status == "approved":
+        params.append(body.status.value)
+        if body.status == LessonStatus.approved:
             updates.append("approved_at = GETDATE()")
-        elif body.status == "applied":
+        elif body.status == LessonStatus.applied:
             updates.append("applied_at = GETDATE()")
             if not body.applied_in_sprint:
                 raise HTTPException(400, "applied_in_sprint required when status=applied")
             updates.append("applied_in_sprint = ?")
             params.append(body.applied_in_sprint)
 
-    if body.lesson:
+    if body.lesson is not None:
         updates.append("lesson = ?")
         params.append(body.lesson)
 
-    if body.target_file:
+    if body.target_file is not None:
         updates.append("target_file = ?")
         params.append(body.target_file)
 
-    if body.applied_in_sprint and body.status != "applied":
+    if body.category is not None:
+        updates.append("category = ?")
+        params.append(body.category.value)
+
+    if body.target is not None:
+        updates.append("target = ?")
+        params.append(body.target.value)
+
+    if body.project is not None:
+        updates.append("project = ?")
+        params.append(body.project)
+
+    if body.proposed_by is not None:
+        updates.append("proposed_by = ?")
+        params.append(body.proposed_by.value)
+
+    if body.source_sprint is not None:
+        updates.append("source_sprint = ?")
+        params.append(body.source_sprint)
+
+    if body.applied_in_sprint and body.status != LessonStatus.applied:
         updates.append("applied_in_sprint = ?")
         params.append(body.applied_in_sprint)
 
@@ -390,6 +455,25 @@ async def update_lesson(lesson_id: str, body: LessonUpdate):
         await _rag_ingest_lesson(lesson_dict)
 
     return lesson_dict
+
+
+# ── DELETE /api/lessons/{id} — soft delete ────────────────────────────
+
+@router.delete("/lessons/{lesson_id}")
+async def delete_lesson(lesson_id: str):
+    """Soft-delete a lesson (sets deleted=1, excluded from list queries)."""
+    row = execute_query(
+        "SELECT * FROM lessons_learned WHERE id = ? AND (deleted IS NULL OR deleted = 0)",
+        (lesson_id,), fetch="one"
+    )
+    if not row:
+        raise HTTPException(404, f"Lesson {lesson_id} not found")
+
+    execute_query(
+        "UPDATE lessons_learned SET deleted = 1 WHERE id = ?",
+        (lesson_id,), fetch="none"
+    )
+    return {"deleted": lesson_id}
 
 
 # ── POST /api/lessons/apply (legacy: commit to GitHub) ────────────────

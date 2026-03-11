@@ -1370,4 +1370,56 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 38 warning: {e}")
 
+    # Migration 39: Add deleted column + expand CHECK constraints on lessons_learned (MP-LESSON-INBOX-001)
+    try:
+        # Add deleted column
+        result = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'lessons_learned' AND COLUMN_NAME = 'deleted'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 39: Adding deleted column to lessons_learned...")
+            execute_query("ALTER TABLE lessons_learned ADD deleted BIT NOT NULL DEFAULT 0", fetch="none")
+            logger.info("  Migration 39: deleted column added.")
+        else:
+            logger.info("  Migration 39: deleted column already exists.")
+
+        # Drop and recreate CHECK constraints to allow expanded enum values
+        for col in ['category', 'target']:
+            try:
+                # Find existing check constraint name
+                ck_result = execute_query(f"""
+                    SELECT cc.name FROM sys.check_constraints cc
+                    JOIN sys.columns c ON cc.parent_object_id = c.object_id AND cc.parent_column_id = c.column_id
+                    WHERE OBJECT_NAME(cc.parent_object_id) = 'lessons_learned' AND c.name = '{col}'
+                """, fetch="one")
+                if ck_result:
+                    ck_name = ck_result['name']
+                    execute_query(f"ALTER TABLE lessons_learned DROP CONSTRAINT [{ck_name}]", fetch="none")
+                    logger.info(f"  Migration 39: Dropped CHECK constraint {ck_name} on {col}.")
+            except Exception as drop_err:
+                logger.info(f"  Migration 39: No CHECK constraint to drop on {col}: {drop_err}")
+
+        # Add expanded constraints
+        try:
+            execute_query("""
+                ALTER TABLE lessons_learned ADD CONSTRAINT CK_lessons_category
+                CHECK (category IN ('process','technical','architecture','quality','bootstrap','pk.md','cai_memory','standards'))
+            """, fetch="none")
+            logger.info("  Migration 39: Added expanded category CHECK constraint.")
+        except Exception:
+            logger.info("  Migration 39: category CHECK constraint already exists or failed.")
+
+        try:
+            execute_query("""
+                ALTER TABLE lessons_learned ADD CONSTRAINT CK_lessons_target
+                CHECK (target IN ('bootstrap','pk.md','cai_memory','standards','pl','cai','cc'))
+            """, fetch="none")
+            logger.info("  Migration 39: Added expanded target CHECK constraint.")
+        except Exception:
+            logger.info("  Migration 39: target CHECK constraint already exists or failed.")
+
+    except Exception as e:
+        logger.warning(f"  Migration 39 warning: {e}")
+
     logger.info("Migrations complete.")
