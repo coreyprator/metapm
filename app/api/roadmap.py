@@ -2202,3 +2202,72 @@ async def list_requirement_links(requirement_id: str):
     except Exception as e:
         logger.error(f"Error listing links: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# ACTOR INBOX ENDPOINTS (MP-ACTOR-INBOX-001)
+# ============================================
+
+ACTOR_STATUS_MAP = {
+    "cc": "cc_prompt_ready",
+    "cai": "cc_complete",
+    "pl": "uat_ready",
+}
+
+
+@router.get("/inbox/{actor}")
+async def get_actor_inbox(actor: str):
+    """Return requirements filtered by actor's action queue status.
+    CC inbox: cc_prompt_ready | CAI inbox: cc_complete | PL inbox: uat_ready
+    """
+    if actor not in ACTOR_STATUS_MAP:
+        raise HTTPException(status_code=400, detail=f"Unknown actor: {actor}. Valid: cc, cai, pl")
+
+    status_filter = ACTOR_STATUS_MAP[actor]
+    try:
+        results = execute_query("""
+            SELECT r.id, r.project_id, r.code, r.title, r.description,
+                   r.type, r.priority, r.status, r.target_version,
+                   r.sprint_id, r.handoff_id, r.uat_id, r.uat_url,
+                   r.created_at, r.updated_at,
+                   p.code as project_code, p.name as project_name, p.emoji as project_emoji
+            FROM roadmap_requirements r
+            JOIN roadmap_projects p ON r.project_id = p.id
+            WHERE r.status = ?
+            ORDER BY
+                CASE r.priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 END,
+                r.updated_at DESC
+        """, (status_filter,), fetch="all")
+
+        items = []
+        for row in (results or []):
+            items.append(RequirementResponse(
+                id=row['id'],
+                project_id=row['project_id'],
+                code=row['code'],
+                title=row['title'],
+                description=row['description'],
+                type=RequirementType(row['type']) if row['type'] else RequirementType.TASK,
+                priority=RequirementPriority(row['priority']) if row['priority'] else RequirementPriority.P2,
+                status=RequirementStatus(row['status']) if row['status'] else RequirementStatus.BACKLOG,
+                target_version=row['target_version'],
+                sprint_id=row['sprint_id'],
+                handoff_id=str(row['handoff_id']) if row['handoff_id'] else None,
+                uat_id=str(row['uat_id']) if row['uat_id'] else None,
+                uat_url=row.get('uat_url'),
+                created_at=row['created_at'],
+                updated_at=row['updated_at'],
+                project_code=row['project_code'],
+                project_name=row['project_name'],
+                project_emoji=row['project_emoji'],
+            ))
+
+        return {
+            "actor": actor,
+            "status_filter": status_filter,
+            "count": len(items),
+            "items": [item.model_dump(mode='json') for item in items],
+        }
+    except Exception as e:
+        logger.error(f"Error fetching inbox for {actor}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

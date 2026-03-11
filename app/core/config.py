@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.18.0"  # MP-LESSON-INBOX-001: Lessons field validation, CRUD, LL-id in POST response
+    VERSION: str = "2.19.0"  # MP-ACTOR-INBOX-001: Actor inbox tabs CC/CAI/PL on dashboard
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

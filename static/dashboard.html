@@ -413,6 +413,27 @@
       .add-menu { min-width: 150px; }
       .add-menu button { min-height: 44px; }
     }
+    /* ── Actor Inbox (MP-ACTOR-INBOX-001) ── */
+    .inbox-sub-tabs { display: flex; gap: 8px; margin-bottom: 12px; padding: 10px; }
+    .inbox-sub-tab {
+      padding: 6px 14px; border: 1px solid var(--line); border-radius: 4px;
+      background: var(--panel-soft); color: var(--muted); cursor: pointer; font-size: 13px;
+    }
+    .inbox-sub-tab.active { background: #1a5276; color: white; border-color: #1a5276; }
+    .inbox-count-badge {
+      display: inline-block; background: #e74c3c; color: white;
+      border-radius: 10px; padding: 1px 6px; font-size: 10px;
+      margin-left: 4px; min-width: 16px; text-align: center;
+    }
+    .inbox-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .inbox-table th, .inbox-table td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+    .inbox-table th { color: var(--muted); font-size: 11px; font-weight: 600; }
+    .inbox-action-btn {
+      padding: 3px 10px; background: #1a5276; color: white;
+      border: none; border-radius: 3px; cursor: pointer; font-size: 11px;
+    }
+    .inbox-action-btn:hover { background: #2980b9; }
+    .inbox-empty { color: var(--muted); padding: 30px; text-align: center; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -427,6 +448,7 @@
         <button type="button" id="visionBoardBtn" onclick="toggleVisionBoard()">👁 Vision Board</button>
         <button type="button" id="lessonsBtn" onclick="toggleLessonsView()">📚 Lessons <span id="lessonsDraftBadge" style="display:none;background:#854d0e;color:#fde68a;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:3px"></span></button>
         <button type="button" id="uatTabBtn" onclick="toggleUatTab()">🧪 UAT</button>
+        <button type="button" id="inboxTabBtn" onclick="toggleInboxTab()">📥 Inbox <span id="inboxTotalBadge" class="inbox-count-badge" style="display:none">0</span></button>
         <a href="/static/roadmap-report.html" target="_blank" rel="noopener"><button type="button">📊 Roadmap Report</button></a>
         <a href="/architecture" target="_blank" rel="noopener"><button type="button">🏗️ Architecture</button></a>
         <div class="add-wrap">
@@ -557,6 +579,15 @@
         <select id="uat-filter-status"><option value="">All Status</option><option value="ready">Pending</option><option value="in_progress">In Progress</option><option value="submitted">Submitted</option></select>
       </div>
       <div id="uatList" style="padding:8px"></div>
+    </div>
+
+    <div class="card" id="inboxPanel" style="display:none">
+      <div class="inbox-sub-tabs">
+        <button class="inbox-sub-tab active" data-actor="cc" onclick="switchInboxActor('cc')">🤖 CC <span id="cc-count-badge" class="inbox-count-badge">0</span></button>
+        <button class="inbox-sub-tab" data-actor="cai" onclick="switchInboxActor('cai')">🧠 CAI <span id="cai-count-badge" class="inbox-count-badge">0</span></button>
+        <button class="inbox-sub-tab" data-actor="pl" onclick="switchInboxActor('pl')">👤 PL <span id="pl-count-badge" class="inbox-count-badge">0</span></button>
+      </div>
+      <div id="inboxContent" style="padding:8px"></div>
     </div>
 
     <div class="card footer" id="summary">
@@ -1009,6 +1040,12 @@
       qs('groupBy').value = 'project';
       qs('sortBy').value = 'priority';
       state.expanded = new Set();
+      // Dismiss all tab views
+      if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); qs('visionBoard').style.display = 'none'; }
+      if (uatTabActive) { uatTabActive = false; qs('uatTabBtn').classList.remove('active'); qs('uatPanel').style.display = 'none'; }
+      if (lessonsActive) { lessonsActive = false; qs('lessonsBtn').classList.remove('active'); qs('lessonsPanel').style.display = 'none'; }
+      if (inboxActive) { inboxActive = false; qs('inboxTabBtn').classList.remove('active'); qs('inboxPanel').style.display = 'none'; }
+      qs('hierarchy').style.display = '';
       updateResetButtonState();
       loadData().then(() => render());
     }
@@ -1029,6 +1066,9 @@
       const hierarchy = qs('hierarchy');
       const vb = qs('visionBoard');
       if (visionBoardActive) {
+        if (uatTabActive) { uatTabActive = false; qs('uatTabBtn').classList.remove('active'); qs('uatPanel').style.display = 'none'; }
+        if (lessonsActive) { lessonsActive = false; qs('lessonsBtn').classList.remove('active'); qs('lessonsPanel').style.display = 'none'; }
+        if (inboxActive) { inboxActive = false; qs('inboxTabBtn').classList.remove('active'); qs('inboxPanel').style.display = 'none'; }
         btn.classList.add('active');
         hierarchy.style.display = 'none';
         vb.style.display = 'block';
@@ -1179,9 +1219,11 @@
       const hierarchy = qs('hierarchy');
       const vb = qs('visionBoard');
       const lp = qs('lessonsPanel');
+      const ip = qs('inboxPanel');
       if (uatTabActive) {
         if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); vb.style.display = 'none'; }
         if (lessonsActive) { lessonsActive = false; qs('lessonsBtn').classList.remove('active'); lp.style.display = 'none'; }
+        if (inboxActive) { inboxActive = false; qs('inboxTabBtn').classList.remove('active'); ip.style.display = 'none'; }
         btn.classList.add('active');
         hierarchy.style.display = 'none';
         panel.style.display = 'block';
@@ -1250,6 +1292,110 @@
       if (uatStatusFilter) uatStatusFilter.addEventListener('change', renderUatPages);
     });
 
+    // ── Actor Inbox Section (MP-ACTOR-INBOX-001) ────────────────────
+    let inboxActive = false;
+    let inboxData = {};
+
+    function toggleInboxTab() {
+      inboxActive = !inboxActive;
+      const btn = qs('inboxTabBtn');
+      const panel = qs('inboxPanel');
+      const hierarchy = qs('hierarchy');
+      const vb = qs('visionBoard');
+      const lp = qs('lessonsPanel');
+      const up = qs('uatPanel');
+      if (inboxActive) {
+        if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); vb.style.display = 'none'; }
+        if (lessonsActive) { lessonsActive = false; qs('lessonsBtn').classList.remove('active'); lp.style.display = 'none'; }
+        if (uatTabActive) { uatTabActive = false; qs('uatTabBtn').classList.remove('active'); up.style.display = 'none'; }
+        btn.classList.add('active');
+        hierarchy.style.display = 'none';
+        panel.style.display = 'block';
+        switchInboxActor('cc');
+      } else {
+        btn.classList.remove('active');
+        hierarchy.style.display = '';
+        panel.style.display = 'none';
+      }
+    }
+
+    async function switchInboxActor(actor) {
+      document.querySelectorAll('.inbox-sub-tab').forEach(t =>
+        t.classList.toggle('active', t.dataset.actor === actor));
+      try {
+        const data = await api('/api/inbox/' + actor);
+        inboxData[actor] = data;
+        document.getElementById(actor + '-count-badge').textContent = data.count;
+        renderInboxContent(actor, data);
+      } catch (e) { console.error('Inbox load error:', e); }
+    }
+
+    function renderInboxContent(actor, data) {
+      const container = qs('inboxContent');
+      if (!data || data.count === 0) {
+        container.innerHTML = '<div class="inbox-empty">No items in ' + actor.toUpperCase() + ' inbox</div>';
+        return;
+      }
+      const actionLabel = { cc: 'Copy Code', cai: 'Open Handoff', pl: 'Run UAT' };
+      let html = '<table class="inbox-table"><thead><tr>';
+      html += '<th>Code</th><th>Project</th><th>Title</th><th>Priority</th><th>Updated</th><th>Action</th>';
+      html += '</tr></thead><tbody>';
+      for (const req of data.items) {
+        const emoji = PROJECT_EMOJIS_JS[(req.project_code || '').toLowerCase()] || (req.project_emoji || '');
+        const dateStr = (req.updated_at || '').substring(0, 10);
+        const titleShort = (req.title || '').length > 60 ? (req.title || '').substring(0, 57) + '...' : (req.title || '');
+        const priBadge = req.priority === 'P1' ? '<span style="background:#991b1b;color:#fca5a5;padding:1px 6px;border-radius:3px;font-size:10px">P1</span>'
+          : req.priority === 'P3' ? '<span style="background:#374151;color:#9ca3af;padding:1px 6px;border-radius:3px;font-size:10px">P3</span>'
+          : '<span style="background:#854d0e;color:#fde68a;padding:1px 6px;border-radius:3px;font-size:10px">P2</span>';
+        html += '<tr>';
+        html += '<td style="font-weight:700;color:#60a5fa">' + (req.code || '-') + '</td>';
+        html += '<td>' + emoji + ' ' + (req.project_name || '') + '</td>';
+        html += '<td title="' + ((req.title || '').replace(/"/g, '&quot;')) + '">' + titleShort + '</td>';
+        html += '<td>' + priBadge + '</td>';
+        html += '<td>' + dateStr + '</td>';
+        html += '<td><button class="inbox-action-btn" onclick="inboxAction(\'' + actor + '\',' + JSON.stringify(req).replace(/'/g, "&#39;") + ')">' + actionLabel[actor] + '</button></td>';
+        html += '</tr>';
+      }
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    function inboxAction(actor, req) {
+      if (actor === 'cc') {
+        navigator.clipboard.writeText(req.code)
+          .then(() => alert('Copied: ' + req.code))
+          .catch(() => alert('Code: ' + req.code));
+      } else if (actor === 'cai') {
+        if (req.handoff_id) {
+          window.open('/mcp/handoffs/' + req.handoff_id + '/content', '_blank');
+        } else {
+          alert('No handoff ID on this requirement yet');
+        }
+      } else if (actor === 'pl') {
+        if (req.uat_url) {
+          window.open(req.uat_url, '_blank');
+        } else {
+          alert('No UAT URL on this requirement yet');
+        }
+      }
+    }
+
+    async function loadInboxCounts() {
+      let total = 0;
+      for (const actor of ['cc', 'cai', 'pl']) {
+        try {
+          const data = await api('/api/inbox/' + actor);
+          document.getElementById(actor + '-count-badge').textContent = data.count;
+          total += data.count;
+        } catch (e) { /* ignore */ }
+      }
+      const badge = qs('inboxTotalBadge');
+      if (total > 0) { badge.textContent = total; badge.style.display = ''; }
+      else { badge.style.display = 'none'; }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => { loadInboxCounts(); });
+
     // ── Lessons Learned Section ──────────────────────────────────────
     let lessonsActive = false;
     let lessonsData = [];
@@ -1264,6 +1410,7 @@
         // Deactivate other views
         if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); vb.style.display = 'none'; }
         if (uatTabActive) { uatTabActive = false; qs('uatTabBtn').classList.remove('active'); qs('uatPanel').style.display = 'none'; }
+        if (inboxActive) { inboxActive = false; qs('inboxTabBtn').classList.remove('active'); qs('inboxPanel').style.display = 'none'; }
         btn.classList.add('active');
         hierarchy.style.display = 'none';
         panel.style.display = 'block';
