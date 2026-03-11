@@ -667,6 +667,9 @@ async def update_requirement(requirement_id: str, update: RequirementUpdate):
         if update.uat_id is not None:
             set_clauses.append("uat_id = ?")
             params.append(update.uat_id)
+        if update.uat_url is not None:
+            set_clauses.append("uat_url = ?")
+            params.append(update.uat_url)
 
         params.append(requirement_id)
 

@@ -173,6 +173,7 @@ class RequirementUpdate(BaseModel):
     sprint_id: Optional[str] = None
     handoff_id: Optional[str] = None
     uat_id: Optional[str] = None
+    uat_url: Optional[str] = None
 
 
 class RequirementResponse(RequirementBase):
