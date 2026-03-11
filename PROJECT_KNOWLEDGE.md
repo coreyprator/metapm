@@ -682,6 +682,40 @@ Source: `app/api/mcp.py` lines 32-63
 
 ---
 
+## Schema
+
+**Introspection URL:** https://metapm.rentyourcio.com/openapi.json
+**Framework:** FastAPI (auto-generated OpenAPI 3.x)
+
+Phase 0 schema fetch:
+```bash
+curl -s https://metapm.rentyourcio.com/openapi.json | python -c "
+import sys, json
+spec = json.load(sys.stdin)
+paths = spec.get('paths', {})
+for p in sorted(paths.keys()):
+    print(p)
+"
+```
+
+Key endpoint paths (update as routes change):
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| /health | GET | Health check |
+| /api/roadmap/requirements | GET | List requirements |
+| /api/roadmap/requirements | POST | Create new requirement |
+| /api/roadmap/requirements/{requirement_id} | GET, PUT | Get or update requirement |
+| /api/roadmap/requirements/{req_id}/state | PATCH | Lifecycle state transition |
+| /api/v1/lifecycle/states | GET | List valid lifecycle states |
+| /api/roadmap/export | GET | Full roadmap export |
+| /api/roadmap/requirements/{requirement_id}/history | GET | State history |
+| /mcp/uat/direct-submit | POST | Submit handoff/UAT |
+| /mcp/uat/{uat_id} | GET | Fetch UAT page |
+| /mcp/handoffs/{handoff_id}/content | GET | Handoff content |
+| /mcp/uat/list | GET | List recent UATs |
+
+---
+
 ## 5. FRONTEND
 
 ### Static HTML Pages
