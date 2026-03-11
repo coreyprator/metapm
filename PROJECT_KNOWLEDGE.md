@@ -1,10 +1,23 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-9E3F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-09 — Sprint "MP-UAT-TAB-001" (v2.16.0)
+Updated: 2026-03-10 — Sprint "MP-LESSON-INBOX-001" (v2.18.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-09 (MP-UAT-TAB-001, v2.16.0)
+### Latest Session Update — 2026-03-10 (MP-LESSON-INBOX-001, v2.18.0)
+
+- **Sprint MP-LESSON-INBOX-001**: Lessons API field validation, CRUD, LL-id in POST response.
+- **Current Version**: v2.18.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00173-dk2)
+- **Migration 39**: Added `deleted BIT DEFAULT 0` column to `lessons_learned`. Expanded CHECK constraints for category (added bootstrap, pk.md, cai_memory, standards) and target (added pl, cai, cc).
+- **Pydantic enum validation**: LessonCategory, LessonTarget, LessonBy, LessonStatus enums replace manual if/raise. Field aliases: `text`↔`lesson`, `by`↔`proposed_by`.
+- **POST /api/lessons**: Returns 201 with full lesson dict including `id` (LL-NNN format) and `status`. Already had LL-id generation — confirmed working.
+- **DELETE /api/lessons/{id}**: Soft delete (sets deleted=1). Excluded from all list/stats/pending queries.
+- **PATCH /api/lessons/{id}**: Now supports category, target, project, proposed_by, source_sprint in addition to existing status/lesson/target_file/applied_in_sprint.
+- **Dashboard**: Edit/Delete buttons on lesson cards. Inline edit form with enum dropdowns. Confirm dialog on delete.
+- **RequirementUpdate schema**: Added `uat_url` field so PUT can populate it for closeout gate.
+- **MetaPM code**: MP-061 (EB65)
+
+### Previous: MP-UAT-TAB-001 (v2.16.0, 2026-03-09)
 
 - **Sprint MP-UAT-TAB-001**: UAT tab + dashboard visibility + cai_review fix.
 - **Current Version**: v2.16.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00165-n95)
