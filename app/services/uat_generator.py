@@ -94,28 +94,52 @@ def generate_test_cases(
     work_items: List[Dict],
     project: str,
     version: str,
-    cai_review: Optional[Dict] = None
+    cai_review: Optional[Dict] = None,
+    deploy_url: Optional[str] = None
 ) -> List[Dict]:
     """Generate test cases from requirements and CAI review data."""
     cases = []
 
-    # ALWAYS: deploy verify
-    cases.append({
-        "id": "DV-01",
-        "category": "deploy_verify",
-        "title": f"Health endpoint returns version {version}",
-        "expected": f"GET /health returns version: {version}",
-        "req_code": None
-    })
+    # MP-UAT-PROJTYPE-001: skip deploy/smoke tests for GitHub repo URLs
+    is_github_repo = "github.com" in (deploy_url or "").lower()
 
-    # ALWAYS: smoke
-    cases.append({
-        "id": "SM-01",
-        "category": "smoke",
-        "title": "Application loads without console errors",
-        "expected": "No JS errors in browser console on main page load",
-        "req_code": None
-    })
+    if is_github_repo:
+        cases.append({
+            "id": "DV-01",
+            "category": "deploy_verify",
+            "title": f"Health endpoint returns version {version}",
+            "expected": f"GET /health returns version: {version}",
+            "req_code": None,
+            "status": "skipped",
+            "notes": "Non-app project (GitHub repo URL detected) — deploy verification not applicable."
+        })
+        cases.append({
+            "id": "SM-01",
+            "category": "smoke",
+            "title": "Application loads without console errors",
+            "expected": "No JS errors in browser console on main page load",
+            "req_code": None,
+            "status": "skipped",
+            "notes": "Non-app project (GitHub repo URL detected) — smoke test not applicable."
+        })
+    else:
+        # ALWAYS: deploy verify
+        cases.append({
+            "id": "DV-01",
+            "category": "deploy_verify",
+            "title": f"Health endpoint returns version {version}",
+            "expected": f"GET /health returns version: {version}",
+            "req_code": None
+        })
+
+        # ALWAYS: smoke
+        cases.append({
+            "id": "SM-01",
+            "category": "smoke",
+            "title": "Application loads without console errors",
+            "expected": "No JS errors in browser console on main page load",
+            "req_code": None
+        })
 
     # For each requirement work item
     for i, item in enumerate(work_items):

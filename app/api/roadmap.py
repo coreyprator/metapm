@@ -1703,7 +1703,7 @@ async def update_requirement_state(req_id: str, body: StateTransition):
             raise HTTPException(status_code=400, detail=f"Invalid status: '{body.status}'. Valid: {sorted(_VALID_STATUSES)}")
 
         req = execute_query(
-            "SELECT id, status FROM roadmap_requirements WHERE id = ?",
+            "SELECT id, status, handoff_id, uat_url FROM roadmap_requirements WHERE id = ?",
             (req_id,), fetch="one"
         )
         if not req:
@@ -1720,6 +1720,22 @@ async def update_requirement_state(req_id: str, body: StateTransition):
                     status_code=400,
                     detail=f"Invalid transition: {current_status} -> {new_status}. Allowed: {allowed}"
                 )
+
+        # CLOSEOUT GATE — MP-CLOSEOUT-GATE-001
+        if new_status == "cc_complete":
+            override = getattr(body, 'override_gate', False)
+            if not override:
+                missing = []
+                if not req.get('handoff_id'):
+                    missing.append("handoff_id")
+                if not req.get('uat_url'):
+                    missing.append("uat_url")
+                if missing:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Closeout gate: {', '.join(missing)} must be populated before cc_complete. "
+                               f"Post handoff and generate UAT first. Use override_gate: true to bypass."
+                    )
 
         execute_query(
             "UPDATE roadmap_requirements SET status = ?, updated_at = GETDATE() WHERE id = ?",

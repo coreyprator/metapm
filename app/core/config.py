@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.16.0"  # MP-UAT-TAB-001: UAT tab, cai_review fix, title inheritance
+    VERSION: str = "2.17.0"  # MP-CLOSEOUT-GATE-001: Closeout gate, evidence unconfirmed, UAT project type fix
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

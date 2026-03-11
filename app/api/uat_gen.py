@@ -89,7 +89,8 @@ async def generate_uat(body: UATGenerateRequest):
         work_items=work_item_details,
         project=project,
         version=version,
-        cai_review=body.cai_review
+        cai_review=body.cai_review,
+        deploy_url=body.deploy_url
     )
 
     # 4. Check for existing uat_pages record for this handoff (upsert)

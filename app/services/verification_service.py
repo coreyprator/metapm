@@ -34,14 +34,14 @@ async def verify_handoff(handoff_id: str) -> dict:
 
     evidence_json = handoff.get("evidence_json")
     if not evidence_json:
-        _save_verification(handoff_id, "skipped", [], "no evidence provided")
-        return {"handoff_id": handoff_id, "verification_status": "skipped", "reason": "no evidence provided", "results": []}
+        _save_verification(handoff_id, "unconfirmed", [], "no evidence provided")
+        return {"handoff_id": handoff_id, "verification_status": "unconfirmed", "reason": "no evidence provided", "results": []}
 
     try:
         requirements = json.loads(evidence_json)
     except (json.JSONDecodeError, TypeError):
-        _save_verification(handoff_id, "skipped", [], "invalid evidence JSON")
-        return {"handoff_id": handoff_id, "verification_status": "skipped", "reason": "invalid evidence JSON", "results": []}
+        _save_verification(handoff_id, "unconfirmed", [], "invalid evidence JSON")
+        return {"handoff_id": handoff_id, "verification_status": "unconfirmed", "reason": "invalid evidence JSON", "results": []}
 
     results = []
 
