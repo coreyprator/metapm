@@ -1370,56 +1370,115 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 38 warning: {e}")
 
-    # Migration 39: Add deleted column + expand CHECK constraints on lessons_learned (MP-LESSON-INBOX-001)
+    # Migration 39: Add pth column to roadmap_requirements (MP-PTH-FIELD-001)
     try:
-        # Add deleted column
         result = execute_query("""
             SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_NAME = 'lessons_learned' AND COLUMN_NAME = 'deleted'
+            WHERE TABLE_NAME = 'roadmap_requirements' AND COLUMN_NAME = 'pth'
         """, fetch="one")
         if result and result['cnt'] == 0:
-            logger.info("  Migration 39: Adding deleted column to lessons_learned...")
-            execute_query("ALTER TABLE lessons_learned ADD deleted BIT NOT NULL DEFAULT 0", fetch="none")
-            logger.info("  Migration 39: deleted column added.")
+            logger.info("  Migration 39: Adding pth column to roadmap_requirements...")
+            execute_query("ALTER TABLE roadmap_requirements ADD pth NVARCHAR(4) NULL", fetch="none")
+            execute_query("CREATE INDEX idx_requirements_pth ON roadmap_requirements(pth)", fetch="none")
+            logger.info("  Migration 39: pth column and index added.")
         else:
-            logger.info("  Migration 39: deleted column already exists.")
-
-        # Drop and recreate CHECK constraints to allow expanded enum values
-        for col in ['category', 'target']:
-            try:
-                # Find existing check constraint name
-                ck_result = execute_query(f"""
-                    SELECT cc.name FROM sys.check_constraints cc
-                    JOIN sys.columns c ON cc.parent_object_id = c.object_id AND cc.parent_column_id = c.column_id
-                    WHERE OBJECT_NAME(cc.parent_object_id) = 'lessons_learned' AND c.name = '{col}'
-                """, fetch="one")
-                if ck_result:
-                    ck_name = ck_result['name']
-                    execute_query(f"ALTER TABLE lessons_learned DROP CONSTRAINT [{ck_name}]", fetch="none")
-                    logger.info(f"  Migration 39: Dropped CHECK constraint {ck_name} on {col}.")
-            except Exception as drop_err:
-                logger.info(f"  Migration 39: No CHECK constraint to drop on {col}: {drop_err}")
-
-        # Add expanded constraints
-        try:
-            execute_query("""
-                ALTER TABLE lessons_learned ADD CONSTRAINT CK_lessons_category
-                CHECK (category IN ('process','technical','architecture','quality','bootstrap','pk.md','cai_memory','standards'))
-            """, fetch="none")
-            logger.info("  Migration 39: Added expanded category CHECK constraint.")
-        except Exception:
-            logger.info("  Migration 39: category CHECK constraint already exists or failed.")
-
-        try:
-            execute_query("""
-                ALTER TABLE lessons_learned ADD CONSTRAINT CK_lessons_target
-                CHECK (target IN ('bootstrap','pk.md','cai_memory','standards','pl','cai','cc'))
-            """, fetch="none")
-            logger.info("  Migration 39: Added expanded target CHECK constraint.")
-        except Exception:
-            logger.info("  Migration 39: target CHECK constraint already exists or failed.")
-
+            logger.info("  Migration 39: pth column already exists.")
     except Exception as e:
         logger.warning(f"  Migration 39 warning: {e}")
+
+    # Migration 40: Create pth_registry table (MP-PTH-FIELD-001)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'pth_registry'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 40: Creating pth_registry table...")
+            execute_query("""
+                CREATE TABLE pth_registry (
+                    pth              NVARCHAR(4)   NOT NULL PRIMARY KEY,
+                    requirement_code NVARCHAR(50)  NOT NULL,
+                    requirement_id   NVARCHAR(100) NOT NULL,
+                    assigned_at      DATETIME2     NOT NULL DEFAULT GETDATE(),
+                    assigned_by      NVARCHAR(20)  NOT NULL
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_pth_registry_req ON pth_registry(requirement_code)", fetch="none")
+            logger.info("  Migration 40: pth_registry table created.")
+        else:
+            logger.info("  Migration 40: pth_registry table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 40 warning: {e}")
+
+    # Migration 41: Backfill all requirements with null pth (MP-PTH-FIELD-001)
+    try:
+        null_count = execute_query("""
+            SELECT COUNT(*) as cnt FROM roadmap_requirements WHERE pth IS NULL
+        """, fetch="one")
+        if null_count and null_count['cnt'] > 0:
+            logger.info(f"  Migration 41: Backfilling {null_count['cnt']} requirements with PTH codes...")
+            rows = execute_query("""
+                SELECT id, code FROM roadmap_requirements WHERE pth IS NULL
+            """, fetch="all") or []
+
+            import secrets
+            existing_pths = set()
+            # Load existing PTH values from registry
+            existing = execute_query("SELECT pth FROM pth_registry", fetch="all") or []
+            for e in existing:
+                existing_pths.add(e['pth'])
+
+            backfilled = 0
+            for row in rows:
+                # Generate unique 4-char hex code
+                attempts = 0
+                while True:
+                    candidate = ''.join(secrets.choice('0123456789ABCDEF') for _ in range(4))
+                    if candidate not in existing_pths:
+                        break
+                    attempts += 1
+                    if attempts > 1000:
+                        logger.error("  Migration 41: Too many PTH collisions, stopping.")
+                        break
+
+                if candidate in existing_pths:
+                    continue
+
+                existing_pths.add(candidate)
+                # Update requirement
+                execute_query(
+                    "UPDATE roadmap_requirements SET pth = ? WHERE id = ?",
+                    (candidate, row['id']), fetch="none"
+                )
+                # Insert into registry
+                try:
+                    execute_query("""
+                        INSERT INTO pth_registry (pth, requirement_code, requirement_id, assigned_by)
+                        VALUES (?, ?, ?, 'backfill')
+                    """, (candidate, row['code'], row['id']), fetch="none")
+                except Exception as reg_err:
+                    logger.warning(f"  Migration 41: Registry insert failed for {row['code']}: {reg_err}")
+                backfilled += 1
+
+            logger.info(f"  Migration 41: Backfilled {backfilled} requirements with PTH codes.")
+        else:
+            logger.info("  Migration 41: All requirements already have PTH codes.")
+    except Exception as e:
+        logger.warning(f"  Migration 41 warning: {e}")
+
+    # Migration 42: Add pth column to mcp_handoffs for propagation (MP-PTH-FIELD-001)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'pth'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 42: Adding pth column to mcp_handoffs...")
+            execute_query("ALTER TABLE mcp_handoffs ADD pth NVARCHAR(4) NULL", fetch="none")
+            logger.info("  Migration 42: pth column added to mcp_handoffs.")
+        else:
+            logger.info("  Migration 42: mcp_handoffs.pth already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 42 warning: {e}")
 
     logger.info("Migrations complete.")

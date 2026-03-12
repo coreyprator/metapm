@@ -16,6 +16,40 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _render_fallback_uat(row: dict) -> str:
+    """Render a minimal UAT results page from handoff/uat_results data.
+    Used when no uat_pages record exists (e.g. direct-submit without generate)."""
+    from html import escape
+    project = escape(str(row.get("project", "Unknown")))
+    version = escape(str(row.get("version", "?")))
+    status = escape(str(row.get("status", "unknown")))
+    total = row.get("total_tests", 0)
+    passed = row.get("passed", 0)
+    failed = row.get("failed", 0)
+    tested_by = escape(str(row.get("tested_by", "unknown")))
+    tested_at = escape(str(row.get("tested_at", "")))
+    results_text = escape(str(row.get("results_text", "")))
+    handoff_id = escape(str(row.get("handoff_id", "")))
+    status_color = "#22c55e" if status == "passed" else "#ef4444" if status == "failed" else "#eab308"
+    return f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>UAT Results — {project} {version}</title>
+<style>
+body {{ font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #1a1a2e; color: #e5e5e5; padding: 2rem; }}
+.card {{ background: #252538; border-radius: 12px; padding: 2rem; max-width: 800px; margin: 0 auto; }}
+h1 {{ color: #818cf8; margin-bottom: 0.5rem; }}
+.status {{ display: inline-block; padding: 4px 12px; border-radius: 6px; background: {status_color}; color: #fff; font-weight: 600; }}
+.meta {{ color: #9ca3af; margin: 1rem 0; }}
+.results {{ background: #1a1a2e; padding: 1rem; border-radius: 8px; margin-top: 1rem; white-space: pre-wrap; }}
+</style></head><body>
+<div class="card">
+<h1>{project} {version}</h1>
+<span class="status">{status.upper()}</span>
+<div class="meta">Tested by: {tested_by} | {tested_at}<br>Tests: {total} total, {passed} passed, {failed} failed<br>Handoff: {handoff_id}</div>
+<div class="results">{results_text}</div>
+</div></body></html>"""
+
+
 # ---- Pydantic Models ----
 
 class UATGenerateRequest(BaseModel):
@@ -186,19 +220,55 @@ async def generate_uat(body: UATGenerateRequest):
 
 @router.get("/uat/{uat_id}")
 async def serve_uat_page(uat_id: str):
-    """Serve the UAT HTML page."""
+    """Serve the UAT HTML page.
+
+    Lookup chain: uat_pages.id → uat_pages.handoff_id →
+    uat_results.id→handoff_id→uat_pages → render fallback from handoff data.
+    """
+    # 1. Primary: uat_pages by id
     page = execute_query(
-        "SELECT html_content, status FROM uat_pages WHERE id = ?",
+        "SELECT id, html_content, status FROM uat_pages WHERE id = ?",
         (uat_id,), fetch="one"
     )
+
+    # 2. Fallback: uat_pages by handoff_id
     if not page:
+        page = execute_query(
+            "SELECT id, html_content, status FROM uat_pages WHERE handoff_id = ?",
+            (uat_id,), fetch="one"
+        )
+
+    # 3. Fallback: uat_results.id → handoff_id → uat_pages
+    if not page:
+        uat_result = execute_query(
+            "SELECT handoff_id FROM uat_results WHERE id = ?",
+            (uat_id,), fetch="one"
+        )
+        if uat_result:
+            page = execute_query(
+                "SELECT id, html_content, status FROM uat_pages WHERE handoff_id = ?",
+                (uat_result["handoff_id"],), fetch="one"
+            )
+
+    # 4. Last resort: render minimal page from handoff/uat_results data
+    if not page:
+        fallback = execute_query("""
+            SELECT u.id as result_id, u.status, u.total_tests, u.passed, u.failed,
+                   u.tested_by, u.tested_at, u.results_text,
+                   h.id as handoff_id, h.project, h.version
+            FROM uat_results u
+            JOIN mcp_handoffs h ON u.handoff_id = h.id
+            WHERE u.id = ? OR h.id = ?
+        """, (uat_id, uat_id), fetch="one")
+        if fallback:
+            return HTMLResponse(content=_render_fallback_uat(fallback))
         raise HTTPException(404, "UAT page not found")
 
     # Mark as in_progress on first view
     if page["status"] == "ready":
         execute_query(
             "UPDATE uat_pages SET status = 'in_progress' WHERE id = ?",
-            (uat_id,), fetch="none"
+            (page["id"],), fetch="none"
         )
 
     return HTMLResponse(content=page["html_content"])
@@ -386,3 +456,107 @@ async def get_verification_status(handoff_id: str):
         "results": results,
         "verified_at": str(row["verified_at"]) if row.get("verified_at") else None
     }
+
+
+# ── PATCH /api/uat/{id}/status — UAT page status update / archive (MP-PTH-FIELD-001 PTH-9) ──
+
+class UATStatusUpdate(BaseModel):
+    status: str = Field(..., description="New status: active, archived, pending, passed, failed")
+    notes: Optional[str] = None
+
+
+@router.patch("/api/uat/{uat_id}/status")
+async def update_uat_status(uat_id: str, body: UATStatusUpdate):
+    """Update UAT page status (e.g. archive a legacy page)."""
+    valid_statuses = {'active', 'archived', 'pending', 'passed', 'failed', 'ready', 'in_progress', 'submitted'}
+    if body.status not in valid_statuses:
+        raise HTTPException(400, f"Invalid status '{body.status}'. Valid: {sorted(valid_statuses)}")
+
+    page = execute_query(
+        "SELECT id, status FROM uat_pages WHERE id = ?",
+        (uat_id,), fetch="one"
+    )
+    if not page:
+        raise HTTPException(404, f"UAT page {uat_id} not found")
+
+    previous = page['status']
+    execute_query(
+        "UPDATE uat_pages SET status = ? WHERE id = ?",
+        (body.status, uat_id), fetch="none"
+    )
+    logger.info(f"UAT page {uat_id} status: {previous} -> {body.status}")
+    return {"uat_id": uat_id, "status": body.status, "previous_status": previous}
+
+
+# ── GET /api/search — Universal PTH search (MP-PTH-FIELD-001 PTH-8) ──
+
+@router.get("/api/search")
+async def universal_search(q: str = Query(..., min_length=1, max_length=100)):
+    """Search across requirements, UAT pages, handoffs, and lessons by PTH or keyword."""
+    results = {"query": q, "requirements": [], "uat_pages": [], "handoffs": [], "lessons": []}
+
+    # Search requirements by pth or code/title
+    reqs = execute_query("""
+        SELECT r.id, r.code, r.title, r.status, r.pth, r.project_id,
+               p.code as project_code, p.name as project_name
+        FROM roadmap_requirements r
+        LEFT JOIN roadmap_projects p ON r.project_id = p.id
+        WHERE r.pth = ? OR r.code LIKE ? OR r.title LIKE ?
+        ORDER BY CASE WHEN r.pth = ? THEN 0 ELSE 1 END, r.updated_at DESC
+    """, (q, f"%{q}%", f"%{q}%", q), fetch="all") or []
+    for r in reqs:
+        results["requirements"].append({
+            "id": r["id"], "code": r["code"], "title": r["title"],
+            "status": r["status"], "pth": r.get("pth"),
+            "project_code": r.get("project_code"), "project_name": r.get("project_name")
+        })
+
+    # Search UAT pages by pth or title/project
+    pages = execute_query("""
+        SELECT u.id, u.project, u.version, u.status, u.pth, u.created_at,
+               h.title as handoff_title
+        FROM uat_pages u
+        LEFT JOIN mcp_handoffs h ON u.handoff_id = h.id
+        WHERE u.pth = ? OR u.project LIKE ? OR h.title LIKE ?
+        ORDER BY u.created_at DESC
+    """, (q, f"%{q}%", f"%{q}%"), fetch="all") or []
+    for p in pages:
+        results["uat_pages"].append({
+            "uat_id": str(p["id"]), "project": p["project"], "version": p.get("version"),
+            "status": p["status"], "pth": p.get("pth"),
+            "title": p.get("handoff_title") or f"UAT: {p['project']} v{p.get('version','?')}",
+            "uat_url": f"https://metapm.rentyourcio.com/uat/{p['id']}"
+        })
+
+    # Search handoffs by pth or title/project
+    handoffs = execute_query("""
+        SELECT id, project, title, task, version, status, pth, created_at
+        FROM mcp_handoffs
+        WHERE pth = ? OR title LIKE ? OR project LIKE ? OR task LIKE ?
+        ORDER BY created_at DESC
+        OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY
+    """, (q, f"%{q}%", f"%{q}%", f"%{q}%"), fetch="all") or []
+    for h in handoffs:
+        results["handoffs"].append({
+            "id": str(h["id"]), "project": h["project"],
+            "title": h.get("title") or h.get("task"),
+            "version": h.get("version"), "status": h["status"], "pth": h.get("pth")
+        })
+
+    # Search lessons by pth in notes/lesson text or source_sprint
+    lessons = execute_query("""
+        SELECT id, project, category, lesson, source_sprint, status, target
+        FROM lessons_learned
+        WHERE lesson LIKE ? OR source_sprint LIKE ? OR id LIKE ?
+        ORDER BY created_at DESC
+        OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY
+    """, (f"%{q}%", f"%{q}%", f"%{q}%"), fetch="all") or []
+    for ll in lessons:
+        results["lessons"].append({
+            "id": ll["id"], "project": ll["project"], "category": ll["category"],
+            "lesson": ll["lesson"][:200], "source_sprint": ll.get("source_sprint"),
+            "status": ll["status"]
+        })
+
+    results["total"] = sum(len(v) for k, v in results.items() if isinstance(v, list))
+    return results

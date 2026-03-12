@@ -283,26 +283,42 @@ async def create_handoff(
                 version = None
                 if handoff.metadata and isinstance(handoff.metadata, dict):
                     version = handoff.metadata.get('version')
+                # PTH propagation (MP-PTH-FIELD-001): get PTH from first linked requirement
+                pth_value = None
+                for code in req_codes[:20]:
+                    pth_row = execute_query(
+                        "SELECT pth FROM roadmap_requirements WHERE code = ? AND pth IS NOT NULL",
+                        (code,), fetch="one"
+                    )
+                    if pth_row and pth_row.get('pth'):
+                        pth_value = pth_row['pth']
+                        break
+                # Store PTH on handoff
+                if pth_value:
+                    execute_query(
+                        "UPDATE mcp_handoffs SET pth = ? WHERE id = ?",
+                        (pth_value, handoff_id), fetch="none"
+                    )
                 test_cases = generate_test_cases(work_items, handoff.project, version or '?')
-                # Insert uat_pages record
+                # Insert uat_pages record with PTH
                 uat_result = execute_query("""
-                    INSERT INTO uat_pages (handoff_id, project, test_cases_json, html_content)
+                    INSERT INTO uat_pages (handoff_id, project, pth, test_cases_json, html_content)
                     OUTPUT INSERTED.id
-                    VALUES (?, ?, ?, 'placeholder')
-                """, (handoff_id, handoff.project, json.dumps(test_cases)), fetch="one")
+                    VALUES (?, ?, ?, ?, 'placeholder')
+                """, (handoff_id, handoff.project, pth_value, json.dumps(test_cases)), fetch="one")
                 if uat_result:
                     uat_id = str(uat_result['id'])
                     feature_title = getattr(handoff, 'title', None) or handoff.task or None
                     html = render_uat_html(
                         uat_id=uat_id, project=handoff.project, sprint_code=None,
-                        pth=None, version=version, deploy_url=None,
+                        pth=pth_value, version=version, deploy_url=None,
                         handoff_id=handoff_id, test_cases=test_cases,
                         linked_requirements=[w.get('code','') for w in work_items if w.get('code')],
                         feature_title=feature_title
                     )
                     execute_query("UPDATE uat_pages SET html_content = ? WHERE id = ?",
                                   (html, uat_id), fetch="none")
-                    logger.info(f"Auto-generated UAT page {uat_id} for handoff {handoff_id}")
+                    logger.info(f"Auto-generated UAT page {uat_id} (PTH={pth_value}) for handoff {handoff_id}")
         except Exception as autogen_err:
             logger.warning(f"UAT auto-gen failed (non-blocking): {autogen_err}")
 
@@ -916,6 +932,20 @@ async def submit_uat_direct(uat: UATDirectSubmit):
             logger.info(f"Created new handoff {handoff_id} for {project_name} {version_db}")
             # MP-MS1-FIX WF-03: Link ONLY from explicit linked_requirements, never from content text
             _link_requirement_codes_to_handoff(handoff_id, linked_requirement_codes, source='uat_explicit')
+
+        # PTH propagation (MP-PTH-FIELD-001): copy PTH from linked requirement to handoff
+        if linked_requirement_codes:
+            for _rc in linked_requirement_codes:
+                _pth_row = execute_query(
+                    "SELECT pth FROM roadmap_requirements WHERE code = ? AND pth IS NOT NULL",
+                    (_rc,), fetch="one"
+                )
+                if _pth_row and _pth_row.get('pth'):
+                    execute_query(
+                        "UPDATE mcp_handoffs SET pth = ? WHERE id = ?",
+                        (_pth_row['pth'], handoff_id), fetch="none"
+                    )
+                    break
 
         # Insert UAT result
         uat_result = execute_query("""

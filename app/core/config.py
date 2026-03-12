@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.19.0"  # MP-ACTOR-INBOX-001: Actor inbox tabs CC/CAI/PL on dashboard
+    VERSION: str = "2.21.0"  # MP-PTH-FIELD-001: PTH as schema field, registry, backfill, gate, search, archive
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

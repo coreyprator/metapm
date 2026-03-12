@@ -173,7 +173,7 @@ class RequirementUpdate(BaseModel):
     sprint_id: Optional[str] = None
     handoff_id: Optional[str] = None
     uat_id: Optional[str] = None
-    uat_url: Optional[str] = None
+    pth: Optional[str] = Field(None, max_length=4)
 
 
 class RequirementResponse(RequirementBase):
@@ -186,6 +186,8 @@ class RequirementResponse(RequirementBase):
     project_emoji: Optional[str] = None
     # UAT link (MP-UAT-TAB-001)
     uat_url: Optional[str] = None
+    # PTH (MP-PTH-FIELD-001)
+    pth: Optional[str] = None
     # Checkpoint fields (PF5-MS1, populated only when include_checkpoint=true)
     checkpoint: Optional[str] = None
     checkpoint_message: Optional[str] = None

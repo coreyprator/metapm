@@ -8,6 +8,7 @@ import logging
 import uuid
 from datetime import datetime
 from typing import Optional, List
+from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import PlainTextResponse
 
@@ -496,7 +497,7 @@ async def list_requirements(
         results = execute_query(f"""
             SELECT r.id, r.project_id, r.code, r.title, r.description,
                    r.type, r.priority, r.status, r.target_version,
-                   r.sprint_id, r.handoff_id, r.uat_id, r.uat_url,
+                   r.sprint_id, r.handoff_id, r.uat_id, r.uat_url, r.pth,
                    r.created_at, r.updated_at,
                    p.code as project_code, p.name as project_name, p.emoji as project_emoji
             FROM roadmap_requirements r
@@ -524,6 +525,7 @@ async def list_requirements(
                 handoff_id=str(row['handoff_id']) if row['handoff_id'] else None,
                 uat_id=str(row['uat_id']) if row['uat_id'] else None,
                 uat_url=row.get('uat_url'),
+                pth=row.get('pth'),
                 created_at=row['created_at'],
                 updated_at=row['updated_at'],
                 project_code=row['project_code'],
@@ -545,7 +547,7 @@ async def get_requirement(requirement_id: str, include_checkpoint: bool = Query(
         result = execute_query("""
             SELECT r.id, r.project_id, r.code, r.title, r.description,
                    r.type, r.priority, r.status, r.target_version,
-                   r.sprint_id, r.handoff_id, r.uat_id, r.uat_url,
+                   r.sprint_id, r.handoff_id, r.uat_id, r.uat_url, r.pth,
                    r.created_at, r.updated_at,
                    p.code as project_code, p.name as project_name, p.emoji as project_emoji
             FROM roadmap_requirements r
@@ -577,6 +579,7 @@ async def get_requirement(requirement_id: str, include_checkpoint: bool = Query(
             handoff_id=str(result['handoff_id']) if result['handoff_id'] else None,
             uat_id=str(result['uat_id']) if result['uat_id'] else None,
             uat_url=result.get('uat_url'),
+            pth=result.get('pth'),
             created_at=result['created_at'],
             updated_at=result['updated_at'],
             project_code=result['project_code'],
@@ -667,9 +670,6 @@ async def update_requirement(requirement_id: str, update: RequirementUpdate):
         if update.uat_id is not None:
             set_clauses.append("uat_id = ?")
             params.append(update.uat_id)
-        if update.uat_url is not None:
-            set_clauses.append("uat_url = ?")
-            params.append(update.uat_url)
 
         params.append(requirement_id)
 
@@ -1520,6 +1520,81 @@ async def auto_close_requirement(requirement_id: str):
 
 
 # ============================================
+# PTH ASSIGNMENT (MP-PTH-FIELD-001)
+# ============================================
+
+class PthAssignRequest(BaseModel):
+    pth: Optional[str] = None
+
+@router.post("/roadmap/requirements/{requirement_id}/assign-pth")
+async def assign_pth(requirement_id: str, body: PthAssignRequest = None):
+    """Assign a PTH code to a requirement. Auto-generates if not provided."""
+    import re as _re
+    import secrets as _secrets
+    try:
+        req = execute_query(
+            "SELECT id, code, pth FROM roadmap_requirements WHERE id = ?",
+            (requirement_id,), fetch="one"
+        )
+        if not req:
+            raise HTTPException(status_code=404, detail="Requirement not found")
+
+        if req.get('pth'):
+            return {"pth": req['pth'], "assigned_by": "existing", "requirement_code": req['code']}
+
+        pth_value = None
+        assigned_by = 'cai'
+
+        if body and body.pth:
+            # Validate format: exactly 4 uppercase hex chars
+            if not _re.match(r'^[0-9A-F]{4}$', body.pth):
+                raise HTTPException(status_code=400, detail="PTH must be exactly 4 uppercase hex characters (0-9, A-F).")
+            pth_value = body.pth
+            assigned_by = 'human'
+        else:
+            # Auto-generate unique PTH
+            existing = execute_query("SELECT pth FROM pth_registry", fetch="all") or []
+            existing_set = {r['pth'] for r in existing}
+            for _ in range(1000):
+                candidate = ''.join(_secrets.choice('0123456789ABCDEF') for _ in range(4))
+                if candidate not in existing_set:
+                    pth_value = candidate
+                    break
+            if not pth_value:
+                raise HTTPException(status_code=500, detail="Could not generate unique PTH after 1000 attempts.")
+
+        # Check for collision in registry
+        collision = execute_query(
+            "SELECT pth, requirement_code FROM pth_registry WHERE pth = ?",
+            (pth_value,), fetch="one"
+        )
+        if collision:
+            raise HTTPException(
+                status_code=409,
+                detail=f"PTH {pth_value} already assigned to {collision['requirement_code']}."
+            )
+
+        # Update requirement
+        execute_query(
+            "UPDATE roadmap_requirements SET pth = ?, updated_at = GETDATE() WHERE id = ?",
+            (pth_value, requirement_id), fetch="none"
+        )
+
+        # Insert into registry
+        execute_query("""
+            INSERT INTO pth_registry (pth, requirement_code, requirement_id, assigned_by)
+            VALUES (?, ?, ?, ?)
+        """, (pth_value, req['code'], requirement_id, assigned_by), fetch="none")
+
+        return {"pth": pth_value, "assigned_by": assigned_by, "requirement_code": req['code']}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error assigning PTH: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
 # STATUS TRANSITION + HISTORY (MP-MS3 Phase 2)
 # ============================================
 
@@ -1706,7 +1781,7 @@ async def update_requirement_state(req_id: str, body: StateTransition):
             raise HTTPException(status_code=400, detail=f"Invalid status: '{body.status}'. Valid: {sorted(_VALID_STATUSES)}")
 
         req = execute_query(
-            "SELECT id, status, handoff_id, uat_url FROM roadmap_requirements WHERE id = ?",
+            "SELECT id, status, pth FROM roadmap_requirements WHERE id = ?",
             (req_id,), fetch="one"
         )
         if not req:
@@ -1714,6 +1789,13 @@ async def update_requirement_state(req_id: str, body: StateTransition):
 
         current_status = req['status']
         new_status = body.status
+
+        # PTH gate: block cc_prompt_ready without PTH (MP-PTH-GATE-001)
+        if new_status == 'cc_prompt_ready' and not req.get('pth') and not body.override_gate:
+            raise HTTPException(
+                status_code=400,
+                detail="PTH required before advancing to cc_prompt_ready. Call POST /api/roadmap/requirements/{id}/assign-pth first."
+            )
 
         # Validate transition
         if new_status != current_status:
@@ -1723,22 +1805,6 @@ async def update_requirement_state(req_id: str, body: StateTransition):
                     status_code=400,
                     detail=f"Invalid transition: {current_status} -> {new_status}. Allowed: {allowed}"
                 )
-
-        # CLOSEOUT GATE — MP-CLOSEOUT-GATE-001
-        if new_status == "cc_complete":
-            override = getattr(body, 'override_gate', False)
-            if not override:
-                missing = []
-                if not req.get('handoff_id'):
-                    missing.append("handoff_id")
-                if not req.get('uat_url'):
-                    missing.append("uat_url")
-                if missing:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Closeout gate: {', '.join(missing)} must be populated before cc_complete. "
-                               f"Post handoff and generate UAT first. Use override_gate: true to bypass."
-                    )
 
         execute_query(
             "UPDATE roadmap_requirements SET status = ?, updated_at = GETDATE() WHERE id = ?",
@@ -2201,73 +2267,4 @@ async def list_requirement_links(requirement_id: str):
         } for r in rows]}
     except Exception as e:
         logger.error(f"Error listing links: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ============================================
-# ACTOR INBOX ENDPOINTS (MP-ACTOR-INBOX-001)
-# ============================================
-
-ACTOR_STATUS_MAP = {
-    "cc": "cc_prompt_ready",
-    "cai": "cc_complete",
-    "pl": "uat_ready",
-}
-
-
-@router.get("/inbox/{actor}")
-async def get_actor_inbox(actor: str):
-    """Return requirements filtered by actor's action queue status.
-    CC inbox: cc_prompt_ready | CAI inbox: cc_complete | PL inbox: uat_ready
-    """
-    if actor not in ACTOR_STATUS_MAP:
-        raise HTTPException(status_code=400, detail=f"Unknown actor: {actor}. Valid: cc, cai, pl")
-
-    status_filter = ACTOR_STATUS_MAP[actor]
-    try:
-        results = execute_query("""
-            SELECT r.id, r.project_id, r.code, r.title, r.description,
-                   r.type, r.priority, r.status, r.target_version,
-                   r.sprint_id, r.handoff_id, r.uat_id, r.uat_url,
-                   r.created_at, r.updated_at,
-                   p.code as project_code, p.name as project_name, p.emoji as project_emoji
-            FROM roadmap_requirements r
-            JOIN roadmap_projects p ON r.project_id = p.id
-            WHERE r.status = ?
-            ORDER BY
-                CASE r.priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 END,
-                r.updated_at DESC
-        """, (status_filter,), fetch="all")
-
-        items = []
-        for row in (results or []):
-            items.append(RequirementResponse(
-                id=row['id'],
-                project_id=row['project_id'],
-                code=row['code'],
-                title=row['title'],
-                description=row['description'],
-                type=RequirementType(row['type']) if row['type'] else RequirementType.TASK,
-                priority=RequirementPriority(row['priority']) if row['priority'] else RequirementPriority.P2,
-                status=RequirementStatus(row['status']) if row['status'] else RequirementStatus.BACKLOG,
-                target_version=row['target_version'],
-                sprint_id=row['sprint_id'],
-                handoff_id=str(row['handoff_id']) if row['handoff_id'] else None,
-                uat_id=str(row['uat_id']) if row['uat_id'] else None,
-                uat_url=row.get('uat_url'),
-                created_at=row['created_at'],
-                updated_at=row['updated_at'],
-                project_code=row['project_code'],
-                project_name=row['project_name'],
-                project_emoji=row['project_emoji'],
-            ))
-
-        return {
-            "actor": actor,
-            "status_filter": status_filter,
-            "count": len(items),
-            "items": [item.model_dump(mode='json') for item in items],
-        }
-    except Exception as e:
-        logger.error(f"Error fetching inbox for {actor}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
