@@ -173,6 +173,16 @@ async def handoffs_page():
     raise HTTPException(status_code=404, detail="Handoffs page not found")
 
 
+@app.get("/seed")
+async def seed_page():
+    """Serve the Bulk Seed page"""
+    seed_file = static_dir / "seed.html"
+    if seed_file.exists():
+        return FileResponse(str(seed_file), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Seed page not found")
+
+
 @app.get("/roadmap.html")
 async def roadmap_page():
     """Serve the Project Roadmap dashboard"""

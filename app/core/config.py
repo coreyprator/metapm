@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.21.1"  # MP-HL-SEED-001: UAT filter fix (exclude archived from Open Only)
+    VERSION: str = "2.22.0"  # MP-SEED-FORM-001: Bulk Seed form for requirements and lessons learned
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
