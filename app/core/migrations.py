@@ -1466,19 +1466,47 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 41 warning: {e}")
 
-    # Migration 42: Add pth column to mcp_handoffs for propagation (MP-PTH-FIELD-001)
+    # Migration 42: Expand uat_pages status CHECK to include 'archived' (MP-PTH-FIELD-001 PTH-9)
+    try:
+        # Drop old CHECK constraint and recreate with 'archived' added
+        result = execute_query("""
+            SELECT name FROM sys.check_constraints
+            WHERE parent_object_id = OBJECT_ID('uat_pages') AND definition LIKE '%status%'
+        """, fetch="one")
+        if result:
+            constraint_name = result['name']
+            # Check if 'archived' is already in the constraint
+            chk = execute_query(f"""
+                SELECT definition FROM sys.check_constraints WHERE name = '{constraint_name}'
+            """, fetch="one")
+            if chk and 'archived' not in chk.get('definition', ''):
+                logger.info(f"  Migration 42: Expanding uat_pages status CHECK ({constraint_name})...")
+                execute_query(f"ALTER TABLE uat_pages DROP CONSTRAINT [{constraint_name}]", fetch="none")
+                execute_query("""
+                    ALTER TABLE uat_pages ADD CONSTRAINT chk_uat_pages_status_v2
+                    CHECK (status IN ('ready','in_progress','submitted','archived','active','passed','failed','pending'))
+                """, fetch="none")
+                logger.info("  Migration 42: uat_pages status CHECK updated.")
+            else:
+                logger.info("  Migration 42: uat_pages status CHECK already includes 'archived'.")
+        else:
+            logger.info("  Migration 42: No status CHECK constraint found on uat_pages.")
+    except Exception as e:
+        logger.warning(f"  Migration 42 warning: {e}")
+
+    # Migration 43: Add pth column to mcp_handoffs for propagation (MP-PTH-FIELD-001)
     try:
         result = execute_query("""
             SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
             WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'pth'
         """, fetch="one")
         if result and result['cnt'] == 0:
-            logger.info("  Migration 42: Adding pth column to mcp_handoffs...")
+            logger.info("  Migration 43: Adding pth column to mcp_handoffs...")
             execute_query("ALTER TABLE mcp_handoffs ADD pth NVARCHAR(4) NULL", fetch="none")
-            logger.info("  Migration 42: pth column added to mcp_handoffs.")
+            logger.info("  Migration 43: pth column added to mcp_handoffs.")
         else:
-            logger.info("  Migration 42: mcp_handoffs.pth already exists.")
+            logger.info("  Migration 43: mcp_handoffs.pth already exists.")
     except Exception as e:
-        logger.warning(f"  Migration 42 warning: {e}")
+        logger.warning(f"  Migration 43 warning: {e}")
 
     logger.info("Migrations complete.")
