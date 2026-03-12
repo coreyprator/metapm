@@ -278,10 +278,18 @@ async def serve_uat_page(uat_id: str):
 async def list_uat_pages(
     handoff_id: Optional[str] = Query(None),
     project: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
     limit: int = Query(20, le=100),
     offset: int = Query(0)
 ):
-    """List UAT pages with optional filters."""
+    """List UAT pages with optional filters.
+
+    status filter behavior:
+      - status=pending  → open pages only (in_progress, pending, submitted, ready, active)
+      - status=archived → archived pages only
+      - status=<value>  → exact match on that status
+      - (omitted)       → all pages
+    """
     import re as _re
     where_clauses = []
     params = []
@@ -292,6 +300,13 @@ async def list_uat_pages(
     if project:
         where_clauses.append("u.project = ?")
         params.append(project)
+    if status:
+        if status == "pending":
+            # "Open Only" — exclude archived pages
+            where_clauses.append("u.status IN ('in_progress','pending','submitted','ready','active')")
+        else:
+            where_clauses.append("u.status = ?")
+            params.append(status)
 
     where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 

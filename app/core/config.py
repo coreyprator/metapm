@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.21.0"  # MP-PTH-FIELD-001: PTH as schema field, registry, backfill, gate, search, archive
+    VERSION: str = "2.21.1"  # MP-HL-SEED-001: UAT filter fix (exclude archived from Open Only)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
@@ -40,6 +40,7 @@ class Settings(BaseSettings):
 
     # Portfolio RAG
     PORTFOLIO_RAG_URL: str = "https://portfolio-rag-57478301787.us-central1.run.app"
+    PORTFOLIO_RAG_API_KEY: str = ""
     
     # Application
     ENVIRONMENT: str = "development"
