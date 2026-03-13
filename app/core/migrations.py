@@ -1509,4 +1509,29 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 43 warning: {e}")
 
+    # Migration 44: Expand uat_results status CHECK to include 'archived' (MP-UAT-GEN-FIXUP-001)
+    try:
+        result = execute_query("""
+            SELECT name, definition FROM sys.check_constraints
+            WHERE parent_object_id = OBJECT_ID('uat_results')
+              AND definition LIKE '%status%'
+        """, fetch="one")
+        if result:
+            if 'archived' not in (result.get('definition') or ''):
+                constraint_name = result['name']
+                logger.info(f"  Migration 44: Expanding uat_results status CHECK ({constraint_name})...")
+                execute_query(f"ALTER TABLE uat_results DROP CONSTRAINT [{constraint_name}]", fetch="none")
+                execute_query("""
+                    ALTER TABLE uat_results
+                    ADD CONSTRAINT CK_uat_results_status_v3
+                    CHECK (status IN ('passed', 'failed', 'pending', 'conditional_pass', 'archived'))
+                """, fetch="none")
+                logger.info("  Migration 44: uat_results status CHECK updated to include 'archived'.")
+            else:
+                logger.info("  Migration 44: uat_results status CHECK already includes 'archived'.")
+        else:
+            logger.info("  Migration 44: No status CHECK constraint found on uat_results.")
+    except Exception as e:
+        logger.warning(f"  Migration 44 warning: {e}")
+
     logger.info("Migrations complete.")

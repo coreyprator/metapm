@@ -33,6 +33,7 @@ class UATStatus(str, Enum):
     BLOCKED = "blocked"
     PARTIAL = "partial"
     CONDITIONAL_PASS = "conditional_pass"
+    ARCHIVED = "archived"
 
 
 class TaskPriority(str, Enum):
@@ -459,7 +460,7 @@ class UATListResponse(BaseModel):
 class TestCaseResultUpdate(BaseModel):
     """Single test case result from PL."""
     id: str
-    status: str = Field(..., pattern=r"^(pass|fail|skip)$")
+    status: str = Field(..., pattern=r"^(pass|fail|skip|pending)$")
     result: Optional[str] = Field(None, max_length=1000)
     notes: Optional[str] = Field(None, max_length=5000)
 

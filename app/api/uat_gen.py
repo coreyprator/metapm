@@ -662,15 +662,18 @@ async def update_uat_results(uat_id: str, body: UATResultsUpdate):
 
 @router.post("/api/uat/bulk-archive")
 async def bulk_archive_uats(body: BulkArchiveRequest):
-    """Archive multiple UAT page records. Sets status to 'archived'."""
+    """Archive multiple UAT records. Sets status to 'archived' on both uat_pages and uat_results."""
     if not body.uat_ids:
         raise HTTPException(400, "uat_ids list cannot be empty")
 
-    archived = 0
+    archived_pages = 0
+    archived_results = 0
     not_found = []
     for uid in body.uat_ids:
+        found = False
+        # Archive in uat_pages if present
         page = execute_query(
-            "SELECT id, status FROM uat_pages WHERE id = ?",
+            "SELECT id FROM uat_pages WHERE id = ?",
             (uid,), fetch="one"
         )
         if page:
@@ -678,13 +681,31 @@ async def bulk_archive_uats(body: BulkArchiveRequest):
                 "UPDATE uat_pages SET status = 'archived' WHERE id = ?",
                 (uid,), fetch="none"
             )
-            archived += 1
-        else:
+            archived_pages += 1
+            found = True
+
+        # Archive in uat_results if present
+        result = execute_query(
+            "SELECT id FROM uat_results WHERE id = ?",
+            (uid,), fetch="one"
+        )
+        if result:
+            execute_query(
+                "UPDATE uat_results SET status = 'archived' WHERE id = ?",
+                (uid,), fetch="none"
+            )
+            archived_results += 1
+            found = True
+
+        if not found:
             not_found.append(uid)
 
-    logger.info(f"Bulk archived {archived} UAT pages. Reason: {body.reason}")
+    total_archived = archived_pages + archived_results
+    logger.info(f"Bulk archived {archived_pages} pages + {archived_results} results. Reason: {body.reason}")
     return {
-        "archived": archived,
+        "archived": total_archived,
+        "archived_pages": archived_pages,
+        "archived_results": archived_results,
         "not_found": len(not_found),
         "reason": body.reason
     }

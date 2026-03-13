@@ -1180,6 +1180,9 @@ async def list_uat_results(
         if status:
             where_clauses.append("u.status = ?")
             params.append(status.value)
+        else:
+            # Exclude archived records by default
+            where_clauses.append("u.status != 'archived'")
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
@@ -1261,6 +1264,9 @@ async def list_uat_results_alias(
         if status:
             where_clauses.append("u.status = ?")
             params.append(status.value)
+        else:
+            # Exclude archived records by default
+            where_clauses.append("u.status != 'archived'")
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
