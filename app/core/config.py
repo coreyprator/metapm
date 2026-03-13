@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.23.1"  # MP-UAT-GEN-FIXUP-001: pending status fix, bulk archive cleanup
+    VERSION: str = "2.23.2"  # PR-BROWSER-001: RAG Search nav entry
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
