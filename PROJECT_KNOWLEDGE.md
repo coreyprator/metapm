@@ -1207,6 +1207,8 @@ Source: `app/api/mcp.py`, `app/api/handoff_lifecycle.py`, `app/services/handoff_
 
 4. **CLAUDE.md has duplicate/conflicting sections**: The file contains two versions of instructions -- the top half (updated 2026-02-10) has correct infrastructure values, while the bottom half (older) has incorrect GCP project name "metapm" instead of "super-flashcards-475210" (`CLAUDE.md` lines 258-390).
 
+5. **Seed form auto-code prefix** (discovered 2026-03-13): When seeding requirements via /seed form, auto-generated codes may use generic prefix REQ- instead of project code (MP-, HL-, etc.). Triggered when project_id is a string like "proj-mp" rather than a UUID. Sprint to fix: not yet written. Workaround: verify generated codes after seeding, rename manually if prefix is wrong.
+
 5. **Root-level file clutter**: Many specification, UAT, and handoff `.md` and `.html` files are in the project root instead of organized in subdirectories.
 
 6. **transactions.py lives in project root**: The transactions router module is at `transactions.py` (root) rather than in `app/api/` like all other routers (`app/main.py` line 16).
