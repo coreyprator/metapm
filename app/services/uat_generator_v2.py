@@ -549,6 +549,33 @@ def render_structured_uat_html(
             }};
             reader.readAsDataURL(file);
         }});
+
+        // Pre-populate saved results on page load (MP-UAT-DASHBOARD-FIX-001)
+        (async function loadSavedResults() {{
+            try {{
+                const res = await fetch(
+                    'https://metapm.rentyourcio.com/api/uat/' + UAT_CONFIG.uat_page_id + '/results'
+                );
+                if (!res.ok) return;
+                const data = await res.json();
+                (data.test_cases || []).forEach(tc => {{
+                    if (!tc.status || tc.status === 'pending') return;
+                    const item = document.querySelector('.test-item[data-test="' + tc.id + '"]');
+                    if (!item) return;
+                    // Find and click the matching button
+                    const btnClass = tc.status === 'pass' ? 'btn-pass' : tc.status === 'fail' ? 'btn-fail' : 'btn-skip';
+                    const btn = item.querySelector('.' + btnClass);
+                    if (btn) setResult(btn, tc.status);
+                    // Restore notes
+                    if (tc.notes) {{
+                        const textarea = item.querySelector('.notes-input');
+                        if (textarea) textarea.value = tc.notes;
+                    }}
+                }});
+            }} catch(e) {{
+                console.log('Could not load saved results:', e);
+            }}
+        }})();
     </script>
 </body>
 </html>'''

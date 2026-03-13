@@ -273,7 +273,44 @@ async def serve_uat_page(uat_id: str):
             (page["id"],), fetch="none"
         )
 
-    return HTMLResponse(content=page["html_content"])
+    html = page["html_content"]
+
+    # MP-UAT-DASHBOARD-FIX-001: Inject pre-populate script into existing pages
+    if 'loadSavedResults' not in html and '</script>' in html:
+        prepopulate_js = """
+        // Pre-populate saved results on page load (injected by serve endpoint)
+        (async function loadSavedResults() {
+            try {
+                const pageId = UAT_CONFIG?.uat_page_id;
+                if (!pageId) return;
+                const res = await fetch(
+                    'https://metapm.rentyourcio.com/api/uat/' + pageId + '/results'
+                );
+                if (!res.ok) return;
+                const data = await res.json();
+                (data.test_cases || []).forEach(tc => {
+                    if (!tc.status || tc.status === 'pending') return;
+                    const item = document.querySelector('.test-item[data-test="' + tc.id + '"]');
+                    if (!item) return;
+                    const btnClass = tc.status === 'pass' ? 'btn-pass' : tc.status === 'fail' ? 'btn-fail' : 'btn-skip';
+                    const btn = item.querySelector('.' + btnClass);
+                    if (btn) setResult(btn, tc.status);
+                    if (tc.notes) {
+                        const textarea = item.querySelector('.notes-input');
+                        if (textarea) textarea.value = tc.notes;
+                    }
+                });
+            } catch(e) {
+                console.log('Could not load saved results:', e);
+            }
+        })();
+"""
+        # Insert before the last </script> tag
+        last_script_close = html.rfind('</script>')
+        if last_script_close > 0:
+            html = html[:last_script_close] + prepopulate_js + html[last_script_close:]
+
+    return HTMLResponse(content=html)
 
 
 @router.get("/api/uat/pages")
@@ -577,6 +614,26 @@ async def universal_search(q: str = Query(..., min_length=1, max_length=100)):
 
     results["total"] = sum(len(v) for k, v in results.items() if isinstance(v, list))
     return results
+
+
+# ── GET /api/uat/{id}/results — Fetch current test case results (MP-UAT-DASHBOARD-FIX-001) ──
+
+@router.get("/api/uat/{uat_id}/results")
+async def get_uat_results(uat_id: str):
+    """Get current test case results for a UAT page. Used by page JS to pre-populate on load."""
+    page = execute_query(
+        "SELECT id, test_cases_json, status FROM uat_pages WHERE id = ?",
+        (uat_id,), fetch="one"
+    )
+    if not page:
+        raise HTTPException(404, f"UAT page {uat_id} not found")
+
+    test_cases = json.loads(page["test_cases_json"]) if page.get("test_cases_json") else []
+    return {
+        "uat_id": uat_id,
+        "status": page["status"],
+        "test_cases": test_cases
+    }
 
 
 # ── PATCH /api/uat/{id}/results — Update test case results (MP-UAT-GEN-001 Part 3) ──

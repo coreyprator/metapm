@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.23.2"  # PR-BROWSER-001: RAG Search nav entry
+    VERSION: str = "2.23.3"  # MP-UAT-DASHBOARD-FIX-001: archive filter + pre-populate results on load
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
