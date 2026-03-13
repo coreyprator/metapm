@@ -1010,6 +1010,72 @@ async def submit_uat_direct(uat: UATDirectSubmit):
             except Exception as ve:
                 logger.warning(f"Auto-verification trigger failed (non-blocking): {ve}")
 
+        # MP-UAT-GEN-001: PTH propagation from submit payload
+        if uat.pth:
+            execute_query(
+                "UPDATE mcp_handoffs SET pth = ? WHERE id = ?",
+                (uat.pth, handoff_id), fetch="none"
+            )
+
+        # MP-UAT-GEN-001: Server-side UAT page generation from structured test_cases
+        uat_page_id = None
+        if uat.test_cases:
+            try:
+                from app.services.uat_generator_v2 import render_structured_uat_html
+                tc_dicts = [tc.model_dump() for tc in uat.test_cases]
+                html = render_structured_uat_html(
+                    project=project_name,
+                    version=version_full,
+                    feature=feature_value,
+                    pth=uat.pth,
+                    cc_summary=uat.cc_summary,
+                    test_cases=tc_dicts,
+                    handoff_id=handoff_id,
+                    uat_result_id=uat_id
+                )
+                # Upsert into uat_pages
+                existing_page = execute_query(
+                    "SELECT id FROM uat_pages WHERE handoff_id = ?",
+                    (handoff_id,), fetch="one"
+                )
+                if existing_page:
+                    uat_page_id = str(existing_page["id"])
+                    execute_query("""
+                        UPDATE uat_pages
+                        SET test_cases_json = ?, html_content = ?, pth = ?,
+                            version = ?, status = 'ready'
+                        WHERE id = ?
+                    """, (json.dumps(tc_dicts), html, uat.pth, version_full[:20], uat_page_id), fetch="none")
+                else:
+                    page_result = execute_query("""
+                        INSERT INTO uat_pages (handoff_id, project, pth, version,
+                                               test_cases_json, html_content, status)
+                        OUTPUT INSERTED.id
+                        VALUES (?, ?, ?, ?, ?, ?, 'ready')
+                    """, (handoff_id, project_name, uat.pth, version_full[:20],
+                          json.dumps(tc_dicts), html), fetch="one")
+                    if page_result:
+                        uat_page_id = str(page_result["id"])
+                        # Re-render with real uat_page_id in the HTML
+                        html = render_structured_uat_html(
+                            project=project_name,
+                            version=version_full,
+                            feature=feature_value,
+                            pth=uat.pth,
+                            cc_summary=uat.cc_summary,
+                            test_cases=tc_dicts,
+                            handoff_id=handoff_id,
+                            uat_result_id=uat_id,
+                            uat_page_id=uat_page_id
+                        )
+                        execute_query(
+                            "UPDATE uat_pages SET html_content = ? WHERE id = ?",
+                            (html, uat_page_id), fetch="none"
+                        )
+                logger.info(f"Generated UAT page {uat_page_id} from {len(uat.test_cases)} structured test cases")
+            except Exception as gen_err:
+                logger.warning(f"UAT page generation failed (non-blocking): {gen_err}")
+
         # Checkpoint verification (MP-MS3 Phase 6)
         checkpoint_verified = None
         if uat.uat_checkpoint and uat.uat_verification_hash:
@@ -1133,7 +1199,7 @@ async def list_uat_results(
             SELECT u.id, u.handoff_id, u.status, u.total_tests,
                    u.passed, u.failed, u.notes_count, u.tested_by,
                    u.tested_at, u.results_text,
-                   h.project, h.version
+                   h.project, h.version, h.pth
             FROM uat_results u
             JOIN mcp_handoffs h ON u.handoff_id = h.id
             WHERE {where_sql}
@@ -1155,7 +1221,8 @@ async def list_uat_results(
                 notes_count=row.get('notes_count'),
                 tested_by=row.get('tested_by'),
                 tested_at=row['tested_at'],
-                results_text=row.get('results_text')
+                results_text=row.get('results_text'),
+                pth=row.get('pth')
             ))
 
         return UATListResponse(results=items, total=total)
@@ -1214,7 +1281,7 @@ async def list_uat_results_alias(
             SELECT u.id, u.handoff_id, u.status, u.total_tests,
                    u.passed, u.failed, u.notes_count, u.tested_by,
                    u.tested_at, u.results_text,
-                   h.project, h.version
+                   h.project, h.version, h.pth
             FROM uat_results u
             JOIN mcp_handoffs h ON u.handoff_id = h.id
             WHERE {where_sql}
@@ -1236,7 +1303,8 @@ async def list_uat_results_alias(
                 notes_count=row.get('notes_count'),
                 tested_by=row.get('tested_by'),
                 tested_at=row['tested_at'],
-                results_text=row.get('results_text')
+                results_text=row.get('results_text'),
+                pth=row.get('pth')
             ))
 
         return UATListResponse(results=items, total=total)

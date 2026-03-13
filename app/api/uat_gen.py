@@ -4,6 +4,7 @@ Endpoints for generating and serving UAT pages.
 """
 import json
 import logging
+from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException, Query
@@ -11,6 +12,7 @@ from fastapi.responses import HTMLResponse
 
 from app.core.database import execute_query
 from app.services.uat_generator import generate_test_cases, render_uat_html
+from app.schemas.mcp import UATResultsUpdate, BulkArchiveRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -575,3 +577,114 @@ async def universal_search(q: str = Query(..., min_length=1, max_length=100)):
 
     results["total"] = sum(len(v) for k, v in results.items() if isinstance(v, list))
     return results
+
+
+# ── PATCH /api/uat/{id}/results — Update test case results (MP-UAT-GEN-001 Part 3) ──
+
+@router.patch("/api/uat/{uat_id}/results")
+async def update_uat_results(uat_id: str, body: UATResultsUpdate):
+    """Update individual test case results from PL interaction.
+    Updates test_cases_json in uat_pages and re-renders HTML."""
+    page = execute_query(
+        "SELECT id, test_cases_json, handoff_id, project, pth, version FROM uat_pages WHERE id = ?",
+        (uat_id,), fetch="one"
+    )
+    if not page:
+        raise HTTPException(404, f"UAT page {uat_id} not found")
+
+    # Parse existing test cases
+    existing_cases = json.loads(page["test_cases_json"]) if page.get("test_cases_json") else []
+
+    # Build lookup of updates
+    updates_by_id = {tc.id: tc for tc in body.test_cases}
+
+    # Apply updates
+    for case in existing_cases:
+        update = updates_by_id.get(case["id"])
+        if update:
+            case["status"] = update.status
+            if update.result is not None:
+                case["result"] = update.result
+            if update.notes is not None:
+                case["notes"] = update.notes
+
+    # Check if all test cases are resolved (no pending)
+    all_resolved = all(
+        c.get("status") in ("pass", "fail", "skip")
+        for c in existing_cases
+        if c.get("type", "pl_visual") == "pl_visual"
+    )
+
+    # Update status
+    new_status = page.get("status", "in_progress")
+    if body.overall_status:
+        if body.overall_status == "passed":
+            new_status = "passed"
+        elif body.overall_status == "failed":
+            new_status = "failed"
+        elif all_resolved:
+            new_status = "submitted"
+    elif all_resolved:
+        new_status = "submitted"
+
+    submitted_at = "GETUTCDATE()" if new_status in ("passed", "failed", "submitted") else "NULL"
+
+    execute_query(f"""
+        UPDATE uat_pages
+        SET test_cases_json = ?,
+            status = ?,
+            submitted_at = {submitted_at}
+        WHERE id = ?
+    """, (json.dumps(existing_cases), new_status, uat_id), fetch="none")
+
+    # Count results
+    pl_cases = [c for c in existing_cases if c.get("type", "pl_visual") == "pl_visual"]
+    passed = sum(1 for c in pl_cases if c.get("status") == "pass")
+    failed = sum(1 for c in pl_cases if c.get("status") == "fail")
+    skipped = sum(1 for c in pl_cases if c.get("status") == "skip")
+    pending = len(pl_cases) - passed - failed - skipped
+
+    logger.info(f"UAT {uat_id} results updated: {passed}P/{failed}F/{skipped}S/{pending} pending, status={new_status}")
+
+    return {
+        "uat_id": uat_id,
+        "status": new_status,
+        "total": len(pl_cases),
+        "passed": passed,
+        "failed": failed,
+        "skipped": skipped,
+        "pending": pending,
+        "updated": len(updates_by_id)
+    }
+
+
+# ── POST /api/uat/bulk-archive — Archive old UAT records (MP-UAT-GEN-001 Part 5) ──
+
+@router.post("/api/uat/bulk-archive")
+async def bulk_archive_uats(body: BulkArchiveRequest):
+    """Archive multiple UAT page records. Sets status to 'archived'."""
+    if not body.uat_ids:
+        raise HTTPException(400, "uat_ids list cannot be empty")
+
+    archived = 0
+    not_found = []
+    for uid in body.uat_ids:
+        page = execute_query(
+            "SELECT id, status FROM uat_pages WHERE id = ?",
+            (uid,), fetch="one"
+        )
+        if page:
+            execute_query(
+                "UPDATE uat_pages SET status = 'archived' WHERE id = ?",
+                (uid,), fetch="none"
+            )
+            archived += 1
+        else:
+            not_found.append(uid)
+
+    logger.info(f"Bulk archived {archived} UAT pages. Reason: {body.reason}")
+    return {
+        "archived": archived,
+        "not_found": len(not_found),
+        "reason": body.reason
+    }

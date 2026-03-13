@@ -1,10 +1,34 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-9E3F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-10 — Sprint "MP-LESSON-INBOX-001" (v2.18.0)
+Updated: 2026-03-13 — Sprint "MP-UAT-GEN-001" (v2.23.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-10 (MP-LESSON-INBOX-001, v2.18.0)
+### Latest Session Update — 2026-03-13 (MP-UAT-GEN-001, v2.23.0)
+
+- **Sprint MP-UAT-GEN-001**: Server-side UAT generation from structured handoff data.
+- **Current Version**: v2.23.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00193-tdg)
+- **Part 1 — Extended submit schema**: `POST /api/uat/submit` now accepts `test_cases[]` (structured test case array), `pth` (Prompt Tracking Hash), `cc_summary` (CC summary block). All backward-compatible — existing calls without these fields still work.
+- **Part 2 — Server-side UAT render**: When `test_cases` are provided in submit, MetaPM generates and stores a full interactive HTML page in `uat_pages`. Only `pl_visual` type test cases are rendered; `cc_machine` cases are stored but hidden. `GET /uat/{uuid}` returns the generated page with pass/fail/skip controls, CC summary block, save progress, and submit functionality.
+- **Part 3 — PATCH results endpoint**: `PATCH /api/uat/{uat_id}/results` — PL can update individual test case results. Accepts `{test_cases: [{id, status, result, notes}], overall_status}`. Updates `test_cases_json` in `uat_pages` and tracks completion.
+- **Part 4 — PTH in UAT list**: `GET /mcp/uat/list` now includes `pth` field from `mcp_handoffs.pth`. Searchable/filterable.
+- **Part 5 — Bulk archive**: `POST /api/uat/bulk-archive` — archives multiple UAT page records. Archived 5 pre-2026-03-13 administrative UATs. Only HM01 (HarmonyLab v2.7.0) remains active.
+- **New file**: `app/services/uat_generator_v2.py` — structured test case renderer (separate from auto-generated renderer in `uat_generator.py`)
+- **New schema models**: `TestCaseInput`, `TestCaseResultUpdate`, `UATResultsUpdate`, `BulkArchiveRequest` in `app/schemas/mcp.py`
+- **MetaPM code**: MP-UAT-GEN-001 (6C9B)
+
+### Previous: 2026-03-12 (PR-009 MetaPM→RAG Sync, v2.22.1)
+
+- **Sprint PR-009**: Added `/api/rag/sync` endpoint to sync all MetaPM requirements into Portfolio RAG `metapm` collection.
+- **Current Version**: v2.22.1 — **DEPLOYED** to Cloud Run (revision metapm-v2-00189-wcb)
+- **New endpoint**: `POST /api/rag/sync` — fetches all requirements from DB, builds structured text chunks, POSTs to Portfolio RAG `/ingest/custom` in batches of 25 with `replace_collection=true`. Returns `{"synced": N, "collection": "metapm", "timestamp": "..."}`.
+- **New config**: `PORTFOLIO_RAG_API_KEY` env var (mapped to `rag-api-key` Secret Manager secret)
+- **New file**: `app/api/rag.py` — extended with sync endpoint (was proxy-only before)
+- **Cloud Run timeout**: Increased to 900s (sync takes ~250s for 313 requirements)
+- **Cloud Scheduler**: PENDING — `cc-deploy` lacks `cloudscheduler.jobs.create` permission. PL must create: `gcloud scheduler jobs create http metapm-rag-sync --schedule="0 2 * * *" --uri=https://metapm.rentyourcio.com/api/rag/sync --http-method=POST --time-zone=America/Chicago --location=us-central1 --headers=Content-Type=application/json,Content-Length=0`
+- **Note**: MetaPM has 10 duplicate requirement codes (REQ-001 ×6, etc). Chunk IDs use requirement UUIDs to avoid conflicts.
+
+### Previous: MP-LESSON-INBOX-001 (v2.18.0, 2026-03-10)
 
 - **Sprint MP-LESSON-INBOX-001**: Lessons API field validation, CRUD, LL-id in POST response.
 - **Current Version**: v2.18.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00173-dk2)

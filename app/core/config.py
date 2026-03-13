@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.22.0"  # MP-SEED-FORM-001: Bulk Seed form for requirements and lessons learned
+    VERSION: str = "2.23.0"  # MP-UAT-GEN-001: Server-side UAT generation, PTH field, UAT cleanup
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

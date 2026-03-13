@@ -156,6 +156,18 @@ class LogResponse(BaseModel):
 
 
 # UAT Schemas
+class TestCaseInput(BaseModel):
+    """Structured test case submitted by CC for server-side UAT generation."""
+    id: str = Field(..., max_length=20)
+    title: str = Field(..., max_length=300)
+    type: str = Field("pl_visual", pattern=r"^(pl_visual|cc_machine)$")
+    instructions: List[str] = Field(default_factory=list)
+    expected: Optional[str] = Field(None, max_length=500)
+    status: str = Field("pending", pattern=r"^(pending|pass|fail|skip)$")
+    result: Optional[str] = None
+    notes: Optional[str] = None
+
+
 class UATResultItem(BaseModel):
     """A single UAT test result item from the HTML checklist."""
     id: str
@@ -252,6 +264,9 @@ class UATDirectSubmit(BaseModel):
     checklist_path: Optional[str] = None
     url: Optional[str] = None
     tested_by: Optional[str] = Field(None, max_length=100)
+    pth: Optional[str] = Field(None, max_length=4, description="Prompt Tracking Hash")
+    cc_summary: Optional[str] = Field(None, max_length=5000, description="CC summary block (version, canaries, items to delete)")
+    test_cases: Optional[List[TestCaseInput]] = Field(None, description="Structured test cases for server-side UAT generation")
     uat_checkpoint: Optional[str] = Field(None, max_length=100)
     uat_verification_hash: Optional[str] = Field(None, max_length=128)
     requirements: Optional[List[dict]] = Field(None, description="Requirements with evidence for verification")
@@ -432,9 +447,30 @@ class UATListItem(BaseModel):
     tested_by: Optional[str] = None
     tested_at: datetime
     results_text: Optional[str] = None
+    pth: Optional[str] = None
 
 
 class UATListResponse(BaseModel):
     """Paginated list of UAT results."""
     results: List[UATListItem]
     total: int
+
+
+class TestCaseResultUpdate(BaseModel):
+    """Single test case result from PL."""
+    id: str
+    status: str = Field(..., pattern=r"^(pass|fail|skip)$")
+    result: Optional[str] = Field(None, max_length=1000)
+    notes: Optional[str] = Field(None, max_length=5000)
+
+
+class UATResultsUpdate(BaseModel):
+    """PATCH body for updating UAT test case results."""
+    test_cases: List[TestCaseResultUpdate]
+    overall_status: Optional[str] = Field(None, pattern=r"^(passed|failed|pending)$")
+
+
+class BulkArchiveRequest(BaseModel):
+    """Request to archive multiple UAT records."""
+    uat_ids: List[str]
+    reason: Optional[str] = Field("administrative cleanup", max_length=500)
