@@ -74,12 +74,12 @@ async def seed_requirements(
                     UPDATE roadmap_requirements
                     SET title = ?, description = ?, project_id = ?,
                         status = ?, priority = ?, type = ?,
-                        pth = ?, notes = ?, updated_at = GETUTCDATE()
+                        pth = ?, updated_at = GETUTCDATE()
                     WHERE code = ?
                 """, (
                     item.title, item.description, item.project_id,
                     item.status, item.priority, item.type,
-                    item.pth, item.notes, item.code
+                    item.pth, item.code
                 ), fetch="none")
                 updated += 1
                 continue
@@ -88,12 +88,12 @@ async def seed_requirements(
             req_id = str(uuid.uuid4())
             execute_query("""
                 INSERT INTO roadmap_requirements
-                    (id, project_id, code, title, description, type, priority, status, pth, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, project_id, code, title, description, type, priority, status, pth)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 req_id, item.project_id, item.code, item.title,
                 item.description, item.type, item.priority, item.status,
-                item.pth, item.notes
+                item.pth
             ), fetch="none")
             created += 1
 
