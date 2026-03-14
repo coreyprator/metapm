@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.23.5"  # MP-UAT-UI-001: header/footer/PTH-buttons/auto-approve
+    VERSION: str = "2.24.0"  # MP-SEED-FORM-001: bulk seed form + endpoints
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

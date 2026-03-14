@@ -160,8 +160,11 @@
 
     <!-- Requirements Tab -->
     <div class="tab-content active" id="tab-req">
-      <label style="font-size:13px;color:var(--muted);margin-bottom:6px;display:block">Paste Requirements JSON</label>
-      <textarea class="json-input" id="req-input" placeholder='[{"project_id":"proj-mp","title":"...","description":"...","type":"feature","priority":"P1"}]'></textarea>
+      <label style="font-size:13px;color:var(--muted);margin-bottom:6px;display:block">Paste Requirements JSON or upload a .json file</label>
+      <textarea class="json-input" id="req-input" placeholder='[{"code":"PR-015","title":"...","description":"...","project_id":"proj-mp","status":"build","priority":"P1","pth":"PR01"}]'></textarea>
+      <div style="margin-top:8px">
+        <input type="file" id="req-file" accept=".json" onchange="loadFile('req-file','req-input')" style="font-size:13px;color:var(--muted)">
+      </div>
       <div class="btn-row">
         <button class="action-btn btn-validate" onclick="validateReq()">Validate</button>
         <button class="action-btn btn-seed" id="req-seed-btn" onclick="seedReq()" disabled>Seed Requirements</button>
@@ -174,8 +177,11 @@
 
     <!-- Lessons Learned Tab -->
     <div class="tab-content" id="tab-ll">
-      <label style="font-size:13px;color:var(--muted);margin-bottom:6px;display:block">Paste Lessons Learned JSON</label>
-      <textarea class="json-input" id="ll-input" placeholder='[{"title":"...","description":"what happened","resolution":"the fix","category":"Process","routing":"Bootstrap"}]'></textarea>
+      <label style="font-size:13px;color:var(--muted);margin-bottom:6px;display:block">Paste Lessons Learned JSON or upload a .json file</label>
+      <textarea class="json-input" id="ll-input" placeholder='[{"title":"...","lesson":"Full lesson text","project":"MetaPM","category":"process","severity":"medium"}]'></textarea>
+      <div style="margin-top:8px">
+        <input type="file" id="ll-file" accept=".json" onchange="loadFile('ll-file','ll-input')" style="font-size:13px;color:var(--muted)">
+      </div>
       <div class="btn-row">
         <button class="action-btn btn-validate" onclick="validateLL()">Validate</button>
         <button class="action-btn btn-seed" id="ll-seed-btn" onclick="seedLL()" disabled>Seed Lessons</button>
@@ -201,6 +207,17 @@
       }
     }
 
+    // File upload loader
+    function loadFile(fileInputId, textareaId) {
+      const file = document.getElementById(fileInputId).files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById(textareaId).value = e.target.result;
+      };
+      reader.readAsText(file);
+    }
+
     // Helpers
     function showError(id, msg) {
       const el = document.getElementById(id);
@@ -214,7 +231,7 @@
 
     // ── Requirements ──
 
-    const REQ_TYPES = ['feature', 'bug', 'enhancement', 'chore', 'research'];
+    const REQ_TYPES = ['feature', 'bug', 'enhancement', 'chore', 'research', 'task'];
     const REQ_PRIORITIES = ['P1', 'P2', 'P3'];
     let reqParsed = null;
 
@@ -239,7 +256,7 @@
       const errors = [];
       data.forEach((item, i) => {
         const missing = [];
-        ['project_id', 'title', 'description', 'type', 'priority'].forEach(f => {
+        ['code', 'title', 'project_id'].forEach(f => {
           if (!item[f] || (typeof item[f] === 'string' && !item[f].trim())) missing.push(f);
         });
         if (missing.length) errors.push(`Item ${i + 1}: missing required fields: ${missing.join(', ')}`);
@@ -250,9 +267,9 @@
       if (errors.length) { showError('req-error', errors.join('\n')); return; }
 
       reqParsed = data;
-      let html = '<table class="preview-table"><thead><tr><th>#</th><th>Project ID</th><th>Title</th><th>Type</th><th>Priority</th><th>Description</th></tr></thead><tbody>';
+      let html = '<table class="preview-table"><thead><tr><th>#</th><th>Code</th><th>Project ID</th><th>Title</th><th>Priority</th><th>PTH</th></tr></thead><tbody>';
       data.forEach((item, i) => {
-        html += `<tr><td>${i + 1}</td><td>${truncate(item.project_id, 12)}</td><td>${esc(item.title)}</td><td>${item.type}</td><td>${item.priority}</td><td>${esc(truncate(item.description, 80))}</td></tr>`;
+        html += `<tr><td>${i + 1}</td><td>${esc(item.code)}</td><td>${truncate(item.project_id, 12)}</td><td>${esc(item.title)}</td><td>${item.priority || 'P2'}</td><td>${esc(item.pth || '-')}</td></tr>`;
       });
       html += '</tbody></table>';
       const preview = document.getElementById('req-preview');
@@ -268,76 +285,40 @@
       btn.textContent = 'Seeding...';
       hideEl('req-error');
 
-      // Cache project_id -> project_code mapping
-      const projectCodeCache = {};
+      try {
+        const res = await fetch('/api/seed/requirements', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reqParsed)
+        });
+        const data = await res.json();
 
-      const results = [];
-      for (const item of reqParsed) {
-        try {
-          // Resolve project code from project_id if not cached
-          if (!projectCodeCache[item.project_id]) {
-            const projRes = await fetch('/api/roadmap/projects');
-            if (projRes.ok) {
-              const projData = await projRes.json();
-              for (const p of (projData.projects || [])) {
-                projectCodeCache[p.id] = p.code;
-              }
-            }
-          }
-          const projCode = projectCodeCache[item.project_id] || 'MP';
-
-          // Get next auto-generated code
-          const codeRes = await fetch(`/api/roadmap/next-code/${projCode}/${item.type}`);
-          let code = '';
-          if (codeRes.ok) {
-            const codeData = await codeRes.json();
-            code = codeData.code || '';
-          }
-
-          const res = await fetch('/api/roadmap/requirements', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id: crypto.randomUUID(),
-              project_id: item.project_id,
-              code: code,
-              title: item.title,
-              description: item.description,
-              type: item.type,
-              priority: item.priority
-            })
-          });
-          const data = await res.json();
-          if (res.ok) {
-            results.push({ title: item.title, code: data.code || code || '-', ok: true });
-          } else {
-            results.push({ title: item.title, code: '-', ok: false, error: data.detail || data.error || 'Unknown error' });
-          }
-        } catch (e) {
-          results.push({ title: item.title, code: '-', ok: false, error: e.message });
+        if (!res.ok) {
+          showError('req-error', data.detail || 'Seed failed');
+          btn.textContent = 'Seed Requirements';
+          btn.disabled = false;
+          return;
         }
-      }
 
-      const ok = results.filter(r => r.ok).length;
-      const total = results.length;
+        let html = '';
+        const cls = data.errors.length === 0 ? 'summary-ok' : data.created > 0 ? 'summary-partial' : 'summary-fail';
+        html += `<div class="summary-bar ${cls}">Created: ${data.created} | Skipped: ${data.skipped} | Updated: ${data.updated || 0} | Errors: ${data.errors.length}</div>`;
 
-      let html = '<table class="results-table"><thead><tr><th>Title</th><th>Assigned Code</th><th>Status</th></tr></thead><tbody>';
-      for (const r of results) {
-        if (r.ok) {
-          html += `<tr><td>${esc(r.title)}</td><td style="font-weight:700;color:#4ade80;font-size:14px">${esc(r.code)}</td><td style="color:#4ade80">Seeded</td></tr>`;
-        } else {
-          html += `<tr><td>${esc(r.title)}</td><td>-</td><td style="color:#fca5a5">${esc(r.error)}</td></tr>`;
+        if (data.errors.length > 0) {
+          html += '<table class="results-table"><thead><tr><th>Code</th><th>Error</th></tr></thead><tbody>';
+          for (const e of data.errors) {
+            html += `<tr><td>${esc(e.code)}</td><td style="color:#fca5a5">${esc(e.reason)}</td></tr>`;
+          }
+          html += '</tbody></table>';
         }
+
+        const container = document.getElementById('req-results');
+        container.innerHTML = html;
+        showEl('req-results');
+        hideEl('req-preview');
+      } catch (e) {
+        showError('req-error', 'Network error: ' + e.message);
       }
-      html += '</tbody></table>';
-
-      const cls = ok === total ? 'summary-ok' : ok > 0 ? 'summary-partial' : 'summary-fail';
-      html += `<div class="summary-bar ${cls}">${ok} of ${total} seeded successfully</div>`;
-
-      const container = document.getElementById('req-results');
-      container.innerHTML = html;
-      showEl('req-results');
-      hideEl('req-preview');
       btn.textContent = 'Seed Requirements';
     }
 
@@ -352,10 +333,7 @@
 
     // ── Lessons Learned ──
 
-    const LL_CATEGORIES = ['Process', 'Tech', 'Arch', 'Quality'];
-    const LL_ROUTINGS = ['Bootstrap', 'PK.md', 'CAI Memory', 'Standards'];
-    const CATEGORY_MAP = { 'Process': 'process', 'Tech': 'technical', 'Arch': 'architecture', 'Quality': 'quality' };
-    const ROUTING_MAP = { 'Bootstrap': 'bootstrap', 'PK.md': 'pk.md', 'CAI Memory': 'cai_memory', 'Standards': 'standards' };
+    const LL_CATEGORIES = ['process', 'technical', 'architecture', 'quality', 'bootstrap', 'pk.md', 'cai_memory', 'standards'];
     let llParsed = null;
 
     function validateLL() {
@@ -379,20 +357,19 @@
       const errors = [];
       data.forEach((item, i) => {
         const missing = [];
-        ['title', 'description', 'resolution', 'category', 'routing'].forEach(f => {
+        ['title', 'lesson', 'project', 'category'].forEach(f => {
           if (!item[f] || (typeof item[f] === 'string' && !item[f].trim())) missing.push(f);
         });
         if (missing.length) errors.push(`Item ${i + 1}: missing required fields: ${missing.join(', ')}`);
         if (item.category && !LL_CATEGORIES.includes(item.category)) errors.push(`Item ${i + 1}: invalid category "${item.category}" (must be one of: ${LL_CATEGORIES.join(', ')})`);
-        if (item.routing && !LL_ROUTINGS.includes(item.routing)) errors.push(`Item ${i + 1}: invalid routing "${item.routing}" (must be one of: ${LL_ROUTINGS.join(', ')})`);
       });
 
       if (errors.length) { showError('ll-error', errors.join('\n')); return; }
 
       llParsed = data;
-      let html = '<table class="preview-table"><thead><tr><th>#</th><th>Title</th><th>Category</th><th>Routing</th><th>Description</th></tr></thead><tbody>';
+      let html = '<table class="preview-table"><thead><tr><th>#</th><th>Title</th><th>Project</th><th>Category</th><th>Lesson</th></tr></thead><tbody>';
       data.forEach((item, i) => {
-        html += `<tr><td>${i + 1}</td><td>${esc(item.title)}</td><td>${item.category}</td><td>${item.routing}</td><td>${esc(truncate(item.description, 80))}</td></tr>`;
+        html += `<tr><td>${i + 1}</td><td>${esc(item.title)}</td><td>${esc(item.project)}</td><td>${item.category}</td><td>${esc(truncate(item.lesson, 80))}</td></tr>`;
       });
       html += '</tbody></table>';
       const preview = document.getElementById('ll-preview');
@@ -408,52 +385,40 @@
       btn.textContent = 'Seeding...';
       hideEl('ll-error');
 
-      const results = [];
-      for (const item of llParsed) {
-        try {
-          const res = await fetch('/api/lessons', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              project: 'metapm',
-              category: CATEGORY_MAP[item.category] || item.category.toLowerCase(),
-              text: `${item.title}: ${item.description} -- Resolution: ${item.resolution}`,
-              target: ROUTING_MAP[item.routing] || item.routing.toLowerCase(),
-              by: 'pl',
-              source_sprint: 'bulk-seed'
-            })
-          });
-          const data = await res.json();
-          if (res.ok) {
-            results.push({ title: item.title, id: data.id || '-', ok: true });
-          } else {
-            results.push({ title: item.title, id: '-', ok: false, error: data.detail || data.error || 'Unknown error' });
+      try {
+        const res = await fetch('/api/seed/lessons', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(llParsed)
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showError('ll-error', data.detail || 'Seed failed');
+          btn.textContent = 'Seed Lessons';
+          btn.disabled = false;
+          return;
+        }
+
+        let html = '';
+        const cls = data.errors.length === 0 ? 'summary-ok' : data.created > 0 ? 'summary-partial' : 'summary-fail';
+        html += `<div class="summary-bar ${cls}">Created: ${data.created} | Skipped: ${data.skipped} | Errors: ${data.errors.length}</div>`;
+
+        if (data.errors.length > 0) {
+          html += '<table class="results-table"><thead><tr><th>Title</th><th>Error</th></tr></thead><tbody>';
+          for (const e of data.errors) {
+            html += `<tr><td>${esc(e.title)}</td><td style="color:#fca5a5">${esc(e.reason)}</td></tr>`;
           }
-        } catch (e) {
-          results.push({ title: item.title, id: '-', ok: false, error: e.message });
+          html += '</tbody></table>';
         }
+
+        const container = document.getElementById('ll-results');
+        container.innerHTML = html;
+        showEl('ll-results');
+        hideEl('ll-preview');
+      } catch (e) {
+        showError('ll-error', 'Network error: ' + e.message);
       }
-
-      const ok = results.filter(r => r.ok).length;
-      const total = results.length;
-
-      let html = '<table class="results-table"><thead><tr><th>Title</th><th>Assigned ID</th><th>Status</th></tr></thead><tbody>';
-      for (const r of results) {
-        if (r.ok) {
-          html += `<tr><td>${esc(r.title)}</td><td style="font-weight:700;color:#4ade80;font-size:14px">${esc(r.id)}</td><td style="color:#4ade80">Seeded</td></tr>`;
-        } else {
-          html += `<tr><td>${esc(r.title)}</td><td>-</td><td style="color:#fca5a5">${esc(r.error)}</td></tr>`;
-        }
-      }
-      html += '</tbody></table>';
-
-      const cls = ok === total ? 'summary-ok' : ok > 0 ? 'summary-partial' : 'summary-fail';
-      html += `<div class="summary-bar ${cls}">${ok} of ${total} seeded successfully</div>`;
-
-      const container = document.getElementById('ll-results');
-      container.innerHTML = html;
-      showEl('ll-results');
-      hideEl('ll-preview');
       btn.textContent = 'Seed Lessons';
     }
 
