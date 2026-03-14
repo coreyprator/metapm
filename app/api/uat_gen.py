@@ -343,9 +343,14 @@ async def list_uat_pages(
         if status == "pending":
             # "Open Only" — exclude archived pages
             where_clauses.append("u.status IN ('in_progress','pending','submitted','ready','active')")
+        elif status == "archived":
+            where_clauses.append("u.status = 'archived'")
         else:
             where_clauses.append("u.status = ?")
             params.append(status)
+    else:
+        # Exclude archived pages by default (MP-UAT-SUBMIT-001)
+        where_clauses.append("u.status != 'archived'")
 
     where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
