@@ -229,14 +229,14 @@ async def serve_uat_page(uat_id: str):
     """
     # 1. Primary: uat_pages by id
     page = execute_query(
-        "SELECT id, html_content, status FROM uat_pages WHERE id = ?",
+        "SELECT id, html_content, status, pth FROM uat_pages WHERE id = ?",
         (uat_id,), fetch="one"
     )
 
     # 2. Fallback: uat_pages by handoff_id
     if not page:
         page = execute_query(
-            "SELECT id, html_content, status FROM uat_pages WHERE handoff_id = ?",
+            "SELECT id, html_content, status, pth FROM uat_pages WHERE handoff_id = ?",
             (uat_id,), fetch="one"
         )
 
@@ -248,7 +248,7 @@ async def serve_uat_page(uat_id: str):
         )
         if uat_result:
             page = execute_query(
-                "SELECT id, html_content, status FROM uat_pages WHERE handoff_id = ?",
+                "SELECT id, html_content, status, pth FROM uat_pages WHERE handoff_id = ?",
                 (uat_result["handoff_id"],), fetch="one"
             )
 
@@ -309,6 +309,55 @@ async def serve_uat_page(uat_id: str):
         last_script_close = html.rfind('</script>')
         if last_script_close > 0:
             html = html[:last_script_close] + prepopulate_js + html[last_script_close:]
+
+    # MP-UAT-UI-001: Inject footer (duplicate header) into existing pages
+    import re as _re_serve
+    if '<footer' not in html and '<header>' in html:
+        header_match = _re_serve.search(r'<header>(.*?)</header>', html, _re_serve.DOTALL)
+        if header_match:
+            footer_html = f'<footer style="background:linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent), black 15%));padding:20px;border-radius:12px;margin-top:24px;">{header_match.group(1).strip()}</footer>'
+            # Insert before the status-bar div
+            status_bar_pos = html.find('<div class="status-bar">')
+            if status_bar_pos > 0:
+                html = html[:status_bar_pos] + footer_html + '\n\n    ' + html[status_bar_pos:]
+
+    # MP-UAT-UI-001: Fix header format — move PTH inline with version on line 1
+    # Old: <h1>🔴 MetaPM v2.23.4 — MP-UAT-SUBMIT-001: desc</h1>\n<p>PTH: UG04 | N test cases</p>
+    # New: <h1>🔴 MetaPM v2.23.4 PTH: UG04 — MP-UAT-SUBMIT-001</h1>\n<p>desc | N test cases</p>
+    header_fix = _re_serve.search(
+        r'(<h1>)(.*?)\s*—\s*([\w-]+):\s*(.*?)(</h1>\s*<p>)PTH:\s*(\w+)\s*\|\s*(\d+ test cases)(</p>)',
+        html, _re_serve.DOTALL
+    )
+    if header_fix:
+        prefix = header_fix.group(2)  # emoji + project + version
+        sprint = header_fix.group(3)  # sprint code
+        desc = header_fix.group(4)    # feature description
+        pth_val = header_fix.group(6) # PTH value
+        tc_count = header_fix.group(7) # "N test cases"
+        new_header = f'<h1>{prefix} PTH: {pth_val} — {sprint}</h1>\n        <p>{desc} | {tc_count}</p>'
+        html = html[:header_fix.start()] + new_header + html[header_fix.end():]
+        # Also fix the footer copy if it was injected above
+        if '<footer' in html:
+            html = _re_serve.sub(
+                r'(<footer[^>]*>.*?<h1>)(.*?)\s*—\s*([\w-]+):\s*(.*?)(</h1>\s*<p>)PTH:\s*(\w+)\s*\|\s*(\d+ test cases)(</p>)',
+                lambda m: f'{m.group(1)}{m.group(2)} PTH: {m.group(6)} — {m.group(3)}</h1>\n        <p>{m.group(4)} | {m.group(7)}</p>',
+                html, count=1, flags=_re_serve.DOTALL
+            )
+
+    # MP-UAT-UI-001: Fix button labels — add PTH to Copy CC Link
+    if 'Copy Results' in html or 'Copy CC Link' in html:
+        pth_col = page.get("pth") if "pth" in (page or {}) else None
+        if not pth_col:
+            # Try to extract PTH from page content
+            pth_match = _re_serve.search(r'pth:\s*["\'](\w+)["\']', html)
+            pth_col = pth_match.group(1) if pth_match else None
+        if pth_col:
+            html = html.replace('>Copy Results<', f'>Copy CC Link ({pth_col})<')
+            html = html.replace('>Copy CC Link<', f'>Copy CC Link ({pth_col})<')
+        else:
+            html = html.replace('>Copy Results<', '>Copy CC Link<')
+    if '>Submit to MetaPM<' in html:
+        html = html.replace('>Submit to MetaPM<', '>Submit Final<')
 
     return HTMLResponse(content=html)
 
