@@ -58,13 +58,28 @@ def render_structured_uat_html(
     pl_cases = [tc for tc in test_cases if tc.get("type", "pl_visual") == "pl_visual"]
     total_tests = len(pl_cases)
 
+    # Header line 1: {emoji} {Project} v{version} PTH: {PTH} — {sprint_title}
+    # Header line 2: {feature_description} | {N} test cases
     title = f"{emoji} {project_display} v{version}"
+    if pth:
+        title += f" PTH: {pth}"
+
+    # Split feature into sprint title (before colon) and description (after colon)
+    sprint_title = ""
+    feature_desc = ""
     if feature:
-        title += f" — {feature}"
+        if ":" in feature:
+            sprint_title = feature.split(":", 1)[0].strip()
+            feature_desc = feature.split(":", 1)[1].strip()
+        else:
+            sprint_title = feature
+
+    if sprint_title:
+        title += f" — {sprint_title}"
 
     subtitle_parts = []
-    if pth:
-        subtitle_parts.append(f"PTH: {pth}")
+    if feature_desc:
+        subtitle_parts.append(feature_desc)
     subtitle_parts.append(f"{total_tests} test cases")
     subtitle = " | ".join(subtitle_parts)
 
@@ -275,6 +290,11 @@ def render_structured_uat_html(
         <textarea id="general-notes" class="general-notes-input" placeholder="Any observations, issues found, suggestions..."></textarea>
     </div>
 
+    <footer style="background:linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent), black 15%));padding:20px;border-radius:12px;margin-top:24px;">
+        <h1 style="font-size:1.4rem;margin-bottom:8px;">{escape(title)}</h1>
+        <p style="opacity:0.9;font-size:0.9rem;">{escape(subtitle)}</p>
+    </footer>
+
     <div class="status-bar">
         <h3>Results Summary</h3>
         <div class="summary-stats">
@@ -292,8 +312,8 @@ def render_structured_uat_html(
 
     <div class="export-bar">
         <button class="export-btn save-btn" onclick="saveResults()">Save Progress</button>
-        <button class="export-btn copy-btn" onclick="copyResults()">Copy Results</button>
-        <button class="export-btn submit-btn" id="submit-btn" onclick="submitResults()">Submit to MetaPM</button>
+        <button class="export-btn copy-btn" onclick="copyResults()">{'Copy CC Link (' + escape(pth) + ')' if pth else 'Copy CC Link'}</button>
+        <button class="export-btn submit-btn" id="submit-btn" onclick="submitResults()">Submit Final</button>
     </div>
 
     <script>
@@ -459,7 +479,8 @@ def render_structured_uat_html(
             btn.textContent = 'Submitting...';
 
             try {{
-                // Save results first
+                // Save results first — auto-approve when all pass
+                const allPassFinal = (f === 0 && pending === 0 && p === total);
                 const saveRes = await fetch(
                     'https://metapm.rentyourcio.com/api/uat/' + UAT_CONFIG.uat_page_id + '/results',
                     {{
@@ -467,7 +488,7 @@ def render_structured_uat_html(
                         headers: {{ 'Content-Type': 'application/json' }},
                         body: JSON.stringify({{
                             test_cases: cases,
-                            overall_status: f > 0 ? 'failed' : (pending > 0 ? 'pending' : 'passed')
+                            overall_status: allPassFinal ? 'approved' : (f > 0 ? 'failed' : (pending > 0 ? 'pending' : 'passed'))
                         }})
                     }}
                 );
@@ -497,7 +518,8 @@ def render_structured_uat_html(
 
                 if (submitRes.ok) {{
                     const data = await submitRes.json();
-                    btn.textContent = 'Submitted!';
+                    const allPass = (f === 0 && pending === 0 && p === total);
+                    btn.textContent = allPass ? 'UAT approved — all tests passed' : 'Submitted!';
                     btn.style.background = '#166534';
                     if (data.handoff_url) {{
                         const link = document.createElement('a');

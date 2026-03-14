@@ -349,8 +349,8 @@ async def list_uat_pages(
             where_clauses.append("u.status = ?")
             params.append(status)
     else:
-        # Exclude archived pages by default (MP-UAT-SUBMIT-001)
-        where_clauses.append("u.status != 'archived'")
+        # Exclude archived and approved pages by default (MP-UAT-SUBMIT-001, MP-UAT-UI-001)
+        where_clauses.append("u.status NOT IN ('archived', 'approved')")
 
     where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
@@ -527,7 +527,7 @@ class UATStatusUpdate(BaseModel):
 @router.patch("/api/uat/{uat_id}/status")
 async def update_uat_status(uat_id: str, body: UATStatusUpdate):
     """Update UAT page status (e.g. archive a legacy page)."""
-    valid_statuses = {'active', 'archived', 'pending', 'passed', 'failed', 'ready', 'in_progress', 'submitted'}
+    valid_statuses = {'active', 'archived', 'pending', 'passed', 'failed', 'ready', 'in_progress', 'submitted', 'approved'}
     if body.status not in valid_statuses:
         raise HTTPException(400, f"Invalid status '{body.status}'. Valid: {sorted(valid_statuses)}")
 
@@ -677,10 +677,16 @@ async def update_uat_results(uat_id: str, body: UATResultsUpdate):
         if c.get("type", "pl_visual") == "pl_visual"
     )
 
-    # Update status
+    # Update status — auto-approve when client sends overall_status=approved (all-pass)
     new_status = page.get("status", "in_progress")
     if body.overall_status:
-        if body.overall_status == "passed":
+        if body.overall_status == "approved":
+            # Verify server-side: all pl_visual cases must be pass
+            if all(c.get("status") == "pass" for c in existing_cases if c.get("type", "pl_visual") == "pl_visual"):
+                new_status = "approved"
+            else:
+                new_status = "passed" if all_resolved else "in_progress"
+        elif body.overall_status == "passed":
             new_status = "passed"
         elif body.overall_status == "failed":
             new_status = "failed"
@@ -689,7 +695,7 @@ async def update_uat_results(uat_id: str, body: UATResultsUpdate):
     elif all_resolved:
         new_status = "submitted"
 
-    submitted_at = "GETUTCDATE()" if new_status in ("passed", "failed", "submitted") else "NULL"
+    submitted_at = "GETUTCDATE()" if new_status in ("passed", "failed", "submitted", "approved") else "NULL"
 
     execute_query(f"""
         UPDATE uat_pages

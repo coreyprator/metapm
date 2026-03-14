@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.23.4"  # MP-UAT-SUBMIT-001: archive filter on /api/uat/pages, write path confirmed
+    VERSION: str = "2.23.5"  # MP-UAT-UI-001: header/footer/PTH-buttons/auto-approve
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
