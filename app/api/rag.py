@@ -254,7 +254,7 @@ async def tools_ingest(
         # Build a single custom chunk
         chunk = {
             "id": str(uuid.uuid4()),
-            "text": text,
+            "content": text,
             "metadata": {
                 "source": source_id,
                 "filename": filename,
