@@ -23,7 +23,7 @@ class SeedRequirement(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: str = Field(default="")
     project_id: str = Field(..., min_length=1)
-    status: str = Field(default="build")
+    status: str = Field(default="req_created")
     priority: str = Field(default="P2")
     type: str = Field(default="feature")
     pth: Optional[str] = None

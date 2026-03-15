@@ -519,7 +519,9 @@ async def list_requirements(
                 description=row['description'],
                 type=RequirementType(row['type']) if row['type'] else RequirementType.TASK,
                 priority=RequirementPriority(row['priority']) if row['priority'] else RequirementPriority.P2,
-                status=RequirementStatus(row['status']) if row['status'] else RequirementStatus.BACKLOG,
+                status=(RequirementStatus(row['status'])
+                        if row['status'] and row['status'] in {s.value for s in RequirementStatus}
+                        else RequirementStatus.REQ_CREATED),
                 target_version=row['target_version'],
                 sprint_id=row['sprint_id'],
                 handoff_id=str(row['handoff_id']) if row['handoff_id'] else None,
@@ -880,7 +882,9 @@ async def get_roadmap(
                     description=row['description'],
                     type=RequirementType(row['type']) if row['type'] else RequirementType.TASK,
                     priority=RequirementPriority(row['priority']) if row['priority'] else RequirementPriority.P2,
-                    status=RequirementStatus(row['status']) if row['status'] else RequirementStatus.BACKLOG,
+                    status=(RequirementStatus(row['status'])
+                            if row['status'] and row['status'] in {s.value for s in RequirementStatus}
+                            else RequirementStatus.REQ_CREATED),
                     target_version=row['target_version'],
                     sprint_id=row['sprint_id'],
                     handoff_id=str(row['handoff_id']) if row['handoff_id'] else None,
