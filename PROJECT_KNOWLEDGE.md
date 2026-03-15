@@ -1,10 +1,23 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-9E3F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-13 — Sprint "MP-UAT-GEN-001" (v2.23.0)
+Updated: 2026-03-15 — Sprint "MP-MEGA-003" (v2.25.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-13 (MP-UAT-GEN-001, v2.23.0)
+### Latest Session Update — 2026-03-15 (MP-MEGA-003, v2.25.0)
+
+- **Sprint MP-MEGA-003 (PTH: MP03)**: Roadmap drill-down + doc ingest + governance fix + RAG search
+- **Current Version**: v2.25.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00216-n4b)
+- **New route: /roadmap-drill** — 4-level expandable hierarchy: Wave > Sprint (by PTH) > Requirement (full description) > UAT results (BV items + pass/fail). sessionStorage for expand state (not localStorage). Priority/project/search filters. Export JSON button. PL primary tool for requirements review before sprint firing.
+- **New route: /tools** — Tools page with two tabs: Document Ingest (MP-053) and RAG Search (MP-022). Document Ingest proxies file/URL to Portfolio RAG via `POST /api/tools/ingest` (API key server-side only). RAG Search calls `/api/rag/query`.
+- **Governance fix (MP-BUG-001)**: Added `GET /api/governance/bootstrap-version` endpoint. Fixed stale 1.5.7 state — updated `governance_state.json` (baked into image) AND `DEFAULT_STATE` to BOOT-1.5.9-D4F1.
+- **PORTFOLIO_RAG_API_KEY**: Now wired as `--set-secrets=PORTFOLIO_RAG_API_KEY=rag-api-key:latest` in Cloud Run deploy command. Required for /api/tools/ingest and /api/rag/sync.
+- **MP-022**: Closed. RAG search available at /tools (RAG Search tab).
+- **CI/CD RAG indexing**: All 8 projects confirmed with `ingest/code` step: metapm, etymython, harmonylab, portfolio-rag, personal-assistant, Super-Flashcards, ArtForge (7 from UG08 + PA from PA02e).
+- **Note**: governance_state.json is baked into Docker image. After each deploy, state persists from file. To update Bootstrap version: edit governance_state.json in repo and redeploy (or call POST /api/governance/sync after deploy).
+- **UAT ID**: 71A2E8BE-A384-4AE5-9E99-8DEB9C5C6EF2
+
+### Previous: 2026-03-13 (MP-UAT-GEN-001, v2.23.0)
 
 - **Sprint MP-UAT-GEN-001**: Server-side UAT generation from structured handoff data.
 - **Current Version**: v2.23.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00193-tdg)
