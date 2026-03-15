@@ -21,9 +21,9 @@ router = APIRouter()
 GOVERNANCE_STATE_FILE = Path(__file__).parent.parent.parent / "governance_state.json"
 
 DEFAULT_STATE = {
-    "checkpoint": "BOOT-1.5.7-65D6",
-    "bootstrap_version": "1.5.7",
-    "updated_at": "2026-03-12",
+    "checkpoint": "BOOT-1.5.9-D4F1",
+    "bootstrap_version": "1.5.9",
+    "updated_at": "2026-03-15",
     "source": "project-methodology/templates/CC_Bootstrap_v1.md"
 }
 
