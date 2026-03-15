@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.24.2"  # MP-UAT-LIST-FIX-001: safe RequirementStatus parse, seed default fix
+    VERSION: str = "2.25.0"  # MP-MEGA-003: roadmap-drill + doc-ingest + gov-fix + rag-search
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

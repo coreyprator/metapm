@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tools - MetaPM</title>
+  <style>
+    :root {
+      --bg: #0b1220; --panel: #111a2d; --panel-soft: #0f1729;
+      --text: #e6edf8; --muted: #9aa8c7; --line: #26344f;
+      --accent: #e74c3c; --ok: #23a55a; --warn: #f5a623; --info: #4a90d9;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh; }
+    .app { max-width: 900px; margin: 0 auto; padding: 10px 16px 40px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+      padding: 16px; margin-bottom: 12px; }
+    .header { display: flex; justify-content: space-between; align-items: center;
+      padding: 14px 16px; margin-bottom: 10px; }
+    .title { font-size: 22px; font-weight: 700; }
+    a.back-link { color: var(--info); text-decoration: none; font-size: 13px; }
+    a.back-link:hover { text-decoration: underline; }
+    .tabs { display: flex; gap: 0; }
+    .tab-btn { padding: 10px 24px; background: var(--panel-soft); color: var(--muted);
+      border: 1px solid var(--line); border-bottom: none; border-radius: 8px 8px 0 0;
+      cursor: pointer; font-size: 14px; font-weight: 600; transition: background 0.15s; }
+    .tab-btn.active { background: var(--panel); color: var(--text); border-bottom-color: var(--panel); }
+    .tab-content { display: none; border: 1px solid var(--line); border-top: none;
+      border-radius: 0 0 10px 10px; background: var(--panel); padding: 20px; }
+    .tab-content.active { display: block; }
+    label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px; }
+    select, input[type="text"], textarea {
+      width: 100%; padding: 9px 12px; background: var(--bg); color: var(--text);
+      border: 1px solid var(--line); border-radius: 6px; font-size: 13px; margin-bottom: 12px; }
+    select:focus, input:focus, textarea:focus { outline: none; border-color: var(--info); }
+    .file-input { padding: 6px 0; font-size: 13px; color: var(--muted); background: none;
+      border: none; margin-bottom: 12px; }
+    .divider { text-align: center; color: var(--muted); font-size: 13px; margin: 8px 0 12px; }
+    .btn-row { display: flex; gap: 8px; margin-top: 4px; }
+    button.action-btn { padding: 9px 20px; border: none; border-radius: 6px; font-size: 13px;
+      font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+    button.action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.action-btn:hover:not(:disabled) { opacity: 0.85; }
+    .btn-primary { background: var(--info); color: white; }
+    .btn-clear { background: #374151; color: #d1d5db; }
+    .result-box { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+      padding: 12px 14px; margin-top: 14px; font-size: 13px; }
+    .result-box.ok { border-color: var(--ok); }
+    .result-box.err { border-color: var(--accent); }
+    .result-label { font-size: 11px; text-transform: uppercase; color: var(--muted);
+      margin-bottom: 4px; letter-spacing: 0.05em; }
+    .result-value { font-size: 22px; font-weight: 700; color: #4ade80; }
+    .err .result-value { color: #fca5a5; font-size: 13px; }
+    .results-list { margin-top: 14px; }
+    .result-item { background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+      padding: 10px 14px; margin-bottom: 8px; }
+    .result-item .score { font-size: 11px; color: var(--muted); float: right; }
+    .result-item .source { font-size: 11px; color: var(--info); margin-top: 4px; }
+    .result-item .snippet { font-size: 12px; color: var(--muted); margin-top: 6px;
+      font-style: italic; line-height: 1.5; }
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--line);
+      border-top-color: var(--info); border-radius: 50%; animation: spin 0.7s linear infinite;
+      margin-right: 6px; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="card header">
+    <div class="title">🔧 Tools</div>
+    <a class="back-link" href="/static/dashboard.html">&larr; Back to Dashboard</a>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('ingest')">Document Ingest</button>
+    <button class="tab-btn" onclick="switchTab('search')">RAG Search</button>
+  </div>
+
+  <!-- DOCUMENT INGEST TAB -->
+  <div class="tab-content active" id="tab-ingest">
+    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">
+      Ingest a document or URL into a Portfolio RAG collection. API key is handled server-side.
+    </p>
+
+    <label>Collection</label>
+    <select id="ingest-collection">
+      <option value="portfolio">portfolio</option>
+      <option value="metapm">metapm</option>
+      <option value="code">code</option>
+      <option value="jazz_theory">jazz_theory</option>
+      <option value="etymology">etymology</option>
+    </select>
+
+    <label>Upload file (MD, TXT)</label>
+    <input type="file" id="ingest-file" accept=".md,.txt,.json" class="file-input">
+
+    <div class="divider">— or —</div>
+
+    <label>Paste URL</label>
+    <input type="text" id="ingest-url" placeholder="https://...">
+
+    <div class="btn-row">
+      <button class="action-btn btn-primary" id="ingest-btn" onclick="runIngest()">Ingest</button>
+      <button class="action-btn btn-clear" onclick="clearIngest()">Clear</button>
+    </div>
+    <div id="ingest-result" style="display:none"></div>
+  </div>
+
+  <!-- RAG SEARCH TAB -->
+  <div class="tab-content" id="tab-search">
+    <p style="color:var(--muted);font-size:13px;margin:0 0 16px">
+      Search the Portfolio RAG knowledge base. Results include source, score, and snippet.
+    </p>
+
+    <label>Query</label>
+    <input type="text" id="search-query" placeholder="e.g. UAT bulk archive implementation" onkeydown="if(event.key==='Enter') runSearch()">
+
+    <label>Collection (optional)</label>
+    <select id="search-collection">
+      <option value="">All collections</option>
+      <option value="portfolio">portfolio</option>
+      <option value="metapm">metapm</option>
+      <option value="code">code</option>
+      <option value="jazz_theory">jazz_theory</option>
+      <option value="etymology">etymology</option>
+    </select>
+
+    <div class="btn-row">
+      <button class="action-btn btn-primary" id="search-btn" onclick="runSearch()">Search</button>
+      <button class="action-btn btn-clear" onclick="clearSearch()">Clear</button>
+    </div>
+    <div id="search-results" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    const idx = tab === 'ingest' ? 0 : 1;
+    document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+    document.getElementById('tab-' + tab).classList.add('active');
+  }
+
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+  }
+
+  // ── Document Ingest ──
+
+  async function runIngest() {
+    const btn = document.getElementById('ingest-btn');
+    const fileInput = document.getElementById('ingest-file');
+    const urlInput = document.getElementById('ingest-url').value.trim();
+    const collection = document.getElementById('ingest-collection').value;
+    const resultEl = document.getElementById('ingest-result');
+
+    const file = fileInput.files[0];
+    if (!file && !urlInput) {
+      showIngestResult('err', 'Provide a file or URL.');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Ingesting...';
+    resultEl.style.display = 'none';
+
+    try {
+      const fd = new FormData();
+      fd.append('collection', collection);
+      if (file) fd.append('file', file);
+      if (urlInput) fd.append('url', urlInput);
+
+      const resp = await fetch('/api/tools/ingest', { method: 'POST', body: fd });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        showIngestResult('err', data.detail || 'Ingest failed');
+      } else {
+        const source = data.source_id || data.filename || data.url || '?';
+        resultEl.innerHTML = `<div class="result-box ok">
+          <div class="result-label">Chunks ingested into <strong>${esc(data.collection)}</strong></div>
+          <div class="result-value">${data.chunks}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:6px">Source: ${esc(source)}</div>
+        </div>`;
+        resultEl.style.display = 'block';
+      }
+    } catch (e) {
+      showIngestResult('err', 'Network error: ' + e.message);
+    }
+    btn.disabled = false;
+    btn.textContent = 'Ingest';
+  }
+
+  function showIngestResult(cls, msg) {
+    const el = document.getElementById('ingest-result');
+    el.innerHTML = `<div class="result-box ${cls}"><div class="result-value">${esc(msg)}</div></div>`;
+    el.style.display = 'block';
+  }
+
+  function clearIngest() {
+    document.getElementById('ingest-file').value = '';
+    document.getElementById('ingest-url').value = '';
+    document.getElementById('ingest-result').style.display = 'none';
+  }
+
+  // ── RAG Search ──
+
+  async function runSearch() {
+    const q = document.getElementById('search-query').value.trim();
+    if (!q) return;
+    const collection = document.getElementById('search-collection').value;
+    const btn = document.getElementById('search-btn');
+    const resultsEl = document.getElementById('search-results');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Searching...';
+    resultsEl.style.display = 'none';
+
+    try {
+      const params = new URLSearchParams({ q });
+      if (collection) params.set('collection', collection);
+      const resp = await fetch('/api/rag/query?' + params);
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        resultsEl.innerHTML = `<div class="result-box err"><div class="result-value">${esc(data.detail || 'Search failed')}</div></div>`;
+        resultsEl.style.display = 'block';
+      } else {
+        const results = data.results || data.matches || [];
+        if (results.length === 0) {
+          resultsEl.innerHTML = `<div class="result-box"><div style="color:var(--muted)">No results found.</div></div>`;
+        } else {
+          let html = `<div style="font-size:12px;color:var(--muted);margin-bottom:8px">${results.length} result(s)</div><div class="results-list">`;
+          for (const r of results) {
+            const score = r.score != null ? `${(r.score * 100).toFixed(1)}%` : '';
+            const source = r.source || r.metadata?.source || r.id || '';
+            const snippet = r.text || r.content || r.snippet || '';
+            html += `<div class="result-item">
+              <strong style="font-size:13px">${esc(source)}</strong>
+              ${score ? `<span class="score">${score}</span>` : ''}
+              ${snippet ? `<div class="snippet">${esc(snippet.slice(0, 300))}${snippet.length > 300 ? '...' : ''}</div>` : ''}
+            </div>`;
+          }
+          html += '</div>';
+          resultsEl.innerHTML = html;
+        }
+        resultsEl.style.display = 'block';
+      }
+    } catch (e) {
+      resultsEl.innerHTML = `<div class="result-box err"><div class="result-value">Network error: ${esc(e.message)}</div></div>`;
+      resultsEl.style.display = 'block';
+    }
+    btn.disabled = false;
+    btn.textContent = 'Search';
+  }
+
+  function clearSearch() {
+    document.getElementById('search-query').value = '';
+    document.getElementById('search-results').style.display = 'none';
+  }
+</script>
+</body>
+</html>

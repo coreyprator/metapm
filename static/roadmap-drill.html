@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Roadmap Drill-Down - MetaPM</title>
+  <style>
+    :root {
+      --bg: #0b1220; --panel: #111a2d; --panel-soft: #0f1729;
+      --text: #e6edf8; --muted: #9aa8c7; --line: #26344f;
+      --accent: #e74c3c; --ok: #23a55a; --warn: #f5a623; --info: #4a90d9;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh; }
+    .app { max-width: 1200px; margin: 0 auto; padding: 10px 16px 60px; }
+
+    /* Header */
+    .header { display: flex; justify-content: space-between; align-items: center;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+      padding: 14px 16px; margin-bottom: 12px; }
+    .title { font-size: 20px; font-weight: 700; }
+    a.back-link { color: var(--info); text-decoration: none; font-size: 13px; }
+
+    /* Controls */
+    .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+      padding: 12px 16px; margin-bottom: 12px; }
+    .controls input, .controls select {
+      padding: 7px 10px; background: var(--bg); color: var(--text);
+      border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
+    .controls input { flex: 1; min-width: 180px; }
+    .controls input:focus, .controls select:focus { outline: none; border-color: var(--info); }
+    .btn-sm { padding: 7px 14px; border: none; border-radius: 6px; font-size: 12px;
+      font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+    .btn-sm:hover { opacity: 0.85; }
+    .btn-export { background: #374151; color: #d1d5db; }
+    .btn-expand-all { background: var(--panel-soft); color: var(--muted);
+      border: 1px solid var(--line); }
+
+    /* Wave (Level 1) */
+    .wave { background: var(--panel); border: 1px solid var(--line);
+      border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+    .wave-header { display: flex; align-items: center; gap: 10px;
+      padding: 14px 16px; cursor: pointer; user-select: none;
+      transition: background 0.15s; }
+    .wave-header:hover { background: var(--panel-soft); }
+    .wave-chevron { font-size: 12px; color: var(--muted); transition: transform 0.2s;
+      flex-shrink: 0; }
+    .wave-chevron.open { transform: rotate(90deg); }
+    .wave-title { font-size: 16px; font-weight: 700; }
+    .wave-badge { background: var(--panel-soft); border: 1px solid var(--line);
+      border-radius: 12px; padding: 2px 10px; font-size: 11px; color: var(--muted); }
+    .wave-body { display: none; border-top: 1px solid var(--line); }
+    .wave-body.open { display: block; }
+
+    /* Sprint (Level 2) */
+    .sprint { border-bottom: 1px solid var(--line); }
+    .sprint:last-child { border-bottom: none; }
+    .sprint-header { display: flex; align-items: center; gap: 8px;
+      padding: 10px 16px 10px 32px; cursor: pointer; user-select: none;
+      transition: background 0.15s; }
+    .sprint-header:hover { background: var(--panel-soft); }
+    .sprint-chevron { font-size: 11px; color: var(--muted); transition: transform 0.2s;
+      flex-shrink: 0; }
+    .sprint-chevron.open { transform: rotate(90deg); }
+    .sprint-pth { font-family: monospace; font-size: 12px; background: #1e2a40;
+      border: 1px solid var(--line); border-radius: 4px; padding: 2px 7px;
+      color: var(--info); flex-shrink: 0; }
+    .sprint-name { font-size: 14px; font-weight: 600; flex: 1; }
+    .proj-badge { font-size: 11px; border-radius: 10px; padding: 2px 9px;
+      font-weight: 600; flex-shrink: 0; }
+    .status-badge { font-size: 11px; border-radius: 10px; padding: 2px 9px;
+      font-weight: 600; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.03em; }
+    .sprint-body { display: none; background: var(--panel-soft); }
+    .sprint-body.open { display: block; }
+
+    /* Requirement (Level 3) */
+    .req-row { border-top: 1px solid var(--line); padding: 9px 16px 9px 52px;
+      cursor: pointer; transition: background 0.15s; }
+    .req-row:hover { background: #0e1625; }
+    .req-row-head { display: flex; align-items: center; gap: 8px; }
+    .req-code { font-family: monospace; font-size: 12px; color: var(--muted);
+      flex-shrink: 0; min-width: 80px; }
+    .req-title { font-size: 13px; flex: 1; }
+    .priority-badge { font-size: 11px; border-radius: 10px; padding: 2px 8px;
+      font-weight: 700; flex-shrink: 0; }
+    .p1 { background: #7f1d1d; color: #fca5a5; }
+    .p2 { background: #713f12; color: #fde68a; }
+    .p3 { background: #1e3a5f; color: #93c5fd; }
+    .type-badge { font-size: 10px; color: var(--muted); flex-shrink: 0;
+      text-transform: uppercase; }
+    .req-detail { display: none; margin-top: 8px; background: #0b1220;
+      border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+    .req-detail.open { display: block; }
+    .req-description { font-size: 13px; color: var(--text); line-height: 1.6;
+      white-space: pre-wrap; margin-bottom: 10px; }
+    .req-meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 11px;
+      color: var(--muted); }
+    .req-meta span strong { color: var(--text); }
+
+    /* UAT results (Level 4) */
+    .uat-section { margin-top: 10px; border-top: 1px solid var(--line);
+      padding-top: 10px; }
+    .uat-section-title { font-size: 11px; text-transform: uppercase; color: var(--muted);
+      margin-bottom: 6px; letter-spacing: 0.05em; }
+    .uat-row { background: var(--panel); border: 1px solid var(--line);
+      border-radius: 6px; margin-bottom: 6px; overflow: hidden; }
+    .uat-row-head { display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; cursor: pointer; }
+    .uat-row-head:hover { background: var(--panel-soft); }
+    .uat-id { font-family: monospace; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+    .uat-ver { font-size: 12px; font-weight: 600; flex-shrink: 0; }
+    .uat-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .uat-counts { display: flex; gap: 8px; flex-shrink: 0; }
+    .uat-count { font-size: 11px; padding: 1px 6px; border-radius: 10px; }
+    .ct-pass { background: #14532d; color: #bbf7d0; }
+    .ct-fail { background: #7f1d1d; color: #fca5a5; }
+    .ct-pend { background: #1e3a5f; color: #93c5fd; }
+    .uat-detail { display: none; padding: 10px 12px; border-top: 1px solid var(--line);
+      background: #0b1220; }
+    .uat-detail.open { display: block; }
+    .bv-item { display: flex; align-items: flex-start; gap: 8px;
+      padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+    .bv-item:last-child { border-bottom: none; }
+    .bv-id { font-family: monospace; font-size: 11px; color: var(--muted);
+      flex-shrink: 0; min-width: 48px; }
+    .bv-title { flex: 1; color: var(--text); }
+    .bv-result { font-size: 11px; font-weight: 700; padding: 1px 7px;
+      border-radius: 10px; flex-shrink: 0; }
+    .bv-pass { background: #14532d; color: #bbf7d0; }
+    .bv-fail { background: #7f1d1d; color: #fca5a5; }
+    .bv-skip { background: #374151; color: #d1d5db; }
+    .bv-pend { background: #1e3a5f; color: #93c5fd; }
+    .uat-link { font-size: 12px; color: var(--info); text-decoration: none;
+      display: block; margin-top: 8px; }
+    .uat-link:hover { text-decoration: underline; }
+
+    /* Status colors */
+    .st-inflight { background: #1a3a1a; color: #4ade80; }
+    .st-ready { background: #1e3050; color: #93c5fd; }
+    .st-backlog { background: #2d2d1a; color: #fde68a; }
+    .st-done { background: #1a1a2e; color: #9aa8c7; }
+
+    /* Empty / loading */
+    .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+    .empty { color: var(--muted); font-size: 13px; padding: 8px 16px 16px 52px; }
+
+    /* Mobile */
+    @media (max-width: 600px) {
+      .sprint-header { padding-left: 20px; }
+      .req-row { padding-left: 30px; }
+      .uat-counts { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="title">📋 Roadmap Drill-Down</div>
+    <a class="back-link" href="/static/dashboard.html">&larr; Dashboard</a>
+  </div>
+
+  <div class="controls">
+    <input type="text" id="search-box" placeholder="Search requirements..." oninput="applyFilters()">
+    <select id="filter-priority" onchange="applyFilters()">
+      <option value="">All Priorities</option>
+      <option value="P1">P1</option>
+      <option value="P2">P2</option>
+      <option value="P3">P3</option>
+    </select>
+    <select id="filter-project" onchange="applyFilters()">
+      <option value="">All Projects</option>
+    </select>
+    <button class="btn-sm btn-expand-all" onclick="toggleAll()">Expand All</button>
+    <button class="btn-sm btn-export" onclick="exportJSON()">Export JSON</button>
+  </div>
+
+  <div id="drill-root">
+    <div class="loading">Loading requirements...</div>
+  </div>
+</div>
+
+<script>
+// ── Data ──
+let allRequirements = [];
+let allUATs = [];
+let allExpanded = false;
+
+const WAVE_GROUPS = [
+  { key: 'inflight', label: 'In Flight', emoji: '🔥',
+    statuses: ['cc_executing','cc_complete','uat_ready','cai_review','cc_prompt_ready','req_approved'],
+    cls: 'st-inflight' },
+  { key: 'backlog', label: 'Backlog', emoji: '📥',
+    statuses: ['req_created','backlog','definition'],
+    cls: 'st-backlog' },
+  { key: 'build', label: 'Build Ready', emoji: '🔨',
+    statuses: ['build','pl_approved'],
+    cls: 'st-ready' },
+  { key: 'done', label: 'Complete', emoji: '✅',
+    statuses: ['done','closed','cc_complete'],
+    cls: 'st-done' },
+];
+
+const STATUS_LABEL = {
+  req_created: 'Created', req_approved: 'Approved', cc_prompt_ready: 'CC Ready',
+  cc_executing: 'Executing', cc_complete: 'CC Done', uat_ready: 'UAT Ready',
+  cai_review: 'CAI Review', pl_approved: 'PL Approved', done: 'Done',
+  closed: 'Closed', backlog: 'Backlog', build: 'Build', definition: 'Definition',
+};
+
+const STATUS_CLS = {
+  cc_executing: 'st-inflight', cc_complete: 'st-inflight', uat_ready: 'st-inflight',
+  cai_review: 'st-inflight', cc_prompt_ready: 'st-ready', req_approved: 'st-ready',
+  req_created: 'st-backlog', backlog: 'st-backlog', definition: 'st-backlog',
+  build: 'st-ready', pl_approved: 'st-ready',
+  done: 'st-done', closed: 'st-done',
+};
+
+const UAT_STATUS_COLOR = {
+  passed: '#23a55a', approved: '#23a55a', failed: '#e74c3c',
+  pending: '#4a90d9', submitted: '#f5a623', partial: '#f5a623',
+};
+
+// ── Fetch ──
+async function loadData() {
+  try {
+    const [reqResp, uatResp] = await Promise.all([
+      fetch('/api/roadmap/requirements?limit=500'),
+      fetch('/mcp/uat/list?limit=200'),
+    ]);
+    const reqData = await reqResp.json();
+    allRequirements = reqData.requirements || reqData || [];
+
+    if (uatResp.ok) {
+      const uatData = await uatResp.json();
+      allUATs = uatData.results || uatData || [];
+    }
+
+    // Populate project filter
+    const projects = [...new Set(allRequirements.map(r => r.project_name).filter(Boolean))].sort();
+    const sel = document.getElementById('filter-project');
+    for (const p of projects) {
+      const o = document.createElement('option');
+      o.value = p; o.textContent = p;
+      sel.appendChild(o);
+    }
+
+    applyFilters();
+  } catch (e) {
+    document.getElementById('drill-root').innerHTML =
+      `<div class="loading" style="color:#fca5a5">Failed to load: ${esc(e.message)}</div>`;
+  }
+}
+
+// ── Filtering ──
+function applyFilters() {
+  const q = document.getElementById('search-box').value.toLowerCase();
+  const pri = document.getElementById('filter-priority').value;
+  const proj = document.getElementById('filter-project').value;
+
+  const filtered = allRequirements.filter(r => {
+    if (pri && r.priority !== pri) return false;
+    if (proj && r.project_name !== proj) return false;
+    if (q && !((r.title||'').toLowerCase().includes(q) || (r.description||'').toLowerCase().includes(q) || (r.code||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+
+  renderDrill(filtered);
+}
+
+// ── Render ──
+function renderDrill(reqs) {
+  const root = document.getElementById('drill-root');
+
+  // Map UATs by PTH
+  const uatsByPTH = {};
+  for (const u of allUATs) {
+    const pth = u.pth || '';
+    if (!uatsByPTH[pth]) uatsByPTH[pth] = [];
+    uatsByPTH[pth].push(u);
+  }
+
+  let html = '';
+
+  for (const wave of WAVE_GROUPS) {
+    const waveReqs = reqs.filter(r => wave.statuses.includes(r.status));
+    if (waveReqs.length === 0) continue;
+
+    // Group into sprints by PTH
+    const sprintMap = {};
+    for (const r of waveReqs) {
+      const pth = r.pth || '__no_pth__';
+      if (!sprintMap[pth]) sprintMap[pth] = [];
+      sprintMap[pth].push(r);
+    }
+
+    const sprintCount = Object.keys(sprintMap).length;
+    const waveKey = wave.key;
+    const isOpen = sessionGet(`wave_${waveKey}`) !== 'closed';
+
+    html += `<div class="wave" id="wave-${waveKey}">
+      <div class="wave-header" onclick="toggleWave('${waveKey}')">
+        <span class="wave-chevron${isOpen ? ' open' : ''}" id="wchev-${waveKey}">&#9658;</span>
+        <span class="wave-title">${wave.emoji} ${wave.label}</span>
+        <span class="wave-badge">${sprintCount} sprint${sprintCount !== 1 ? 's' : ''}</span>
+        <span class="wave-badge">${waveReqs.length} req${waveReqs.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div class="wave-body${isOpen ? ' open' : ''}" id="wbody-${waveKey}">`;
+
+    // Sort sprints: no-PTH last, else alphabetical
+    const pthKeys = Object.keys(sprintMap).sort((a, b) => {
+      if (a === '__no_pth__') return 1;
+      if (b === '__no_pth__') return -1;
+      return a.localeCompare(b);
+    });
+
+    for (const pth of pthKeys) {
+      const sprintReqs = sprintMap[pth];
+      const sprintId = `${waveKey}_${pth}`;
+      const isSprintOpen = sessionGet(`sprint_${sprintId}`) === 'open';
+      const displayPTH = pth === '__no_pth__' ? '—' : pth;
+
+      // Pick project from first req
+      const projName = sprintReqs[0]?.project_name || '';
+      const projEmoji = sprintReqs[0]?.project_emoji || '';
+      const status = sprintReqs[0]?.status || '';
+      const statusLabel = STATUS_LABEL[status] || status;
+      const statusCls = STATUS_CLS[status] || 'st-backlog';
+
+      html += `<div class="sprint" id="sprint-${sprintId}">
+        <div class="sprint-header" onclick="toggleSprint('${sprintId}')">
+          <span class="sprint-chevron${isSprintOpen ? ' open' : ''}" id="schev-${sprintId}">&#9658;</span>
+          <span class="sprint-pth">${esc(displayPTH)}</span>
+          <span class="sprint-name">${esc(projEmoji)} ${esc(projName)}</span>
+          <span class="proj-badge" style="background:#1e2a40;color:var(--info)">${sprintReqs.length} req${sprintReqs.length !== 1 ? 's' : ''}</span>
+          <span class="status-badge ${statusCls}">${esc(statusLabel)}</span>
+        </div>
+        <div class="sprint-body${isSprintOpen ? ' open' : ''}" id="sbody-${sprintId}">`;
+
+      for (const req of sprintReqs) {
+        const reqId = req.id;
+        const isReqOpen = sessionGet(`req_${reqId}`) === 'open';
+        const priCls = req.priority === 'P1' ? 'p1' : req.priority === 'P3' ? 'p3' : 'p2';
+
+        // UAT results for this req — match by uat_id or by PTH
+        const reqUATs = allUATs.filter(u =>
+          u.uat_id === req.uat_id ||
+          (pth !== '__no_pth__' && u.pth === pth && u.feature && u.feature.includes(req.code))
+        );
+
+        html += `<div class="req-row" id="req-${reqId}" onclick="toggleReq('${reqId}')">
+          <div class="req-row-head">
+            <span class="req-code">${esc(req.code || '—')}</span>
+            <span class="req-title">${esc(req.title)}</span>
+            <span class="priority-badge ${priCls}">${esc(req.priority || 'P2')}</span>
+            <span class="type-badge">${esc(req.type || '')}</span>
+          </div>
+          <div class="req-detail${isReqOpen ? ' open' : ''}" id="rdetail-${reqId}">
+            <div class="req-description">${esc(req.description || 'No description.')}</div>
+            <div class="req-meta">
+              ${req.pth ? `<span><strong>PTH:</strong> ${esc(req.pth)}</span>` : ''}
+              ${req.created_at ? `<span><strong>Created:</strong> ${fmtDate(req.created_at)}</span>` : ''}
+              ${req.updated_at ? `<span><strong>Updated:</strong> ${fmtDate(req.updated_at)}</span>` : ''}
+              ${req.sprint_id ? `<span><strong>Sprint:</strong> ${esc(req.sprint_id)}</span>` : ''}
+            </div>
+            ${renderUATSection(req, uatsByPTH[pth !== '__no_pth__' ? pth : ''] || [])}
+          </div>
+        </div>`;
+      }
+
+      html += `</div></div>`; // sprint-body, sprint
+    }
+
+    html += `</div></div>`; // wave-body, wave
+  }
+
+  if (!html) {
+    html = '<div class="loading">No requirements match the current filters.</div>';
+  }
+
+  root.innerHTML = html;
+}
+
+function renderUATSection(req, pthUATs) {
+  // Find UATs linked to this requirement
+  const uats = allUATs.filter(u =>
+    (req.uat_id && u.uat_id === req.uat_id) ||
+    (req.pth && u.pth === req.pth)
+  );
+
+  if (uats.length === 0) return '';
+
+  let html = `<div class="uat-section">
+    <div class="uat-section-title">UAT History (${uats.length})</div>`;
+
+  for (const u of uats) {
+    const uatShort = (u.uat_id || '').slice(0, 8).toUpperCase();
+    const dotColor = UAT_STATUS_COLOR[u.status] || '#9aa8c7';
+    const tc = u.test_cases || [];
+    const pass = tc.filter(t => t.status === 'pass' || t.status === 'passed').length;
+    const fail = tc.filter(t => t.status === 'fail' || t.status === 'failed').length;
+    const pend = tc.filter(t => !t.status || t.status === 'pending').length;
+    const uatKey = u.uat_id || u.handoff_id;
+    const isUATOpen = sessionGet(`uat_${uatKey}`) === 'open';
+
+    html += `<div class="uat-row">
+      <div class="uat-row-head" onclick="toggleUAT('${uatKey}', event)">
+        <div class="uat-status-dot" style="background:${dotColor}"></div>
+        <span class="uat-id">${esc(uatShort)}...</span>
+        <span class="uat-ver">v${esc(u.version || '?')}</span>
+        <span style="flex:1;font-size:12px;color:var(--muted)">${esc(u.status || '')}</span>
+        <div class="uat-counts">
+          ${pass > 0 ? `<span class="uat-count ct-pass">${pass} Pass</span>` : ''}
+          ${fail > 0 ? `<span class="uat-count ct-fail">${fail} Fail</span>` : ''}
+          ${pend > 0 ? `<span class="uat-count ct-pend">${pend} Pending</span>` : ''}
+        </div>
+      </div>
+      <div class="uat-detail${isUATOpen ? ' open' : ''}" id="udetail-${esc(uatKey)}">`;
+
+    if (tc.length > 0) {
+      for (const t of tc) {
+        const resCls = t.status === 'pass' || t.status === 'passed' ? 'bv-pass'
+          : t.status === 'fail' || t.status === 'failed' ? 'bv-fail'
+          : t.status === 'skip' ? 'bv-skip' : 'bv-pend';
+        const resLabel = t.status === 'pass' || t.status === 'passed' ? 'PASS'
+          : t.status === 'fail' || t.status === 'failed' ? 'FAIL'
+          : t.status === 'skip' ? 'SKIP' : 'PENDING';
+        html += `<div class="bv-item">
+          <span class="bv-id">${esc(t.id || '')}</span>
+          <span class="bv-title">${esc(t.title || '')}</span>
+          <span class="bv-result ${resCls}">${resLabel}</span>
+        </div>`;
+      }
+    } else {
+      html += `<div style="font-size:12px;color:var(--muted)">No BV items recorded.</div>`;
+    }
+
+    if (u.uat_id) {
+      html += `<a class="uat-link" href="https://metapm.rentyourcio.com/uat/${esc(u.uat_id)}" target="_blank">Open full UAT &rarr;</a>`;
+    }
+    if (u.notes) {
+      html += `<div style="margin-top:8px;font-size:12px;color:var(--warn)">Notes: ${esc(u.notes)}</div>`;
+    }
+
+    html += `</div></div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+// ── Toggle handlers ──
+function toggleWave(key) {
+  const body = document.getElementById(`wbody-${key}`);
+  const chev = document.getElementById(`wchev-${key}`);
+  const isOpen = body.classList.toggle('open');
+  chev.classList.toggle('open', isOpen);
+  sessionSet(`wave_${key}`, isOpen ? 'open' : 'closed');
+}
+
+function toggleSprint(id) {
+  const body = document.getElementById(`sbody-${id}`);
+  const chev = document.getElementById(`schev-${id}`);
+  const isOpen = body.classList.toggle('open');
+  chev.classList.toggle('open', isOpen);
+  sessionSet(`sprint_${id}`, isOpen ? 'open' : 'closed');
+}
+
+function toggleReq(id) {
+  const detail = document.getElementById(`rdetail-${id}`);
+  const isOpen = detail.classList.toggle('open');
+  sessionSet(`req_${id}`, isOpen ? 'open' : 'closed');
+}
+
+function toggleUAT(id, event) {
+  event.stopPropagation();
+  const detail = document.getElementById(`udetail-${id}`);
+  if (!detail) return;
+  const isOpen = detail.classList.toggle('open');
+  sessionSet(`uat_${id}`, isOpen ? 'open' : 'closed');
+}
+
+function toggleAll() {
+  allExpanded = !allExpanded;
+  document.querySelectorAll('.wave-body').forEach(el => {
+    el.classList.toggle('open', allExpanded);
+  });
+  document.querySelectorAll('.wave-chevron').forEach(el => {
+    el.classList.toggle('open', allExpanded);
+  });
+  document.querySelectorAll('.sprint-body').forEach(el => {
+    el.classList.toggle('open', allExpanded);
+  });
+  document.querySelectorAll('.sprint-chevron').forEach(el => {
+    el.classList.toggle('open', allExpanded);
+  });
+  document.querySelector('.btn-expand-all').textContent = allExpanded ? 'Collapse All' : 'Expand All';
+}
+
+// ── Export ──
+function exportJSON() {
+  const q = document.getElementById('search-box').value.toLowerCase();
+  const pri = document.getElementById('filter-priority').value;
+  const proj = document.getElementById('filter-project').value;
+  const filtered = allRequirements.filter(r => {
+    if (pri && r.priority !== pri) return false;
+    if (proj && r.project_name !== proj) return false;
+    if (q && !((r.title||'').toLowerCase().includes(q) || (r.description||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const blob = new Blob([JSON.stringify(filtered, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `metapm-requirements-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+// ── Utilities ──
+function sessionGet(k) { return sessionStorage.getItem('drill_' + k); }
+function sessionSet(k, v) { sessionStorage.setItem('drill_' + k, v); }
+
+function fmtDate(s) {
+  if (!s) return '';
+  try { return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+  catch { return s; }
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = String(s || '');
+  return d.innerHTML;
+}
+
+// ── Init ──
+loadData();
+</script>
+</body>
+</html>

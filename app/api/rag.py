@@ -1,14 +1,17 @@
 """
-Portfolio RAG proxy endpoints (MP-MS3 Phase 4).
+Portfolio RAG proxy endpoints (MP-MS3 Phase 4) + MetaPM→RAG sync (PR-009).
 Proxies requests to the Portfolio RAG service.
 """
 
 import logging
+import uuid
+from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
 import httpx
 
 from app.core.config import settings
+from app.core.database import execute_query
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +19,7 @@ router = APIRouter()
 
 RAG_BASE = settings.PORTFOLIO_RAG_URL.rstrip("/")
 TIMEOUT = 15.0
+SYNC_TIMEOUT = 300.0
 
 
 @router.get("/rag/query")
@@ -84,3 +88,234 @@ async def rag_checkpoints():
     except Exception as e:
         logger.error(f"RAG checkpoints proxy error: {e}")
         raise HTTPException(status_code=502, detail=f"RAG service error: {e}")
+
+
+@router.post("/rag/sync")
+async def sync_requirements_to_rag():
+    """Sync all MetaPM requirements into Portfolio RAG metapm collection.
+
+    Fetches all requirements from MetaPM DB, builds chunks per SYNC-2 schema,
+    and POSTs to Portfolio RAG /ingest/custom with replace_collection=true.
+    Called by Cloud Scheduler nightly or manually.
+    """
+    api_key = settings.PORTFOLIO_RAG_API_KEY
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="PORTFOLIO_RAG_API_KEY not configured"
+        )
+
+    # Fetch all requirements from DB
+    try:
+        rows = execute_query("""
+            SELECT r.id, r.project_id, r.code, r.title, r.description,
+                   r.type, r.priority, r.status, r.target_version,
+                   r.sprint_id, r.handoff_id, r.uat_id, r.pth,
+                   r.created_at, r.updated_at,
+                   p.code as project_code, p.name as project_name
+            FROM roadmap_requirements r
+            JOIN roadmap_projects p ON r.project_id = p.id
+            ORDER BY p.code, r.code
+        """, fetch="all")
+    except Exception as e:
+        logger.error(f"RAG sync DB query failed: {e}")
+        raise HTTPException(status_code=500, detail=f"DB query failed: {e}")
+
+    if not rows:
+        return {"synced": 0, "collection": "metapm", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+    # Build chunks per SYNC-2 schema
+    chunks = []
+    for row in rows:
+        code = row.get("code", "")
+        project_name = row.get("project_name", "")
+        title = row.get("title", "")
+        status = row.get("status", "")
+        priority = row.get("priority", "")
+        req_type = row.get("type", "")
+        pth = row.get("pth", "")
+        description = row.get("description", "")
+        created_at = str(row.get("created_at", ""))
+        updated_at = str(row.get("updated_at", ""))
+
+        text = (
+            f"REQUIREMENT: {code}\n"
+            f"PROJECT: {project_name}\n"
+            f"TITLE: {title}\n"
+            f"STATUS: {status}\n"
+            f"PRIORITY: {priority}\n"
+            f"TYPE: {req_type}\n"
+            f"PTH: {pth}\n"
+            f"DESCRIPTION: {description}\n"
+            f"CREATED: {created_at}\n"
+            f"UPDATED: {updated_at}"
+        )
+
+        metadata = {
+            "source": "MetaPM",
+            "code": code,
+            "project": project_name,
+            "status": status,
+            "priority": priority,
+            "pth": pth or "",
+            "version": "1.0",
+        }
+
+        req_id = row.get("id", code)
+        chunks.append({
+            "id": f"metapm::{req_id}",
+            "content": text,
+            "metadata": metadata,
+        })
+
+    # POST to Portfolio RAG /ingest/custom in batches of 25
+    import asyncio
+    batch_size = 25
+    total_ingested = 0
+    headers = {"Content-Type": "application/json", "x-api-key": api_key}
+
+    try:
+        async with httpx.AsyncClient(timeout=SYNC_TIMEOUT) as client:
+            for i in range(0, len(chunks), batch_size):
+                batch = chunks[i : i + batch_size]
+                do_replace = i == 0  # only replace on first batch
+                payload = {
+                    "collection": "metapm",
+                    "replace_collection": do_replace,
+                    "chunks": batch,
+                }
+                resp = await client.post(
+                    f"{RAG_BASE}/ingest/custom",
+                    json=payload,
+                    headers=headers,
+                )
+                resp.raise_for_status()
+                result = resp.json()
+                total_ingested += result.get("chunks_ingested", len(batch))
+                logger.info(f"RAG sync batch {i // batch_size + 1}: {len(batch)} chunks (replace={do_replace})")
+                # Pause between batches to avoid rate limits
+                if i + batch_size < len(chunks):
+                    await asyncio.sleep(2)
+    except httpx.HTTPStatusError as e:
+        logger.error(f"RAG sync ingest failed at chunk {i}: {e.response.text}")
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=f"RAG ingest failed at batch {i // batch_size + 1}: {e}"
+        )
+    except Exception as e:
+        logger.error(f"RAG sync error: {e}")
+        raise HTTPException(status_code=502, detail=f"RAG service error: {e}")
+
+    logger.info(f"RAG sync complete: {total_ingested} requirements synced to metapm collection")
+    return {
+        "synced": total_ingested,
+        "collection": "metapm",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+ALLOWED_COLLECTIONS = {"portfolio", "etymology", "code", "jazz_theory", "metapm"}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+
+@router.post("/tools/ingest")
+async def tools_ingest(
+    file: Optional[UploadFile] = File(None),
+    url: Optional[str] = Form(None),
+    collection: str = Form(...),
+):
+    """Proxy document ingest to Portfolio RAG (MP-053).
+    Accepts a file upload (PDF, MD, TXT) or URL. Does not expose the RAG API key to frontend.
+    """
+    api_key = settings.PORTFOLIO_RAG_API_KEY
+    if not api_key:
+        raise HTTPException(status_code=503, detail="PORTFOLIO_RAG_API_KEY not configured")
+
+    if collection not in ALLOWED_COLLECTIONS:
+        raise HTTPException(status_code=400, detail=f"Invalid collection. Must be one of: {', '.join(sorted(ALLOWED_COLLECTIONS))}")
+
+    headers = {"x-api-key": api_key}
+
+    if file:
+        # Read file content
+        content = await file.read()
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="File too large (max 5MB)")
+
+        filename = file.filename or "upload"
+        source_id = f"upload/{collection}/{filename}"
+
+        # Decode text content
+        try:
+            text = content.decode("utf-8")
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="File must be a text-readable format (MD, TXT, PDF not supported for binary decode)")
+
+        # Build a single custom chunk
+        chunk = {
+            "id": str(uuid.uuid4()),
+            "text": text,
+            "metadata": {
+                "source": source_id,
+                "filename": filename,
+                "collection": collection,
+                "ingested_at": datetime.now(timezone.utc).isoformat(),
+            }
+        }
+        payload = {
+            "collection": collection,
+            "chunks": [chunk],
+            "replace_collection": False,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(
+                    f"{RAG_BASE}/ingest/custom",
+                    json=payload,
+                    headers=headers,
+                )
+                resp.raise_for_status()
+                result = resp.json()
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(status_code=e.response.status_code, detail=f"RAG ingest error: {e.response.text}")
+        except Exception as e:
+            logger.error(f"Tools ingest proxy error: {e}")
+            raise HTTPException(status_code=502, detail=f"RAG service error: {e}")
+
+        chunks_ingested = result.get("ingested", result.get("count", 1))
+        return {
+            "status": "ingested",
+            "source_id": source_id,
+            "collection": collection,
+            "chunks": chunks_ingested,
+            "filename": filename,
+        }
+
+    elif url:
+        # Forward URL ingest request
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(
+                    f"{RAG_BASE}/ingest/url",
+                    json={"url": url, "collection": collection},
+                    headers={**headers, "Content-Type": "application/json"},
+                )
+                resp.raise_for_status()
+                result = resp.json()
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(status_code=e.response.status_code, detail=f"RAG ingest error: {e.response.text}")
+        except Exception as e:
+            logger.error(f"Tools ingest URL proxy error: {e}")
+            raise HTTPException(status_code=502, detail=f"RAG service error: {e}")
+
+        return {
+            "status": "ingested",
+            "source_id": url,
+            "collection": collection,
+            "chunks": result.get("ingested", result.get("count", 1)),
+            "url": url,
+        }
+
+    else:
+        raise HTTPException(status_code=400, detail="Provide either a file or a URL")

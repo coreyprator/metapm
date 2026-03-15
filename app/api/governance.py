@@ -81,6 +81,21 @@ async def get_bootstrap_checkpoint():
     )
 
 
+@router.get(
+    "/governance/bootstrap-version",
+    summary="Get Bootstrap version string (MP-BUG-001 fix)"
+)
+async def get_bootstrap_version():
+    """Returns the current Bootstrap version string.
+    Alias for bootstrap-checkpoint for simpler Phase 0 verification."""
+    state = _read_state()
+    return {
+        "version": state["bootstrap_version"],
+        "checkpoint": state["checkpoint"],
+        "updated_at": state["updated_at"]
+    }
+
+
 @router.post(
     "/governance/sync",
     response_model=GovernanceSyncResponse,

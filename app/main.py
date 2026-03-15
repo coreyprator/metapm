@@ -185,6 +185,26 @@ async def seed_page():
     raise HTTPException(status_code=404, detail="Seed page not found")
 
 
+@app.get("/tools")
+async def tools_page():
+    """Serve the Tools page (MP-053 doc ingest + MP-022 RAG search)"""
+    tools_file = static_dir / "tools.html"
+    if tools_file.exists():
+        return FileResponse(str(tools_file), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Tools page not found")
+
+
+@app.get("/roadmap-drill")
+async def roadmap_drill_page():
+    """Serve the Roadmap Drill-Down page (MP-ROADMAP-DRILL-001)"""
+    drill_file = static_dir / "roadmap-drill.html"
+    if drill_file.exists():
+        return FileResponse(str(drill_file), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Roadmap drill page not found")
+
+
 @app.get("/roadmap.html")
 async def roadmap_page():
     """Serve the Project Roadmap dashboard"""
