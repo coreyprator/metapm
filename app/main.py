@@ -9,8 +9,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor, rag, lessons, uat_gen, governance, seed
+from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor, rag, lessons, uat_gen, governance, seed, auth, uat_spec, prompts, reviews
 from app.core.config import settings
 from app.core.migrations import run_migrations
 from app.schemas.mcp import UATDirectSubmit, UATDirectSubmitResponse
@@ -43,6 +44,10 @@ except Exception as e:
 @app.get("/")
 async def root_redirect():
     return RedirectResponse(url="/static/dashboard.html")
+
+# Trust X-Forwarded-Proto from Cloud Run load balancer so request.base_url returns https://
+# Required for Google OAuth redirect_uri to use https:// (MP-UAT-SPEC-FIX-001)
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 # CORS middleware for mobile/web access
 # allow_credentials=False allows wildcard origins, which is needed for file:// (null origin)
@@ -106,8 +111,12 @@ app.include_router(conductor.router, tags=["Conductor"])
 app.include_router(rag.router, prefix="/api", tags=["Portfolio RAG"])
 app.include_router(lessons.router, prefix="/api", tags=["Lessons"])
 app.include_router(uat_gen.router, tags=["UAT Generation"])
+app.include_router(uat_spec.router, tags=["UAT Spec"])
+app.include_router(auth.router, tags=["PL Auth"])
 app.include_router(seed.router, tags=["Bulk Seed"])
 app.include_router(governance.router, prefix="/api", tags=["Governance"])
+app.include_router(prompts.router, prefix="/api/prompts", tags=["Prompts"])
+app.include_router(reviews.router, prefix="/api/reviews", tags=["Reviews"])
 
 
 # Define static_dir early for use in routes
@@ -227,6 +236,16 @@ async def compare_page(handoff_id: str):
     raise HTTPException(status_code=404, detail="Compare page not found")
 
 
+@app.get("/prompts/{pth}")
+async def prompt_viewer_page(pth: str):
+    """Serve the Prompt Viewer page (PF5-MS2)."""
+    prompt_viewer_file = static_dir / "prompt-viewer.html"
+    if prompt_viewer_file.exists():
+        return FileResponse(str(prompt_viewer_file), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Prompt viewer page not found")
+
+
 @app.get("/favicon.ico")
 async def favicon():
     """Serve favicon from static directory."""
@@ -254,6 +273,14 @@ async def api_uat_direct_submit_alias(uat: UATDirectSubmit):
     """Backward-compatible API alias for direct UAT submission."""
     return await mcp.submit_uat_direct(uat)
 
+
+# MP09/MF02: MCP JSON-RPC tools endpoint
+try:
+    from app.api import mcp_tools
+    app.include_router(mcp_tools.router, tags=["MCP Tools"])
+    logger.info("MCP Tools router registered at /mcp-tools")
+except Exception as mcp_err:
+    logger.error(f"Failed to register MCP tools router: {mcp_err}")
 
 # Mount static files LAST (after all route definitions)
 if static_dir.exists():

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.34.0"  # MF01: uat_bv_items migration + RAG sync fix + PA06 UAT spec
+    VERSION: str = "2.35.0"  # MF02: get_uat_results fix + trigger_rag_sync MCP + E2E02 BV-01 close
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
