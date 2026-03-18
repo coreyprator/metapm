@@ -1534,4 +1534,242 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 44 warning: {e}")
 
+    # Migration 45: Add spec columns to uat_pages (MP-UAT-SERVER-001 / MP04)
+    for col_name, col_def in [
+        ("spec_source", "NVARCHAR(20)"),
+        ("spec_locked_at", "DATETIME"),
+        ("pl_submitted_at", "DATETIME"),
+        ("spec_data", "NVARCHAR(MAX)"),
+    ]:
+        try:
+            result = execute_query("""
+                SELECT COUNT(*) as cnt
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'uat_pages' AND COLUMN_NAME = ?
+            """, (col_name,), fetch="one")
+            if result and result['cnt'] == 0:
+                logger.info(f"  Migration 45: Adding {col_name} column to uat_pages...")
+                execute_query(f"ALTER TABLE uat_pages ADD {col_name} {col_def}", fetch="none")
+                logger.info(f"  Migration 45: {col_name} column added.")
+            else:
+                logger.info(f"  Migration 45: {col_name} already exists.")
+        except Exception as e:
+            logger.warning(f"  Migration 45 ({col_name}) warning: {e}")
+
+    # Migration 46: Add conditional_pass to uat_pages status CHECK (MP-MEGA-005)
+    try:
+        result = execute_query("""
+            SELECT name, definition
+            FROM sys.check_constraints
+            WHERE OBJECT_NAME(parent_object_id) = 'uat_pages'
+            AND definition LIKE '%status%'
+        """, fetch="one")
+        if result and 'conditional_pass' not in (result.get('definition') or ''):
+            constraint_name = result['name']
+            logger.info(f"  Migration 46: Expanding uat_pages status CHECK ({constraint_name})...")
+            execute_query(f"ALTER TABLE uat_pages DROP CONSTRAINT [{constraint_name}]", fetch="none")
+            execute_query("""
+                ALTER TABLE uat_pages
+                ADD CONSTRAINT chk_uat_pages_status_v3
+                CHECK (status IN ('active','archived','pending','passed','failed','ready',
+                                  'in_progress','submitted','approved','conditional_pass'))
+            """, fetch="none")
+            logger.info("  Migration 46: uat_pages status CHECK updated to include 'conditional_pass'.")
+        else:
+            logger.info("  Migration 46: uat_pages status CHECK already includes 'conditional_pass' or no constraint found.")
+    except Exception as e:
+        logger.warning(f"  Migration 46 warning: {e}")
+
+    # Migration 47: Add general_notes column to uat_pages (MP-MEGA-005 Fix 2d)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'uat_pages' AND COLUMN_NAME = 'general_notes'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 47: Adding general_notes column to uat_pages...")
+            execute_query("ALTER TABLE uat_pages ADD general_notes NVARCHAR(MAX)", fetch="none")
+            logger.info("  Migration 47: general_notes column added.")
+        else:
+            logger.info("  Migration 47: general_notes already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 47 warning: {e}")
+
+    # Migration 48: Bulk archive phantom pending UAT records (MP-MEGA-005 Fix 2h)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt FROM uat_pages
+            WHERE status = 'pending'
+            AND created_at < DATEADD(day, -7, GETDATE())
+            AND pth IN (
+                SELECT pth FROM uat_pages
+                WHERE status NOT IN ('pending', 'archived')
+                AND pth IS NOT NULL
+            )
+        """, fetch="one")
+        phantom_count = result['cnt'] if result else 0
+        if phantom_count > 0:
+            logger.info(f"  Migration 48: Archiving {phantom_count} phantom pending UAT records...")
+            execute_query("""
+                UPDATE uat_pages SET status = 'archived'
+                WHERE status = 'pending'
+                AND created_at < DATEADD(day, -7, GETDATE())
+                AND pth IN (
+                    SELECT pth FROM uat_pages
+                    WHERE status NOT IN ('pending', 'archived')
+                    AND pth IS NOT NULL
+                )
+            """, fetch="none")
+            logger.info(f"  Migration 48: Archived {phantom_count} phantom records.")
+        else:
+            logger.info("  Migration 48: No phantom pending UAT records to archive.")
+    except Exception as e:
+        logger.warning(f"  Migration 48 warning: {e}")
+
+    # Migration 49: Add handoff_ref_id to mcp_handoffs for BA04 custom handoff IDs (MP-MEGA-006)
+    try:
+        existing = execute_query("""
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'handoff_ref_id'
+        """, fetch="one")
+        if not existing:
+            logger.info("  Migration 49: Adding handoff_ref_id column to mcp_handoffs...")
+            execute_query("ALTER TABLE mcp_handoffs ADD handoff_ref_id NVARCHAR(100)", fetch="none")
+            execute_query("CREATE INDEX idx_handoffs_ref_id ON mcp_handoffs(handoff_ref_id)", fetch="none")
+            logger.info("  Migration 49: handoff_ref_id column added.")
+        else:
+            logger.info("  Migration 49: handoff_ref_id already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 49 warning: {e}")
+
+    # Migration 50: PF5-MS2 — Extend cc_prompts for prompt storage + viewer + approval
+    try:
+        # Add pth column
+        col = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'cc_prompts' AND COLUMN_NAME = 'pth'
+        """, fetch="one")
+        if col and col['cnt'] == 0:
+            logger.info("  Migration 50: Adding pth column to cc_prompts...")
+            execute_query("ALTER TABLE cc_prompts ADD pth NVARCHAR(10) NULL", fetch="none")
+            execute_query("CREATE INDEX idx_prompts_pth ON cc_prompts(pth)", fetch="none")
+
+        # Add requirement_id column
+        col = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'cc_prompts' AND COLUMN_NAME = 'requirement_id'
+        """, fetch="one")
+        if col and col['cnt'] == 0:
+            logger.info("  Migration 50: Adding requirement_id column to cc_prompts...")
+            execute_query("ALTER TABLE cc_prompts ADD requirement_id NVARCHAR(36) NULL", fetch="none")
+
+        # Add content_md column
+        col = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'cc_prompts' AND COLUMN_NAME = 'content_md'
+        """, fetch="one")
+        if col and col['cnt'] == 0:
+            logger.info("  Migration 50: Adding content_md column to cc_prompts...")
+            execute_query("ALTER TABLE cc_prompts ADD content_md NVARCHAR(MAX) NULL", fetch="none")
+
+        # Add created_by column
+        col = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'cc_prompts' AND COLUMN_NAME = 'created_by'
+        """, fetch="one")
+        if col and col['cnt'] == 0:
+            logger.info("  Migration 50: Adding created_by column to cc_prompts...")
+            execute_query("ALTER TABLE cc_prompts ADD created_by NVARCHAR(50) DEFAULT 'CAI'", fetch="none")
+
+        # Update status CHECK constraint to include new statuses
+        # Drop old constraint and add new one
+        try:
+            execute_query("""
+                DECLARE @constraint_name NVARCHAR(200)
+                SELECT @constraint_name = name FROM sys.check_constraints
+                WHERE parent_object_id = OBJECT_ID('cc_prompts') AND definition LIKE '%status%'
+                IF @constraint_name IS NOT NULL
+                    EXEC('ALTER TABLE cc_prompts DROP CONSTRAINT ' + @constraint_name)
+            """, fetch="none")
+            execute_query("""
+                ALTER TABLE cc_prompts ADD CONSTRAINT CK_cc_prompts_status
+                CHECK (status IN ('draft','prompt_ready','approved','sent','completed',
+                                  'executing','complete','closed','rejected'))
+            """, fetch="none")
+            logger.info("  Migration 50: Status constraint updated.")
+        except Exception as ck_err:
+            logger.warning(f"  Migration 50: Status constraint update skipped: {ck_err}")
+
+        # Add index on status
+        try:
+            execute_query("CREATE INDEX idx_prompts_status ON cc_prompts(status)", fetch="none")
+        except Exception:
+            pass  # Index may already exist
+
+        logger.info("  Migration 50: cc_prompts extension complete.")
+    except Exception as e:
+        logger.warning(f"  Migration 50 warning: {e}")
+
+    # Migration 51: PF5-MS2-SESSION-B — Create reviews table
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'reviews'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 51: Creating reviews table...")
+            execute_query("""
+                CREATE TABLE reviews (
+                    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+                    handoff_id UNIQUEIDENTIFIER NOT NULL,
+                    prompt_pth NVARCHAR(10) NULL,
+                    assessment NVARCHAR(20) NOT NULL
+                        CHECK (assessment IN ('pass', 'conditional_pass', 'fail')),
+                    focus_areas NVARCHAR(MAX) NULL,
+                    risks NVARCHAR(MAX) NULL,
+                    regression_zones NVARCHAR(MAX) NULL,
+                    lesson_candidates NVARCHAR(MAX) NULL,
+                    rework_needed BIT DEFAULT 0,
+                    notes NVARCHAR(MAX) NULL,
+                    created_at DATETIME2 DEFAULT GETDATE(),
+                    FOREIGN KEY (handoff_id) REFERENCES mcp_handoffs(id)
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_reviews_handoff ON reviews(handoff_id)", fetch="none")
+            execute_query("CREATE INDEX idx_reviews_pth ON reviews(prompt_pth)", fetch="none")
+            logger.info("  Migration 51: reviews table created.")
+        else:
+            logger.info("  Migration 51: reviews table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 51 warning: {e}")
+
+    # Migration 52: MP-UAT-FIX-001 — Create uat_bv_items table
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'uat_bv_items'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 52: Creating uat_bv_items table...")
+            execute_query("""
+                CREATE TABLE uat_bv_items (
+                    id          UNIQUEIDENTIFIER NOT NULL DEFAULT NEWID() PRIMARY KEY,
+                    spec_id     UNIQUEIDENTIFIER NOT NULL,
+                    bv_id       NVARCHAR(20)     NOT NULL,
+                    title       NVARCHAR(500)    NULL,
+                    status      NVARCHAR(20)     NOT NULL DEFAULT 'pending',
+                    notes       NVARCHAR(MAX)    NULL,
+                    updated_at  DATETIME2        NOT NULL DEFAULT GETUTCDATE(),
+                    CONSTRAINT CHK_bv_status CHECK (status IN ('pending','pass','fail','skip')),
+                    CONSTRAINT FK_bv_spec FOREIGN KEY (spec_id)
+                        REFERENCES uat_pages(id) ON DELETE CASCADE
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX IX_uat_bv_items_spec ON uat_bv_items(spec_id)", fetch="none")
+            logger.info("  Migration 52: uat_bv_items table created.")
+        else:
+            logger.info("  Migration 52: uat_bv_items table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 52 warning: {e}")
+
     logger.info("Migrations complete.")

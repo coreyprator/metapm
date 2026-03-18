@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.25.0"  # MP-MEGA-003: roadmap-drill + doc-ingest + gov-fix + rag-search
+    VERSION: str = "2.34.0"  # MF01: uat_bv_items migration + RAG sync fix + PA06 UAT spec
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     # Portfolio RAG
     PORTFOLIO_RAG_URL: str = "https://portfolio-rag-57478301787.us-central1.run.app"
     PORTFOLIO_RAG_API_KEY: str = ""
+
+    # Google OAuth (for PL-authenticated UAT pages)
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    SESSION_SECRET_KEY: str = "metapm-session-dev-key-change-in-prod"
+    PL_EMAIL: str = "cprator@cbsware.com"
     
     # Application
     ENVIRONMENT: str = "development"
