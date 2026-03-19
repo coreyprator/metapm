@@ -1,10 +1,169 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-9E3F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-15 — Sprint "MP-MEGA-003" (v2.25.0)
+Updated: 2026-03-19 — Sprint "MP-PK-AUDIT-001" (v2.36.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-15 (MP-MEGA-003, v2.25.0)
+### Latest Session Update — 2026-03-19 (MP-PK-AUDIT-001, v2.36.0)
+
+- **Sprint MP-PK-AUDIT-001 (PTH: MP10)**: PK.md RAG audit + auto-refresh on deploy + PA PK verified
+- **Current Version**: v2.36.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00260-5ml)
+- **Item 1 (PK audit)**: Audited all 10 project PKs in Portfolio RAG. 7/10 found, 3 missing (PA, PIE Graph, EtymoRAG Lab). Root cause: repos not on GitHub, portfolio ingest only pulled from GitHub.
+- **Item 2 (re-ingest)**: Triggered portfolio re-ingest. Added GCS fallback for non-GitHub repos. Uploaded PA + PIE Graph PK files to gs://corey-handoff-bridge/pk-docs/. Post-ingest: 688 chunks, all 9 active projects indexed (EtymoRAG Lab has no PK.md).
+- **Item 3 (/api/pk-status)**: New GET endpoint on Portfolio RAG returning ingestion status for all project PK.md files. Uses ChromaDB metadata query.
+- **Item 4 (auto-refresh)**: MetaPM startup event fires fire-and-forget POST to Portfolio RAG /ingest/portfolio. Uses PORTFOLIO_RAG_API_KEY or REINGEST_TOKEN for auth. 10s delay to let service stabilize first.
+- **Item 5 (PA PK)**: Verified personal-assistant/PROJECT_KNOWLEDGE.md exists (10KB, comprehensive). Uploaded to GCS for RAG ingest.
+- **Portfolio RAG**: v2.7.2 → v2.7.4, new /api/pk-status endpoint, GCS_PORTFOLIO_FILES in ingestion.py
+- **REINGEST_TOKEN**: Added to MetaPM settings, mounted as Cloud Run secret from reingest-token
+
+### Previous Session Update — 2026-03-17 (PF5-MS2-SESSION-A, v2.30.0)
+
+- **Sprint PF5-MS2-SESSION-A (PTH: PF01A)**: Prompt storage, viewer, approval, dashboard tab, CC Phase 0 retrieval
+- **Current Version**: v2.30.0
+- **MP-062**: PF5-MS2 Session A requirement
+- **Item 1**: Migration 50 — cc_prompts extended with pth, requirement_id, content_md, created_by columns + updated status CHECK
+- **Item 2**: New `app/api/prompts.py` — POST /api/prompts, GET /api/prompts/{pth}, GET /api/prompts, PATCH /api/prompts/{id}
+- **Item 3**: Prompt viewer page at /prompts/{pth} (static/prompt-viewer.html) with Approve/Reject buttons
+- **Item 4**: Dashboard Prompts tab — table with inline approve, status filter
+- **Item 5**: Bootstrap v1.5.13 — PROMPT RETRIEVAL section added (BOOT-1.5.13-PF01A)
+- **Item 6**: Handoff-prompt linking — prompt_pth field on HandoffCreate, auto-complete prompt on handoff POST
+
+### Previous Session — 2026-03-17 (MP-MEGA-007, v2.29.0)
+
+- **Sprint MP-MEGA-007 (PTH: MP07)**: Wave group fix confirmed + UAT attachments + Bootstrap path gate
+- **Current Version**: v2.29.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00234-xkx)
+- **MP07 Handoff ID**: 237D4483-1980-4908-9B0D-4B48E6484027
+- **MP07 UAT spec_id**: C9130DC0-3DF2-4C54-9531-C69934CC1106 → https://metapm.rentyourcio.com/uat/C9130DC0-3DF2-4C54-9531-C69934CC1106
+- **Item 1 (wave groups)**: Confirmed working — 4/4 wave labels in HTML, all 7 production statuses covered by WAVE_GROUPS. Root fix was limit=200→100 (MP06-FIX). No additional code changes needed.
+- **Item 2 (UAT attachments)**:
+  - `PLResultsTestCase` extended: `attachments: Optional[List[dict]]` (image/file evidence per BV item)
+  - `PLResultsSubmit` extended: `general_notes_attachments: Optional[List[dict]]`
+  - Paste zone (`contenteditable="false"`, tabindex, paste event) + file attach button on each BV card
+  - Same paste zone + file attach on General Notes section
+  - Attachments stored as base64 in `test_cases_json`; general notes attachments in sentinel entry `id="_general_notes"`
+  - `uat_gen.py` `spec_tests` comprehension excludes sentinel entries (id starts with `_`)
+  - Thumbnails rendered in read-only view after submission
+  - **PATCH endpoint**: `/api/uat/{spec_id}/pl-results`
+- **Item 3 (Bootstrap path gate)**:
+  - `CC_Bootstrap_v1.md` → v1.5.12, checkpoint BOOT-1.5.12-MP07
+  - Explicit BOOTSTRAP FILE LOCATION section added at top: exact path, templates\ required, STOP if not found
+  - `CAI_Outbound_CC_Prompt_Standard.md` (both templates/ and docs/ copies) updated Gate 1 with same path/STOP rule
+- **BV-01, BV-02, BV-03 PENDING PL**: https://metapm.rentyourcio.com/uat/C9130DC0-3DF2-4C54-9531-C69934CC1106
+- **MP-ROADMAP-DRILL-001**: uat_ready (maintained)
+
+### Previous Session Update — 2026-03-16 (MP-ROADMAP-DRILL-DIAG-001, v2.28.1)
+
+- **Sprint MP-ROADMAP-DRILL-DIAG-001 (PTH: MP06-FIX)**: Diagnostic + fix for BV-02/BV-05 three-sprint failures
+- **Current Version**: v2.28.1 — **DEPLOYED** to Cloud Run (revision metapm-v2-00232-rws)
+- **MP06-FIX Handoff ID**: D45B3589-008F-42A8-A198-B8638FE96BC8
+- **MP06-FIX UAT spec_id**: A3C45FF9-55A3-4716-83CC-AB50B1E78A91 → https://metapm.rentyourcio.com/uat/A3C45FF9-55A3-4716-83CC-AB50B1E78A91
+- **Root cause (BV-05 UAT history / BV-02 sprint title)**: `fetch('/api/uat/pages?limit=200')` was rejected with HTTP 400 (API max is 100). Code checked `if (uatResp.ok)` so `allUATs = []` always. Fixed: `limit=200` → `limit=100`.
+- **Root cause (BV-02 secondary — executing status)**: Status `"executing"` exists in production but was not in WAVE_GROUPS. Fixed: added to In Flight statuses array.
+- **Files changed**:
+  - `metapm/app/core/config.py` — VERSION 2.28.1
+  - `metapm/static/roadmap-drill.html` — UAT fetch limit fix + WAVE_GROUPS executing status
+- **Canaries 4 and 5 PENDING PL**: https://metapm.rentyourcio.com/roadmap-drill
+- **MP-ROADMAP-DRILL-001**: uat_ready (maintained pending PL browser confirmation)
+
+### Previous Session Update — 2026-03-16 (MP-MEGA-006, v2.28.0)
+
+- **Sprint MP-MEGA-006 (PTH: MP06)**: PA handoff webhook + roadmap-drill sprint title + UAT list filter
+- **Current Version**: v2.28.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00230-dqn)
+- **MP06 Handoff ID**: 08D30933-7233-4B02-965A-55F34DD9B2C1
+- **MP06 UAT spec_id**: 1B255FE5-9B02-4590-8DA7-D0B19B33B271
+- **Bootstrap**: BOOT-1.5.11-R3B8 (BA04 shipped — two-step closeout now enforced)
+- **New: PA webhook (Item 1)**:
+  - `notify_pa_handoff()` async function fires after every `POST /mcp/handoffs`
+  - Fire-and-forget (non-blocking, 5s timeout, non-fatal on failure)
+  - `PA_WEBHOOK_URL` env var: `https://personal-assistant-57478301787.us-central1.run.app/api/webhook/handoff`
+  - Secret `PA_WEBHOOK_SECRET` to be added when PA03 ships webhook auth
+  - `asyncio` and `httpx` added to mcp.py imports at module level
+- **New: BA04 handoff format support (Item 1)**:
+  - `HandoffCreate` schema extended: accepts `id` (custom ref), `request_type`, `title`, `description`, `completion_handoff_url` as optional BA04 fields
+  - `task` / `direction` / `content` now optional with BA04 fallbacks
+  - `handoff_ref_id NVARCHAR(100)` column added to mcp_handoffs (Migration 49)
+  - `GET /mcp/handoffs/{id}/content` uses `TRY_CAST` to lookup by UUID OR handoff_ref_id
+  - Example: `{"id":"MP06-TEST","project":"MetaPM","title":"...","description":"..."}` works
+  - `MCP_API_KEY` now mounted as secret in Cloud Run (`metapm-mcp-api-key`)
+- **Roadmap-drill fixes (Item 2)**:
+  - Sprint title now shows: `PTH: {pth} | {sprint_code}` (sprint_code from UAT data)
+  - Expand All now expands all 4 levels: wave, sprint, requirements, UAT
+  - Search now also searches sprint_code (via PTH→sprint_code lookup from allUATs)
+  - renderUATSection shows "No UAT history" when empty (not blank)
+- **UAT list filter (Item 4)**: `/mcp/uat/list` default now excludes `passed`, `approved`, `archived`. Supports `?status=open` as meta-param.
+- **PA-004**: cc_complete (MetaPM webhook implemented; PA side pending PA03)
+- **MP-ROADMAP-DRILL-001**: uat_ready
+
+### Previous Session — 2026-03-16 (MP-MEGA-005, v2.27.0)
+
+- **Sprint MP-MEGA-005 (PTH: MP05)**: Roadmap-drill fixes + UAT regressions + portfolio OAuth + RAG UAT sync
+- **Current Version**: v2.27.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00225-hpv)
+- **MP05 UAT spec_id**: BF8FBFD4-986A-4F5D-B69C-2018D9964847 → https://metapm.rentyourcio.com/uat/BF8FBFD4-986A-4F5D-B69C-2018D9964847
+- **Roadmap-drill (GROUP 1)**:
+  - Wave groups fixed: WAVE_GROUPS now correctly assigns `cc_complete` to In Flight only (not both In Flight and Complete). Label "Build Ready" → "Ready". `cc_prompt_ready`, `req_approved`, `build`, `pl_approved` in Ready group.
+  - Search (BV-07 fix): Now searches `project_name` and `pth` fields in addition to title/description/code. "HarmonyLab" returns HM06/HM05 requirements.
+  - UAT data source (BV-05/BV-06 fix): Switched from `/mcp/uat/list` (uat_results table) to `/api/uat/pages` (uat_pages table, cc_spec records). Response includes `test_cases` array stripped to id/title/status. Field `uat_id` (not `id`) used for links.
+- **UAT system (GROUP 2 — 8 regressions fixed)**:
+  - Fix 2a: PATCH pl-results returns `uat_url` in response; page displays confirmation link after submit
+  - Fix 2b: Status auto-computed: all pass → `passed`; any fail → `failed`; pass/skip no fail → `conditional_pass`
+  - Fix 2c: "Copy Results" button on UAT spec page — formats BV items + notes to clipboard
+  - Fix 2d: `general_notes` accepted in PLResultsSubmit model and persisted to DB
+  - Fix 2e: UAT list title now includes PTH: "PTH: MP03 | MetaPM v2.25.1 — MP03-FIX"
+  - Fix 2f: UAT list default filter excludes `passed`, `conditional_pass`, `archived`, `approved`. Toggle "Show Completed" to include.
+  - Fix 2g: After submit, page reloads in read-only mode showing submitted results. Radio buttons reflect submitted state. Resubmit button replaces Submit.
+  - Fix 2h (migration 48): Bulk archived phantom pending UAT pages older than 7 days where same PTH has newer non-pending record
+- **DB migrations (MP05)**:
+  - Migration 46: Expand `chk_uat_pages_status_v2` → `v3` to include `conditional_pass`
+  - Migration 47: Add `general_notes NVARCHAR(MAX)` to `uat_pages`
+  - Migration 48: Bulk archive phantom pending UAT records (one-time)
+- **ProxyHeadersMiddleware (GROUP 3)**: Added to harmonylab, ArtForge, etymython main.py. All deployed.
+  - harmonylab: revision harmonylab-00174-2mb
+  - artforge: revision artforge-00172-dfv
+  - etymython: revision etymython-00208-p74
+  - OAUTHLIB_RELAX_TOKEN_SCOPE=1: set on harmonylab (00173-xjf), artforge (00171-rrb), etymython (00207-d7v)
+  - OAuth redirect_uri confirmed `https://` for all three services
+- **RAG sync (GROUP 4)**: `/api/rag/sync` now syncs UAT pages in addition to requirements. Last run: 366 requirements + 4 UATs = 370 total. UAT chunk id format: `metapm::uat::{id}`
+- **Requirement transitions**: MP-ROADMAP-DRILL-001 → `uat_ready`; MP-UAT-SERVER-001 → `uat_ready`; MP-UAT-FILTER-001 → `done`
+- **Canary 6 (PL browser tests PENDING)**:
+  - BV-04: UAT submit shows confirmation URL at /uat/6DCFE05C-7C89-4338-ABF6-5CDD949A6A8E
+  - BV-05: General notes persist after submit + reload
+  - BV-06: Copy results button present and functional
+  - BV-07: UAT list hides passed/archived by default (dashboard UAT tab)
+
+### Previous Session — 2026-03-15 (MP-MEGA-004, v2.26.0)
+
+- **Sprint MP-MEGA-004 (PTH: MP04)**: Authenticated spec-first UAT system (MP-UAT-SERVER-001)
+- **Current Version**: v2.26.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00219-phn)
+- **New: POST /api/uat/spec** — CC creates immutable UAT spec before handoff. Returns `spec_id`, `uat_url`, `test_count`. Stored in `uat_pages` with `spec_source='cc_spec'`, `status='ready'`.
+- **New: GET /api/uat/spec/{spec_id}** — Returns spec metadata + test_cases (without result values). 404 if not a cc_spec record.
+- **New: PATCH /api/uat/{spec_id}/pl-results** — PL-only endpoint (403 for all non-PL). Updates test_cases_json, sets pl_submitted_at.
+- **New: GET /uat/{spec_id} (cc_spec gate)** — cc_spec UATs require Google OAuth (cprator@cbsware.com). Unauthenticated requests get "PL Authentication Required" HTML page. Authenticated PL gets interactive spec page.
+- **New: app/api/auth.py** — HMAC-signed session cookies (email|timestamp|sha256), 7-day TTL. Routes: GET /app/login, GET /app/oauth-callback, GET /app/logout.
+- **New: app/api/uat_spec.py** — All cc_spec endpoints + render_spec_uat_page()
+- **DB migration 45**: 4 new uat_pages columns: spec_source (NVARCHAR(20)), spec_locked_at (DATETIME), pl_submitted_at (DATETIME), spec_data (NVARCHAR(MAX))
+- **Bootstrap amendment**: CC_Bootstrap_v1.md updated with mandatory UAT SPEC REQUIREMENT section (BOOT-1.5.10)
+- **MP-UAT-SERVER-001**: cc_complete. MP-055 and MP-048 closed as superseded.
+- **Backfill specs**: MP03-FIX (7 BV) → spec_id 6DCFE05C-7C89-4338-ABF6-5CDD949A6A8E; PA02f (4 BV) → spec_id F907E8BA-E9B9-467A-A3B8-632F62211CE0
+- **MP04 self-UAT spec_id**: 6EDEA28D-2C65-405F-8154-EB922AE1D9AF → https://metapm.rentyourcio.com/uat/6EDEA28D-2C65-405F-8154-EB922AE1D9AF
+- **PL action required**: Configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in GCP Secret Manager to enable full OAuth flow. Secret names: google-client-id, google-client-secret.
+- **Note**: spec_source='cc_spec' UATs use status='ready' in DB (CHECK constraint). API returns logical status='spec_created' in response.
+
+### Previous Session — 2026-03-15 (MP-ROADMAP-DRILL-FIX-001, v2.25.1)
+
+- **Sprint MP-ROADMAP-DRILL-FIX-001 (PTH: MP03-FIX)**: Roadmap drill levels 3+4 fix + nav button + PK v4 update
+- **Current Version**: v2.25.1 — deploying to Cloud Run
+- **/roadmap-drill: all 4 levels working**
+  - Level 1: Wave groups by status (In Flight, Backlog, Build Ready, Complete)
+  - Level 2: Sprint rows with PTH badge / project / req count / status badge
+  - Level 3: Requirement rows with chevron expand — shows full description (no truncation), PTH, created/updated timestamps. **Fix: onclick moved from req-row to req-row-head so description text clicks don't re-collapse the panel.**
+  - Level 4: UAT results with BV items, pass/fail/pending counts, "Open full UAT →" link on expand
+- **Nav**: "🔍 Roadmap Drill" button added to dashboard nav bar alongside UAT, Roadmap Report, Architecture
+- **UAT template**: All UAT_Template_v3 references in PK.md replaced with UAT_Template_v4
+- **Bootstrap**: Updated to BOOT-1.5.10-Q7A2 — governance_state.json and DEFAULT_STATE both updated
+- **UAT ID**: A20B6877-BF04-4517-963F-17762F02366B
+- **UAT URL**: https://metapm.rentyourcio.com/uat/A20B6877-BF04-4517-963F-17762F02366B
+
+### Previous Session — 2026-03-15 (MP-MEGA-003, v2.25.0)
 
 - **Sprint MP-MEGA-003 (PTH: MP03)**: Roadmap drill-down + doc ingest + governance fix + RAG search
 - **Current Version**: v2.25.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00216-n4b)
@@ -119,7 +278,7 @@ Purpose: Canonical reference for all AI sessions working on this project.
   - `GET /uat/{uat_id}` — serves UAT HTML page. Marks status in_progress on first view.
   - `GET /api/uat/pages` — list UAT pages, filterable by handoff_id and project.
 - **Test case generation**: Auto-generates DV (deploy verify), SM (smoke), AC (acceptance from parsed description), BF (bug fix), CF (CAI focus), RC (risk check), RG (regression) categories.
-- **HTML renderer**: Matches UAT_Template_v3 dark theme. Pass/Fail/Skip buttons, notes, screenshot paste, submit to /api/uat/submit, category color-coded badges.
+- **HTML renderer**: Matches UAT_Template_v4 dark theme. Pass/Fail/Skip buttons, notes, screenshot paste, submit to /api/uat/submit, category color-coded badges.
 - **Auto-generation**: Hooks into POST /mcp/handoffs. Extracts requirement codes from content, generates test cases, creates uat_pages record. Best-effort, non-blocking.
 - **Dashboard**: Handoff links in detail panel show "UAT READY" badge and "Run UAT" link when uat_pages record exists.
 - **Handoff**: 77F76B3F | Checkpoint: BD34
@@ -250,9 +409,9 @@ Purpose: Canonical reference for all AI sessions working on this project.
 - **MP-028 Fix**: Added code uniqueness validation to `create_requirement()` route. Prevents 409 when inserting duplicate codes within a project. (`app/api/roadmap.py`)
 - **MP-027 Fix**: Prompt badge on `prompt_ready` rows now inline with title (📝 icon + gold left border on row). Fixed grid overflow bug where badge was a separate grid item. (`static/dashboard.html`)
 - **MP-030**: Active Prompts panel has helper text explaining its purpose. Copy CC Link button has tooltip. (`static/dashboard.html`)
-- **MP-029**: UAT submit confirmation link made more prominent with green-bordered success box showing handoff ID and clickable MetaPM link. (`UAT_Template_v3.html`)
-- **MP-031/032**: UAT template now supports Ctrl+V screenshot paste and file attachment per test item. Screenshots resized to max 800px. Files limited to 5MB. Both included in POST payload. (`UAT_Template_v3.html`)
-- **Files Modified**: `app/api/roadmap.py`, `static/dashboard.html`, `app/core/config.py`, `app/main.py`, `project-methodology/templates/UAT_Template_v3.html`
+- **MP-029**: UAT submit confirmation link made more prominent with green-bordered success box showing handoff ID and clickable MetaPM link. (`UAT_Template_v4.html`)
+- **MP-031/032**: UAT template now supports Ctrl+V screenshot paste and file attachment per test item. Screenshots resized to max 800px. Files limited to 5MB. Both included in POST payload. (`UAT_Template_v4.html`)
+- **Files Modified**: `app/api/roadmap.py`, `static/dashboard.html`, `app/core/config.py`, `app/main.py`, `project-methodology/templates/UAT_Template_v4.html`
 
 ### Previous: MP-MS3-FIX Bug Fixes, v2.7.1 (2026-03-01)
 
@@ -1076,8 +1235,8 @@ Excludes: `.git`, `__pycache__`, `.env`, `.vscode`, `*.md`, `tests/`, `scripts/`
 
 ### UAT Template
 
-Canonical UAT checklist template: `project-methodology/templates/UAT_Template_v3.html`
-GitHub: https://github.com/coreyprator/project-methodology/blob/main/templates/UAT_Template_v3.html
+Canonical UAT checklist template: `project-methodology/templates/UAT_Template_v4.html`
+GitHub: https://github.com/coreyprator/project-methodology/blob/main/templates/UAT_Template_v4.html
 Do not recreate from scratch. Copy and replace `UAT_` placeholders.
 
 Source: `.gcloudignore`
@@ -1330,7 +1489,7 @@ Source: `CLAUDE.md`, `.claude/settings.json`
 
 6. **Is the Google Calendar integration fully operational?** The code references OAuth credentials that may need rotation/reconfiguration.
 
-7. **What happened to the `templates/` directory?** It exists and now contains `UAT_Template_v3.html` (committed 2026-02-19) as well as previous templates. Use this location for all UAT template versions.
+7. **What happened to the `templates/` directory?** It exists and now contains `UAT_Template_v4.html` (committed 2026-02-19) as well as previous templates. Use this location for all UAT template versions.
 
 8. **Are the Backlog tables (`Bugs`, `Requirements`) still in use alongside `roadmap_requirements`?** There appears to be functional overlap.
 
