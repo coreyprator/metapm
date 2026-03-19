@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.35.0"  # MF02: get_uat_results fix + trigger_rag_sync MCP + E2E02 BV-01 close
+    VERSION: str = "2.36.0"  # MP10: PK audit + RAG auto-refresh on startup
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     # Portfolio RAG
     PORTFOLIO_RAG_URL: str = "https://portfolio-rag-57478301787.us-central1.run.app"
     PORTFOLIO_RAG_API_KEY: str = ""
+    REINGEST_TOKEN: str = ""  # Shared with Portfolio RAG for auto-refresh on deploy
 
     # Google OAuth (for PL-authenticated UAT pages)
     GOOGLE_CLIENT_ID: str = ""
