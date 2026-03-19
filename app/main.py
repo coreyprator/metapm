@@ -16,7 +16,6 @@ from app.core.config import settings
 from app.core.migrations import run_migrations
 from app.schemas.mcp import UATDirectSubmit, UATDirectSubmitResponse
 from transactions import router as transactions_router
-import asyncio
 import logging
 import traceback
 
@@ -40,31 +39,6 @@ try:
     run_migrations()
 except Exception as e:
     logger.warning(f"Migration warning (non-fatal): {e}")
-
-# Fire-and-forget portfolio RAG refresh on startup (MP10)
-async def _trigger_portfolio_rag_refresh():
-    """Refresh Portfolio RAG portfolio collection after MetaPM deploys."""
-    await asyncio.sleep(10)  # Wait for service to be healthy
-    try:
-        import httpx
-        rag_key = settings.PORTFOLIO_RAG_API_KEY or settings.REINGEST_TOKEN
-        if not rag_key:
-            logger.info("No RAG API key set, skipping portfolio RAG refresh")
-            return
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(
-                f"{settings.PORTFOLIO_RAG_URL}/ingest/portfolio",
-                headers={"X-API-Key": rag_key},
-            )
-            logger.info(f"Portfolio RAG refresh on startup: HTTP {resp.status_code}")
-    except Exception as e:
-        logger.warning(f"Portfolio RAG refresh failed (non-fatal): {e}")
-
-
-@app.on_event("startup")
-async def startup_event():
-    asyncio.create_task(_trigger_portfolio_rag_refresh())
-
 
 # Redirect root to dashboard
 @app.get("/")

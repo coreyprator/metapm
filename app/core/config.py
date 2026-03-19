@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.36.0"  # MP10: PK audit + RAG auto-refresh on startup
+    VERSION: str = "2.36.1"  # HF02: remove startup RAG refresh causing 503
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
