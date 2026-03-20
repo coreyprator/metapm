@@ -109,6 +109,14 @@ TOOLS = [
             "required": ["code", "status"],
         },
     },
+    {
+        "name": "list_projects",
+        "description": "List all portfolio projects. Returns project UUID, code, and name. Use the 'id' field as project_id when calling post_prompt.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
 ]
 
 
@@ -300,6 +308,27 @@ def _tool_list_requirements(args: dict) -> dict:
     }
 
 
+def _tool_list_projects(args: dict) -> dict:
+    rows = execute_query("""
+        SELECT id, code, name, production_url
+        FROM roadmap_projects
+        ORDER BY code
+    """, fetch="all") or []
+
+    return {
+        "count": len(rows),
+        "projects": [
+            {
+                "project_id_for_post_prompt": str(r["id"]),
+                "code": r.get("code"),
+                "name": r.get("name"),
+                "production_url": r.get("production_url") or "",
+            }
+            for r in rows
+        ],
+    }
+
+
 def _tool_patch_requirement_status(args: dict) -> dict:
     code = args["code"]
     status = args["status"]
@@ -333,6 +362,7 @@ TOOL_HANDLERS = {
     "trigger_rag_sync": _tool_trigger_rag_sync,
     "list_requirements": _tool_list_requirements,
     "patch_requirement_status": _tool_patch_requirement_status,
+    "list_projects": _tool_list_projects,
 }
 
 
@@ -362,7 +392,7 @@ async def mcp_jsonrpc(request: Request):
         return JSONResponse(_jsonrpc_result(req_id, {
             "protocolVersion": "2024-11-05",
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "metapm", "version": "2.35.0"},
+            "serverInfo": {"name": "metapm", "version": "2.37.4"},
         }))
 
     if method == "tools/list":

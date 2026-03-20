@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.37.3"  # MM05: enforcement gates, conditional_pass override, dashboard UAT badges
+    VERSION: str = "2.37.5"  # MM06: get_handoff_by_pth, email completeness, CAI outbound gate, prompt viewer collapsible
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
