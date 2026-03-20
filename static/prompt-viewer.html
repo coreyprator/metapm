@@ -32,7 +32,28 @@
   #reject-btn:hover { background: #b91c1c; }
   .approved-badge { background: #065f46; color: #6ee7b7; padding: 8px 16px; border-radius: 8px; font-weight: 600; }
   .executing-badge { background: #1e40af; color: #93c5fd; padding: 8px 16px; border-radius: 8px; font-weight: 600; }
-  .prompt-content { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; line-height: 1.7; font-size: 14px; white-space: pre-wrap; word-wrap: break-word; overflow-x: auto; }
+  .prompt-content { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 0; line-height: 1.7; font-size: 14px; overflow: hidden; }
+  .section-panel { border-bottom: 1px solid #1e293b; }
+  .section-panel:last-child { border-bottom: none; }
+  .section-header { display: flex; align-items: center; gap: 10px; padding: 12px 20px; cursor: pointer; user-select: none; background: #1e293b; transition: background 0.15s; }
+  .section-header:hover { background: #243045; }
+  .section-chevron { font-size: 11px; color: #64748b; width: 14px; flex-shrink: 0; transition: transform 0.15s; }
+  .section-title { font-weight: 600; font-size: 14px; color: #e2e8f0; flex: 1; }
+  .section-hint { font-size: 11px; color: #475569; font-style: italic; }
+  .section-body { padding: 16px 24px; background: #0f172a; display: none; border-top: 1px solid #1e293b; }
+  .section-body.expanded { display: block; }
+  .section-body h1, .section-body h2, .section-body h3 { color: #f1f5f9; margin: 14px 0 6px; }
+  .section-body h2 { font-size: 15px; }
+  .section-body h3 { font-size: 13px; color: #94a3b8; }
+  .section-body code { background: #1e293b; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+  .section-body pre { background: #0a0e1a; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin: 8px 0; overflow-x: auto; white-space: pre; }
+  .section-body pre code { background: none; padding: 0; }
+  .section-body p { margin: 6px 0; }
+  .section-body li { margin: 3px 0 3px 16px; }
+  .section-body strong { color: #f1f5f9; }
+  .section-expand-bar { display: flex; gap: 8px; margin-bottom: 8px; }
+  .section-expand-btn { padding: 4px 12px; background: transparent; border: 1px solid #334155; border-radius: 6px; color: #64748b; font-size: 12px; cursor: pointer; }
+  .section-expand-btn:hover { border-color: #60a5fa; color: #60a5fa; }
   .prompt-content-edit { width: 100%; min-height: 400px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; line-height: 1.7; font-size: 14px; font-family: monospace; color: #e2e8f0; resize: vertical; }
   .save-bar { margin-top: 10px; display: flex; gap: 10px; align-items: center; }
   .save-bar button { padding: 8px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; background: #2563eb; color: #fff; }
@@ -114,21 +135,6 @@ function renderPrompt(p) {
     ? `<a href="/static/roadmap-drill.html?req=${p.requirement_id}">&larr; View Requirement</a>`
     : '';
 
-  // Simple markdown-to-HTML: headers, code blocks, bold, links
-  let contentHtml = escapeHtml(p.content_md || p.content || 'No content');
-  // Code blocks
-  contentHtml = contentHtml.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
-  // Inline code
-  contentHtml = contentHtml.replace(/`([^`]+)`/g, '<code>$1</code>');
-  // Headers
-  contentHtml = contentHtml.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-  contentHtml = contentHtml.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-  contentHtml = contentHtml.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-  // Bold
-  contentHtml = contentHtml.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  // Horizontal rules
-  contentHtml = contentHtml.replace(/^---$/gm, '<hr style="border-color:#334155;margin:16px 0">');
-
   const isDraft = (p.status === 'draft' || p.status === 'prompt_ready');
   const contentArea = isDraft
     ? `<textarea id="content-editor" class="prompt-content-edit">${escapeHtml(p.content_md || p.content || '')}</textarea>
@@ -136,7 +142,7 @@ function renderPrompt(p) {
          <button onclick="saveContent()">Save Changes</button>
          <span class="save-status" id="save-status"></span>
        </div>`
-    : `<div class="prompt-content">${contentHtml}</div>`;
+    : buildCollapsibleContent(p.content_md || p.content || 'No content');
 
   // Build artifact chain
   const reqNode = p.requirement_id
@@ -179,6 +185,122 @@ function renderPrompt(p) {
     ${artifactChain}
     ${contentArea}
   `;
+}
+
+// MP-PROMPT-UI-001: Collapsible section rendering
+const BOILERPLATE_SECTIONS = ['bootstrap', 'phase 0', 'git gate', 'deploy', 'canaries',
+  'pl-facing', 'session closeout', 'rules', 'security', 'completion rules', 'closeout',
+  'overview', 'commit', 'push'];
+const EXPAND_KEYWORDS = ['item', 'requirement', 'objective', 'fix', 'deliverable',
+  'scope', 'feature', 'sprint requirements', 'changes', 'implementation'];
+
+function mdToHtml(text) {
+  let h = escapeHtml(text);
+  h = h.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+  h = h.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  h = h.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  h = h.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  h = h.replace(/^---$/gm, '<hr style="border-color:#1e293b;margin:10px 0">');
+  h = h.replace(/^- (.+)$/gm, '<li>$1</li>');
+  return h;
+}
+
+function buildCollapsibleContent(raw) {
+  // Split on H2 headings
+  const lines = raw.split('\n');
+  const sections = [];
+  let currentTitle = null;
+  let currentLines = [];
+
+  for (const line of lines) {
+    const h2Match = line.match(/^## (.+)$/);
+    if (h2Match) {
+      if (currentTitle !== null) sections.push({ title: currentTitle, body: currentLines.join('\n') });
+      else if (currentLines.length) sections.push({ title: null, body: currentLines.join('\n') });
+      currentTitle = h2Match[1].replace(/<!--.*?-->/g, '').trim();
+      currentLines = [];
+    } else {
+      currentLines.push(line);
+    }
+  }
+  if (currentLines.length || currentTitle !== null) {
+    sections.push({ title: currentTitle, body: currentLines.join('\n') });
+  }
+
+  if (sections.length <= 1) {
+    // No H2 sections — render flat
+    return `<div class="prompt-content" style="padding:24px;white-space:pre-wrap">${mdToHtml(raw)}</div>`;
+  }
+
+  function shouldExpand(title) {
+    if (!title) return true;
+    const t = title.toLowerCase();
+    if (EXPAND_KEYWORDS.some(k => t.includes(k))) return true;
+    if (BOILERPLATE_SECTIONS.some(k => t.includes(k))) return false;
+    return true; // default expand unknown sections
+  }
+
+  const HINTS = {
+    'bootstrap': 'standard preamble', 'phase 0': 'diagnostics', 'git gate': 'pre-deploy check',
+    'deploy': 'deploy commands', 'canaries': 'smoke tests', 'pl-facing': 'output template',
+    'session closeout': 'closeout steps', 'rules': 'process rules'
+  };
+
+  function getHint(title) {
+    if (!title) return '';
+    const t = title.toLowerCase();
+    for (const [k, v] of Object.entries(HINTS)) { if (t.includes(k)) return v; }
+    return '';
+  }
+
+  let panels = '';
+  let sectionIndex = 0;
+  for (const sec of sections) {
+    const id = `sec-${sectionIndex++}`;
+    const expanded = shouldExpand(sec.title);
+    const chevron = expanded ? '▼' : '▶';
+    const bodyClass = expanded ? 'section-body expanded' : 'section-body';
+    const hint = sec.title ? getHint(sec.title) : '';
+    const titleLabel = sec.title
+      ? `<span class="section-title">${escapeHtml(sec.title)}</span>`
+      : `<span class="section-title" style="color:#475569">Preamble</span>`;
+    const hintLabel = hint ? `<span class="section-hint">${hint}</span>` : '';
+    panels += `
+      <div class="section-panel">
+        <div class="section-header" onclick="toggleSection('${id}')">
+          <span class="section-chevron" id="chev-${id}">${chevron}</span>
+          ${titleLabel}${hintLabel}
+        </div>
+        <div class="${bodyClass}" id="${id}">${mdToHtml(sec.body)}</div>
+      </div>`;
+  }
+
+  return `
+    <div class="section-expand-bar">
+      <button class="section-expand-btn" onclick="expandAll()">Expand all</button>
+      <button class="section-expand-btn" onclick="collapseAll()">Collapse all</button>
+    </div>
+    <div class="prompt-content">${panels}</div>`;
+}
+
+function toggleSection(id) {
+  const body = document.getElementById(id);
+  const chev = document.getElementById('chev-' + id);
+  if (!body) return;
+  const isExpanded = body.classList.toggle('expanded');
+  if (chev) chev.textContent = isExpanded ? '▼' : '▶';
+}
+
+function expandAll() {
+  document.querySelectorAll('.section-body').forEach(b => b.classList.add('expanded'));
+  document.querySelectorAll('.section-chevron').forEach(c => c.textContent = '▼');
+}
+
+function collapseAll() {
+  document.querySelectorAll('.section-body').forEach(b => b.classList.remove('expanded'));
+  document.querySelectorAll('.section-chevron').forEach(c => c.textContent = '▶');
 }
 
 function escapeHtml(text) {

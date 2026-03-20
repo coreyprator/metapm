@@ -396,6 +396,7 @@ async def create_handoff(
                 "description": f"CC finished {handoff.task}",
                 "handoff_url": public_url,
                 "uat_url": auto_uat_url,
+                "handoff_id": handoff_id,  # MP-EMAIL-COMPLETE: include UUID for plain-text email
             }))
         except Exception as pa_err:
             logger.warning(f"PA handoff notification failed (non-fatal): {pa_err}")

@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import uuid
 from datetime import datetime
 from typing import Optional, List
@@ -35,6 +36,7 @@ async def notify_pa(event_type: str, data: dict):
                 "description": data.get("description", ""),
                 "handoff_url": data.get("handoff_url", ""),
                 "uat_url": data.get("uat_url", ""),
+                "handoff_id": data.get("handoff_id", ""),  # MP-EMAIL-COMPLETE
                 "secret": os.getenv("PA_WEBHOOK_SECRET", "")
             }, headers={"Content-Type": "application/json"})
             logger.info(f"PA notified: {event_type}")
@@ -58,6 +60,21 @@ async def verify_api_key(x_api_key: Optional[str] = Depends(api_key_header)) -> 
     return True
 
 
+# ── MP-CAI-OUTBOUND-GATE (MM06): UAT spec presence check ─────────────────────
+
+def _has_uat_spec(content_md: str) -> bool:
+    """Return True if content_md contains a ```json block with a test_cases array."""
+    blocks = re.findall(r'```json\s*(\{.*?\})\s*```', content_md, re.DOTALL)
+    for block in blocks:
+        try:
+            data = json.loads(block)
+            if isinstance(data.get('test_cases'), list) and len(data['test_cases']) > 0:
+                return True
+        except Exception:
+            continue
+    return False
+
+
 # Schemas
 class PromptCreate(BaseModel):
     requirement_id: Optional[str] = None
@@ -67,6 +84,7 @@ class PromptCreate(BaseModel):
     project_id: Optional[str] = None
     estimated_hours: Optional[float] = None
     created_by: str = "CAI"
+    enforcement_bypass: Optional[str] = None  # "data_only_sprint" skips UAT spec gate
 
 
 class PromptPatch(BaseModel):
@@ -123,6 +141,22 @@ def _row_to_response(row: dict) -> dict:
 @router.post("", status_code=201)
 async def create_prompt(prompt: PromptCreate, _: bool = Depends(verify_api_key)):
     """Create a new CC prompt."""
+    # MP-CAI-OUTBOUND-GATE: require UAT spec JSON block in content_md
+    bypass = (prompt.enforcement_bypass or "").strip().lower()
+    if bypass != "data_only_sprint" and not _has_uat_spec(prompt.content_md or ""):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "prompt_missing_uat_spec",
+                "message": (
+                    "content_md must include a UAT spec JSON block with a test_cases array "
+                    "containing at least 1 BV item. CAI compliance requires UAT specs in every "
+                    "prompt (BOOT-1.5.10)."
+                ),
+                "fix": "Add a ```json {..., \"test_cases\": [{...}]} ``` block to the prompt content.",
+            }
+        )
+
     # Default project_id to MetaPM if not provided
     project_id = prompt.project_id or "proj-mp"
 
@@ -216,6 +250,47 @@ async def get_prompt_by_pth(pth: str):
         resp["uat_url"] = None
 
     return resp
+
+
+@router.get("/{pth}/handoff")
+async def get_handoff_by_pth(pth: str):
+    """MP-GET-HO-BY-PTH: Return most recent handoff registered for a PTH code.
+    CAI calls this to get handoff_id + UAT URL without asking PL for UUIDs."""
+    # Look up by pth column on mcp_handoffs (set by create_handoff when prompt_pth is provided),
+    # OR by metadata JSON match as fallback
+    row = execute_query("""
+        SELECT TOP 1 h.id, h.task, h.project, h.version, h.created_at,
+               u.id as uat_spec_id, u.id as uat_page_id
+        FROM mcp_handoffs h
+        LEFT JOIN uat_pages u ON u.pth = ? AND u.spec_source = 'cc_spec'
+        WHERE h.pth = ? OR h.metadata LIKE ?
+        ORDER BY h.created_at DESC
+    """, (pth, pth, f'%"prompt_pth":"{pth}"%'), fetch="one")
+
+    if not row:
+        raise HTTPException(status_code=404, detail=f"No handoff registered for PTH {pth}")
+
+    handoff_id = str(row["id"])
+    uat_spec_id = str(row["uat_spec_id"]) if row.get("uat_spec_id") else None
+
+    # Get the most recent spec uat_url separately if not found via join
+    if not uat_spec_id:
+        uat_row = execute_query(
+            "SELECT TOP 1 id FROM uat_pages WHERE pth = ? ORDER BY created_at DESC",
+            (pth,), fetch="one"
+        )
+        uat_spec_id = str(uat_row["id"]) if uat_row else None
+
+    return {
+        "pth": pth,
+        "handoff_id": handoff_id,
+        "uat_url": f"https://metapm.rentyourcio.com/uat/{uat_spec_id}" if uat_spec_id else None,
+        "uat_spec_id": uat_spec_id,
+        "sprint": row.get("task", ""),
+        "version": row.get("version", ""),
+        "project": row.get("project", ""),
+        "registered_at": str(row["created_at"]) if row.get("created_at") else None,
+    }
 
 
 @router.get("")
