@@ -290,6 +290,14 @@ async def upload_screenshot(file: UploadFile = File(...)):
     return {"url": data_uri, "filename": file.filename, "size": len(content)}
 
 
+# MP09/MF02: MCP JSON-RPC tools endpoint
+try:
+    from app.api import mcp_tools
+    app.include_router(mcp_tools.router, tags=["MCP Tools"])
+    logger.info("MCP Tools router registered at /mcp-tools")
+except Exception as mcp_err:
+    logger.error(f"Failed to register MCP tools router: {mcp_err}")
+
 # Mount static files LAST (after all route definitions)
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
