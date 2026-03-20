@@ -1,10 +1,22 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-9E3F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-19 — Sprint "MP-PK-AUDIT-001" (v2.36.0)
+Updated: 2026-03-20 — Sprint "MM01" (v2.37.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-19 (MP-PK-AUDIT-001, v2.36.0)
+### Latest Session Update — 2026-03-20 (MM01, v2.37.0)
+
+- **Sprint MM01 (PTH: MM01)**: Dashboard Mega Sprint — 14 items across 4 groups
+- **Current Version**: v2.37.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00265-xwp)
+- **CI fix**: `app/api/auth.py`, `app/api/prompts.py`, `app/api/reviews.py` were never committed to git. All prior working revisions were manual local deploys. Now committed — CI works automatically.
+- **Group A (bugs)**: BUG-007 Not Done filter (not_done pseudo-status, backend NOT IN clause); BUG-008 dStatus.onchange accumulation fixed (null before rebind, status removed from PUT); BUG-003 mobile filter collapsible toggle; BUG-002 Type filter dropdown
+- **Group B (UAT list)**: REQ-011 `PATCH /api/uat/{spec_id}/override` (PL auth, UATOverride model); REQ-012 passed/failed/conditional_pass status filter + Hide archived; REQ-013 inline req-row click opens drawer
+- **Group C (UX)**: Screenshot paste in description (`POST /api/upload/screenshot` → data-URI); search clear button; persist last project/type in localStorage; bulk sprint assign (checkboxes + bulk bar); Document Library tab (Portfolio RAG pk-status); Software default filter; Seed moved to +Add menu
+- **Group D**: RAG search tab inside MetaPM (collection select + /rag/query)
+- **Backend**: `POST /api/upload/screenshot`; `search` param on requirements endpoint; `not_done` status filter
+- **Handoff**: FBBCCC6E-89D7-40C4-9E92-94C84D354E90 | **UAT**: 0043C048-FB23-4CAA-B814-EB9EF327113B
+
+### Previous Session Update — 2026-03-19 (MP-PK-AUDIT-001, v2.36.0)
 
 - **Sprint MP-PK-AUDIT-001 (PTH: MP10)**: PK.md RAG audit + auto-refresh on deploy + PA PK verified
 - **Current Version**: v2.36.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00260-5ml)
