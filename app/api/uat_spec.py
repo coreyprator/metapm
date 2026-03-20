@@ -343,6 +343,37 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
     }
 
 
+class UATOverride(BaseModel):
+    status: str  # passed | conditional_pass | failed
+    override_note: Optional[str] = None
+
+
+@router.patch("/api/uat/{spec_id}/override")
+async def override_uat_status(spec_id: str, body: UATOverride, request: Request):
+    """
+    PL-only: Override UAT result status (e.g. conditional_pass → passed).
+    Requires PL Google auth session.
+    """
+    if not is_pl_authenticated(request):
+        raise HTTPException(status_code=403, detail="PL authentication required")
+    allowed = {"passed", "conditional_pass", "failed", "in_progress"}
+    if body.status not in allowed:
+        raise HTTPException(status_code=400, detail=f"status must be one of {allowed}")
+    row = execute_query("SELECT id, status FROM uat_pages WHERE id = ?", (spec_id,), fetch="one")
+    if not row:
+        raise HTTPException(status_code=404, detail=f"UAT spec {spec_id} not found")
+    try:
+        execute_query("""
+            UPDATE uat_pages SET status = ?, override_note = ?, override_at = GETDATE()
+            WHERE id = ?
+        """, (body.status, body.override_note or "", spec_id), fetch="none")
+    except Exception:
+        # Fallback: columns may not exist yet — update only status
+        execute_query("UPDATE uat_pages SET status = ? WHERE id = ?",
+                      (body.status, spec_id), fetch="none")
+    return {"spec_id": spec_id, "status": body.status, "override_note": body.override_note}
+
+
 @router.get("/api/uat/{spec_id}/results")
 async def get_uat_results(spec_id: str):
     """

@@ -3,8 +3,11 @@ MetaPM - Meta Project Manager
 FastAPI Application Entry Point
 """
 
+import base64
+import os
+import uuid as _uuid
 from pathlib import Path
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse, FileResponse
@@ -274,13 +277,18 @@ async def api_uat_direct_submit_alias(uat: UATDirectSubmit):
     return await mcp.submit_uat_direct(uat)
 
 
-# MP09/MF02: MCP JSON-RPC tools endpoint
-try:
-    from app.api import mcp_tools
-    app.include_router(mcp_tools.router, tags=["MCP Tools"])
-    logger.info("MCP Tools router registered at /mcp-tools")
-except Exception as mcp_err:
-    logger.error(f"Failed to register MCP tools router: {mcp_err}")
+@app.post("/api/upload/screenshot")
+async def upload_screenshot(file: UploadFile = File(...)):
+    """Upload a screenshot/image file, return a data-URI for inline display."""
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=413, detail="Image too large (max 5MB)")
+    ct = file.content_type or "image/png"
+    b64 = base64.b64encode(content).decode()
+    data_uri = f"data:{ct};base64,{b64}"
+    return {"url": data_uri, "filename": file.filename, "size": len(content)}
+
 
 # Mount static files LAST (after all route definitions)
 if static_dir.exists():

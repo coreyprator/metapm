@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.36.1"  # HF02: remove startup RAG refresh causing 503
+    VERSION: str = "2.37.0"  # MM01: dashboard mega — filters, UAT list, inline detail, RAG search
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

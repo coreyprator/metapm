@@ -33,6 +33,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _safe_enum(enum_cls, value, default):
+    """Parse an enum value safely, returning default if invalid."""
+    if not value:
+        return default
+    try:
+        return enum_cls(value)
+    except ValueError:
+        logger.warning(f"Unknown {enum_cls.__name__} value: {value!r}, using {default.value}")
+        return default
+
+
 def _project_done_counts() -> dict:
     rows = execute_query("""
         SELECT project_id,
@@ -453,14 +464,15 @@ async def delete_sprint(sprint_id: str):
 async def list_requirements(
     project_id: Optional[str] = Query(None),
     project_code: Optional[str] = Query(None),
-    status: Optional[RequirementStatus] = Query(None),
+    status: Optional[str] = Query(None),
     type: Optional[RequirementType] = Query(None),
     priority: Optional[RequirementPriority] = Query(None),
     sprint_id: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
     limit: int = Query(50, le=500),
     offset: int = Query(0)
 ):
-    """List requirements with filters."""
+    """List requirements with filters. status=not_done excludes done/closed."""
     try:
         where_clauses = []
         params = []
@@ -471,9 +483,15 @@ async def list_requirements(
         if project_code:
             where_clauses.append("p.code = ?")
             params.append(project_code)
-        if status:
+        if status == "not_done":
+            where_clauses.append("r.status NOT IN ('done', 'closed')")
+        elif status:
             where_clauses.append("r.status = ?")
-            params.append(status.value)
+            params.append(status)
+        if search:
+            where_clauses.append("(r.title LIKE ? OR r.description LIKE ? OR r.code LIKE ?)")
+            like_term = f"%{search}%"
+            params.extend([like_term, like_term, like_term])
         if type:
             where_clauses.append("r.type = ?")
             params.append(type.value)
@@ -517,11 +535,9 @@ async def list_requirements(
                 code=row['code'],
                 title=row['title'],
                 description=row['description'],
-                type=RequirementType(row['type']) if row['type'] else RequirementType.TASK,
-                priority=RequirementPriority(row['priority']) if row['priority'] else RequirementPriority.P2,
-                status=(RequirementStatus(row['status'])
-                        if row['status'] and row['status'] in {s.value for s in RequirementStatus}
-                        else RequirementStatus.REQ_CREATED),
+                type=_safe_enum(RequirementType, row['type'], RequirementType.TASK),
+                priority=_safe_enum(RequirementPriority, row['priority'], RequirementPriority.P2),
+                status=_safe_enum(RequirementStatus, row['status'], RequirementStatus.BACKLOG),
                 target_version=row['target_version'],
                 sprint_id=row['sprint_id'],
                 handoff_id=str(row['handoff_id']) if row['handoff_id'] else None,
@@ -880,11 +896,9 @@ async def get_roadmap(
                     code=row['code'],
                     title=row['title'],
                     description=row['description'],
-                    type=RequirementType(row['type']) if row['type'] else RequirementType.TASK,
-                    priority=RequirementPriority(row['priority']) if row['priority'] else RequirementPriority.P2,
-                    status=(RequirementStatus(row['status'])
-                            if row['status'] and row['status'] in {s.value for s in RequirementStatus}
-                            else RequirementStatus.REQ_CREATED),
+                    type=_safe_enum(RequirementType, row['type'], RequirementType.TASK),
+                    priority=_safe_enum(RequirementPriority, row['priority'], RequirementPriority.P2),
+                    status=_safe_enum(RequirementStatus, row['status'], RequirementStatus.BACKLOG),
                     target_version=row['target_version'],
                     sprint_id=row['sprint_id'],
                     handoff_id=str(row['handoff_id']) if row['handoff_id'] else None,

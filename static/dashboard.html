@@ -227,13 +227,17 @@
     .ll-cat-technical { background: rgba(168,85,247,0.2); color: #a855f7; }
     .ll-cat-architecture { background: rgba(20,184,166,0.2); color: #14b8a6; }
     .ll-cat-quality { background: rgba(239,68,68,0.2); color: #ef4444; }
-    .ll-target-badge { color: var(--muted); font-size: 11px; }
+    .ll-target-badge { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; }
+    .ll-target-bootstrap { background: rgba(59,130,246,0.2); color: #60a5fa; }
+    .ll-target-cai_outbound { background: rgba(34,197,94,0.2); color: #4ade80; }
+    .ll-target-project { background: rgba(249,115,22,0.2); color: #fb923c; }
+    .ll-target-default { background: rgba(107,114,128,0.2); color: #9ca3af; }
     .ll-status-draft { background: #854d0e; color: #fde68a; }
     .ll-status-approved { background: #1e3a5f; color: #93c5fd; }
     .ll-status-applied { background: #14532d; color: #86efac; }
     .ll-status-rejected { background: #374151; color: #d1d5db; }
     .ll-rag-badge { font-size: 10px; color: #86efac; }
-    .ll-text { font-size: 13px; line-height: 1.5; color: var(--fg); margin: 6px 0; }
+    .ll-text { font-size: 14px; line-height: 1.6; color: var(--fg); margin: 8px 0; padding: 8px 10px; background: rgba(255,255,255,0.03); border-left: 3px solid #854d0e; border-radius: 0 4px 4px 0; white-space: pre-wrap; }
     .lesson-meta { font-size: 11px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; }
     .lesson-actions { margin-top: 8px; display: flex; gap: 6px; }
     .lesson-actions button { font-size: 11px; padding: 4px 10px; border-radius: 5px; cursor: pointer; border: 1px solid var(--line); }
@@ -341,6 +345,11 @@
       select, input, button { min-height: 40px; }
     }
 
+    .filter-toggle-btn { display: none; }
+    @media (max-width: 767px) {
+      .filter-toggle-btn { display: inline-block; }
+      .controls.mobile-collapsed { display: none; }
+    }
     /* Responsive: Mobile (<768px) */
     @media (max-width: 767px) {
       .app { padding: 6px 8px 90px; }
@@ -427,9 +436,13 @@
         <button type="button" id="visionBoardBtn" onclick="toggleVisionBoard()">👁 Vision Board</button>
         <button type="button" id="lessonsBtn" onclick="toggleLessonsView()">📚 Lessons <span id="lessonsDraftBadge" style="display:none;background:#854d0e;color:#fde68a;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:3px"></span></button>
         <button type="button" id="uatTabBtn" onclick="toggleUatTab()">🧪 UAT</button>
+        <button type="button" id="promptsTabBtn" onclick="togglePromptsTab()">📝 Prompts</button>
+        <button type="button" id="ragSearchBtn" onclick="toggleRagSearch()">🔍 RAG</button>
+        <button type="button" id="docsTabBtn" onclick="toggleDocsTab()">📚 Docs</button>
+        <a href="/static/roadmap-drill.html" target="_blank" rel="noopener"><button type="button">📋 Roadmap Drill</button></a>
         <a href="/static/roadmap-report.html" target="_blank" rel="noopener"><button type="button">📊 Roadmap Report</button></a>
         <a href="/architecture" target="_blank" rel="noopener"><button type="button">🏗️ Architecture</button></a>
-        <a href="https://portfolio-rag-57478301787.us-central1.run.app/search" target="_blank" rel="noopener"><button type="button">🔍 RAG Search</button></a>
+        <button type="button" id="filterToggleBtn" class="filter-toggle-btn" onclick="const p=document.getElementById('controlsPanel');p.classList.toggle('mobile-collapsed');this.textContent=p.classList.contains('mobile-collapsed')?'⊞ Filters':'✕ Filters'">⊞ Filters</button>
         <div class="add-wrap">
           <button id="addBtn">+ Add ▾</button>
           <div id="addMenu" class="add-menu">
@@ -439,12 +452,13 @@
             <button data-kind="bug">Bug</button>
             <button data-kind="task">Task</button>
             <button data-kind="vision">Vision</button>
+            <button data-kind="seed" onclick="window.location.href='/static/seed.html'">Seed (batch)</button>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="card controls">
+    <div class="card controls mobile-collapsed" id="controlsPanel">
       <div class="control-row">
         <label>Filter</label>
         <select id="categoryFilter"><option value="">All Categories</option></select>
@@ -452,6 +466,7 @@
         <select id="priorityFilter"><option value="">All Priorities</option><option>P1</option><option>P2</option><option>P3</option></select>
         <select id="statusFilter">
           <option value="">All Status</option>
+          <option value="not_done">🔲 Not Done</option>
           <optgroup label="── Definition ──">
             <option value="req_created">Req Created</option>
             <option value="req_approved">Req Approved</option>
@@ -479,6 +494,7 @@
             <option value="closed">Closed</option>
           </optgroup>
         </select>
+        <select id="typeFilter"><option value="">All Types</option><option value="feature">Feature</option><option value="bug">Bug</option><option value="enhancement">Enhancement</option><option value="task">Task</option><option value="vision">Vision</option></select>
         <select id="personFilter"><option value="">All Persons</option><option value="PL">PL</option><option value="CAI">CAI</option><option value="CC">CC</option></select>
         <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="openItemsToggle" checked style="min-height:auto" /> Open Only</label>
         <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="showArchivedToggle" style="min-height:auto" /> Show Archived</label>
@@ -489,6 +505,7 @@
         <div class="search-wrap">
           <label for="searchInput">Full Text Search</label>
           <input id="searchInput" placeholder="Search code, title, description, type, status..." />
+          <button id="clearSearchBtn" type="button" title="Clear search" style="min-width:32px;padding:4px 8px;display:none">✕</button>
         </div>
         <select id="sortBy"><option value="priority">Priority</option><option value="lifecycle">Lifecycle State</option><option value="code">Code</option><option value="title">Title</option></select>
         <select id="groupBy"><option value="project">By Project</option><option value="category">By Category</option><option value="priority">By Priority</option><option value="status">By Status</option><option value="type">By Type</option></select>
@@ -507,12 +524,18 @@
     </div>
 
     <div class="phase-bar" id="phaseBar"></div>
+    <div id="bulkBar" style="display:none;padding:8px 12px;background:#1e293b;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;display:none;align-items:center;gap:10px">
+      <span id="bulkCount" style="font-size:13px;color:var(--muted)">0 selected</span>
+      <select id="bulkSprintSelect" style="padding:4px 8px;background:var(--panel-soft);color:var(--text);border:1px solid var(--line);border-radius:4px;font-size:12px"><option value="">Assign to sprint...</option></select>
+      <button type="button" onclick="bulkAssignSprint()" style="padding:4px 12px;background:var(--info);color:#fff;border:none;border-radius:4px;font-size:12px;cursor:pointer">Assign</button>
+      <button type="button" onclick="clearBulkSelection()" style="padding:4px 10px;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:4px;font-size:12px;cursor:pointer">Clear</button>
+    </div>
     <div class="card hierarchy" id="hierarchy"></div>
     <div class="card" id="visionBoard"></div>
     <div class="card" id="lessonsPanel">
       <div class="ll-filter-bar" style="align-items:center">
         <select id="ll-filter-project"><option value="">All Projects</option></select>
-        <select id="ll-filter-status"><option value="">All Status</option><option value="draft">Draft</option><option value="approved">Approved</option><option value="applied">Applied</option><option value="rejected">Rejected</option></select>
+        <select id="ll-filter-status"><option value="">All Status</option><option value="draft" selected>Draft</option><option value="approved">Approved</option><option value="applied">Applied</option><option value="rejected">Rejected</option></select>
         <select id="ll-filter-category"><option value="">All Categories</option><option value="process">Process</option><option value="technical">Technical</option><option value="architecture">Architecture</option><option value="quality">Quality</option></select>
         <select id="ll-filter-target"><option value="">All Targets</option><option value="bootstrap">Bootstrap</option><option value="pk.md">PK.md</option><option value="cai_memory">CAI Memory</option><option value="standards">Standards</option></select>
         <button type="button" onclick="toggleNewLessonForm()" style="margin-left:auto;background:#22c55e;color:white;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-weight:600;font-size:12px">+ New Lesson</button>
@@ -555,9 +578,48 @@
           <option value="artforge">artforge</option><option value="harmonylab">harmonylab</option><option value="pie-network-graph">pie-network-graph</option>
           <option value="portfolio-rag">portfolio-rag</option><option value="project-methodology">project-methodology</option>
         </select>
-        <select id="uat-filter-status"><option value="">All Status</option><option value="ready">Pending</option><option value="in_progress">In Progress</option><option value="submitted">Submitted</option></select>
+        <select id="uat-filter-status"><option value="">All Status</option><option value="ready">Pending</option><option value="in_progress">In Progress</option><option value="submitted">Submitted</option><option value="passed">Passed</option><option value="failed">Failed</option><option value="conditional_pass">Conditional Pass</option></select>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" id="uat-hide-archived" checked style="min-height:auto"> Hide archived</label>
       </div>
       <div id="uatList" style="padding:8px"></div>
+    </div>
+
+    <div class="card" id="promptsPanel" style="display:none">
+      <div class="ll-filter-bar" style="align-items:center">
+        <select id="prompts-filter-status">
+          <option value="">Active (Draft+Approved)</option>
+          <option value="draft">Draft</option>
+          <option value="approved">Approved</option>
+          <option value="executing">Executing</option>
+          <option value="complete">Complete</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+      <div id="promptsList" style="padding:8px"></div>
+    </div>
+
+    <div class="card" id="ragSearchPanel" style="display:none">
+      <div class="ll-filter-bar" style="align-items:center">
+        <input id="rag-query-input" placeholder="Search Portfolio RAG..." style="flex:1;padding:6px 10px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:13px">
+        <select id="rag-collection" style="padding:6px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px">
+          <option value="portfolio">Portfolio</option>
+          <option value="metapm">MetaPM</option>
+          <option value="code">Code</option>
+          <option value="dcc">DCC</option>
+          <option value="etymology">Etymology</option>
+        </select>
+        <button type="button" onclick="runRagSearch()" style="padding:6px 14px;background:var(--info);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">Search</button>
+        <button class="icon-btn" onclick="qs('ragSearchPanel').style.display='none'" title="Close">✕</button>
+      </div>
+      <div id="ragResults" style="padding:8px;max-height:400px;overflow-y:auto"></div>
+    </div>
+
+    <div class="card" id="docsPanel" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px 4px">
+        <strong>📚 Document Library — Project Knowledge</strong>
+        <button class="icon-btn" onclick="qs('docsPanel').style.display='none'" title="Close">✕</button>
+      </div>
+      <div id="docsList" style="padding:8px"></div>
     </div>
 
     <div class="card footer" id="summary">
@@ -811,6 +873,7 @@
         qs('projectFilter').value ||
         qs('priorityFilter').value ||
         qs('statusFilter').value ||
+        qs('typeFilter')?.value ||
         qs('personFilter').value ||
         (qs('searchInput').value || '').trim()
       );
@@ -890,6 +953,7 @@
       const project = qs('projectFilter').value;
       const priority = qs('priorityFilter').value;
       const status = qs('statusFilter').value;
+      const typeF = qs('typeFilter')?.value || '';
       const person = qs('personFilter').value;
       const search = (qs('searchInput').value || '').trim().toLowerCase();
       const openOnly = qs('openItemsToggle').checked;
@@ -901,10 +965,15 @@
         }
         if (project && req.project_id !== project) return false;
         if (priority && req.priority !== priority) return false;
-        if (status && req.status !== status) return false;
+        if (status === 'not_done') {
+          if (CLOSED_STATUSES.includes(req.status)) return false;
+        } else if (status && req.status !== status) return false;
+        if (typeF && req.type !== typeF) return false;
         if (person && PERSON_FILTER_MAP[person] && !PERSON_FILTER_MAP[person].includes(req.status)) return false;
         if (search) {
-          const haystack = `${req.code} ${req.title} ${req.description || ''} ${req.type || ''} ${req.status || ''}`.toLowerCase();
+          // Fix 2 (MP08): PTH-first search — exact PTH match always passes
+          if (search.match(/^[a-f0-9]{4,8}$/i) && req.pth && req.pth.toLowerCase() === search) return true;
+          const haystack = `${req.code} ${req.title} ${req.description || ''} ${req.type || ''} ${req.status || ''} ${req.pth || ''}`.toLowerCase();
           if (!haystack.includes(search)) return false;
         }
         return true;
@@ -966,13 +1035,13 @@
     function rowHtml(req) {
       const isRework = req.status === 'rework';
       const statusLabel = LIFECYCLE_LABELS[req.status] || req.status;
-      return `<div class="req-row${isRework ? ' has-prompt' : ''}" data-req="${req.id}">
-        <div><strong>${req.code}</strong> ${req.pth ? `<span class="pill" style="background:#4f46e5;color:#e0e7ff;font-size:0.65rem;font-family:monospace;padding:1px 5px;margin:0 4px;cursor:pointer" onclick="event.stopPropagation();window.open('/api/search?q='+encodeURIComponent('${req.pth}'),'_blank')" title="Search PTH ${req.pth}">${req.pth}</span>` : ''} ${req.title}</div>
+      return `<div class="req-row${isRework ? ' has-prompt' : ''}" data-req="${req.id}" onclick="openRequirement('${req.id}')" title="Click to view details">
+        <div style="display:flex;align-items:center;gap:6px"><input type="checkbox" class="bulk-check" data-req-id="${req.id}" onclick="event.stopPropagation();updateBulkBar()" style="min-height:auto;width:14px;height:14px;cursor:pointer"><strong>${req.code}</strong> ${req.pth ? `<span class="pill" style="background:#4f46e5;color:#e0e7ff;font-size:0.65rem;font-family:monospace;padding:1px 5px;margin:0 4px;cursor:pointer" onclick="event.stopPropagation();window.open('/api/search?q='+encodeURIComponent('${req.pth}'),'_blank')" title="Search PTH ${req.pth}">${req.pth}</span>` : ''} ${req.title}</div>
         <span class="pill ${req.priority.toLowerCase()}">${req.priority}</span>
         <span class="pill status-${req.status}">${statusLabel}</span>
         <span class="pill${req.type === 'vision' ? ' type-vision' : ''}">${req.type === 'vision' ? '👁 Vision' : req.type}</span>
         ${req.uat_url ? `<a href="${req.uat_url}" target="_blank" class="pill" style="background:#059669;color:#fff;text-decoration:none;font-size:0.75rem;padding:2px 8px;cursor:pointer">Run UAT →</a>` : ''}
-        <div class="actions-row">
+        <div class="actions-row" onclick="event.stopPropagation()">
           <button class="icon-btn" data-open-req="${req.id}" title="Edit Requirement">✏️</button>
           <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete Requirement">🗑️</button>
         </div>
@@ -1004,7 +1073,9 @@
       qs('projectFilter').value = '';
       qs('priorityFilter').value = '';
       qs('statusFilter').value = '';
+      qs('typeFilter').value = '';
       qs('searchInput').value = '';
+      if (qs('clearSearchBtn')) qs('clearSearchBtn').style.display = 'none';
       qs('openItemsToggle').checked = true;
       qs('showArchivedToggle').checked = false;
       qs('groupBy').value = 'project';
@@ -1183,6 +1254,7 @@
       if (uatTabActive) {
         if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); vb.style.display = 'none'; }
         if (lessonsActive) { lessonsActive = false; qs('lessonsBtn').classList.remove('active'); lp.style.display = 'none'; }
+        if (promptsTabActive) { promptsTabActive = false; qs('promptsTabBtn').classList.remove('active'); qs('promptsPanel').style.display = 'none'; }
         btn.classList.add('active');
         hierarchy.style.display = 'none';
         panel.style.display = 'block';
@@ -1234,11 +1306,27 @@
         html += `<td style="padding:6px" title="${(p.title||'').replace(/"/g,'&quot;')}">${titleShort}</td>`;
         html += `<td style="padding:6px">${statusBadge}</td>`;
         html += `<td style="padding:6px">${dateStr}</td>`;
-        html += `<td style="padding:6px"><a href="${p.uat_url}" target="_blank" style="color:#4ade80;font-weight:600;text-decoration:none" onclick="event.stopPropagation()">Open</a></td>`;
+        const overrideBtn = `<button onclick="event.stopPropagation();showUatOverride('${p.id || p.spec_id || ''}')" style="font-size:10px;padding:2px 6px;background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:3px;cursor:pointer;margin-left:4px">Override</button>`;
+        html += `<td style="padding:6px"><a href="${p.uat_url}" target="_blank" style="color:#4ade80;font-weight:600;text-decoration:none" onclick="event.stopPropagation()">Open</a>${overrideBtn}</td>`;
         html += '</tr>';
       }
       html += '</tbody></table>';
       container.innerHTML = html;
+    }
+
+    async function showUatOverride(specId) {
+      if (!specId) { showToast('No spec ID available for this entry'); return; }
+      const newStatus = prompt('Override status to (passed / conditional_pass / failed):');
+      if (!newStatus) return;
+      const note = prompt('Override note (optional):') || '';
+      try {
+        await api(`/api/uat/${specId}/override`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: newStatus, override_note: note })
+        });
+        showToast(`UAT status overridden to: ${newStatus}`, 'success');
+        refreshUatPages();
+      } catch (e) { showToast('Override failed: ' + e.message); }
     }
 
     // UAT tab filter event listeners
@@ -1249,6 +1337,104 @@
       if (uatProjectFilter) uatProjectFilter.addEventListener('change', refreshUatPages);
       const uatStatusFilter = document.getElementById('uat-filter-status');
       if (uatStatusFilter) uatStatusFilter.addEventListener('change', renderUatPages);
+    });
+
+    // ── Prompts Tab Section (PF5-MS2) ──────────────────────────────────
+    let promptsTabActive = false;
+
+    function togglePromptsTab() {
+      promptsTabActive = !promptsTabActive;
+      const btn = qs('promptsTabBtn');
+      const panel = qs('promptsPanel');
+      const hierarchy = qs('hierarchy');
+      const vb = qs('visionBoard');
+      const lp = qs('lessonsPanel');
+      const up = qs('uatPanel');
+      if (promptsTabActive) {
+        if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); vb.style.display = 'none'; }
+        if (uatTabActive) { uatTabActive = false; qs('uatTabBtn').classList.remove('active'); up.style.display = 'none'; }
+        if (lessonsActive) { lessonsActive = false; qs('lessonsBtn').classList.remove('active'); lp.style.display = 'none'; }
+        btn.classList.add('active');
+        hierarchy.style.display = 'none';
+        panel.style.display = 'block';
+        refreshPrompts();
+      } else {
+        btn.classList.remove('active');
+        hierarchy.style.display = '';
+        panel.style.display = 'none';
+      }
+    }
+
+    async function refreshPrompts() {
+      const filterVal = qs('prompts-filter-status').value;
+      let url = '/api/prompts?limit=50';
+      if (filterVal && filterVal !== 'all') {
+        url += `&status=${filterVal}`;
+      }
+      try {
+        const res = await fetch(url);
+        let data = await res.json();
+        // Default filter: show draft + approved if "Active" selected
+        if (!filterVal) {
+          data = data.filter(p => ['draft','approved','prompt_ready'].includes(p.status));
+        }
+        renderPromptsTable(data);
+      } catch (e) {
+        qs('promptsList').innerHTML = `<div style="color:#f87171;padding:12px">Error loading prompts: ${e.message}</div>`;
+      }
+    }
+
+    function renderPromptsTable(prompts) {
+      if (!prompts.length) {
+        qs('promptsList').innerHTML = '<div style="color:#64748b;padding:12px">No prompts found.</div>';
+        return;
+      }
+      const statusColors = {draft:'#92400e',approved:'#065f46',executing:'#1e40af',complete:'#166534',completed:'#166534',rejected:'#991b1b',closed:'#374151'};
+      let html = `<table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="border-bottom:1px solid var(--line);text-align:left">
+          <th style="padding:6px">PTH</th><th style="padding:6px">Sprint</th><th style="padding:6px">Project</th>
+          <th style="padding:6px">Status</th><th style="padding:6px">Hours</th><th style="padding:6px">Created</th>
+          <th style="padding:6px">Actions</th>
+        </tr></thead><tbody>`;
+      for (const p of prompts) {
+        const bg = statusColors[p.status] || '#374151';
+        const created = p.created_at ? new Date(p.created_at).toLocaleDateString() : '';
+        const projectLabel = p.project_emoji ? `${p.project_emoji} ${p.project_name || ''}` : (p.project_id || '');
+        const approveBtn = (p.status === 'draft' || p.status === 'prompt_ready')
+          ? `<button onclick="inlineApprovePrompt(${p.id}, this)" style="background:#059669;color:#fff;border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:12px">Approve</button>`
+          : '';
+        html += `<tr style="border-bottom:1px solid var(--line)">
+          <td style="padding:6px"><a href="/prompts/${p.pth}" style="color:#60a5fa">${p.pth || '?'}</a></td>
+          <td style="padding:6px">${p.sprint_id || ''}</td>
+          <td style="padding:6px">${projectLabel}</td>
+          <td style="padding:6px"><span id="prompt-status-${p.id}" style="background:${bg};color:#fff;padding:2px 8px;border-radius:8px;font-size:11px">${p.status}</span></td>
+          <td style="padding:6px">${p.estimated_hours ? p.estimated_hours + 'h' : ''}</td>
+          <td style="padding:6px">${created}</td>
+          <td style="padding:6px"><a href="/prompts/${p.pth}" style="color:#60a5fa;margin-right:8px">View</a>${approveBtn}</td>
+        </tr>`;
+      }
+      html += '</tbody></table>';
+      qs('promptsList').innerHTML = html;
+    }
+
+    async function inlineApprovePrompt(promptId, btn) {
+      try {
+        const res = await fetch(`/api/prompts/${promptId}`, {
+          method: 'PATCH',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({status: 'approved', approved_by: 'PL'})
+        });
+        if (res.ok) {
+          const statusSpan = document.getElementById(`prompt-status-${promptId}`);
+          if (statusSpan) { statusSpan.textContent = 'approved'; statusSpan.style.background = '#065f46'; }
+          btn.remove();
+        }
+      } catch (e) { alert('Approve failed: ' + e.message); }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const psf = qs('prompts-filter-status');
+      if (psf) psf.addEventListener('change', refreshPrompts);
     });
 
     // ── Lessons Learned Section ──────────────────────────────────────
@@ -1265,6 +1451,7 @@
         // Deactivate other views
         if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); vb.style.display = 'none'; }
         if (uatTabActive) { uatTabActive = false; qs('uatTabBtn').classList.remove('active'); qs('uatPanel').style.display = 'none'; }
+        if (promptsTabActive) { promptsTabActive = false; qs('promptsTabBtn').classList.remove('active'); qs('promptsPanel').style.display = 'none'; }
         btn.classList.add('active');
         hierarchy.style.display = 'none';
         panel.style.display = 'block';
@@ -1321,9 +1508,9 @@
         const approveReject = l.status === 'draft' ? `
             <button class="btn-approve" onclick="approveLesson('${l.id}')">Approve</button>
             <button class="btn-reject" onclick="rejectLesson('${l.id}')">Reject</button>` : '';
+        // Fix 6 (MP08): remove Copy JSON, keep Approve/Reject + View
         const actions = `<div class="lesson-actions">
             ${approveReject}
-            <button style="background:#374151;color:#d1d5db;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:11px" onclick="copyLessonJson('${l.id}')">Copy JSON</button>
             <a href="/lessons/${l.id}" target="_blank" style="color:#60a5fa;font-size:11px;text-decoration:none;padding:4px 6px">View</a>
           </div>`;
         return `<div class="lesson-card" data-id="${l.id}" data-status="${l.status}">
@@ -1331,14 +1518,15 @@
             <span class="ll-code">${l.id}</span>
             <span class="ll-badge ll-project-badge">${l.project}</span>
             <span class="ll-badge ${catClass}">${l.category}</span>
-            <span class="ll-target-badge">→ ${l.target}</span>
+            <span class="ll-target-badge ll-target-${l.target === 'bootstrap' ? 'bootstrap' : l.target === 'cai_outbound' ? 'cai_outbound' : l.target === 'project' ? 'project' : 'default'}">→ ${l.target}</span>
             <span class="ll-badge ${statusClass}">${l.status.toUpperCase()}</span>
             ${ragBadge}
           </div>
           <p class="ll-text">${(l.lesson||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>
           <div class="lesson-meta">
+            <span style="font-weight:600;color:#60a5fa">Target: ${l.target || 'unset'}</span>
             ${l.source_sprint ? `<span>Sprint: ${l.source_sprint}</span>` : ''}
-            <span>by: ${l.proposed_by}</span>
+            <span>Proposed by: ${l.proposed_by}</span>
             <span>${l.created_at ? new Date(l.created_at).toLocaleDateString() : ''}</span>
             ${l.applied_in_sprint ? `<span>Applied in: ${l.applied_in_sprint}</span>` : ''}
           </div>
@@ -1698,6 +1886,8 @@
       qs('dDescription').value = req.description || '';
 
       // State transition via PATCH /state — immediate, no Save needed
+      // A2 fix: reset handler before re-assigning to prevent accumulation across drawer opens
+      qs('dStatus').onchange = null;
       qs('dStatus').onchange = async function() {
         const newStatus = this.value;
         const targetReq = state.selectedReq;
@@ -1754,7 +1944,23 @@
                 handoffHtml += ` <button style="font-size:9px;padding:1px 4px;margin-left:4px;cursor:pointer" onclick="reverifyHandoff('${h.id}')">Re-verify</button>`;
               }
             } catch {}
-            handoffHtml += '</div>';
+            // PF01B-FIX2: Labeled CAI Review section
+            try {
+              const rev = await fetch(`/api/reviews/${h.id}`);
+              if (rev.ok) {
+                const rd = await rev.json();
+                const aColors = {pass:'#065f46;color:#6ee7b7', conditional_pass:'#92400e;color:#fde68a', fail:'#991b1b;color:#fca5a5'};
+                const aLabel = (rd.assessment || '').replace('_',' ').toUpperCase();
+                handoffHtml += `</div><div style="margin:4px 0 8px 12px;padding:8px 12px;background:#1e293b;border-radius:6px;border-left:3px solid ${rd.assessment==='pass'?'#22c55e':rd.assessment==='fail'?'#ef4444':'#eab308'}">`;
+                handoffHtml += `<div style="font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase;margin-bottom:4px">CAI Review</div>`;
+                handoffHtml += `<span style="background:${aColors[rd.assessment] || '#374151;color:#d1d5db'};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">${aLabel}</span>`;
+                if (rd.notes) handoffHtml += `<div style="font-size:11px;color:#cbd5e1;margin-top:4px">${rd.notes}</div>`;
+                if (rd.focus_areas?.length) handoffHtml += `<div style="font-size:10px;color:#94a3b8;margin-top:3px">Focus: ${rd.focus_areas.join(', ')}</div>`;
+                handoffHtml += `</div>`;
+              } else {
+                handoffHtml += '</div>';
+              }
+            } catch { handoffHtml += '</div>'; }
           }
           qs('dHandoffs').innerHTML = handoffHtml;
         } else {
@@ -1953,7 +2159,7 @@
         title: qs('dTitle').value.trim(),
         priority: qs('dPriority').value,
         type: qs('dType').value,
-        status: newStatus,
+        // status is updated immediately via PATCH /state on dropdown change — not re-sent on PUT
         sprint_id: qs('dSprint').value || null,
         description: qs('dDescription').value,
         target_version: qs('dVersion').value || null
@@ -2244,6 +2450,11 @@
 
       // Auto-number code for requirements/bugs/tasks
       if (kind !== 'project' && kind !== 'sprint') {
+        // C6: Restore last-used project and type from localStorage
+        const lastProject = localStorage.getItem('metapm_last_add_project');
+        const lastType = localStorage.getItem('metapm_last_add_type');
+        if (lastProject && qs('aProject')) qs('aProject').value = lastProject;
+        if (lastType && qs('aType')) qs('aType').value = lastType;
         autoFillCode();
         const projSel = qs('aProject');
         if (projSel) projSel.addEventListener('change', autoFillCode);
@@ -2305,6 +2516,9 @@
               status: qs('aStatus').value
             })
           });
+          // C6: Persist last-used project and type
+          if (qs('aProject')) localStorage.setItem('metapm_last_add_project', qs('aProject').value);
+          if (qs('aType')) localStorage.setItem('metapm_last_add_type', qs('aType').value);
         }
       } catch (err) {
         const code = qs('aCode') ? qs('aCode').value.trim().toUpperCase() : '';
@@ -2417,7 +2631,19 @@
       for (const c of state.categories) {
         cf.insertAdjacentHTML('beforeend', `<option value="${c.id}">${c.name}</option>`);
       }
-      if (currentCat) cf.value = currentCat;
+      if (currentCat) {
+        cf.value = currentCat;
+      } else if (window._defaultCategoryName) {
+        // C9: Default to Software category (from localStorage or initial default)
+        const savedCat = localStorage.getItem('metapm_category_filter');
+        if (savedCat !== null) {
+          cf.value = savedCat;
+        } else {
+          const softwareOpt = [...cf.options].find(o => o.text === window._defaultCategoryName);
+          if (softwareOpt) cf.value = softwareOpt.value;
+        }
+        window._defaultCategoryName = null;
+      }
 
       updateProjectFilterCounts();
 
@@ -2425,8 +2651,131 @@
       render();
     }
 
+    // ── Tab toggle wrappers for RAG + Docs ────────────────────────────────────
+    function toggleRagSearch() {
+      const p = qs('ragSearchPanel');
+      const show = p.style.display === 'none';
+      p.style.display = show ? 'block' : 'none';
+      qs('ragSearchBtn').classList.toggle('active', show);
+    }
+    function toggleDocsTab() {
+      const p = qs('docsPanel');
+      const show = p.style.display === 'none';
+      p.style.display = show ? 'block' : 'none';
+      qs('docsTabBtn').classList.toggle('active', show);
+      if (show) loadDocLibrary();
+    }
+
+    // ── C7: Bulk sprint assign ─────────────────────────────────────────────────
+    function updateBulkBar() {
+      const checked = document.querySelectorAll('.bulk-check:checked');
+      const bar = qs('bulkBar');
+      if (checked.length > 0) {
+        bar.style.display = 'flex';
+        qs('bulkCount').textContent = `${checked.length} selected`;
+        // Populate sprint select
+        const sel = qs('bulkSprintSelect');
+        sel.innerHTML = '<option value="">Assign to sprint...</option><option value="__backlog__">Backlog (unassign)</option>';
+        for (const s of state.sprints) {
+          sel.insertAdjacentHTML('beforeend', `<option value="${s.id}">${s.name}</option>`);
+        }
+      } else {
+        bar.style.display = 'none';
+      }
+    }
+    function clearBulkSelection() {
+      document.querySelectorAll('.bulk-check:checked').forEach(cb => cb.checked = false);
+      qs('bulkBar').style.display = 'none';
+    }
+    async function bulkAssignSprint() {
+      const sprintId = qs('bulkSprintSelect').value;
+      const ids = [...document.querySelectorAll('.bulk-check:checked')].map(cb => cb.dataset.reqId);
+      if (!ids.length) return;
+      for (const id of ids) {
+        await api(`/api/roadmap/requirements/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ sprint_id: sprintId === '__backlog__' ? null : (sprintId || null) })
+        });
+      }
+      clearBulkSelection();
+      await loadData();
+    }
+
+    // ── D1: Portfolio RAG search ───────────────────────────────────────────────
+    async function runRagSearch() {
+      const q = qs('rag-query-input').value.trim();
+      if (!q) return;
+      const col = qs('rag-collection').value;
+      const container = qs('ragResults');
+      container.innerHTML = '<div style="color:var(--muted);padding:12px">Searching...</div>';
+      try {
+        const res = await fetch(`/rag/query?q=${encodeURIComponent(q)}&collection=${col}`);
+        const data = await res.json();
+        const results = data.results || [];
+        if (!results.length) { container.innerHTML = '<div style="color:var(--muted);padding:12px">No results.</div>'; return; }
+        container.innerHTML = results.map(r => `
+          <div style="border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:8px;background:var(--panel-soft)">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${r.source || r.metadata?.source_file || ''} · score: ${(r.score||r.distance||0).toFixed(3)}</div>
+            <div style="font-size:13px;line-height:1.5">${(r.content||r.text||'').substring(0,300)}</div>
+          </div>`).join('');
+      } catch (e) {
+        container.innerHTML = `<div style="color:#ff9a9a">Error: ${e.message}</div>`;
+      }
+    }
+
+    // ── C8: Document Library ───────────────────────────────────────────────────
+    async function loadDocLibrary() {
+      const container = qs('docsList');
+      container.innerHTML = '<div style="color:var(--muted);padding:12px">Loading...</div>';
+      try {
+        const RAG_BASE = 'https://portfolio-rag-57478301787.us-central1.run.app';
+        const res = await fetch(`${RAG_BASE}/api/pk-status`);
+        const docs = await res.json();
+        container.innerHTML = docs.map(d => `
+          <div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin-bottom:6px;background:var(--panel-soft)">
+            <div>
+              <strong style="font-size:13px">${d.project}</strong>
+              <span class="pill" style="margin-left:6px;${d.status==='indexed'?'background:#14532d;color:#86efac':'background:#7f1d1d;color:#fca5a5'}">${d.status}</span>
+              ${d.chunks ? `<span style="font-size:11px;color:var(--muted);margin-left:6px">${d.chunks} chunks</span>` : ''}
+            </div>
+            <div style="font-size:11px;color:var(--muted)">${d.ingested_at||''}</div>
+          </div>`).join('');
+      } catch (e) {
+        container.innerHTML = `<div style="color:#ff9a9a">Could not load doc library: ${e.message}</div>`;
+      }
+    }
+
+    // ── C3: Screenshot paste in description ────────────────────────────────────
+    function initScreenshotPaste() {
+      const ta = qs('dDescription');
+      if (!ta) return;
+      ta.addEventListener('paste', async (e) => {
+        const items = e.clipboardData?.items || [];
+        for (const item of items) {
+          if (item.type.startsWith('image/')) {
+            e.preventDefault();
+            const file = item.getAsFile();
+            const fd = new FormData();
+            fd.append('file', file);
+            try {
+              const res = await fetch('/api/upload/screenshot', { method: 'POST', body: fd });
+              const data = await res.json();
+              const pos = ta.selectionStart;
+              const before = ta.value.substring(0, pos);
+              const after = ta.value.substring(pos);
+              ta.value = `${before}![screenshot](${data.url})${after}`;
+              showToast('Screenshot pasted', 'success');
+            } catch (err) {
+              showToast('Screenshot paste failed: ' + err.message);
+            }
+            break;
+          }
+        }
+      });
+    }
+
     function bindControls() {
-      ['categoryFilter', 'projectFilter', 'priorityFilter', 'statusFilter', 'personFilter', 'sortBy', 'groupBy'].forEach((id) => {
+      ['categoryFilter', 'projectFilter', 'priorityFilter', 'statusFilter', 'typeFilter', 'personFilter', 'sortBy', 'groupBy'].forEach((id) => {
         qs(id).onchange = () => {
           updateResetButtonState();
           render();
@@ -2442,6 +2791,8 @@
       };
       qs('searchInput').addEventListener('input', () => {
         updateResetButtonState();
+        const hasVal = !!qs('searchInput').value;
+        qs('clearSearchBtn').style.display = hasVal ? '' : 'none';
         render();
       });
       qs('searchInput').addEventListener('keydown', (e) => {
@@ -2450,6 +2801,28 @@
           render();
         }
       });
+      qs('clearSearchBtn').onclick = () => {
+        qs('searchInput').value = '';
+        qs('clearSearchBtn').style.display = 'none';
+        updateResetButtonState();
+        render();
+      };
+      // C9: Software default filter — read localStorage or default to Software
+      const catEl = qs('categoryFilter');
+      const savedCat = localStorage.getItem('metapm_category_filter');
+      if (savedCat !== null) {
+        catEl.value = savedCat;
+      } else {
+        // Will be set after categories load — store intent
+        window._defaultCategoryName = 'Software';
+      }
+      catEl.addEventListener('change', () => {
+        localStorage.setItem('metapm_category_filter', catEl.value);
+      });
+      // C6: Persist project/type for +Add
+      qs('addMenu').addEventListener('click', () => {});  // handled in openAdd
+      // C3: Screenshot paste
+      initScreenshotPaste();
       qs('closeBtn').onclick = () => {
         qs('drawer').classList.remove('open');
         state.selectedReq = null;
@@ -2462,9 +2835,12 @@
         qs('projectFilter').value = '';
         qs('priorityFilter').value = '';
         qs('statusFilter').value = '';
+        qs('typeFilter').value = '';
         qs('personFilter').value = '';
         qs('searchInput').value = '';
+        qs('clearSearchBtn').style.display = 'none';
         qs('openItemsToggle').checked = true;
+        localStorage.removeItem('metapm_category_filter');
         updateResetButtonState();
         render();
       };
