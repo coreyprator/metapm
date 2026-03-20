@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.37.1"  # MM02: restore mcp_tools router dropped in MM01
+    VERSION: str = "2.37.2"  # MM03: commit prompt-viewer.html + add /prompts list page
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

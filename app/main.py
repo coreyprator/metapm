@@ -239,6 +239,16 @@ async def compare_page(handoff_id: str):
     raise HTTPException(status_code=404, detail="Compare page not found")
 
 
+@app.get("/prompts")
+async def prompts_list_page():
+    """Serve the Prompts list page."""
+    prompts_list_file = static_dir / "prompts-list.html"
+    if prompts_list_file.exists():
+        return FileResponse(str(prompts_list_file), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Prompts list page not found")
+
+
 @app.get("/prompts/{pth}")
 async def prompt_viewer_page(pth: str):
     """Serve the Prompt Viewer page (PF5-MS2)."""

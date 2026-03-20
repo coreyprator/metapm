@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MetaPM Prompts</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+  .container { max-width: 1000px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 16px; color: #f1f5f9; }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .toolbar select { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 6px 10px; border-radius: 8px; font-size: 13px; }
+  .back-link { display: inline-block; margin-bottom: 16px; color: #60a5fa; text-decoration: none; font-size: 14px; }
+  .back-link:hover { text-decoration: underline; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #1e293b; color: #94a3b8; text-align: left; padding: 10px 12px; font-weight: 600; border-bottom: 1px solid #334155; text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; }
+  td { padding: 10px 12px; border-bottom: 1px solid #1e293b; vertical-align: middle; }
+  tr:hover td { background: #1e293b; }
+  .pth-badge { display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 12px; font-weight: 700; background: #7c3aed; color: #fff; }
+  .status-badge { display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+  .status-draft { background: #92400e; color: #fde68a; }
+  .status-approved { background: #065f46; color: #6ee7b7; }
+  .status-executing { background: #1e40af; color: #93c5fd; }
+  .status-complete, .status-completed { background: #166534; color: #86efac; }
+  .status-rejected { background: #991b1b; color: #fca5a5; }
+  .status-closed { background: #374151; color: #9ca3af; }
+  a.view-link { color: #60a5fa; text-decoration: none; font-weight: 600; }
+  a.view-link:hover { text-decoration: underline; }
+  .loading { text-align: center; padding: 60px; color: #64748b; }
+  .empty { text-align: center; padding: 40px; color: #64748b; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="/static/dashboard.html" class="back-link">&larr; Back to Dashboard</a>
+  <h1>Sprint Prompts</h1>
+  <div class="toolbar">
+    <select id="statusFilter" onchange="render()">
+      <option value="">All statuses</option>
+      <option value="draft">Draft</option>
+      <option value="approved">Approved</option>
+      <option value="executing">Executing</option>
+      <option value="complete">Complete</option>
+      <option value="rejected">Rejected</option>
+    </select>
+    <select id="projectFilter" onchange="render()">
+      <option value="">All projects</option>
+    </select>
+  </div>
+  <div id="content"><div class="loading">Loading prompts...</div></div>
+</div>
+
+<script>
+let allPrompts = [];
+
+async function load() {
+  try {
+    const res = await fetch('/api/prompts?limit=200');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    allPrompts = await res.json();
+    // Populate project filter
+    const projects = [...new Set(allPrompts.map(p => p.project_id).filter(Boolean))];
+    const pf = document.getElementById('projectFilter');
+    projects.forEach(pid => {
+      const opt = document.createElement('option');
+      opt.value = pid;
+      const p = allPrompts.find(x => x.project_id === pid);
+      opt.textContent = p && p.project_emoji ? `${p.project_emoji} ${p.project_name || pid}` : pid;
+      pf.appendChild(opt);
+    });
+    render();
+  } catch (e) {
+    document.getElementById('content').innerHTML = `<div class="empty">Error loading prompts: ${e.message}</div>`;
+  }
+}
+
+function render() {
+  const statusF = document.getElementById('statusFilter').value;
+  const projF = document.getElementById('projectFilter').value;
+  let rows = allPrompts;
+  if (statusF) rows = rows.filter(p => p.status === statusF);
+  if (projF) rows = rows.filter(p => p.project_id === projF);
+
+  if (!rows.length) {
+    document.getElementById('content').innerHTML = '<div class="empty">No prompts found.</div>';
+    return;
+  }
+
+  const html = `<table>
+    <thead><tr>
+      <th>PTH</th><th>Sprint</th><th>Project</th><th>Status</th><th>Hours</th><th>Created</th><th>By</th><th></th>
+    </tr></thead>
+    <tbody>${rows.map(p => {
+      const proj = p.project_emoji ? `${p.project_emoji} ${p.project_name || p.project_id}` : (p.project_id || '');
+      const created = p.created_at ? new Date(p.created_at).toLocaleDateString() : '';
+      return `<tr>
+        <td><span class="pth-badge">${p.pth || '?'}</span></td>
+        <td>${p.sprint_id || ''}</td>
+        <td>${proj}</td>
+        <td><span class="status-badge status-${p.status}">${p.status}</span></td>
+        <td>${p.estimated_hours ? p.estimated_hours + 'h' : ''}</td>
+        <td>${created}</td>
+        <td>${p.created_by || ''}</td>
+        <td><a class="view-link" href="/prompts/${p.pth}">View &rarr;</a></td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+  document.getElementById('content').innerHTML = html;
+}
+
+load();
+</script>
+</body>
+</html>

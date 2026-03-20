@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MetaPM Prompt Viewer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+  .container { max-width: 900px; margin: 0 auto; }
+  .prompt-header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+  .badge { padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+  .pth-badge { background: #7c3aed; color: #fff; }
+  .sprint-badge { background: #1e40af; color: #dbeafe; }
+  .project-badge { background: #374151; color: #d1d5db; }
+  .hours-badge { background: #065f46; color: #a7f3d0; }
+  .status-badge { padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 700; text-transform: uppercase; }
+  .status-draft { background: #92400e; color: #fde68a; }
+  .status-approved { background: #065f46; color: #6ee7b7; }
+  .status-executing { background: #1e40af; color: #93c5fd; }
+  .status-complete, .status-completed { background: #166534; color: #86efac; }
+  .status-rejected { background: #991b1b; color: #fca5a5; }
+  .status-closed { background: #374151; color: #9ca3af; }
+  .prompt-meta { color: #94a3b8; font-size: 14px; margin-bottom: 16px; line-height: 1.8; }
+  .prompt-meta a { color: #60a5fa; text-decoration: none; }
+  .prompt-meta a:hover { text-decoration: underline; }
+  .prompt-actions { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
+  .prompt-actions button { padding: 8px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  #approve-btn { background: #059669; color: #fff; }
+  #approve-btn:hover { background: #047857; }
+  #reject-btn { background: #dc2626; color: #fff; }
+  #reject-btn:hover { background: #b91c1c; }
+  .approved-badge { background: #065f46; color: #6ee7b7; padding: 8px 16px; border-radius: 8px; font-weight: 600; }
+  .executing-badge { background: #1e40af; color: #93c5fd; padding: 8px 16px; border-radius: 8px; font-weight: 600; }
+  .prompt-content { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; line-height: 1.7; font-size: 14px; white-space: pre-wrap; word-wrap: break-word; overflow-x: auto; }
+  .prompt-content-edit { width: 100%; min-height: 400px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; line-height: 1.7; font-size: 14px; font-family: monospace; color: #e2e8f0; resize: vertical; }
+  .save-bar { margin-top: 10px; display: flex; gap: 10px; align-items: center; }
+  .save-bar button { padding: 8px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; background: #2563eb; color: #fff; }
+  .save-bar button:hover { background: #1d4ed8; }
+  .save-status { color: #6ee7b7; font-size: 13px; }
+  .prompt-content h1, .prompt-content h2, .prompt-content h3 { color: #f1f5f9; margin: 16px 0 8px; }
+  .prompt-content code { background: #334155; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  .prompt-content pre { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin: 8px 0; overflow-x: auto; }
+  .prompt-content pre code { background: none; padding: 0; }
+  .loading { text-align: center; padding: 60px; color: #64748b; font-size: 16px; }
+  .error { text-align: center; padding: 60px; color: #f87171; font-size: 16px; }
+  .back-link { display: inline-block; margin-bottom: 16px; color: #60a5fa; text-decoration: none; font-size: 14px; }
+  .back-link:hover { text-decoration: underline; }
+  .artifact-chain { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+  .chain-title { font-weight: 700; font-size: 14px; color: #94a3b8; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .chain-node { padding: 6px 0; font-size: 13px; border-left: 2px solid #334155; padding-left: 12px; margin-left: 4px; }
+  .chain-node.chain-active { border-left-color: #3b82f6; color: #93c5fd; font-weight: 600; }
+  .chain-node.chain-done { border-left-color: #22c55e; }
+  .chain-node.chain-pending { border-left-color: #475569; color: #64748b; }
+  .chain-node a { color: #60a5fa; text-decoration: none; }
+  .chain-node a:hover { text-decoration: underline; }
+  .chain-assessment { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+  .assess-pass { background: #065f46; color: #6ee7b7; }
+  .assess-conditional_pass { background: #92400e; color: #fde68a; }
+  .assess-fail { background: #991b1b; color: #fca5a5; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="/static/dashboard.html" class="back-link">&larr; Back to Dashboard</a>
+  <div id="content">
+    <div class="loading">Loading prompt...</div>
+  </div>
+</div>
+
+<script>
+const pth = window.location.pathname.split('/prompts/')[1];
+let promptData = null;
+
+async function loadPrompt() {
+  try {
+    const res = await fetch(`/api/prompts/${pth}`);
+    if (!res.ok) {
+      document.getElementById('content').innerHTML = `<div class="error">Prompt "${pth}" not found (${res.status})</div>`;
+      return;
+    }
+    promptData = await res.json();
+    renderPrompt(promptData);
+  } catch (e) {
+    document.getElementById('content').innerHTML = `<div class="error">Error loading prompt: ${e.message}</div>`;
+  }
+}
+
+function renderPrompt(p) {
+  const statusClass = `status-${p.status}`;
+  const projectLabel = p.project_emoji ? `${p.project_emoji} ${p.project_name || ''}` : (p.project_id || '');
+  const hoursLabel = p.estimated_hours ? `~${p.estimated_hours}h` : '';
+  const createdAt = p.created_at ? new Date(p.created_at).toLocaleDateString() : '';
+  const approvedInfo = p.approved_by
+    ? `<div>Approved by ${p.approved_by} &middot; ${p.approved_at ? new Date(p.approved_at).toLocaleString() : ''}</div>`
+    : '';
+
+  let actionBar = '';
+  if (p.status === 'draft' || p.status === 'prompt_ready') {
+    actionBar = `
+      <button id="approve-btn" onclick="approvePrompt()">&#x2705; Approve</button>
+      <button id="reject-btn" onclick="rejectPrompt()">&#x274C; Reject</button>`;
+  } else if (p.status === 'approved') {
+    actionBar = `<div class="approved-badge">&#x2705; Approved &mdash; ready for CC</div>`;
+  } else if (p.status === 'executing') {
+    actionBar = `<div class="executing-badge">&#x2699;&#xFE0F; CC executing this sprint</div>`;
+  } else if (p.status === 'complete' || p.status === 'completed') {
+    actionBar = `<div class="approved-badge">&#x2705; Complete</div>`;
+  } else if (p.status === 'rejected') {
+    actionBar = `<div style="background:#991b1b;color:#fca5a5;padding:8px 16px;border-radius:8px;font-weight:600">&#x274C; Rejected</div>`;
+  }
+
+  const reqLink = p.requirement_id
+    ? `<a href="/static/roadmap-drill.html?req=${p.requirement_id}">&larr; View Requirement</a>`
+    : '';
+
+  // Simple markdown-to-HTML: headers, code blocks, bold, links
+  let contentHtml = escapeHtml(p.content_md || p.content || 'No content');
+  // Code blocks
+  contentHtml = contentHtml.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  // Inline code
+  contentHtml = contentHtml.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Headers
+  contentHtml = contentHtml.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  contentHtml = contentHtml.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  contentHtml = contentHtml.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  // Bold
+  contentHtml = contentHtml.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Horizontal rules
+  contentHtml = contentHtml.replace(/^---$/gm, '<hr style="border-color:#334155;margin:16px 0">');
+
+  const isDraft = (p.status === 'draft' || p.status === 'prompt_ready');
+  const contentArea = isDraft
+    ? `<textarea id="content-editor" class="prompt-content-edit">${escapeHtml(p.content_md || p.content || '')}</textarea>
+       <div class="save-bar">
+         <button onclick="saveContent()">Save Changes</button>
+         <span class="save-status" id="save-status"></span>
+       </div>`
+    : `<div class="prompt-content">${contentHtml}</div>`;
+
+  // Build artifact chain
+  const reqNode = p.requirement_id
+    ? `<div class="chain-node chain-done">&#x1F4CB; Requirement: <a href="/static/roadmap-drill.html?req=${p.requirement_id}">${p.requirement_id}</a></div>`
+    : `<div class="chain-node chain-pending">&#x1F4CB; Requirement: N/A</div>`;
+  const promptNode = `<div class="chain-node chain-active">&#x1F4DD; Prompt: PTH ${p.pth || '?'} (this)</div>`;
+  const handoffNode = p.handoff_id
+    ? `<div class="chain-node chain-done">&#x1F4E4; Handoff: <a href="${p.handoff_url}">View &rarr;</a></div>`
+    : `<div class="chain-node chain-pending">&#x1F4E4; Handoff: Pending</div>`;
+  const reviewBadge = p.review_assessment
+    ? `<span class="chain-assessment assess-${p.review_assessment}">${p.review_assessment.replace('_',' ')}</span>`
+    : '';
+  const reviewNode = p.review_id
+    ? `<div class="chain-node chain-done">&#x1F50D; Review: ${reviewBadge}</div>`
+    : `<div class="chain-node chain-pending">&#x1F50D; Review: Pending</div>`;
+  const uatNode = p.uat_url
+    ? `<div class="chain-node chain-done">&#x1F9EA; UAT: <a href="${p.uat_url}">Run UAT &rarr;</a></div>`
+    : `<div class="chain-node chain-pending">&#x1F9EA; UAT: Pending</div>`;
+
+  const artifactChain = `
+    <div class="artifact-chain">
+      <div class="chain-title">Sprint Artifacts</div>
+      ${reqNode}${promptNode}${handoffNode}${reviewNode}${uatNode}
+    </div>`;
+
+  document.getElementById('content').innerHTML = `
+    <div class="prompt-header">
+      <span class="badge pth-badge">PTH: ${p.pth || '?'}</span>
+      <span class="badge sprint-badge">${p.sprint_id || ''}</span>
+      <span class="badge project-badge">${projectLabel}</span>
+      <span class="status-badge ${statusClass}">${p.status}</span>
+      ${hoursLabel ? `<span class="badge hours-badge">${hoursLabel}</span>` : ''}
+    </div>
+    <div class="prompt-meta">
+      <div>Created by ${p.created_by || 'unknown'} &middot; ${createdAt}</div>
+      ${approvedInfo}
+      ${reqLink}
+    </div>
+    <div class="prompt-actions">${actionBar}</div>
+    ${artifactChain}
+    ${contentArea}
+  `;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+async function saveContent() {
+  if (!promptData) return;
+  const content = document.getElementById('content-editor').value;
+  const statusEl = document.getElementById('save-status');
+  statusEl.textContent = 'Saving...';
+  const res = await fetch(`/api/prompts/${promptData.id}`, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({content_md: content})
+  });
+  if (res.ok) {
+    statusEl.textContent = 'Saved';
+    setTimeout(() => location.reload(), 800);
+  } else {
+    statusEl.textContent = 'Save failed';
+    statusEl.style.color = '#f87171';
+  }
+}
+
+async function approvePrompt() {
+  if (!promptData) return;
+  const res = await fetch(`/api/prompts/${promptData.id}`, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status: 'approved', approved_by: 'PL'})
+  });
+  if (res.ok) location.reload();
+  else alert('Approve failed: ' + (await res.text()));
+}
+
+async function rejectPrompt() {
+  if (!promptData) return;
+  const res = await fetch(`/api/prompts/${promptData.id}`, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status: 'rejected', approved_by: 'PL'})
+  });
+  if (res.ok) location.reload();
+  else alert('Reject failed: ' + (await res.text()));
+}
+
+loadPrompt();
+</script>
+</body>
+</html>
