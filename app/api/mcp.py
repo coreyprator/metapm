@@ -320,6 +320,11 @@ async def create_handoff(
                     "UPDATE cc_prompts SET status='complete', handoff_id=?, updated_at=GETDATE() WHERE pth=?",
                     (handoff_id, handoff.prompt_pth), fetch="none"
                 )
+                # MP-GET-HO-BY-PTH: also store pth on the handoff record for direct lookup
+                execute_query(
+                    "UPDATE mcp_handoffs SET pth=? WHERE id=?",
+                    (handoff.prompt_pth, handoff_id), fetch="none"
+                )
                 logger.info(f"Prompt {handoff.prompt_pth} marked complete (handoff {handoff_id})")
             except Exception as pth_err:
                 logger.warning(f"Prompt-pth linking failed (non-fatal): {pth_err}")

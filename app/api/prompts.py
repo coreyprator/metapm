@@ -256,30 +256,35 @@ async def get_prompt_by_pth(pth: str):
 async def get_handoff_by_pth(pth: str):
     """MP-GET-HO-BY-PTH: Return most recent handoff registered for a PTH code.
     CAI calls this to get handoff_id + UAT URL without asking PL for UUIDs."""
-    # Look up by pth column on mcp_handoffs (set by create_handoff when prompt_pth is provided),
-    # OR by metadata JSON match as fallback
+    # Primary lookup: cc_prompts.handoff_id (set by create_handoff auto-complete)
+    # Fallback: mcp_handoffs.pth column or metadata JSON
     row = execute_query("""
-        SELECT TOP 1 h.id, h.task, h.project, h.version, h.created_at,
-               u.id as uat_spec_id, u.id as uat_page_id
+        SELECT TOP 1 h.id, h.task, h.project, h.version, h.created_at
         FROM mcp_handoffs h
-        LEFT JOIN uat_pages u ON u.pth = ? AND u.spec_source = 'cc_spec'
-        WHERE h.pth = ? OR h.metadata LIKE ?
+        JOIN cc_prompts p ON p.handoff_id = h.id AND p.pth = ?
         ORDER BY h.created_at DESC
-    """, (pth, pth, f'%"prompt_pth":"{pth}"%'), fetch="one")
+    """, (pth,), fetch="one")
+
+    if not row:
+        # Fallback: pth column or metadata LIKE
+        row = execute_query("""
+            SELECT TOP 1 id, task, project, version, created_at
+            FROM mcp_handoffs
+            WHERE pth = ? OR metadata LIKE ?
+            ORDER BY created_at DESC
+        """, (pth, f'%"prompt_pth":"{pth}"%'), fetch="one")
 
     if not row:
         raise HTTPException(status_code=404, detail=f"No handoff registered for PTH {pth}")
 
     handoff_id = str(row["id"])
-    uat_spec_id = str(row["uat_spec_id"]) if row.get("uat_spec_id") else None
 
-    # Get the most recent spec uat_url separately if not found via join
-    if not uat_spec_id:
-        uat_row = execute_query(
-            "SELECT TOP 1 id FROM uat_pages WHERE pth = ? ORDER BY created_at DESC",
-            (pth,), fetch="one"
-        )
-        uat_spec_id = str(uat_row["id"]) if uat_row else None
+    # Get most recent UAT spec for this PTH
+    uat_row = execute_query(
+        "SELECT TOP 1 id FROM uat_pages WHERE pth = ? ORDER BY created_at DESC",
+        (pth,), fetch="one"
+    )
+    uat_spec_id = str(uat_row["id"]) if uat_row else None
 
     return {
         "pth": pth,
