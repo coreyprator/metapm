@@ -310,7 +310,7 @@ def _tool_list_requirements(args: dict) -> dict:
 
 def _tool_list_projects(args: dict) -> dict:
     rows = execute_query("""
-        SELECT id, code, name, production_url
+        SELECT id, code, name, deploy_url
         FROM roadmap_projects
         ORDER BY code
     """, fetch="all") or []
@@ -322,7 +322,7 @@ def _tool_list_projects(args: dict) -> dict:
                 "project_id_for_post_prompt": str(r["id"]),
                 "code": r.get("code"),
                 "name": r.get("name"),
-                "production_url": r.get("production_url") or "",
+                "deploy_url": r.get("deploy_url") or "",
             }
             for r in rows
         ],
