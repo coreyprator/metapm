@@ -423,7 +423,8 @@ async def get_uat_results(spec_id: str):
 
 def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
                           current_results: list, pl_email: str,
-                          general_notes: str = "", is_submitted: bool = False) -> str:
+                          general_notes: str = "", is_submitted: bool = False,
+                          spec_status: str = "in_progress") -> str:
     """Render the interactive UAT page for an authenticated PL session."""
     from html import escape as esc
     project = esc(spec_data.get("project", "Unknown"))
@@ -442,6 +443,9 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
     submitted_cls = "submitted" if is_submitted else ""
     submitted_badge = '<span class="read-only-badge">✓ Submitted</span>' if is_submitted else ""
     resubmit_btn = '<button class="btn btn-resubmit" onclick="enableResubmit()">🔄 Resubmit</button>' if is_submitted else ""
+    # REQ-011: PL-only override button for conditional_pass
+    mark_passed_btn = ('<button class="btn btn-mark-passed" onclick="markAsPassed()">'
+                       '✅ Mark as Passed</button>') if spec_status == "conditional_pass" else ""
 
     cards_html = ""
     for tc in real_test_cases:
@@ -572,6 +576,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
     .btn-submit {{ background: var(--pass); color: #0d1117; }}
     .btn-copy {{ background: #21262d; color: var(--text); border: 1px solid var(--border); }}
     .btn-resubmit {{ background: #21262d; color: var(--text); border: 1px solid var(--border); }}
+    .btn-mark-passed {{ background: #b45309; color: #fff; }}
     #submit-result {{ margin-top: 16px; padding: 14px 18px; border-radius: 8px;
       font-size: 0.9rem; display: none; }}
     #submit-result.ok {{ background: rgba(63,185,80,0.15); border: 1px solid var(--pass); }}
@@ -636,6 +641,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
     <button class="btn btn-copy" onclick="copyResults()">📋 Copy Results</button>
     <button class="btn btn-submit" id="submit-btn" onclick="submitResults()" {'style="display:none"' if is_submitted else ''}>📤 Submit Results</button>
     {resubmit_btn}
+    {mark_passed_btn}
   </div>
   <div id="submit-result" {'class="ok" style="display:block"' if is_submitted else ''}>{f'Results submitted. <a href="/uat/{spec_id}">View UAT record →</a>' if is_submitted else ''}</div>
 
@@ -786,6 +792,32 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       const submitBtn = document.getElementById('submit-btn');
       if (submitBtn) {{ submitBtn.style.display = ''; submitBtn.disabled = false; submitBtn.textContent = '📤 Submit Results'; }}
       document.getElementById('submit-result').style.display = 'none';
+    }}
+
+    async function markAsPassed() {{
+      const btn = document.querySelector('.btn-mark-passed');
+      if (btn) {{ btn.disabled = true; btn.textContent = '⏳ Overriding...'; }}
+      try {{
+        const resp = await fetch(`/api/uat/${{SPEC_ID}}/override`, {{
+          method: 'PATCH',
+          headers: {{'Content-Type': 'application/json'}},
+          body: JSON.stringify({{ status: 'passed', override_note: 'PL override: conditional_pass → passed' }})
+        }});
+        const data = await resp.json();
+        if (resp.ok) {{
+          const div = document.getElementById('submit-result');
+          div.style.display = 'block';
+          div.className = 'ok';
+          div.innerHTML = `Status overridden to <strong>passed</strong>. <a href="/uat/${{SPEC_ID}}">View UAT record &rarr;</a>`;
+          if (btn) btn.style.display = 'none';
+        }} else {{
+          if (btn) {{ btn.disabled = false; btn.textContent = '✅ Mark as Passed'; }}
+          alert(`Override failed: ${{data.detail || JSON.stringify(data)}}`);
+        }}
+      }} catch(e) {{
+        if (btn) {{ btn.disabled = false; btn.textContent = '✅ Mark as Passed'; }}
+        alert(`Override error: ${{e.message}}`);
+      }}
     }}
 
     async function submitResults() {{

@@ -242,6 +242,54 @@ async def create_handoff(
 ):
     """Create a new handoff."""
     try:
+        # MP-HANDOFF-GATE-001: Enforce cc_complete state and valid UAT spec before registration
+        bypass = (handoff.enforcement_bypass or "").strip().lower()
+
+        # Gate 1: linked prompt/requirement must be at cc_complete or higher
+        # Skipped when enforcement_bypass="data_only_sprint"
+        if bypass != "data_only_sprint" and getattr(handoff, 'prompt_pth', None):
+            allowed_states = ('cc_complete', 'uat_ready', 'uat_pass', 'done', 'closed')
+            pth_req = execute_query(
+                """SELECT r.code, r.status FROM roadmap_requirements r
+                   JOIN cc_prompts p ON p.requirement_id = r.id
+                   WHERE p.pth = ?""",
+                (handoff.prompt_pth,), fetch="one"
+            )
+            if pth_req and pth_req['status'] not in allowed_states:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Requirement {pth_req['code']} linked to PTH {handoff.prompt_pth} "
+                           f"must be at cc_complete before handoff registration. "
+                           f"Current state: {pth_req['status']}. "
+                           f"Advance requirement first: PATCH /api/roadmap/requirements/{pth_req['code']}/state"
+                )
+
+        # Gate 2: uat_spec_id required and must resolve to a real spec with test cases
+        if not getattr(handoff, 'uat_spec_id', None):
+            raise HTTPException(
+                status_code=400,
+                detail="uat_spec_id is required. POST /api/uat/spec first and include spec_id in handoff."
+            )
+        spec_check = execute_query(
+            "SELECT id, test_cases_json FROM uat_pages WHERE id = ?",
+            (handoff.uat_spec_id,), fetch="one"
+        )
+        if not spec_check:
+            raise HTTPException(
+                status_code=400,
+                detail=f"uat_spec_id {handoff.uat_spec_id} not found. POST /api/uat/spec first."
+            )
+        tc_json = spec_check.get('test_cases_json') or '[]'
+        try:
+            tc_count = len(json.loads(tc_json))
+        except Exception:
+            tc_count = 0
+        if tc_count == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"UAT spec {handoff.uat_spec_id} has 0 test cases. Spec must contain BV items."
+            )
+
         metadata_json = json.dumps(handoff.metadata) if handoff.metadata else None
 
         result = execute_query("""
@@ -265,7 +313,19 @@ async def create_handoff(
         handoff_id = str(result['id'])
         _autolink_handoff_to_requirements(handoff_id, handoff.content)
 
+        # PF5-MS2: Auto-complete linked prompt when prompt_pth provided
+        if getattr(handoff, 'prompt_pth', None):
+            try:
+                execute_query(
+                    "UPDATE cc_prompts SET status='complete', handoff_id=?, updated_at=GETDATE() WHERE pth=?",
+                    (handoff_id, handoff.prompt_pth), fetch="none"
+                )
+                logger.info(f"Prompt {handoff.prompt_pth} marked complete (handoff {handoff_id})")
+            except Exception as pth_err:
+                logger.warning(f"Prompt-pth linking failed (non-fatal): {pth_err}")
+
         # MP-UAT-GEN: Best-effort auto-generate UAT page
+        auto_uat_url = ""
         try:
             from app.services.uat_generator import generate_test_cases, render_uat_html
             import re as _re
@@ -318,11 +378,27 @@ async def create_handoff(
                     )
                     execute_query("UPDATE uat_pages SET html_content = ? WHERE id = ?",
                                   (html, uat_id), fetch="none")
+                    auto_uat_url = f"https://metapm.rentyourcio.com/uat/{uat_id}"
                     logger.info(f"Auto-generated UAT page {uat_id} (PTH={pth_value}) for handoff {handoff_id}")
         except Exception as autogen_err:
             logger.warning(f"UAT auto-gen failed (non-blocking): {autogen_err}")
 
         public_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{handoff_id}/content"
+
+        # Fire-and-forget PA notification for handoff received
+        try:
+            from app.api.prompts import notify_pa
+            import asyncio
+            asyncio.create_task(notify_pa("Handoff received", {
+                "pth": getattr(handoff, 'prompt_pth', '') or '',
+                "project": handoff.project,
+                "sprint": handoff.task,
+                "description": f"CC finished {handoff.task}",
+                "handoff_url": public_url,
+                "uat_url": auto_uat_url,
+            }))
+        except Exception as pa_err:
+            logger.warning(f"PA handoff notification failed (non-fatal): {pa_err}")
 
         return HandoffResponse(
             id=handoff_id,
@@ -1378,9 +1454,12 @@ async def get_handoff(
     """Get a single handoff by ID (authenticated)."""
     try:
         result = execute_query("""
-            SELECT id, project, task, direction, status, content, metadata, response_to, created_at, updated_at
-            FROM mcp_handoffs
-            WHERE id = ?
+            SELECT h.id, h.project, h.task, h.direction, h.status, h.content,
+                   h.metadata, h.response_to, h.created_at, h.updated_at,
+                   r.id as review_id, r.assessment
+            FROM mcp_handoffs h
+            LEFT JOIN reviews r ON r.handoff_id = h.id
+            WHERE h.id = ?
         """, (handoff_id,), fetch="one")
 
         if not result:
@@ -1398,6 +1477,8 @@ async def get_handoff(
             metadata=_parse_json_field(result['metadata']),
             response_to=str(result['response_to']) if result['response_to'] else None,
             public_url=public_url,
+            review_id=str(result['review_id']) if result.get('review_id') else None,
+            assessment=result.get('assessment'),
             created_at=result['created_at'],
             updated_at=result['updated_at']
         )

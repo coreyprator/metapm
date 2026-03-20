@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.37.2"  # MM03: commit prompt-viewer.html + add /prompts list page
+    VERSION: str = "2.37.3"  # MM05: enforcement gates, conditional_pass override, dashboard UAT badges
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

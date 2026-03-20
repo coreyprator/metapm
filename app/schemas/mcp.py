@@ -59,12 +59,40 @@ class AssignedTo(str, Enum):
 
 # Handoff Schemas
 class HandoffCreate(BaseModel):
+    # BA04 format fields (optional — for new Bootstrap closeout flow)
+    id: Optional[str] = Field(None, max_length=100)  # Custom ref ID e.g. "MP06-ABC"
+    request_type: Optional[str] = Field(None, max_length=50)  # e.g. "Requirement"
+    title: Optional[str] = Field(None, max_length=255)  # Sprint title
+    description: Optional[str] = None  # Used as content when content not provided
+    completion_handoff_url: Optional[str] = Field(None, max_length=500)  # GCS URL
+
+    # PF5-MS2: Prompt linking
+    prompt_pth: Optional[str] = Field(None, max_length=10)
+
+    # MP-HANDOFF-GATE-001: Enforcement fields
+    uat_spec_id: Optional[str] = None  # Must reference a valid spec with BV items
+    enforcement_bypass: Optional[str] = None  # "data_only_sprint" skips Gate 1 only
+
+    # Existing fields (made optional for BA04 compat)
     project: str = Field(..., max_length=100)
-    task: str = Field(..., max_length=200)
-    direction: HandoffDirection
-    content: str
+    task: Optional[str] = Field(None, max_length=200)
+    direction: Optional[HandoffDirection] = None
+    content: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     response_to: Optional[str] = None
+
+    @model_validator(mode='after')
+    def normalize_ba04_fields(self) -> 'HandoffCreate':
+        # task falls back to title, then id
+        if not self.task:
+            self.task = self.title or self.id or 'handoff'
+        # direction defaults to cc_to_ai
+        if not self.direction:
+            self.direction = HandoffDirection.CC_TO_AI
+        # content falls back to description
+        if not self.content:
+            self.content = self.description or ''
+        return self
 
 
 class HandoffUpdate(BaseModel):
@@ -81,6 +109,8 @@ class HandoffResponse(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     response_to: Optional[str] = None
     public_url: Optional[str] = None
+    review_id: Optional[str] = None
+    assessment: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

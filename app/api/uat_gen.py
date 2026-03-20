@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 
 from app.core.database import execute_query
@@ -221,17 +221,58 @@ async def generate_uat(body: UATGenerateRequest):
 
 
 @router.get("/uat/{uat_id}")
-async def serve_uat_page(uat_id: str):
+async def serve_uat_page(request: Request, uat_id: str):
     """Serve the UAT HTML page.
+
+    For cc_spec UATs: requires Google OAuth PL session (cprator@cbsware.com).
+    For legacy UATs: no auth required (existing behavior).
 
     Lookup chain: uat_pages.id → uat_pages.handoff_id →
     uat_results.id→handoff_id→uat_pages → render fallback from handoff data.
     """
+    from fastapi import Request as _Request
     # 1. Primary: uat_pages by id
     page = execute_query(
-        "SELECT id, html_content, status, pth FROM uat_pages WHERE id = ?",
+        "SELECT id, html_content, status, pth, spec_source, spec_data, test_cases_json FROM uat_pages WHERE id = ?",
         (uat_id,), fetch="one"
     )
+
+    # Check for cc_spec auth BEFORE the legacy fallback chain
+    if page and page.get("spec_source") == "cc_spec":
+        from app.api.auth import is_pl_authenticated, get_session_email, render_login_required_page
+        if not is_pl_authenticated(request):
+            html = render_login_required_page(f"/uat/{uat_id}", uat_id)
+            return HTMLResponse(content=html, status_code=200)
+        # PL is authenticated — render interactive spec page
+        # Fetch full row including general_notes and pl_submitted_at
+        full_page = execute_query(
+            "SELECT id, spec_data, test_cases_json, general_notes, pl_submitted_at, status FROM uat_pages WHERE id = ?",
+            (uat_id,), fetch="one"
+        ) or page
+        from app.api.uat_spec import render_spec_uat_page
+        email = get_session_email(request) or ""
+        spec_data = json.loads(full_page.get("spec_data") or page.get("spec_data") or "{}") if (full_page.get("spec_data") or page.get("spec_data")) else {}
+        tc_json = json.loads(full_page.get("test_cases_json") or page.get("test_cases_json") or "[]") if (full_page.get("test_cases_json") or page.get("test_cases_json")) else []
+        # Strip to spec fields only (no result leakage for spec definition)
+        spec_tests = [
+            {"id": tc["id"], "title": tc["title"], "url": tc.get("url"),
+             "steps": tc.get("steps", []), "expected": tc.get("expected")}
+            for tc in tc_json
+            if not tc.get("id", "").startswith("_")
+        ]
+        general_notes = full_page.get("general_notes") or ""
+        is_submitted = bool(full_page.get("pl_submitted_at"))
+        html = render_spec_uat_page(
+            spec_id=uat_id,
+            spec_data=spec_data,
+            test_cases=spec_tests,
+            current_results=tc_json,
+            pl_email=email,
+            general_notes=general_notes,
+            is_submitted=is_submitted,
+            spec_status=full_page.get("status", "in_progress"),
+        )
+        return HTMLResponse(content=html)
 
     # 2. Fallback: uat_pages by handoff_id
     if not page:
@@ -367,6 +408,7 @@ async def list_uat_pages(
     handoff_id: Optional[str] = Query(None),
     project: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    include_passed: bool = Query(False),  # Fix 2f: show passed/archived when True
     limit: int = Query(20, le=100),
     offset: int = Query(0)
 ):
@@ -397,9 +439,12 @@ async def list_uat_pages(
         else:
             where_clauses.append("u.status = ?")
             params.append(status)
-    else:
-        # Exclude archived and approved pages by default (MP-UAT-SUBMIT-001, MP-UAT-UI-001)
+    elif include_passed:
+        # Show all non-archived when explicitly requested
         where_clauses.append("u.status NOT IN ('archived', 'approved')")
+    else:
+        # Fix 2f: exclude passed, archived, approved by default — hide completed UATs
+        where_clauses.append("u.status NOT IN ('archived', 'approved', 'passed', 'conditional_pass')")
 
     where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
@@ -422,25 +467,39 @@ async def list_uat_pages(
 
     results = []
     for row in (rows or []):
-        test_cases = json.loads(row["test_cases_json"]) if row.get("test_cases_json") else []
-        title = row.get("handoff_title") or row.get("handoff_task") or f"UAT - {row['project']} v{row.get('version','?')}"
-        # Extract PTH from title or from stored pth column
+        test_cases_raw = json.loads(row["test_cases_json"]) if row.get("test_cases_json") else []
         pth = row.get("pth")
+        proj = row["project"]
+        ver = row.get("version") or "?"
+        sprint_code = row.get("sprint_code") or ""
+        # Fix 2e: title includes PTH so UATs are searchable by sprint name
+        if pth and sprint_code:
+            title = f"PTH: {pth} | {proj} v{ver} — {sprint_code}"
+        elif pth:
+            title = f"PTH: {pth} | {proj} v{ver}"
+        else:
+            title = row.get("handoff_title") or row.get("handoff_task") or f"UAT — {proj} v{ver}"
         if not pth:
             m = _re.search(r'PTH-([A-Z0-9]{4})', title or '')
             pth = m.group(1) if m else None
+        # Strip test case result values for list view (id/title/status only)
+        test_cases_stripped = [
+            {"id": tc.get("id", ""), "title": tc.get("title", ""), "status": tc.get("status", "pending")}
+            for tc in test_cases_raw
+        ]
         results.append({
             "uat_id": str(row["id"]),
             "handoff_id": str(row["handoff_id"]),
-            "project": row["project"],
-            "sprint_code": row.get("sprint_code"),
-            "version": row.get("version"),
+            "project": proj,
+            "sprint_code": sprint_code,
+            "version": ver,
             "status": row["status"],
-            "test_count": len(test_cases),
+            "test_count": len(test_cases_raw),
             "created_at": str(row["created_at"]),
             "uat_url": f"https://metapm.rentyourcio.com/uat/{row['id']}",
             "title": title,
-            "pth": pth
+            "pth": pth,
+            "test_cases": test_cases_stripped,  # Fix 1c: included for roadmap-drill BV display
         })
 
     return {"pages": results, "total": total, "count": len(results), "limit": limit, "offset": offset}

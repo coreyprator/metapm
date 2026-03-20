@@ -1269,8 +1269,10 @@
     async function refreshUatPages() {
       try {
         const project = qs('uat-filter-project').value;
+        const hideArchived = document.getElementById('uat-hide-archived')?.checked !== false;
         let url = '/api/uat/pages?limit=50';
         if (project) url += '&project=' + encodeURIComponent(project);
+        if (!hideArchived) url += '&include_passed=true';
         const data = await api(url);
         uatPagesData = data.pages || [];
         renderUatPages();
@@ -1294,9 +1296,12 @@
       html += '<th style="padding:6px">PTH</th><th style="padding:6px">Project</th><th style="padding:6px">Version</th><th style="padding:6px">Title</th><th style="padding:6px">Status</th><th style="padding:6px">Date</th><th style="padding:6px">Action</th></tr></thead><tbody>';
       for (const p of filtered) {
         const emoji = PROJECT_EMOJIS_JS[p.project] || '';
-        const statusBadge = p.status === 'submitted' ? '<span style="background:#166534;color:#bbf7d0;padding:1px 6px;border-radius:3px">PASS</span>'
+        const statusBadge = p.status === 'passed' ? '<span style="background:#166534;color:#bbf7d0;padding:1px 6px;border-radius:3px">Passed</span>'
+          : p.status === 'failed' ? '<span style="background:#7f1d1d;color:#fca5a5;padding:1px 6px;border-radius:3px">Failed</span>'
+          : p.status === 'conditional_pass' ? '<span style="background:#78350f;color:#fde68a;padding:1px 6px;border-radius:3px">Cond. Pass</span>'
           : p.status === 'in_progress' ? '<span style="background:#854d0e;color:#fde68a;padding:1px 6px;border-radius:3px">In Progress</span>'
-          : '<span style="background:#374151;color:#d1d5db;padding:1px 6px;border-radius:3px">Pending</span>';
+          : p.status === 'ready' ? '<span style="background:#374151;color:#d1d5db;padding:1px 6px;border-radius:3px">Pending</span>'
+          : `<span style="background:#374151;color:#d1d5db;padding:1px 6px;border-radius:3px">${p.status || 'Pending'}</span>`;
         const dateStr = (p.created_at || '').substring(0, 10);
         const titleShort = (p.title || '').length > 50 ? (p.title || '').substring(0, 47) + '...' : (p.title || '');
         html += `<tr style="border-bottom:1px solid var(--line);cursor:pointer" onclick="window.open('${p.uat_url}','_blank')">`;
@@ -1337,6 +1342,8 @@
       if (uatProjectFilter) uatProjectFilter.addEventListener('change', refreshUatPages);
       const uatStatusFilter = document.getElementById('uat-filter-status');
       if (uatStatusFilter) uatStatusFilter.addEventListener('change', renderUatPages);
+      const uatHideArchived = document.getElementById('uat-hide-archived');
+      if (uatHideArchived) uatHideArchived.addEventListener('change', refreshUatPages);
     });
 
     // ── Prompts Tab Section (PF5-MS2) ──────────────────────────────────
