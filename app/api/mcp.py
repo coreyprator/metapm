@@ -76,15 +76,15 @@ def _parse_json_field(value: Optional[str]) -> Optional[dict]:
 
 
 def _has_canary_evidence(content: str) -> bool:
-    """Return True if handoff content contains machine-verifiable canary output (BA07)."""
+    """Return True if handoff content contains machine-verifiable canary output (BA07).
+    Checks for: version number, HTTP status line, JSON fragment, or git commit hash (7+ hex chars)."""
     if not content:
         return False
     evidence_patterns = [
-        r'version.*:\s*[\d.]+',       # version number
-        r'HTTP.*[23]\d\d',             # HTTP 2xx/3xx status
-        r'\{.*"[a-z].*:.*\}',         # JSON response fragment
-        r'PASS.*\n.*[{"\[0-9]',       # PASS followed by actual output
-        r'[a-f0-9]{7,40}',            # git commit hash
+        r'version.*:\s*[\d.]+',    # version number e.g. "version: 2.37.7"
+        r'HTTP.*[23]\d\d',          # HTTP status e.g. "HTTP/1.1 200 OK"
+        r'\{.*"[a-z].*:.*\}',       # JSON fragment e.g. {"id":"..."}
+        r'\b[a-f0-9]{7,40}\b',      # git commit hash e.g. e72d2b2 (word-bounded, 7-40 hex chars)
     ]
     return any(re.search(p, content, re.IGNORECASE | re.DOTALL) for p in evidence_patterns)
 
