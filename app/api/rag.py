@@ -3,6 +3,7 @@ Portfolio RAG proxy endpoints (MP-MS3 Phase 4) + MetaPM→RAG sync (PR-009).
 Proxies requests to the Portfolio RAG service.
 """
 
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -90,6 +91,28 @@ async def rag_checkpoints():
         raise HTTPException(status_code=502, detail=f"RAG service error: {e}")
 
 
+def _write_governance_kv(key: str, value: dict) -> None:
+    """Upsert a key/value record in governance_kv table (Amendment E)."""
+    import json as _json
+    value_json = _json.dumps(value)
+    try:
+        existing = execute_query(
+            "SELECT 1 FROM governance_kv WHERE key_name = ?", (key,), fetch="one"
+        )
+        if existing:
+            execute_query(
+                "UPDATE governance_kv SET value_json = ?, updated_at = GETUTCDATE() WHERE key_name = ?",
+                (value_json, key), fetch="none"
+            )
+        else:
+            execute_query(
+                "INSERT INTO governance_kv (key_name, value_json) VALUES (?, ?)",
+                (key, value_json), fetch="none"
+            )
+    except Exception as e:
+        logger.warning(f"governance_kv write failed (non-fatal): {e}")
+
+
 @router.post("/rag/sync")
 async def sync_requirements_to_rag():
     """Sync all MetaPM requirements into Portfolio RAG metapm collection.
@@ -97,7 +120,10 @@ async def sync_requirements_to_rag():
     Fetches all requirements from MetaPM DB, builds chunks per SYNC-2 schema,
     and POSTs to Portfolio RAG /ingest/custom with replace_collection=true.
     Called by Cloud Scheduler nightly or manually.
+    Amendment E: adds [RAG_SYNC] progress logging + governance_kv status persistence.
     """
+    sync_start = datetime.now(timezone.utc)
+    logger.info("[RAG_SYNC] Starting — fetching requirements from DB")
     api_key = settings.PORTFOLIO_RAG_API_KEY
     if not api_key:
         raise HTTPException(
@@ -207,10 +233,93 @@ async def sync_requirements_to_rag():
         raise HTTPException(status_code=502, detail=f"RAG service error: {e}")
 
     logger.info(f"RAG sync complete: {total_ingested} requirements synced to metapm collection")
+    req_ingested = total_ingested
+
+    # GROUP 4 (MP-MEGA-005): Sync UAT records (cc_spec, not archived) to metapm collection
+    try:
+        uat_rows = execute_query("""
+            SELECT id, project, sprint_code, pth, version, status,
+                   test_cases_json, general_notes, pl_submitted_at, spec_locked_at
+            FROM uat_pages
+            WHERE spec_source = 'cc_spec' AND status != 'archived'
+            ORDER BY spec_locked_at DESC
+        """, fetch="all")
+    except Exception as e:
+        logger.warning(f"RAG sync UAT query failed (non-fatal): {e}")
+        uat_rows = []
+
+    if uat_rows:
+        uat_chunks = []
+        for row in uat_rows:
+            tc_json = json.loads(row.get("test_cases_json") or "[]") if row.get("test_cases_json") else []
+            tc_lines = "\n".join(
+                f"  {tc.get('id','')} [{tc.get('status','pending').upper()}]: {tc.get('title','')} — {tc.get('notes','') or ''}"
+                for tc in tc_json
+            )
+            passed = sum(1 for t in tc_json if t.get("status") == "pass")
+            failed = sum(1 for t in tc_json if t.get("status") == "fail")
+            text = (
+                f"UAT: {row.get('pth','')} | {row.get('project','')} v{row.get('version','')}\n"
+                f"Sprint: {row.get('sprint_code','')}\n"
+                f"Status: {row.get('status','')}\n"
+                f"Results: {passed} passed, {failed} failed\n"
+                f"Test cases:\n{tc_lines}\n"
+                f"General notes: {row.get('general_notes','') or ''}\n"
+                f"URL: https://metapm.rentyourcio.com/uat/{row['id']}"
+            )
+            uat_chunks.append({
+                "id": f"metapm::uat::{row['id']}",
+                "content": text,
+                "metadata": {
+                    "source": "MetaPM-UAT",
+                    "pth": row.get("pth") or "",
+                    "project": row.get("project") or "",
+                    "status": row.get("status") or "",
+                    "version": row.get("version") or "",
+                },
+            })
+
+        try:
+            async with httpx.AsyncClient(timeout=SYNC_TIMEOUT) as client:
+                for i in range(0, len(uat_chunks), batch_size):
+                    batch = uat_chunks[i: i + batch_size]
+                    payload = {
+                        "collection": "metapm",
+                        "replace_collection": False,
+                        "chunks": batch,
+                    }
+                    resp = await client.post(
+                        f"{RAG_BASE}/ingest/custom",
+                        json=payload,
+                        headers=headers,
+                    )
+                    resp.raise_for_status()
+                    result = resp.json()
+                    total_ingested += result.get("chunks_ingested", len(batch))
+                    if i + batch_size < len(uat_chunks):
+                        await asyncio.sleep(1)
+            logger.info(f"RAG sync UAT: {total_ingested - req_ingested} UAT records synced")
+        except Exception as e:
+            logger.warning(f"RAG sync UAT ingest failed (non-fatal): {e}")
+
+    elapsed = (datetime.now(timezone.utc) - sync_start).total_seconds()
+    logger.info(f"[RAG_SYNC] Complete — synced={total_ingested} requirements={req_ingested} "
+                f"uats={total_ingested - req_ingested} elapsed={elapsed:.1f}s")
+    _write_governance_kv("rag_sync_last_run", {
+        "status": "success",
+        "synced": total_ingested,
+        "synced_requirements": req_ingested,
+        "synced_uats": total_ingested - req_ingested,
+        "elapsed_seconds": round(elapsed, 1),
+        "timestamp": sync_start.isoformat(),
+    })
     return {
         "synced": total_ingested,
+        "synced_requirements": req_ingested,
+        "synced_uats": total_ingested - req_ingested,
+        "elapsed_seconds": round(elapsed, 1),
         "collection": "metapm",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": sync_start.isoformat(),
     }
 
 

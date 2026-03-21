@@ -1904,3 +1904,62 @@ async def mcp_health():
         "version": settings.VERSION,
         "api_key_configured": bool(settings.MCP_API_KEY)
     }
+
+
+# AP03 Amendment A — Session transcript logging
+@router.post("/session-logs", status_code=201)
+async def create_session_log(payload: dict, _: bool = Depends(verify_api_key)):
+    """Store Cloud Run Job session transcript for audit trail and RAG indexing.
+    Called by loop1_worker.py and loop2_reviewer.py after each Anthropic API call.
+    """
+    from datetime import datetime as _dt
+    pth = payload.get("pth", "")
+    sprint_id = payload.get("sprint_id", "")
+    model = payload.get("model", "claude-opus-4-6")
+    exit_status = payload.get("exit_status", "unknown")
+    full_response = payload.get("full_response", "")
+    response_length = payload.get("response_length", len(full_response))
+    source = payload.get("source", "cloud-run-job")
+    ts_raw = payload.get("timestamp", _dt.utcnow().isoformat() + "Z")
+    # Parse ISO timestamp
+    try:
+        ts = _dt.fromisoformat(ts_raw.replace("Z", "+00:00"))
+    except Exception:
+        ts = _dt.utcnow()
+
+    row = execute_query("""
+        INSERT INTO session_logs (pth, sprint_id, model, exit_status, full_response,
+                                  response_length, timestamp, source)
+        OUTPUT INSERTED.id, INSERTED.created_at
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (pth, sprint_id, model, exit_status, full_response, response_length, ts, source),
+        fetch="one")
+
+    return {
+        "id": str(row["id"]) if row else None,
+        "pth": pth,
+        "exit_status": exit_status,
+        "response_length": response_length,
+        "created_at": str(row["created_at"]) if row else None
+    }
+
+
+# AP03 Amendment E Fix 2 — get_rag_sync_status MCP tool
+@router.get("/tools/get_rag_sync_status")
+async def get_rag_sync_status(_: bool = Depends(verify_api_key)):
+    """Get status of the last Portfolio RAG sync.
+    Returns: last_run timestamp, synced chunk count, elapsed_seconds,
+    status (success/failed), error message if failed.
+    Use this to diagnose stale RAG search results or sync timeouts.
+    """
+    row = execute_query(
+        "SELECT value_json FROM governance_kv WHERE key_name = 'rag_sync_last_run'",
+        fetch="one"
+    )
+    if not row:
+        return {"status": "never_run", "message": "No sync recorded in governance_kv table"}
+    import json as _json
+    try:
+        return _json.loads(row["value_json"])
+    except Exception:
+        return {"status": "error", "raw": row["value_json"]}

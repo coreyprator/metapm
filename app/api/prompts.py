@@ -2,6 +2,7 @@
 MetaPM Prompts API Router
 Endpoints for CC prompt storage, retrieval, and approval.
 PF5-MS2-SESSION-A (PTH: PF01A)
+AP03 Amendment B: immediate Cloud Run Job trigger on PL approval.
 """
 
 import asyncio
@@ -16,11 +17,41 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 import httpx
+import requests as _requests
 
 from app.core.config import settings
 from app.core.database import execute_query
 
 logger = logging.getLogger(__name__)
+
+
+async def trigger_cloud_run_job_immediate(job_name: str = "metapm-loop1-worker"):
+    """Fire the Cloud Run Job immediately when PL approves a prompt (Amendment B).
+    Uses GCP metadata server to get identity token, then calls Cloud Run Jobs API.
+    Non-blocking — never delays the approval response.
+    """
+    try:
+        project = "super-flashcards-475210"
+        region = "us-central1"
+        # Get identity token from metadata server (available in Cloud Run)
+        token_resp = _requests.get(
+            "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
+            headers={"Metadata-Flavor": "Google"},
+            timeout=5
+        )
+        token = token_resp.json().get("access_token", "")
+        if not token:
+            logger.warning("[AP03-B] Could not obtain identity token — skipping immediate trigger")
+            return
+        run_url = (f"https://us-central1-run.googleapis.com/apis/run.googleapis.com/v1/"
+                   f"namespaces/{project}/jobs/{job_name}:run")
+        resp = _requests.post(run_url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
+        if resp.status_code in (200, 201, 202):
+            logger.info(f"[AP03-B] Immediate Cloud Run trigger fired for {job_name}")
+        else:
+            logger.warning(f"[AP03-B] Cloud Run trigger failed (non-fatal): {resp.status_code} {resp.text[:200]}")
+    except Exception as e:
+        logger.warning(f"[AP03-B] Cloud Run trigger error (non-fatal): {e}")
 
 
 async def notify_pa(event_type: str, data: dict):
@@ -397,6 +428,9 @@ async def update_prompt(prompt_id: int, patch: PromptPatch):
             if patch.approved_by:
                 set_parts.append("approved_by = ?")
                 params.append(patch.approved_by)
+            # Amendment B: fire Cloud Run Job immediately on PL approval
+            if patch.approved_by == "PL":
+                asyncio.create_task(trigger_cloud_run_job_immediate("metapm-loop1-worker"))
 
     if patch.approved_by and patch.status != 'approved':
         set_parts.append("approved_by = ?")

@@ -1771,4 +1771,54 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 52 warning: {e}")
 
+    # Migration 53: AP03 — Create session_logs table (Amendment A) + governance_kv table (Amendment E)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'session_logs'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 53a: Creating session_logs table...")
+            execute_query("""
+                CREATE TABLE session_logs (
+                    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+                    pth NVARCHAR(20),
+                    sprint_id NVARCHAR(100),
+                    model NVARCHAR(50),
+                    exit_status NVARCHAR(20),
+                    full_response NVARCHAR(MAX),
+                    response_length INT,
+                    timestamp DATETIME2,
+                    source NVARCHAR(50),
+                    created_at DATETIME2 DEFAULT GETUTCDATE()
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_session_logs_pth ON session_logs(pth)", fetch="none")
+            execute_query("CREATE INDEX idx_session_logs_exit ON session_logs(exit_status)", fetch="none")
+            logger.info("  Migration 53a: session_logs table created.")
+        else:
+            logger.info("  Migration 53a: session_logs table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 53a warning: {e}")
+
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'governance_kv'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 53b: Creating governance_kv table...")
+            execute_query("""
+                CREATE TABLE governance_kv (
+                    key_name NVARCHAR(100) PRIMARY KEY,
+                    value_json NVARCHAR(MAX) NOT NULL,
+                    updated_at DATETIME2 DEFAULT GETUTCDATE()
+                )
+            """, fetch="none")
+            logger.info("  Migration 53b: governance_kv table created.")
+        else:
+            logger.info("  Migration 53b: governance_kv table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 53b warning: {e}")
+
     logger.info("Migrations complete.")

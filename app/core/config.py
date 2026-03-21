@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.37.8"  # MM09: Not Done filter fix (activeItems) + governance table (Cloud SQL, survives redeploy)
+    VERSION: str = "2.37.9"  # AP03: session_logs + governance_kv + RAG sync logging + immediate approval trigger
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
