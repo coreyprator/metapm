@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.37.9"  # AP03: session_logs + governance_kv + RAG sync logging + immediate approval trigger
+    VERSION: str = "2.37.10"  # AP04: UAT spec upsert by PTH — eliminate duplicate specs
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

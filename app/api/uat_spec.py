@@ -86,17 +86,12 @@ class PLResultsSubmit(BaseModel):
 @router.post("/api/uat/spec", response_model=UATSpecResponse, status_code=201)
 async def create_uat_spec(body: UATSpecCreate):
     """
-    Create an immutable UAT spec. Returns spec_id for use in handoff.
-    Spec is locked at creation — test_cases cannot be modified afterward.
+    Create or update a UAT spec. Upserts by PTH — second POST with same PTH updates
+    the existing spec rather than creating a duplicate (AP04 Fix 4).
     No auth required (CC runs this as SA).
     """
-    spec_id = str(uuid.uuid4()).upper()
     now = datetime.utcnow()
     spec_data = body.model_dump()
-
-    # Create a placeholder handoff_id so the uat_pages FK is satisfied
-    # (uat_pages.handoff_id is NOT NULL in practice — use a self-referential UUID)
-    placeholder_handoff_id = spec_id  # reuse spec_id as placeholder
 
     # Build minimal test_cases_json for compatibility with existing uat_pages queries
     tc_json = json.dumps([
@@ -113,43 +108,50 @@ async def create_uat_spec(body: UATSpecCreate):
         for tc in body.test_cases
     ])
 
-    # Insert into uat_pages with spec metadata
-    try:
-        result = execute_query("""
-            INSERT INTO uat_pages
-                (id, handoff_id, project, sprint_code, pth, version,
-                 test_cases_json, html_content, status,
-                 spec_source, spec_locked_at, spec_data)
-            OUTPUT INSERTED.id
-            VALUES (?, ?, ?, ?, ?, ?,
-                    ?, 'spec_created', 'ready',
-                    'cc_spec', ?, ?)
-        """, (
-            spec_id,
-            placeholder_handoff_id,
-            body.project,
-            body.sprint,
-            body.pth,
-            body.version,
-            tc_json,
-            now,
-            json.dumps(spec_data),
-        ), fetch="one")
-    except Exception as e:
-        # If id column is not NVARCHAR (it's UNIQUEIDENTIFIER), convert
-        logger.warning(f"First insert attempt failed: {e}, trying with NEWID approach")
-        spec_id = str(uuid.uuid4())
+    # AP04 Fix 4: Check if spec already exists for this PTH (upsert by PTH)
+    existing = execute_query(
+        "SELECT TOP 1 id FROM uat_pages WHERE pth = ? AND spec_source = 'cc_spec' ORDER BY created_at DESC",
+        (body.pth,), fetch="one"
+    )
+
+    if existing:
+        # UPDATE existing spec — preserve ID, reset test cases
+        spec_id = str(existing["id"])
+        try:
+            execute_query("""
+                UPDATE uat_pages SET
+                    project = ?, sprint_code = ?, version = ?,
+                    test_cases_json = ?, html_content = 'spec_created',
+                    status = 'ready', spec_data = ?
+                WHERE id = ?
+            """, (
+                body.project,
+                body.sprint,
+                body.version,
+                tc_json,
+                json.dumps(spec_data),
+                spec_id,
+            ), fetch="none")
+            logger.info(f"Updated existing UAT spec {spec_id} for PTH {body.pth} ({len(body.test_cases)} tests)")
+        except Exception as e:
+            logger.error(f"UAT spec update failed: {e}")
+            raise HTTPException(500, f"Failed to update UAT spec: {e}")
+    else:
+        # INSERT new spec
+        spec_id = str(uuid.uuid4()).upper()
+        placeholder_handoff_id = spec_id  # reuse spec_id as placeholder
         try:
             execute_query("""
                 INSERT INTO uat_pages
-                    (handoff_id, project, sprint_code, pth, version,
+                    (id, handoff_id, project, sprint_code, pth, version,
                      test_cases_json, html_content, status,
                      spec_source, spec_locked_at, spec_data)
-                VALUES (?, ?, ?, ?, ?,
+                VALUES (?, ?, ?, ?, ?, ?,
                         ?, 'spec_created', 'ready',
                         'cc_spec', ?, ?)
             """, (
                 spec_id,
+                placeholder_handoff_id,
                 body.project,
                 body.sprint,
                 body.pth,
@@ -158,19 +160,13 @@ async def create_uat_spec(body: UATSpecCreate):
                 now,
                 json.dumps(spec_data),
             ), fetch="none")
-            # Get the generated ID
-            row = execute_query(
-                "SELECT TOP 1 id FROM uat_pages WHERE handoff_id = ? ORDER BY created_at DESC",
-                (spec_id,), fetch="one"
-            )
-            if row:
-                spec_id = str(row["id"])
-        except Exception as e2:
-            logger.error(f"UAT spec insert failed: {e2}")
-            raise HTTPException(500, f"Failed to create UAT spec: {e2}")
+            logger.info(f"Created new UAT spec {spec_id} for {body.project} {body.version} ({len(body.test_cases)} tests)")
+        except Exception as e:
+            logger.error(f"UAT spec insert failed: {e}")
+            raise HTTPException(500, f"Failed to create UAT spec: {e}")
 
     uat_url = f"https://metapm.rentyourcio.com/uat/{spec_id}"
-    logger.info(f"Created UAT spec {spec_id} for {body.project} {body.version} ({len(body.test_cases)} tests)")
+    logger.info(f"UAT spec upsert complete: {spec_id} PTH={body.pth}")
 
     # Fix 5 (MP08): notify PA *after* spec exists so email contains valid UAT URL
     asyncio.create_task(notify_pa("UAT Ready", {
