@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.37.7"  # BA07: prompt gate (no localhost, non-root BV URLs) + handoff canary evidence gate
+    VERSION: str = "2.37.8"  # MM09: Not Done filter fix (activeItems) + governance table (Cloud SQL, survives redeploy)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

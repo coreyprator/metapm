@@ -2,47 +2,61 @@
 MetaPM Governance API
 Bootstrap checkpoint verification and sync.
 MP-GOVERNANCE-SYNC-001 PTH-G3A1
+MM09: Migrated from JSON file to Cloud SQL governance table.
 """
 
-import json
 import logging
 from datetime import date
-from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from app.core.database import execute_query
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Governance state file — simple JSON storage (no DB table needed)
-GOVERNANCE_STATE_FILE = Path(__file__).parent.parent.parent / "governance_state.json"
-
 DEFAULT_STATE = {
-    "checkpoint": "BOOT-1.5.9-D4F1",
-    "bootstrap_version": "1.5.9",
-    "updated_at": "2026-03-15",
+    "checkpoint": "BOOT-1.5.18-BA07",
+    "bootstrap_version": "1.5.18",
+    "updated_at": "2026-03-21",
     "source": "project-methodology/templates/CC_Bootstrap_v1.md"
 }
 
 
 def _read_state() -> dict:
-    """Read governance state from JSON file, or return defaults."""
-    if GOVERNANCE_STATE_FILE.exists():
-        try:
-            return json.loads(GOVERNANCE_STATE_FILE.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError) as e:
-            logger.warning(f"Failed to read governance state: {e}")
+    """Read governance state from Cloud SQL governance table."""
+    try:
+        row = execute_query(
+            "SELECT TOP 1 checkpoint, bootstrap_version, updated_at, source FROM governance ORDER BY updated_at DESC",
+            fetch="one"
+        )
+        if row:
+            return {
+                "checkpoint": row["checkpoint"],
+                "bootstrap_version": row["bootstrap_version"],
+                "updated_at": str(row["updated_at"])[:10],
+                "source": row["source"] or DEFAULT_STATE["source"]
+            }
+    except Exception as e:
+        logger.warning(f"Failed to read governance state from DB: {e}")
     return DEFAULT_STATE.copy()
 
 
 def _write_state(state: dict) -> None:
-    """Write governance state to JSON file."""
-    GOVERNANCE_STATE_FILE.write_text(
-        json.dumps(state, indent=2), encoding="utf-8"
-    )
+    """Write governance state to Cloud SQL governance table (upsert via delete+insert)."""
+    try:
+        execute_query("DELETE FROM governance", fetch="none")
+        execute_query(
+            "INSERT INTO governance (checkpoint, bootstrap_version, updated_at, source) VALUES (?, ?, ?, ?)",
+            params=(state["checkpoint"], state["bootstrap_version"], state["updated_at"], state.get("source", DEFAULT_STATE["source"])),
+            fetch="none"
+        )
+    except Exception as e:
+        logger.error(f"Failed to write governance state to DB: {e}")
+        raise
 
 
 class GovernanceSyncPayload(BaseModel):

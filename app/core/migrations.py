@@ -1743,32 +1743,31 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 51 warning: {e}")
 
-    # Migration 52: MP-UAT-FIX-001 — Create uat_bv_items table
+    # Migration 52: MM09 — Create governance table (replaces governance_state.json)
     try:
         result = execute_query("""
             SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES
-            WHERE TABLE_NAME = 'uat_bv_items'
+            WHERE TABLE_NAME = 'governance'
         """, fetch="one")
         if result and result['cnt'] == 0:
-            logger.info("  Migration 52: Creating uat_bv_items table...")
+            logger.info("  Migration 52: Creating governance table...")
             execute_query("""
-                CREATE TABLE uat_bv_items (
-                    id          UNIQUEIDENTIFIER NOT NULL DEFAULT NEWID() PRIMARY KEY,
-                    spec_id     UNIQUEIDENTIFIER NOT NULL,
-                    bv_id       NVARCHAR(20)     NOT NULL,
-                    title       NVARCHAR(500)    NULL,
-                    status      NVARCHAR(20)     NOT NULL DEFAULT 'pending',
-                    notes       NVARCHAR(MAX)    NULL,
-                    updated_at  DATETIME2        NOT NULL DEFAULT GETUTCDATE(),
-                    CONSTRAINT CHK_bv_status CHECK (status IN ('pending','pass','fail','skip')),
-                    CONSTRAINT FK_bv_spec FOREIGN KEY (spec_id)
-                        REFERENCES uat_pages(id) ON DELETE CASCADE
+                CREATE TABLE governance (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    checkpoint NVARCHAR(50) NOT NULL,
+                    bootstrap_version NVARCHAR(20) NOT NULL,
+                    updated_at NVARCHAR(20) NOT NULL,
+                    source NVARCHAR(200) NULL
                 )
             """, fetch="none")
-            execute_query("CREATE INDEX IX_uat_bv_items_spec ON uat_bv_items(spec_id)", fetch="none")
-            logger.info("  Migration 52: uat_bv_items table created.")
+            execute_query("""
+                INSERT INTO governance (checkpoint, bootstrap_version, updated_at, source)
+                VALUES ('BOOT-1.5.18-BA07', '1.5.18', '2026-03-21',
+                        'project-methodology/templates/CC_Bootstrap_v1.md')
+            """, fetch="none")
+            logger.info("  Migration 52: governance table created and seeded with BOOT-1.5.18-BA07.")
         else:
-            logger.info("  Migration 52: uat_bv_items table already exists.")
+            logger.info("  Migration 52: governance table already exists.")
     except Exception as e:
         logger.warning(f"  Migration 52 warning: {e}")
 

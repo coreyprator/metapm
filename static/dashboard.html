@@ -1153,7 +1153,9 @@
         const STATUS_GRP = typeof STATUS_GROUPS !== 'undefined' ? STATUS_GROUPS : {};
         let activeItems = openReqs.filter(r => !CLOSED_STATUSES.includes(r.status) && r.status !== 'backlog');
         if (priorityFilter) activeItems = activeItems.filter(r => r.priority === priorityFilter);
-        if (statusFilter && STATUS_GRP[statusFilter]) {
+        if (statusFilter === 'not_done') {
+          // activeItems already filtered to non-closed, non-backlog items above — no additional filter needed
+        } else if (statusFilter && STATUS_GRP[statusFilter]) {
           activeItems = activeItems.filter(r => STATUS_GRP[statusFilter].includes(r.status));
         } else if (statusFilter) {
           activeItems = activeItems.filter(r => r.status === statusFilter);
