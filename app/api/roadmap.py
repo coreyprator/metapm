@@ -644,6 +644,8 @@ async def create_requirement(req: RequirementCreate):
 
 @router.put("/requirements/{requirement_id}", response_model=RequirementResponse)
 @router.put("/roadmap/requirements/{requirement_id}", response_model=RequirementResponse)
+@router.patch("/requirements/{requirement_id}", response_model=RequirementResponse)
+@router.patch("/roadmap/requirements/{requirement_id}", response_model=RequirementResponse)
 async def update_requirement(requirement_id: str, update: RequirementUpdate):
     """Update a requirement."""
     try:

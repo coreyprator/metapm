@@ -900,7 +900,9 @@
           if (openOnly && CLOSED_STATUSES.includes(r.status)) return false;
           if (category && p.category_id !== category) return false;
           if (priority && r.priority !== priority) return false;
-          if (status && r.status !== status) return false;
+          if (status === 'not_done') {
+            if (CLOSED_STATUSES.includes(r.status)) return false;
+          } else if (status && r.status !== status) return false;
           if (person && PERSON_FILTER_MAP[person] && !PERSON_FILTER_MAP[person].includes(r.status)) return false;
           if (search) {
             const haystack = `${r.code} ${r.title} ${r.description || ''} ${r.type || ''} ${r.status || ''}`.toLowerCase();
