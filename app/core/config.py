@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.37.6"  # MM07: not_done filter project counts (BUG-007), PATCH requirement endpoint (BUG-008)
+    VERSION: str = "2.37.7"  # BA07: prompt gate (no localhost, non-root BV URLs) + handoff canary evidence gate
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

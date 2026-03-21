@@ -75,6 +75,20 @@ def _parse_json_field(value: Optional[str]) -> Optional[dict]:
         return None
 
 
+def _has_canary_evidence(content: str) -> bool:
+    """Return True if handoff content contains machine-verifiable canary output (BA07)."""
+    if not content:
+        return False
+    evidence_patterns = [
+        r'version.*:\s*[\d.]+',       # version number
+        r'HTTP.*[23]\d\d',             # HTTP 2xx/3xx status
+        r'\{.*"[a-z].*:.*\}',         # JSON response fragment
+        r'PASS.*\n.*[{"\[0-9]',       # PASS followed by actual output
+        r'[a-f0-9]{7,40}',            # git commit hash
+    ]
+    return any(re.search(p, content, re.IGNORECASE | re.DOTALL) for p in evidence_patterns)
+
+
 def _parse_tags_field(value: Optional[str]) -> Optional[List[str]]:
     """Parse JSON array string field to list."""
     if not value:
@@ -288,6 +302,17 @@ async def create_handoff(
             raise HTTPException(
                 status_code=400,
                 detail=f"UAT spec {handoff.uat_spec_id} has 0 test cases. Spec must contain BV items."
+            )
+
+        # BA07 Gate 3: handoff content must contain at least one machine-verifiable canary result
+        if handoff.content and not _has_canary_evidence(handoff.content):
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "handoff_missing_canary_evidence",
+                    "message": "Handoff content must include at least one machine-verifiable canary result (version number, HTTP status, JSON response, or git commit hash). 'PASS' with no output is not sufficient.",
+                    "fix": "Include the actual curl/gcloud output from your canary checks in the handoff content field.",
+                }
             )
 
         metadata_json = json.dumps(handoff.metadata) if handoff.metadata else None

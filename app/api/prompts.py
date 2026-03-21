@@ -75,6 +75,29 @@ def _has_uat_spec(content_md: str) -> bool:
     return False
 
 
+def _has_localhost_urls(content_md: str) -> list:
+    """Return list of localhost URLs found in test_cases URL fields (BA07)."""
+    return re.findall(r'"url"\s*:\s*"(http://localhost[^"]*)"', content_md)
+
+
+def _all_bv_urls_are_root(content_md: str) -> bool:
+    """Return True if all test_case URL fields point to app root with no path (BA07)."""
+    blocks = re.findall(r'```json\s*(\{.*?\})\s*```', content_md, re.DOTALL)
+    for block in blocks:
+        try:
+            data = json.loads(block)
+            cases = data.get('test_cases', [])
+            if not cases:
+                continue
+            non_root = [c for c in cases if re.search(r'https?://[^/"\s]+/[^/"\s]+', c.get('url', ''))]
+            if non_root:
+                return False  # at least one has a path
+            return True  # all are root-only or have no URL
+        except Exception:
+            continue
+    return False
+
+
 # Schemas
 class PromptCreate(BaseModel):
     requirement_id: Optional[str] = None
@@ -143,7 +166,8 @@ async def create_prompt(prompt: PromptCreate, _: bool = Depends(verify_api_key))
     """Create a new CC prompt."""
     # MP-CAI-OUTBOUND-GATE: require UAT spec JSON block in content_md
     bypass = (prompt.enforcement_bypass or "").strip().lower()
-    if bypass != "data_only_sprint" and not _has_uat_spec(prompt.content_md or ""):
+    content_md = prompt.content_md or ""
+    if bypass != "data_only_sprint" and not _has_uat_spec(content_md):
         raise HTTPException(
             status_code=400,
             detail={
@@ -154,6 +178,30 @@ async def create_prompt(prompt: PromptCreate, _: bool = Depends(verify_api_key))
                     "prompt (BOOT-1.5.10)."
                 ),
                 "fix": "Add a ```json {..., \"test_cases\": [{...}]} ``` block to the prompt content.",
+            }
+        )
+
+    # BA07: Check A — no localhost URLs in test_cases
+    if bypass != "data_only_sprint":
+        localhost_urls = _has_localhost_urls(content_md)
+        if localhost_urls:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "prompt_localhost_urls",
+                    "message": f"UAT spec test_cases must use production URLs, not localhost. Found: {localhost_urls[:3]}",
+                    "fix": "Replace localhost URLs with the production service URL (e.g. https://metapm.rentyourcio.com)",
+                }
+            )
+
+    # BA07: Check B — at least one BV URL must have a non-root path
+    if bypass != "data_only_sprint" and _all_bv_urls_are_root(content_md):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "prompt_bv_urls_too_generic",
+                "message": "All BV test_case URLs point to the app root. At least one must have a specific path (e.g. /prompts/MM07, /uat/UUID, /api/health).",
+                "fix": "Update test_case URLs to point to specific pages or endpoints that verify the feature.",
             }
         )
 
