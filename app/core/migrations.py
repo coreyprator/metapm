@@ -1836,6 +1836,41 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 54 warning: {e}")
 
+    # Migration 55b: MM10B — Drop and recreate cc_prompts status CHECK to add 'cancelled'
+    try:
+        # Find the inline CHECK constraint name on cc_prompts.status
+        ck_row = execute_query("""
+            SELECT cc.CONSTRAINT_NAME
+            FROM INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE cc
+            JOIN INFORMATION_SCHEMA.CHECK_CONSTRAINTS chk
+              ON cc.CONSTRAINT_NAME = chk.CONSTRAINT_NAME
+            WHERE cc.TABLE_NAME = 'cc_prompts' AND cc.COLUMN_NAME = 'status'
+              AND chk.CHECK_CLAUSE LIKE '%cancelled%'
+        """, fetch="one")
+        if not ck_row:
+            # Constraint exists but doesn't include 'cancelled' — find and drop it
+            old_ck = execute_query("""
+                SELECT cc.CONSTRAINT_NAME
+                FROM INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE cc
+                JOIN INFORMATION_SCHEMA.CHECK_CONSTRAINTS chk
+                  ON cc.CONSTRAINT_NAME = chk.CONSTRAINT_NAME
+                WHERE cc.TABLE_NAME = 'cc_prompts' AND cc.COLUMN_NAME = 'status'
+            """, fetch="one")
+            if old_ck:
+                cn = old_ck["CONSTRAINT_NAME"]
+                execute_query(f"ALTER TABLE cc_prompts DROP CONSTRAINT [{cn}]", fetch="none")
+                logger.info(f"  Migration 55b: dropped old CHECK constraint {cn}")
+            execute_query("""
+                ALTER TABLE cc_prompts ADD CONSTRAINT CK_cc_prompts_status
+                CHECK (status IN ('draft','prompt_ready','approved','sent','completed',
+                                  'executing','complete','closed','rejected','cancelled'))
+            """, fetch="none")
+            logger.info("  Migration 55b: cc_prompts status constraint updated to include 'cancelled'.")
+        else:
+            logger.info("  Migration 55b: cc_prompts status constraint already includes 'cancelled'.")
+    except Exception as e:
+        logger.warning(f"  Migration 55b warning: {e}")
+
     # Migration 55: MM10B — Create job_executions table for PTH-aware Jobs panel
     try:
         tbl_check = execute_query(
