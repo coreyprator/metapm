@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse
 
 from app.core.database import execute_query
 from app.services.uat_generator import generate_test_cases, render_uat_html
-from app.schemas.mcp import UATResultsUpdate, BulkArchiveRequest
+from app.schemas.mcp import UATResultsUpdate, BulkArchiveRequest, BulkCloseRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -884,4 +884,42 @@ async def bulk_archive_uats(body: BulkArchiveRequest):
         "archived_results": archived_results,
         "not_found": len(not_found),
         "reason": body.reason
+    }
+
+
+# ── POST /api/uat/bulk-close — Close stale UAT specs by spec_id (AP09) ──────
+
+@router.post("/api/uat/bulk-close")
+async def bulk_close_uat_specs(body: BulkCloseRequest):
+    """Mark multiple UAT specs as archived in bulk.
+    Accepts spec_ids (uat_pages.id). Sets status='archived' and stores archive_reason.
+    Removes them from the active UAT page without deleting records.
+    """
+    if not body.spec_ids:
+        raise HTTPException(400, "spec_ids list cannot be empty")
+
+    reason = body.reason or "bulk-close"
+    closed = []
+    not_found = []
+
+    for spec_id in body.spec_ids:
+        page = execute_query(
+            "SELECT id FROM uat_pages WHERE id = ?",
+            (spec_id,), fetch="one"
+        )
+        if page:
+            execute_query(
+                "UPDATE uat_pages SET status = 'archived', archive_reason = ? WHERE id = ?",
+                (reason[:200], spec_id), fetch="none"
+            )
+            closed.append(spec_id)
+        else:
+            not_found.append(spec_id)
+
+    logger.info(f"AP09 bulk-close: {len(closed)} specs archived, {len(not_found)} not found. Reason: {reason}")
+    return {
+        "closed": len(closed),
+        "spec_ids": closed,
+        "not_found": not_found,
+        "reason": reason
     }

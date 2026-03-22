@@ -505,3 +505,9 @@ class BulkArchiveRequest(BaseModel):
     """Request to archive multiple UAT records."""
     uat_ids: List[str]
     reason: Optional[str] = Field("administrative cleanup", max_length=500)
+
+
+class BulkCloseRequest(BaseModel):
+    """AP09: Request to bulk-close UAT specs by spec_id."""
+    spec_ids: List[str]
+    reason: Optional[str] = Field("bulk-close", max_length=200)

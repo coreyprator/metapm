@@ -1821,4 +1821,18 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 53b warning: {e}")
 
+    # Migration 54: AP09 — Add archive_reason column to uat_pages
+    try:
+        col_check = execute_query(
+            "SELECT COUNT(*) as cnt FROM sys.columns WHERE object_id = OBJECT_ID('uat_pages') AND name = 'archive_reason'",
+            fetch="one"
+        )
+        if not col_check or col_check["cnt"] == 0:
+            execute_query("ALTER TABLE uat_pages ADD archive_reason NVARCHAR(200) NULL", fetch="none")
+            logger.info("  Migration 54: archive_reason column added to uat_pages.")
+        else:
+            logger.info("  Migration 54: archive_reason column already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 54 warning: {e}")
+
     logger.info("Migrations complete.")
