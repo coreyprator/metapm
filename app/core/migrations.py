@@ -1905,7 +1905,7 @@ def run_migrations():
                     project_code NVARCHAR(20)   NULL,
                     content_md   NVARCHAR(MAX)  NOT NULL,
                     version      NVARCHAR(50)   NOT NULL,
-                    checkpoint   NVARCHAR(20)   NOT NULL,
+                    [checkpoint] NVARCHAR(20)   NOT NULL,
                     updated_at   DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
                     updated_by   NVARCHAR(50)   NOT NULL DEFAULT 'system'
                 )

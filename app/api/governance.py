@@ -90,7 +90,7 @@ async def get_bootstrap_checkpoint():
     # Try compliance_docs table first
     try:
         row = execute_query(
-            "SELECT version, checkpoint, updated_at FROM compliance_docs WHERE id = 'bootstrap'",
+            "SELECT version, [checkpoint], updated_at FROM compliance_docs WHERE id = 'bootstrap'",
             fetch="one"
         )
         if row:

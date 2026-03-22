@@ -395,7 +395,7 @@ def _tool_patch_requirement_status(args: dict) -> dict:
 def _tool_get_compliance_doc(args: dict) -> dict:
     doc_id = args["doc_id"]
     row = execute_query(
-        "SELECT id, doc_type, project_code, content_md, version, checkpoint, updated_at, updated_by FROM compliance_docs WHERE id = ?",
+        "SELECT id, doc_type, project_code, content_md, version, [checkpoint], updated_at, updated_by FROM compliance_docs WHERE id = ?",
         (doc_id,), fetch="one"
     )
     if not row:
@@ -428,13 +428,13 @@ def _tool_update_compliance_doc(args: dict) -> dict:
     if existing:
         execute_query("""
             UPDATE compliance_docs
-            SET content_md = ?, version = ?, checkpoint = ?, updated_at = GETUTCDATE(), updated_by = ?
+            SET content_md = ?, version = ?, [checkpoint] = ?, updated_at = GETUTCDATE(), updated_by = ?
             WHERE id = ?
         """, (content_md, version, checkpoint, updated_by, doc_id), fetch="none")
         status = "updated"
     else:
         execute_query("""
-            INSERT INTO compliance_docs (id, doc_type, project_code, content_md, version, checkpoint, updated_by)
+            INSERT INTO compliance_docs (id, doc_type, project_code, content_md, version, [checkpoint], updated_by)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (doc_id, doc_type, project_code, content_md, version, checkpoint, updated_by), fetch="none")
         status = "created"
@@ -452,7 +452,7 @@ def _tool_update_compliance_doc(args: dict) -> dict:
 def _tool_get_checkpoint(args: dict) -> dict:
     doc_id = args["doc_id"]
     row = execute_query(
-        "SELECT id, version, checkpoint, updated_at, updated_by FROM compliance_docs WHERE id = ?",
+        "SELECT id, version, [checkpoint], updated_at, updated_by FROM compliance_docs WHERE id = ?",
         (doc_id,), fetch="one"
     )
     if not row:
