@@ -110,6 +110,45 @@ TOOLS = [
         },
     },
     {
+        "name": "get_compliance_doc",
+        "description": "Retrieve a compliance document from the MetaPM compliance_docs table. Use doc_id values like 'bootstrap', 'pk-metapm', 'pk-sf', 'cai-outbound', 'cai-inbound'.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "string", "description": "Document ID (e.g. 'bootstrap', 'pk-metapm', 'cai-outbound')"},
+            },
+            "required": ["doc_id"],
+        },
+    },
+    {
+        "name": "update_compliance_doc",
+        "description": "Upsert a compliance document in the MetaPM compliance_docs table. Creates if not exists, updates if exists.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "string", "description": "Document ID to upsert (e.g. 'bootstrap', 'pk-metapm')"},
+                "content_md": {"type": "string", "description": "New markdown content"},
+                "version": {"type": "string", "description": "New version string (e.g. 'BOOT-1.5.19-BA08')"},
+                "checkpoint": {"type": "string", "description": "New checkpoint code"},
+                "doc_type": {"type": "string", "description": "Document type: 'bootstrap', 'pk', or 'cai_standard'", "default": "unknown"},
+                "project_code": {"type": "string", "description": "Project code if applicable (e.g. 'proj-mp'), null for cross-project docs"},
+                "updated_by": {"type": "string", "description": "Who made the update (e.g. 'PL', 'CC', 'CAI')", "default": "CC"},
+            },
+            "required": ["doc_id", "content_md", "version", "checkpoint"],
+        },
+    },
+    {
+        "name": "get_checkpoint",
+        "description": "Get the checkpoint and version for a compliance document without fetching full content.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "string", "description": "Document ID (e.g. 'bootstrap')"},
+            },
+            "required": ["doc_id"],
+        },
+    },
+    {
         "name": "list_projects",
         "description": "List all portfolio projects. Returns project UUID, code, and name. Use the 'id' field as project_id when calling post_prompt.",
         "inputSchema": {
@@ -353,6 +392,80 @@ def _tool_patch_requirement_status(args: dict) -> dict:
     return {"code": code, "previous_status": current, "status": status, "checkpoint": checkpoint, "note": note}
 
 
+def _tool_get_compliance_doc(args: dict) -> dict:
+    doc_id = args["doc_id"]
+    row = execute_query(
+        "SELECT id, doc_type, project_code, content_md, version, checkpoint, updated_at, updated_by FROM compliance_docs WHERE id = ?",
+        (doc_id,), fetch="one"
+    )
+    if not row:
+        return {"error": f"Compliance doc '{doc_id}' not found"}
+    return {
+        "id": row["id"],
+        "doc_type": row.get("doc_type"),
+        "project_code": row.get("project_code"),
+        "version": row.get("version"),
+        "checkpoint": row.get("checkpoint"),
+        "updated_at": str(row["updated_at"]) if row.get("updated_at") else None,
+        "updated_by": row.get("updated_by"),
+        "content_md": row.get("content_md") or "",
+        "content_length": len(row.get("content_md") or ""),
+    }
+
+
+def _tool_update_compliance_doc(args: dict) -> dict:
+    doc_id = args["doc_id"]
+    content_md = args["content_md"]
+    version = args["version"]
+    checkpoint = args["checkpoint"]
+    updated_by = args.get("updated_by", "CC")
+    doc_type = args.get("doc_type", "unknown")
+    project_code = args.get("project_code", None)
+
+    existing = execute_query(
+        "SELECT id FROM compliance_docs WHERE id = ?", (doc_id,), fetch="one"
+    )
+    if existing:
+        execute_query("""
+            UPDATE compliance_docs
+            SET content_md = ?, version = ?, checkpoint = ?, updated_at = GETUTCDATE(), updated_by = ?
+            WHERE id = ?
+        """, (content_md, version, checkpoint, updated_by, doc_id), fetch="none")
+        status = "updated"
+    else:
+        execute_query("""
+            INSERT INTO compliance_docs (id, doc_type, project_code, content_md, version, checkpoint, updated_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (doc_id, doc_type, project_code, content_md, version, checkpoint, updated_by), fetch="none")
+        status = "created"
+
+    return {
+        "id": doc_id,
+        "version": version,
+        "checkpoint": checkpoint,
+        "updated_by": updated_by,
+        "content_length": len(content_md),
+        "status": status,
+    }
+
+
+def _tool_get_checkpoint(args: dict) -> dict:
+    doc_id = args["doc_id"]
+    row = execute_query(
+        "SELECT id, version, checkpoint, updated_at, updated_by FROM compliance_docs WHERE id = ?",
+        (doc_id,), fetch="one"
+    )
+    if not row:
+        return {"error": f"Compliance doc '{doc_id}' not found"}
+    return {
+        "id": row["id"],
+        "version": row.get("version"),
+        "checkpoint": row.get("checkpoint"),
+        "updated_at": str(row["updated_at"]) if row.get("updated_at") else None,
+        "updated_by": row.get("updated_by"),
+    }
+
+
 # Tool dispatch map
 TOOL_HANDLERS = {
     "post_prompt": _tool_post_prompt,
@@ -363,6 +476,9 @@ TOOL_HANDLERS = {
     "list_requirements": _tool_list_requirements,
     "patch_requirement_status": _tool_patch_requirement_status,
     "list_projects": _tool_list_projects,
+    "get_compliance_doc": _tool_get_compliance_doc,
+    "update_compliance_doc": _tool_update_compliance_doc,
+    "get_checkpoint": _tool_get_checkpoint,
 }
 
 

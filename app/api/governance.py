@@ -85,7 +85,24 @@ class GovernanceSyncResponse(BaseModel):
 )
 async def get_bootstrap_checkpoint():
     """Returns the current canonical Bootstrap checkpoint code and version.
+    Tries compliance_docs table first (source=compliance_docs_table), falls back to governance table.
     CC Phase 0 must call this and confirm its read checkpoint matches."""
+    # Try compliance_docs table first
+    try:
+        row = execute_query(
+            "SELECT version, checkpoint, updated_at FROM compliance_docs WHERE id = 'bootstrap'",
+            fetch="one"
+        )
+        if row:
+            return GovernanceCheckpointResponse(
+                checkpoint=row["checkpoint"],
+                bootstrap_version=row["version"],
+                updated_at=str(row["updated_at"])[:10],
+                source="compliance_docs_table"
+            )
+    except Exception as e:
+        logger.warning(f"compliance_docs lookup failed, falling back to governance table: {e}")
+
     state = _read_state()
     return GovernanceCheckpointResponse(
         checkpoint=state["checkpoint"],

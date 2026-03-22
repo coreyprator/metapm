@@ -1890,4 +1890,34 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 55 warning: {e}")
 
+    # Migration 56: MC01 — Create compliance_docs table (stores Bootstrap, PKs, CAI standards)
+    try:
+        tbl_check = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'compliance_docs'
+        """, fetch="one")
+        if not tbl_check or tbl_check["cnt"] == 0:
+            logger.info("  Migration 56: Creating compliance_docs table...")
+            execute_query("""
+                CREATE TABLE compliance_docs (
+                    id           NVARCHAR(50)   NOT NULL PRIMARY KEY,
+                    doc_type     NVARCHAR(20)   NOT NULL,
+                    project_code NVARCHAR(20)   NULL,
+                    content_md   NVARCHAR(MAX)  NOT NULL,
+                    version      NVARCHAR(50)   NOT NULL,
+                    checkpoint   NVARCHAR(20)   NOT NULL,
+                    updated_at   DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
+                    updated_by   NVARCHAR(50)   NOT NULL DEFAULT 'system'
+                )
+            """, fetch="none")
+            execute_query(
+                "CREATE INDEX idx_compliance_docs_type ON compliance_docs(doc_type)",
+                fetch="none"
+            )
+            logger.info("  Migration 56: compliance_docs table created.")
+        else:
+            logger.info("  Migration 56: compliance_docs table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 56 warning: {e}")
+
     logger.info("Migrations complete.")

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.38.2"  # MM10B: cancel endpoint, job_executions, Active Prompts/Jobs panel redesign
+    VERSION: str = "2.38.3"  # MC01: compliance_docs table, 3 MCP tools (get/update_compliance_doc, get_checkpoint)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
