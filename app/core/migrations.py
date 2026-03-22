@@ -1838,36 +1838,28 @@ def run_migrations():
 
     # Migration 55b: MM10B — Drop and recreate cc_prompts status CHECK to add 'cancelled'
     try:
-        # Find the inline CHECK constraint name on cc_prompts.status
-        ck_row = execute_query("""
-            SELECT cc.CONSTRAINT_NAME
-            FROM INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE cc
-            JOIN INFORMATION_SCHEMA.CHECK_CONSTRAINTS chk
-              ON cc.CONSTRAINT_NAME = chk.CONSTRAINT_NAME
-            WHERE cc.TABLE_NAME = 'cc_prompts' AND cc.COLUMN_NAME = 'status'
-              AND chk.CHECK_CLAUSE LIKE '%cancelled%'
-        """, fetch="one")
-        if not ck_row:
-            # Constraint exists but doesn't include 'cancelled' — find and drop it
-            old_ck = execute_query("""
-                SELECT cc.CONSTRAINT_NAME
-                FROM INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE cc
-                JOIN INFORMATION_SCHEMA.CHECK_CONSTRAINTS chk
-                  ON cc.CONSTRAINT_NAME = chk.CONSTRAINT_NAME
-                WHERE cc.TABLE_NAME = 'cc_prompts' AND cc.COLUMN_NAME = 'status'
-            """, fetch="one")
-            if old_ck:
-                cn = old_ck["CONSTRAINT_NAME"]
-                execute_query(f"ALTER TABLE cc_prompts DROP CONSTRAINT [{cn}]", fetch="none")
-                logger.info(f"  Migration 55b: dropped old CHECK constraint {cn}")
+        # Use same pattern as Migration 50 — find any status CHECK, drop it, recreate with 'cancelled'
+        execute_query("""
+            DECLARE @ck NVARCHAR(200)
+            SELECT @ck = name FROM sys.check_constraints
+            WHERE parent_object_id = OBJECT_ID('cc_prompts') AND definition LIKE '%status%'
+              AND definition NOT LIKE '%cancelled%'
+            IF @ck IS NOT NULL
+                EXEC('ALTER TABLE cc_prompts DROP CONSTRAINT [' + @ck + ']')
+        """, fetch="none")
+        # Add new constraint with 'cancelled' — skip if already exists
+        try:
             execute_query("""
                 ALTER TABLE cc_prompts ADD CONSTRAINT CK_cc_prompts_status
                 CHECK (status IN ('draft','prompt_ready','approved','sent','completed',
                                   'executing','complete','closed','rejected','cancelled'))
             """, fetch="none")
             logger.info("  Migration 55b: cc_prompts status constraint updated to include 'cancelled'.")
-        else:
-            logger.info("  Migration 55b: cc_prompts status constraint already includes 'cancelled'.")
+        except Exception as ck_add_err:
+            if 'already exists' in str(ck_add_err).lower() or 'duplicate' in str(ck_add_err).lower():
+                logger.info("  Migration 55b: CK_cc_prompts_status already includes 'cancelled'.")
+            else:
+                raise
     except Exception as e:
         logger.warning(f"  Migration 55b warning: {e}")
 
