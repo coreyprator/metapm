@@ -26,16 +26,19 @@ logger = logging.getLogger(__name__)
 
 
 async def trigger_cloud_run_job_immediate(job_name: str = "metapm-loop1-worker",
-                                          pth: str = None, handoff_id: str = None):
+                                          pth: str = None, handoff_id: str = None,
+                                          args_override: list = None):
     """Fire a Cloud Run Job immediately with optional targeted args (AP06).
     Uses GCP metadata server to get identity token, then calls Cloud Run Jobs API.
     Non-blocking — never delays the caller response.
     MM10B: records execution to job_executions table for PTH-aware Jobs panel.
+    AP07: args_override allows passing arbitrary arg list (e.g. for loop3_processor).
 
     Args:
         job_name: Cloud Run Job name to execute.
         pth: If set, passes --pth=<pth> override to loop1_worker (targeted mode).
         handoff_id: If set, passes --handoff-id=<id> override to loop2_reviewer (targeted mode).
+        args_override: If set, uses this list of args directly (overrides pth/handoff_id).
     """
     try:
         project = "super-flashcards-475210"
@@ -53,9 +56,12 @@ async def trigger_cloud_run_job_immediate(job_name: str = "metapm-loop1-worker",
         run_url = (f"https://us-central1-run.googleapis.com/apis/run.googleapis.com/v1/"
                    f"namespaces/{project}/jobs/{job_name}:run")
 
-        # AP06: build targeted override args if provided
+        # AP06/AP07: build targeted override args if provided
         body = {}
-        if pth:
+        if args_override:
+            body = {"overrides": {"containerOverrides": [{"args": args_override}]}}
+            logger.info(f"[AP07] Triggering {job_name} | args: {args_override}")
+        elif pth:
             body = {"overrides": {"containerOverrides": [{"args": [f"--pth={pth}"]}]}}
             logger.info(f"[AP06] Triggering {job_name} targeted | PTH: {pth}")
         elif handoff_id:

@@ -496,12 +496,15 @@ async def list_handoffs(
         )
         total = count_result['total'] if count_result else 0
 
-        # Get paginated results - use literal offset/limit, not parameterized
+        # Get paginated results - LEFT JOIN reviews for review_id (AP07: fixes Loop 2 duplicate emails)
         results = execute_query(f"""
-            SELECT id, project, task, direction, status, metadata, response_to, created_at, updated_at
-            FROM mcp_handoffs
+            SELECT h.id, h.project, h.task, h.direction, h.status, h.metadata, h.response_to,
+                   h.created_at, h.updated_at,
+                   r.id as review_id, r.assessment
+            FROM mcp_handoffs h
+            LEFT JOIN reviews r ON r.handoff_id = h.id
             WHERE {where_sql}
-            ORDER BY created_at DESC
+            ORDER BY h.created_at DESC
             OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY
         """, tuple(params) if params else None, fetch="all")
 
@@ -517,6 +520,8 @@ async def list_handoffs(
                 metadata=_parse_json_field(row['metadata']),
                 response_to=str(row['response_to']) if row['response_to'] else None,
                 public_url=public_url,
+                review_id=str(row['review_id']) if row.get('review_id') else None,
+                assessment=row.get('assessment'),
                 created_at=row['created_at'],
                 updated_at=row['updated_at']
             ))

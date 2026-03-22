@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.38.3"  # MC01: compliance_docs table, 3 MCP tools (get/update_compliance_doc, get_checkpoint)
+    VERSION: str = "2.38.4"  # AP07: Loop 3 trigger on UAT submit, Loop 2 review_id fix (no duplicate emails)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

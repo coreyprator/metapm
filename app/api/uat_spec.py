@@ -17,7 +17,7 @@ import httpx
 from app.core.config import settings
 from app.core.database import execute_query
 from app.api.auth import is_pl_authenticated, render_login_required_page
-from app.api.prompts import notify_pa
+from app.api.prompts import notify_pa, trigger_cloud_run_job_immediate
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -246,7 +246,7 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
         )
 
     row = execute_query(
-        "SELECT id, test_cases_json, spec_source, status FROM uat_pages WHERE id = ?",
+        "SELECT id, test_cases_json, spec_source, status, pth, handoff_id FROM uat_pages WHERE id = ?",
         (spec_id,), fetch="one"
     )
     if not row:
@@ -329,6 +329,19 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
 
     # Fix 7 (MP08): trigger RAG re-ingestion so CAI can query results immediately
     asyncio.create_task(sync_uat_to_rag(spec_id))
+
+    # AP07: trigger Loop 3 to auto-process UAT results (post review + email PL)
+    spec_pth = row.get("pth") or "N/A"
+    spec_handoff_id = str(row["handoff_id"]) if row.get("handoff_id") else "none"
+    asyncio.create_task(trigger_cloud_run_job_immediate(
+        "metapm-loop3-processor",
+        args_override=[
+            f"--spec-id={spec_id}",
+            f"--handoff-id={spec_handoff_id}",
+            f"--pth={spec_pth}",
+        ]
+    ))
+    logger.info(f"[AP07] Loop 3 triggered for spec {spec_id} PTH={spec_pth}")
 
     return {
         "status": new_status,
