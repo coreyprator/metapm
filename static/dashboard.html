@@ -180,6 +180,7 @@
     .p1 { color: #ff9a9a; border-color: #803c3c; }
     .p2 { color: #ffd18a; border-color: #7a5a2f; }
     .req-row.has-prompt { border-left: 3px solid #f0b429; }
+    .item-description { grid-column: 1 / -1; font-size: 11px; color: var(--muted); margin-top: 2px; padding: 0 2px; white-space: pre-wrap; word-break: break-word; }
     /* Lifecycle status badges (PF5-MS1 v2) */
     .status-req_created     { color: #374151; background: #F3F4F6; border-color: #9CA3AF; }
     .status-req_approved    { color: #1D4ED8; background: #EFF6FF; border-color: #93C5FD; }
@@ -498,6 +499,7 @@
         <select id="personFilter"><option value="">All Persons</option><option value="PL">PL</option><option value="CAI">CAI</option><option value="CC">CC</option></select>
         <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="openItemsToggle" checked style="min-height:auto" /> Open Only</label>
         <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="showArchivedToggle" style="min-height:auto" /> Show Archived</label>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="showDescToggle" style="min-height:auto" /> Show Descriptions</label>
         <button id="resetFiltersBtn" type="button" class="danger-btn">Reset Filters</button>
       </div>
       <div class="control-row">
@@ -1057,6 +1059,7 @@
           <button class="icon-btn" data-open-req="${req.id}" title="Edit Requirement">✏️</button>
           <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete Requirement">🗑️</button>
         </div>
+        ${window._showDescriptions && req.description ? `<div class="item-description">${(req.description||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0,200)}${req.description.length > 200 ? '…' : ''}</div>` : ''}
       </div>`;
     }
 
@@ -2808,6 +2811,14 @@
       };
       qs('showArchivedToggle').onchange = async () => {
         await loadData();
+        render();
+      };
+      // Item 1: Show Descriptions toggle (MM10)
+      window._showDescriptions = localStorage.getItem('metapm_show_desc') === '1';
+      qs('showDescToggle').checked = window._showDescriptions;
+      qs('showDescToggle').onchange = () => {
+        window._showDescriptions = qs('showDescToggle').checked;
+        localStorage.setItem('metapm_show_desc', window._showDescriptions ? '1' : '0');
         render();
       };
       qs('searchInput').addEventListener('input', () => {
