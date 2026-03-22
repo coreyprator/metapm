@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.37.10"  # AP04: UAT spec upsert by PTH — eliminate duplicate specs
+    VERSION: str = "2.38.0"  # AP06: event-driven loops, jobs API, dashboard jobs panel
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

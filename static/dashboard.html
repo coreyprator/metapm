@@ -530,6 +530,16 @@
       <button type="button" onclick="bulkAssignSprint()" style="padding:4px 12px;background:var(--info);color:#fff;border:none;border-radius:4px;font-size:12px;cursor:pointer">Assign</button>
       <button type="button" onclick="clearBulkSelection()" style="padding:4px 10px;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:4px;font-size:12px;cursor:pointer">Clear</button>
     </div>
+    <!-- AP06: Jobs Status Panel -->
+    <div class="card" id="jobsPanel" style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-weight:600;font-size:13px">⚡ Active Jobs</span>
+        <button onclick="loadJobsStatus()" style="font-size:11px;padding:2px 8px;background:var(--panel-soft);border:1px solid var(--line);border-radius:4px;color:var(--muted);cursor:pointer">Refresh</button>
+      </div>
+      <div id="jobsList" style="font-size:12px;color:var(--muted)">Loading...</div>
+      <div id="approvedPromptsList" style="margin-top:8px"></div>
+    </div>
+
     <div class="card hierarchy" id="hierarchy"></div>
     <div class="card" id="visionBoard"></div>
     <div class="card" id="lessonsPanel">
@@ -2898,6 +2908,67 @@
         if (!e.target.closest('.add-wrap')) qs('addMenu').classList.remove('open');
       });
     }
+
+    // AP06: Jobs Status Panel
+    async function loadJobsStatus() {
+      const el = qs('jobsList');
+      try {
+        const data = await api('/api/prompts/jobs/status');
+        const loop1 = data.loop1 || [];
+        const loop2 = data.loop2 || [];
+        const all = [
+          ...loop1.map(j => ({...j, label: 'Loop 1 (CC)'})),
+          ...loop2.map(j => ({...j, label: 'Loop 2 (Review)'}))
+        ];
+        if (!all.length) {
+          el.innerHTML = '<span style="color:var(--muted)">No active jobs. Loops idle.</span>';
+        } else {
+          const statusColor = s => s === 'running' ? '#eab308' : s === 'succeeded' ? '#22c55e' : '#ef4444';
+          el.innerHTML = all.map(j =>
+            `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)">
+              <span style="background:${statusColor(j.status)};color:#000;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700">${j.status.toUpperCase()}</span>
+              <span style="font-weight:600">${j.label}</span>
+              <span style="color:var(--muted);font-family:monospace;font-size:11px">${j.name.split('-').slice(-2).join('-')}</span>
+              <span style="color:var(--muted);font-size:10px">${j.started ? new Date(j.started).toLocaleTimeString() : ''}</span>
+            </div>`
+          ).join('');
+        }
+      } catch(e) {
+        el.innerHTML = `<span style="color:#ef4444">Jobs API error: ${e.message}</span>`;
+      }
+
+      // Show approved prompts with Launch buttons
+      try {
+        const promptsData = await api('/api/prompts/?status=approved&limit=10');
+        const approved = Array.isArray(promptsData) ? promptsData : (promptsData.prompts || []);
+        const launchEl = qs('approvedPromptsList');
+        if (approved.length) {
+          launchEl.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Approved prompts ready to launch:</div>' +
+            approved.map(p =>
+              `<div style="display:flex;align-items:center;gap:8px;padding:3px 0">
+                <span style="font-weight:600;font-size:12px">${p.pth || p.id}</span>
+                <span style="color:var(--muted);font-size:11px">${(p.sprint_id || '').slice(0,30)}</span>
+                <button onclick="launchJob('${p.pth}')" style="font-size:10px;padding:1px 8px;background:#3b82f6;color:#fff;border:none;border-radius:3px;cursor:pointer">Launch</button>
+              </div>`
+            ).join('');
+        } else {
+          launchEl.innerHTML = '';
+        }
+      } catch(e) { /* non-fatal */ }
+    }
+
+    async function launchJob(pth) {
+      try {
+        const r = await api('/api/prompts/jobs/launch', {method:'POST', body: JSON.stringify({pth})});
+        alert(`Launched Loop 1 for PTH ${pth}`);
+        loadJobsStatus();
+      } catch(e) {
+        alert(`Launch failed: ${e.message}`);
+      }
+    }
+
+    loadJobsStatus();
+    setInterval(loadJobsStatus, 30000);
 
     bindControls();
     loadVersion();

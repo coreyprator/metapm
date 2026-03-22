@@ -25,14 +25,19 @@ from app.core.database import execute_query
 logger = logging.getLogger(__name__)
 
 
-async def trigger_cloud_run_job_immediate(job_name: str = "metapm-loop1-worker"):
-    """Fire the Cloud Run Job immediately when PL approves a prompt (Amendment B).
+async def trigger_cloud_run_job_immediate(job_name: str = "metapm-loop1-worker",
+                                          pth: str = None, handoff_id: str = None):
+    """Fire a Cloud Run Job immediately with optional targeted args (AP06).
     Uses GCP metadata server to get identity token, then calls Cloud Run Jobs API.
-    Non-blocking — never delays the approval response.
+    Non-blocking — never delays the caller response.
+
+    Args:
+        job_name: Cloud Run Job name to execute.
+        pth: If set, passes --pth=<pth> override to loop1_worker (targeted mode).
+        handoff_id: If set, passes --handoff-id=<id> override to loop2_reviewer (targeted mode).
     """
     try:
         project = "super-flashcards-475210"
-        region = "us-central1"
         # Get identity token from metadata server (available in Cloud Run)
         token_resp = _requests.get(
             "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
@@ -41,17 +46,34 @@ async def trigger_cloud_run_job_immediate(job_name: str = "metapm-loop1-worker")
         )
         token = token_resp.json().get("access_token", "")
         if not token:
-            logger.warning("[AP03-B] Could not obtain identity token — skipping immediate trigger")
+            logger.warning("[AP06] Could not obtain identity token — skipping immediate trigger")
             return
+
         run_url = (f"https://us-central1-run.googleapis.com/apis/run.googleapis.com/v1/"
                    f"namespaces/{project}/jobs/{job_name}:run")
-        resp = _requests.post(run_url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
-        if resp.status_code in (200, 201, 202):
-            logger.info(f"[AP03-B] Immediate Cloud Run trigger fired for {job_name}")
+
+        # AP06: build targeted override args if provided
+        body = {}
+        if pth:
+            body = {"overrides": {"containerOverrides": [{"args": [f"--pth={pth}"]}]}}
+            logger.info(f"[AP06] Triggering {job_name} targeted | PTH: {pth}")
+        elif handoff_id:
+            body = {"overrides": {"containerOverrides": [{"args": [f"--handoff-id={handoff_id}"]}]}}
+            logger.info(f"[AP06] Triggering {job_name} targeted | Handoff: {handoff_id}")
         else:
-            logger.warning(f"[AP03-B] Cloud Run trigger failed (non-fatal): {resp.status_code} {resp.text[:200]}")
+            logger.info(f"[AP06] Triggering {job_name} (fallback sweep)")
+
+        resp = _requests.post(run_url,
+                              headers={"Authorization": f"Bearer {token}",
+                                       "Content-Type": "application/json"},
+                              json=body if body else None,
+                              timeout=10)
+        if resp.status_code in (200, 201, 202):
+            logger.info(f"[AP06] Cloud Run trigger fired for {job_name}")
+        else:
+            logger.warning(f"[AP06] Cloud Run trigger failed (non-fatal): {resp.status_code} {resp.text[:200]}")
     except Exception as e:
-        logger.warning(f"[AP03-B] Cloud Run trigger error (non-fatal): {e}")
+        logger.warning(f"[AP06] Cloud Run trigger error (non-fatal): {e}")
 
 
 async def notify_pa(event_type: str, data: dict):
@@ -428,9 +450,14 @@ async def update_prompt(prompt_id: int, patch: PromptPatch):
             if patch.approved_by:
                 set_parts.append("approved_by = ?")
                 params.append(patch.approved_by)
-            # Amendment B: fire Cloud Run Job immediately on PL approval
+            # AP06: fire Cloud Run Job immediately on PL approval (targeted mode with PTH)
             if patch.approved_by == "PL":
-                asyncio.create_task(trigger_cloud_run_job_immediate("metapm-loop1-worker"))
+                pth_row = execute_query("SELECT pth FROM cc_prompts WHERE id = ?",
+                                        (prompt_id,), fetch="one")
+                pth_val = pth_row.get("pth") if pth_row else None
+                asyncio.create_task(
+                    trigger_cloud_run_job_immediate("metapm-loop1-worker", pth=pth_val)
+                )
 
     if patch.approved_by and patch.status != 'approved':
         set_parts.append("approved_by = ?")
@@ -467,3 +494,75 @@ async def update_prompt(prompt_id: int, patch: PromptPatch):
         raise HTTPException(status_code=404, detail="Prompt not found")
 
     return _row_to_response(row)
+
+
+# ── AP06: Jobs Status API ──
+
+@router.get("/jobs/status")
+async def get_jobs_status():
+    """AP06: Query Cloud Run Jobs API for recent executions of both loop workers.
+    Uses GCP metadata server identity token (available in Cloud Run).
+    """
+    project = "super-flashcards-475210"
+    jobs = ["metapm-loop1-worker", "metapm-loop2-reviewer"]
+    result = {}
+
+    try:
+        token_resp = _requests.get(
+            "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
+            headers={"Metadata-Flavor": "Google"},
+            timeout=5
+        )
+        token = token_resp.json().get("access_token", "")
+    except Exception as e:
+        return {"error": f"Could not obtain identity token: {e}", "loop1": [], "loop2": []}
+
+    for job_name in jobs:
+        key = "loop1" if "loop1" in job_name else "loop2"
+        try:
+            list_url = (f"https://us-central1-run.googleapis.com/apis/run.googleapis.com/v1/"
+                        f"namespaces/{project}/executions")
+            resp = _requests.get(
+                list_url,
+                params={"labelSelector": f"run.googleapis.com/job={job_name}", "limit": "5"},
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10
+            )
+            if resp.status_code == 200:
+                items = resp.json().get("items", [])
+                result[key] = [
+                    {
+                        "name": item.get("metadata", {}).get("name", ""),
+                        "job": job_name,
+                        "status": _parse_execution_status(item),
+                        "started": item.get("metadata", {}).get("creationTimestamp", ""),
+                    }
+                    for item in items
+                ]
+            else:
+                result[key] = []
+        except Exception as e:
+            result[key] = []
+            logger.warning(f"[AP06] jobs/status error for {job_name}: {e}")
+
+    return result
+
+
+def _parse_execution_status(execution: dict) -> str:
+    conditions = execution.get("status", {}).get("conditions", [])
+    for c in conditions:
+        if c.get("type") == "Completed":
+            return "succeeded" if c.get("status") == "True" else "running"
+        if c.get("type") == "Failed" and c.get("status") == "True":
+            return "failed"
+    return "running"
+
+
+@router.post("/jobs/launch")
+async def launch_job(payload: dict):
+    """AP06: Manually launch Loop 1 for a specific PTH (dashboard Launch button)."""
+    pth = payload.get("pth")
+    if not pth:
+        raise HTTPException(status_code=400, detail="pth required")
+    await trigger_cloud_run_job_immediate("metapm-loop1-worker", pth=pth)
+    return {"launched": True, "pth": pth}

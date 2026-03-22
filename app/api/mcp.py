@@ -431,6 +431,17 @@ async def create_handoff(
         except Exception as pa_err:
             logger.warning(f"PA handoff notification failed (non-fatal): {pa_err}")
 
+        # AP06: Fire Loop 2 immediately for this specific handoff (targeted mode)
+        try:
+            from app.api.prompts import trigger_cloud_run_job_immediate
+            import asyncio
+            asyncio.create_task(
+                trigger_cloud_run_job_immediate("metapm-loop2-reviewer",
+                                                handoff_id=str(handoff_id))
+            )
+        except Exception as loop2_err:
+            logger.warning(f"Loop 2 trigger failed (non-fatal): {loop2_err}")
+
         return HandoffResponse(
             id=handoff_id,
             project=result['project'],
