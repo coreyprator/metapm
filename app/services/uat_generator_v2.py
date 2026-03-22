@@ -10,6 +10,33 @@ from html import escape
 
 logger = logging.getLogger(__name__)
 
+# EG06: Project display name lookup — prevents None crash and shows correct display names
+PROJECT_DISPLAY_NAMES = {
+    'proj-mp': 'MetaPM',
+    'proj-sf': 'Super Flashcards',
+    'proj-hl': 'HarmonyLab',
+    'proj-af': 'ArtForge',
+    'proj-em': 'Etymython',
+    'proj-efg': 'Etymology Graph',
+    'proj-pr': 'Portfolio RAG',
+    'proj-pa': 'Personal Assistant',
+    'proj-pm': 'project-methodology',
+    'MetaPM': 'MetaPM',
+    'HarmonyLab': 'HarmonyLab',
+    'Super Flashcards': 'Super Flashcards',
+    'Super-Flashcards': 'Super Flashcards',
+    'Etymology Graph': 'Etymology Graph',
+    'Etymology Graph Service': 'Etymology Graph',
+}
+
+
+def resolve_project_name(raw: str | None) -> str:
+    """Safely resolve any project identifier to a display name. Never crashes."""
+    if not raw:
+        return 'Unknown Project'
+    return PROJECT_DISPLAY_NAMES.get(raw, raw.replace('proj-', '').replace('-', ' ').title())
+
+
 PROJECT_COLORS = {
     "metapm": "#ef4444",
     "etymython": "#a855f7",
@@ -49,10 +76,10 @@ def render_structured_uat_html(
     Only test cases where type == 'pl_visual' are rendered.
     cc_machine test cases are stored in the DB but not shown.
     """
-    project_key = project.lower().replace(" ", "-")
+    project_key = project.lower().replace(" ", "-") if project else "unknown"
     color = PROJECT_COLORS.get(project_key, "#6366f1")
     emoji = PROJECT_EMOJIS.get(project_key, "")
-    project_display = project.replace("-", " ").title() if "-" in project else project
+    project_display = resolve_project_name(project)
 
     # Filter to PL-visible test cases only
     pl_cases = [tc for tc in test_cases if tc.get("type", "pl_visual") == "pl_visual"]

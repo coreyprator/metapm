@@ -11,6 +11,33 @@ from html import escape
 
 logger = logging.getLogger(__name__)
 
+# EG06: Project display name lookup — prevents None crash and shows correct display names
+PROJECT_DISPLAY_NAMES = {
+    'proj-mp': 'MetaPM',
+    'proj-sf': 'Super Flashcards',
+    'proj-hl': 'HarmonyLab',
+    'proj-af': 'ArtForge',
+    'proj-em': 'Etymython',
+    'proj-efg': 'Etymology Graph',
+    'proj-pr': 'Portfolio RAG',
+    'proj-pa': 'Personal Assistant',
+    'proj-pm': 'project-methodology',
+    'MetaPM': 'MetaPM',
+    'HarmonyLab': 'HarmonyLab',
+    'Super Flashcards': 'Super Flashcards',
+    'Super-Flashcards': 'Super Flashcards',
+    'Etymology Graph': 'Etymology Graph',
+    'Etymology Graph Service': 'Etymology Graph',
+}
+
+
+def resolve_project_name(raw: str | None) -> str:
+    """Safely resolve any project identifier to a display name. Never crashes."""
+    if not raw:
+        return 'Unknown Project'
+    return PROJECT_DISPLAY_NAMES.get(raw, raw.replace('proj-', '').replace('-', ' ').title())
+
+
 # Project emoji mapping
 PROJECT_EMOJIS = {
     "metapm": "\U0001f534",       # red circle
@@ -225,7 +252,7 @@ def render_uat_html(
     """Render a complete UAT HTML page matching UAT_Template_v3 visual pattern."""
     emoji = PROJECT_EMOJIS.get(project, "")
     color = PROJECT_COLORS.get(project, "#6366f1")
-    project_display = project.replace("-", " ").title()
+    project_display = resolve_project_name(project)
     if feature_title:
         title = f"{emoji} {feature_title}"
     else:

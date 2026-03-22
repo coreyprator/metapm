@@ -197,7 +197,7 @@ fetch('/api/compliance-docs').then(r=>r.json()).then(data=>{
   let html = '<table><thead><tr><th>Document</th><th>Type</th><th>Version</th><th>Last Updated</th><th>Updated By</th></tr></thead><tbody>';
   docs.forEach(d => {
     const title = d.project_code ? d.project_code + ' (' + d.doc_type + ')' : d.id;
-    html += '<tr><td><a href="/docs/' + d.id + '">' + title + '</a></td>'
+    html += '<tr style="cursor:pointer" onclick="window.location=\'/docs/\'+d.id"><td><a href="/docs/' + d.id + '" onclick="event.stopPropagation()">' + title + '</a></td>'
           + '<td><span class="badge">' + (d.doc_type || '') + '</span></td>'
           + '<td>' + (d.version || '\u2014') + '</td>'
           + '<td>' + formatTimestamp(d.updated_at) + '</td>'

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.38.6"  # AP08: Loop 2/3 fixes (pth+UAT URL in email, unreviewed filter, fix prompt authoring, AHK, jobs panel loop3, UAT note)
+    VERSION: str = "2.38.7"  # EG06: /docs row onclick, formatTimestamp on docs, UAT project name resolve_project_name()
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
