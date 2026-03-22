@@ -81,11 +81,25 @@ async def trigger_cloud_run_job_immediate(job_name: str = "metapm-loop1-worker",
             try:
                 exec_data = resp.json()
                 exec_name = exec_data.get("metadata", {}).get("name", f"{job_name}-{uuid.uuid4().hex[:8]}")
-                job_type = "loop1" if "loop1" in job_name else "loop2"
+                # AP08 Fix 5: detect loop3, extract pth from args_override
+                if "loop1" in job_name:
+                    job_type = "loop1"
+                elif "loop3" in job_name:
+                    job_type = "loop3"
+                else:
+                    job_type = "loop2"
+                effective_pth = pth
+                if not effective_pth and args_override:
+                    for a in args_override:
+                        if a.startswith("--pth="):
+                            effective_pth = a.split("=", 1)[1]
+                            if effective_pth == "N/A":
+                                effective_pth = None
+                            break
                 execute_query(
                     """INSERT INTO job_executions (id, pth, job_type, handoff_id, status)
                        VALUES (?, ?, ?, ?, 'running')""",
-                    (exec_name, pth, job_type, handoff_id), fetch="none"
+                    (exec_name, effective_pth, job_type, handoff_id), fetch="none"
                 )
             except Exception as rec_err:
                 logger.warning(f"[MM10B] job_executions record failed (non-fatal): {rec_err}")
@@ -540,7 +554,7 @@ async def get_jobs_status():
     """
     from datetime import timezone
     project = "super-flashcards-475210"
-    jobs = ["metapm-loop1-worker", "metapm-loop2-reviewer"]
+    jobs = ["metapm-loop1-worker", "metapm-loop2-reviewer", "metapm-loop3-processor"]  # AP08 Fix 5
     result = {}
 
     # MM10B: load job_executions PTH lookup
@@ -564,11 +578,11 @@ async def get_jobs_status():
         )
         token = token_resp.json().get("access_token", "")
     except Exception as e:
-        return {"error": f"Could not obtain identity token: {e}", "loop1": [], "loop2": []}
+        return {"error": f"Could not obtain identity token: {e}", "loop1": [], "loop2": [], "loop3": []}
 
     cutoff_24h = datetime.now(timezone.utc).replace(microsecond=0)
     for job_name in jobs:
-        key = "loop1" if "loop1" in job_name else "loop2"
+        key = "loop1" if "loop1" in job_name else ("loop3" if "loop3" in job_name else "loop2")  # AP08 Fix 5
         try:
             list_url = (f"https://us-central1-run.googleapis.com/apis/run.googleapis.com/v1/"
                         f"namespaces/{project}/executions")

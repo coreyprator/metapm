@@ -3063,9 +3063,11 @@
         const data = await api('/api/prompts/jobs/status');
         const loop1 = data.loop1 || [];
         const loop2 = data.loop2 || [];
+        const loop3 = data.loop3 || [];
         const all = [
           ...loop1.map(j => ({...j, label: 'Loop 1 (CC)'})),
-          ...loop2.map(j => ({...j, label: 'Loop 2 (Review)'}))
+          ...loop2.map(j => ({...j, label: 'Loop 2 (Review)'})),
+          ...loop3.map(j => ({...j, label: 'Loop 3 (UAT)'}))
         ];
         if (!all.length) {
           el.innerHTML = '<span style="color:var(--muted)">No jobs in last 24h. Loops idle.</span>';

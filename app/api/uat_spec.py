@@ -660,6 +660,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
     {resubmit_btn}
     {mark_passed_btn}
   </div>
+  {'<div style="font-size:11px;color:#94a3b8;margin-top:6px;text-align:center">⚡ Submitting fires Loop 3 automatically — requirements will be advanced within 2 minutes.</div>' if not is_submitted else ''}
   <div id="submit-result" {'class="ok" style="display:block"' if is_submitted else ''}>{f'Results submitted. <a href="/uat/{spec_id}">View UAT record →</a>' if is_submitted else ''}</div>
 
   <script>

@@ -468,6 +468,7 @@ async def list_handoffs(
     direction: Optional[HandoffDirection] = Query(None),
     limit: int = Query(20, le=100),
     offset: int = Query(0),
+    unreviewed: bool = Query(False),  # AP08 Fix 2: server-side unreviewed filter
     _: bool = Depends(verify_api_key)
 ):
     """List handoffs with optional filters."""
@@ -477,33 +478,38 @@ async def list_handoffs(
         params = []
 
         if project:
-            where_clauses.append("project = ?")
+            where_clauses.append("h.project = ?")
             params.append(project)
         if status:
-            where_clauses.append("status = ?")
+            where_clauses.append("h.status = ?")
             params.append(status.value)
         if direction:
-            where_clauses.append("direction = ?")
+            where_clauses.append("h.direction = ?")
             params.append(direction.value)
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+        unreviewed_sql = " AND r.id IS NULL" if unreviewed else ""
 
-        # Get total count
+        # Get total count (AP08: always LEFT JOIN reviews to support unreviewed filter)
         count_result = execute_query(
-            f"SELECT COUNT(*) as total FROM mcp_handoffs WHERE {where_sql}",
+            f"""SELECT COUNT(*) as total FROM mcp_handoffs h
+                LEFT JOIN reviews r ON r.handoff_id = h.id
+                WHERE {where_sql}{unreviewed_sql}""",
             tuple(params) if params else None,
             fetch="one"
         )
         total = count_result['total'] if count_result else 0
 
-        # Get paginated results - LEFT JOIN reviews for review_id (AP07: fixes Loop 2 duplicate emails)
+        # Get paginated results — LEFT JOIN reviews (AP07) + uat_pages + pth (AP08 Fix 1)
         results = execute_query(f"""
             SELECT h.id, h.project, h.task, h.direction, h.status, h.metadata, h.response_to,
-                   h.created_at, h.updated_at,
-                   r.id as review_id, r.assessment
+                   h.created_at, h.updated_at, h.pth,
+                   r.id as review_id, r.assessment,
+                   u.id as uat_spec_id
             FROM mcp_handoffs h
             LEFT JOIN reviews r ON r.handoff_id = h.id
-            WHERE {where_sql}
+            LEFT JOIN uat_pages u ON u.handoff_id = h.id
+            WHERE {where_sql}{unreviewed_sql}
             ORDER BY h.created_at DESC
             OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY
         """, tuple(params) if params else None, fetch="all")
@@ -520,8 +526,10 @@ async def list_handoffs(
                 metadata=_parse_json_field(row['metadata']),
                 response_to=str(row['response_to']) if row['response_to'] else None,
                 public_url=public_url,
+                pth=row.get('pth'),
                 review_id=str(row['review_id']) if row.get('review_id') else None,
                 assessment=row.get('assessment'),
+                uat_spec_id=str(row['uat_spec_id']) if row.get('uat_spec_id') else None,
                 created_at=row['created_at'],
                 updated_at=row['updated_at']
             ))

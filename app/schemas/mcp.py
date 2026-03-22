@@ -111,6 +111,8 @@ class HandoffResponse(BaseModel):
     public_url: Optional[str] = None
     review_id: Optional[str] = None
     assessment: Optional[str] = None
+    pth: Optional[str] = None         # AP08 Fix 1: for Loop 2 email
+    uat_spec_id: Optional[str] = None  # AP08 Fix 1: for Loop 2 email UAT URL
     created_at: datetime
     updated_at: datetime
 

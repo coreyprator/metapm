@@ -90,6 +90,14 @@
 </div>
 
 <script>
+function copyPTH(pthVal) {
+  if (!pthVal) return;
+  navigator.clipboard.writeText(pthVal).then(() => {
+    const badge = document.querySelector('.pth-badge');
+    if (badge) { const orig = badge.textContent; badge.textContent = 'Copied!'; setTimeout(() => badge.textContent = orig, 1200); }
+  });
+}
+
 const pth = window.location.pathname.split('/prompts/')[1];
 let promptData = null;
 
@@ -170,7 +178,7 @@ function renderPrompt(p) {
 
   document.getElementById('content').innerHTML = `
     <div class="prompt-header">
-      <span class="badge pth-badge">PTH: ${p.pth || '?'}</span>
+      <span class="badge pth-badge" style="cursor:pointer" onclick="copyPTH('${p.pth || ''}')" title="Click to copy PTH">PTH: ${p.pth || '?'}</span>
       <span class="badge sprint-badge">${p.sprint_id || ''}</span>
       <span class="badge project-badge">${projectLabel}</span>
       <span class="status-badge ${statusClass}">${p.status}</span>
