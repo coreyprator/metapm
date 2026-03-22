@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.38.4"  # AP07: Loop 3 trigger on UAT submit, Loop 2 review_id fix (no duplicate emails)
+    VERSION: str = "2.38.5"  # EG05: /docs JS fix, formatTimestamp, mobile header collapse, UAT project name
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

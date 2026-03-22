@@ -351,6 +351,36 @@
       .filter-toggle-btn { display: inline-block; }
       .controls.mobile-collapsed { display: none; }
     }
+
+    /* EG05 Fix 4 — mobile collapsible header (DevTools-diagnosed) */
+    .header-toggle {
+      display: none;
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: none;
+      color: var(--fg);
+      font-size: 14px;
+      padding: 6px 0;
+      cursor: pointer;
+    }
+    .card.header .header-content {
+      max-height: 500px;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+    }
+    .card.header.is-collapsed .header-content {
+      max-height: 0;
+    }
+    @media (max-width: 768px) {
+      .card.header .header-content { max-height: 0; }
+      .card.header:not(.is-collapsed) .header-content { max-height: 500px; }
+      .header-toggle { display: block; }
+    }
     /* Responsive: Mobile (<768px) */
     @media (max-width: 767px) {
       .app { padding: 6px 8px 90px; }
@@ -428,6 +458,8 @@
 <body>
   <div class="app">
     <div class="card header">
+      <button class="header-toggle" id="headerToggleBtn" aria-expanded="false">⚙ Filters <span class="toggle-icon">▶</span></button>
+      <div class="header-content">
       <div class="title-wrap">
         <div class="title" onclick="resetToHome()" style="cursor:pointer" title="Return to default dashboard">🔴 MetaPM</div>
         <span id="appVersion" class="version-badge">v-</span>
@@ -457,6 +489,7 @@
           </div>
         </div>
       </div>
+      </div><!-- /.header-content -->
     </div>
 
     <div class="card controls mobile-collapsed" id="controlsPanel">
@@ -2855,6 +2888,36 @@
         });
       });
     }
+
+    // EG05 Fix 4 — mobile collapsible header (DevTools-diagnosed)
+    document.addEventListener('DOMContentLoaded', () => {
+      const header = document.querySelector('.card.header');
+      const toggleButton = header && header.querySelector('.header-toggle');
+      if (!header || !toggleButton) return;
+
+      function syncHeaderState() {
+        const mobile = window.matchMedia('(max-width: 768px)').matches;
+        if (mobile) {
+          header.classList.add('is-collapsed');
+          toggleButton.setAttribute('aria-expanded', 'false');
+          toggleButton.style.display = 'block';
+        } else {
+          header.classList.remove('is-collapsed');
+          toggleButton.setAttribute('aria-expanded', 'true');
+          toggleButton.style.display = 'none';
+        }
+      }
+
+      toggleButton.addEventListener('click', () => {
+        const isCollapsed = header.classList.toggle('is-collapsed');
+        toggleButton.setAttribute('aria-expanded', String(!isCollapsed));
+        const icon = toggleButton.querySelector('.toggle-icon');
+        if (icon) icon.textContent = isCollapsed ? '▶' : '▼';
+      });
+
+      syncHeaderState();
+      window.addEventListener('resize', syncHeaderState);
+    });
 
     function bindControls() {
       ['categoryFilter', 'projectFilter', 'priorityFilter', 'statusFilter', 'typeFilter', 'personFilter', 'sortBy', 'groupBy'].forEach((id) => {

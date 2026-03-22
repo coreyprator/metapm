@@ -177,40 +177,71 @@ pre{{background:#0d1117;border:1px solid #2a2e3f;border-radius:6px;padding:16px;
 </html>"""
 
 _DOCS_LIST_BODY = """
-<h1>📋 Compliance Documents</h1>
-<div class="sub">All documents stored in MetaPM — click to view rendered content</div>
+<h1>\U0001f4cb Compliance Documents</h1>
+<div class="sub">All documents stored in MetaPM \u2014 click to view rendered content</div>
 <div id="docs-list"><em style="color:#888">Loading...</em></div>
 <script>
+function formatTimestamp(iso) {
+  if (!iso) return '\u2014';
+  try {
+    return new Date(iso).toLocaleString('en-US', {
+      timeZone: 'America/Chicago',
+      month: '2-digit', day: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    });
+  } catch(e) { return String(iso).slice(0,10); }
+}
 fetch('/api/compliance-docs').then(r=>r.json()).then(data=>{
   const docs = data.docs || [];
-  if(!docs.length){{document.getElementById('docs-list').innerHTML='<em style="color:#f87171">No compliance documents found.</em>';return;}}
-  let html='<table><thead><tr><th>Document</th><th>Type</th><th>Version</th><th>Last Updated</th><th>Updated By</th></tr></thead><tbody>';
-  docs.forEach(d=>{{
-    const title = d.project_code ? d.project_code+' ('+d.doc_type+')' : d.id;
-    html+=`<tr><td><a href="/docs/${{d.id}}">${{title}}</a></td><td><span class="badge">${{d.doc_type||''}}</span></td><td>${{d.version||'—'}}</td><td>${{d.updated_at?String(d.updated_at).slice(0,10):'—'}}</td><td>${{d.updated_by||'—'}}</td></tr>`;
-  }});
-  html+='</tbody></table>';
-  document.getElementById('docs-list').innerHTML=html;
-}).catch(e=>{{document.getElementById('docs-list').innerHTML='<em style="color:#f87171">Error: '+e.message+'</em>';}});
+  if (!docs.length) { document.getElementById('docs-list').innerHTML='<em style="color:#f87171">No compliance documents found.</em>'; return; }
+  let html = '<table><thead><tr><th>Document</th><th>Type</th><th>Version</th><th>Last Updated</th><th>Updated By</th></tr></thead><tbody>';
+  docs.forEach(d => {
+    const title = d.project_code ? d.project_code + ' (' + d.doc_type + ')' : d.id;
+    html += '<tr><td><a href="/docs/' + d.id + '">' + title + '</a></td>'
+          + '<td><span class="badge">' + (d.doc_type || '') + '</span></td>'
+          + '<td>' + (d.version || '\u2014') + '</td>'
+          + '<td>' + formatTimestamp(d.updated_at) + '</td>'
+          + '<td>' + (d.updated_by || '\u2014') + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('docs-list').innerHTML = html;
+}).catch(e => { document.getElementById('docs-list').innerHTML = '<em style="color:#f87171">Error: ' + e.message + '</em>'; });
 </script>
 """
 
 _DOCS_DOC_BODY = """
-<div class="back"><a href="/docs">← All Compliance Documents</a></div>
+<div class="back"><a href="/docs">\u2190 All Compliance Documents</a></div>
 <div id="doc-view"><em style="color:#888">Loading...</em></div>
 <script>
+function formatTimestamp(iso) {{
+  if (!iso) return '\u2014';
+  try {{
+    return new Date(iso).toLocaleString('en-US', {{
+      timeZone: 'America/Chicago',
+      month: '2-digit', day: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    }});
+  }} catch(e) {{ return String(iso).slice(0,10); }}
+}}
 const docId = {doc_id_js};
-fetch('/api/compliance-docs/'+docId).then(r=>{{if(!r.ok)throw new Error('Not found');return r.json();}}).then(doc=>{{
-  const title = doc.project_code ? doc.project_code+' ('+doc.doc_type+')' : doc.id;
-  document.title = title + ' — MetaPM Docs';
-  let html = '<h1>'+title+'</h1>';
-  html += '<div class="meta">Version: <strong>'+(doc.version||'—')+'</strong> &nbsp;|&nbsp; Last updated: <strong>'+(doc.updated_at?String(doc.updated_at).slice(0,10):'—')+'</strong> &nbsp;|&nbsp; By: '+(doc.updated_by||'—')+'</div>';
+fetch('/api/compliance-docs/' + docId).then(r => {{
+  if (!r.ok) throw new Error('Not found');
+  return r.json();
+}}).then(doc => {{
+  const title = doc.project_code ? doc.project_code + ' (' + doc.doc_type + ')' : doc.id;
+  document.title = title + ' \u2014 MetaPM Docs';
+  let html = '<h1>' + title + '</h1>';
+  html += '<div class="meta">Version: <strong>' + (doc.version || '\u2014') + '</strong>'
+        + ' &nbsp;|\u00a0 Last updated: <strong>' + formatTimestamp(doc.updated_at) + '</strong>'
+        + ' &nbsp;|\u00a0 By: ' + (doc.updated_by || '\u2014') + '</div>';
   html += '<hr>';
-  if(doc.content_md){{
-    html += '<div id="content">'+marked.parse(doc.content_md)+'</div>';
-  }}else{{html+='<em style="color:#888">No content available.</em>';}}
+  if (doc.content_md) {{
+    html += '<div id="content">' + marked.parse(doc.content_md) + '</div>';
+  }} else {{ html += '<em style="color:#888">No content available.</em>'; }}
   document.getElementById('doc-view').innerHTML = html;
-}}).catch(e=>{{document.getElementById('doc-view').innerHTML='<em style="color:#f87171">Document not found: '+e.message+'</em>';}});
+}}).catch(e => {{
+  document.getElementById('doc-view').innerHTML = '<em style="color:#f87171">Document not found: ' + e.message + '</em>';
+}});
 </script>
 """
 

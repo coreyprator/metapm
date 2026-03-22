@@ -436,7 +436,15 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
                           spec_status: str = "in_progress") -> str:
     """Render the interactive UAT page for an authenticated PL session."""
     from html import escape as esc
-    project = esc(spec_data.get("project", "Unknown"))
+    _PROJECT_NAMES = {
+        'proj-mp': 'MetaPM', 'proj-sf': 'Super Flashcards',
+        'proj-hl': 'HarmonyLab', 'proj-af': 'ArtForge',
+        'proj-em': 'Etymython', 'proj-efg': 'Etymology Graph',
+        'proj-pr': 'Portfolio RAG', 'proj-pa': 'Personal Assistant',
+        'proj-pm': 'project-methodology', 'EFG': 'Etymology Graph',
+    }
+    _raw_project = spec_data.get("project") or spec_data.get("project_id") or "Unknown"
+    project = esc(_PROJECT_NAMES.get(_raw_project, _raw_project))
     version = esc(spec_data.get("version", "?"))
     sprint = esc(spec_data.get("sprint", ""))
     pth = esc(spec_data.get("pth", ""))
