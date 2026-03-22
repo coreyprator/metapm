@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.38.1"  # MM10: description toggle, UAT list/override/filter, screenshot paste, seed in +Add, mobile filters
+    VERSION: str = "2.38.2"  # MM10B: cancel endpoint, job_executions, Active Prompts/Jobs panel redesign
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

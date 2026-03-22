@@ -516,13 +516,22 @@
       </div>
     </div>
 
+    <!-- MM10B: Active Prompts — two-section panel -->
     <div class="card" id="promptsPanel" style="display:none;border-left:3px solid #f0b429">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <strong style="color:#f0b429">Active Prompts</strong>
         <button class="icon-btn" onclick="qs('promptsPanel').style.display='none'" title="Dismiss">✕</button>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Prompts ready to deliver to a CC session. Copy the CC Link and paste it into your CC prompt.</div>
-      <div id="promptsList"></div>
+      <!-- Section A: Needs Approval -->
+      <div id="needsApprovalSection" style="margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Needs Your Approval</div>
+        <div id="needsApprovalList" style="font-size:12px"></div>
+      </div>
+      <!-- Section B: Run UATs -->
+      <div id="runUatsSection">
+        <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Run These UATs</div>
+        <div id="runUatsList" style="font-size:12px"></div>
+      </div>
     </div>
 
     <div class="phase-bar" id="phaseBar"></div>
@@ -532,11 +541,14 @@
       <button type="button" onclick="bulkAssignSprint()" style="padding:4px 12px;background:var(--info);color:#fff;border:none;border-radius:4px;font-size:12px;cursor:pointer">Assign</button>
       <button type="button" onclick="clearBulkSelection()" style="padding:4px 10px;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:4px;font-size:12px;cursor:pointer">Clear</button>
     </div>
-    <!-- AP06: Jobs Status Panel -->
+    <!-- MM10B: Active Jobs Panel -->
     <div class="card" id="jobsPanel" style="margin-bottom:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <span style="font-weight:600;font-size:13px">⚡ Active Jobs</span>
-        <button onclick="loadJobsStatus()" style="font-size:11px;padding:2px 8px;background:var(--panel-soft);border:1px solid var(--line);border-radius:4px;color:var(--muted);cursor:pointer">Refresh</button>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="jobsLastUpdated" style="font-size:10px;color:var(--muted)"></span>
+          <button onclick="loadJobsStatus()" style="font-size:11px;padding:2px 8px;background:var(--panel-soft);border:1px solid var(--line);border-radius:4px;color:var(--muted);cursor:pointer">Refresh</button>
+        </div>
       </div>
       <div id="jobsList" style="font-size:12px;color:var(--muted)">Loading...</div>
       <div id="approvedPromptsList" style="margin-top:8px"></div>
@@ -2263,34 +2275,72 @@
       });
     }
 
+    // MM10B: Active Prompts — two-section redesign
     async function loadActivePrompts() {
       try {
-        const res = await api('/api/roadmap/prompts/active');
-        const prompts = res.prompts || [];
-        const active = prompts.filter(p => ['draft','prompt_ready','approved','sent'].includes(p.status));
-        if (!active.length) {
+        // Section A: draft prompts awaiting PL approval
+        const draftsRes = await api('/api/prompts/?status=draft&limit=20');
+        const drafts = (Array.isArray(draftsRes) ? draftsRes : (draftsRes.prompts || []))
+          .filter(p => p.status === 'draft');
+
+        // Section B: uat_ready requirements
+        let uatItems = [];
+        try {
+          const uatRes = await api('/api/roadmap/requirements?status=uat_ready&limit=20');
+          uatItems = uatRes.requirements || uatRes || [];
+        } catch(e) { /* non-fatal */ }
+
+        const hasContent = drafts.length || uatItems.length;
+        if (!hasContent) {
           qs('promptsPanel').style.display = 'none';
           return;
         }
         qs('promptsPanel').style.display = '';
-        qs('promptsList').innerHTML = active.map(p => {
-          const proj = state.projects.find(pr => pr.id === p.project_id);
-          const projName = proj ? proj.name : p.project_id;
-          let actions = '';
-          if (p.status === 'draft' || p.status === 'prompt_ready') {
-            actions = `<button style="font-size:11px;padding:2px 8px" onclick="reviewPromptInline(${p.id})">Review Prompt</button>`;
-          } else if (p.status === 'approved' || p.status === 'sent') {
-            const url = 'https://metapm.rentyourcio.com/api/roadmap/prompts/' + p.id + '/handoff';
-            actions = `<button style="font-size:11px;padding:2px 8px" onclick="copyToClipboard('${url}')" title="Copies the handoff URL for this prompt. Paste into your CC session to give CC direct access to this sprint.">Copy CC Link</button>`;
-          }
-          return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)">
-            <span class="pill status-${p.status}" style="font-size:10px">${p.status}</span>
-            <strong style="font-size:12px">${p.sprint_id}</strong>
-            <span style="font-size:12px;color:var(--muted)">${projName}</span>
-            ${actions}
-          </div>`;
-        }).join('');
-      } catch {
+
+        // Section A: Needs Approval
+        const needsEl = qs('needsApprovalList');
+        if (drafts.length) {
+          needsEl.innerHTML = drafts.map(p => {
+            const proj = state.projects.find(pr => pr.id === p.project_id);
+            const emoji = proj ? (proj.emoji || '') : '';
+            const projName = proj ? proj.name : '';
+            const hrs = p.estimated_hours ? `(~${p.estimated_hours}h)` : '';
+            const created = formatTimestamp(p.created_at);
+            const reviewUrl = `https://metapm.rentyourcio.com/prompts/${p.pth || p.id}`;
+            return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--line);flex-wrap:wrap">
+              <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">${p.pth || p.id}</span>
+              <span style="font-size:11px">${emoji} ${projName}</span>
+              <span style="font-size:11px;color:var(--muted)">${(p.sprint_id||'').slice(0,35)} ${hrs}</span>
+              <span style="font-size:10px;color:var(--muted);margin-left:auto">${created}</span>
+              <a href="${reviewUrl}" target="_blank" style="font-size:10px;padding:1px 8px;background:#3b82f6;color:#fff;border:none;border-radius:3px;text-decoration:none">Review ↗</a>
+            </div>`;
+          }).join('');
+          qs('needsApprovalSection').style.display = '';
+        } else {
+          qs('needsApprovalSection').style.display = 'none';
+        }
+
+        // Section B: Run UATs
+        const uatEl = qs('runUatsList');
+        if (uatItems.length) {
+          uatEl.innerHTML = uatItems.map(r => {
+            const pth = r.pth || r.code || '';
+            const proj = state.projects.find(pr => pr.id === r.project_id);
+            const emoji = proj ? (proj.emoji || '') : '';
+            const projName = proj ? proj.name : (r.project_id || '');
+            const uatUrl = r.uat_url || `https://metapm.rentyourcio.com/uat/${r.id}`;
+            return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--line);flex-wrap:wrap">
+              <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">${pth}</span>
+              <span style="font-size:11px">${emoji} ${projName}</span>
+              <span style="font-size:11px;color:var(--muted)">${(r.title||'').slice(0,40)}</span>
+              <a href="${uatUrl}" target="_blank" style="font-size:10px;padding:1px 8px;background:#059669;color:#fff;border:none;border-radius:3px;text-decoration:none;margin-left:auto">Run UAT ↗</a>
+            </div>`;
+          }).join('');
+          qs('runUatsSection').style.display = '';
+        } else {
+          qs('runUatsSection').style.display = 'none';
+        }
+      } catch(e) {
         qs('promptsPanel').style.display = 'none';
       }
     }
@@ -2920,9 +2970,24 @@
       });
     }
 
-    // AP06: Jobs Status Panel
+    // MM10B: Full date+time formatter (CT)
+    function formatTimestamp(isoString) {
+      if (!isoString) return '';
+      try {
+        return new Date(isoString).toLocaleString('en-US', {
+          timeZone: 'America/Chicago',
+          month: 'short', day: 'numeric',
+          hour: 'numeric', minute: '2-digit',
+          hour12: true
+        });
+      } catch(e) { return isoString; }
+    }
+
+    // MM10B: Active Jobs Panel
     async function loadJobsStatus() {
       const el = qs('jobsList');
+      const lastUpdatedEl = qs('jobsLastUpdated');
+      if (lastUpdatedEl) lastUpdatedEl.textContent = 'Last updated: ' + formatTimestamp(new Date().toISOString());
       try {
         const data = await api('/api/prompts/jobs/status');
         const loop1 = data.loop1 || [];
@@ -2932,48 +2997,59 @@
           ...loop2.map(j => ({...j, label: 'Loop 2 (Review)'}))
         ];
         if (!all.length) {
-          el.innerHTML = '<span style="color:var(--muted)">No active jobs. Loops idle.</span>';
+          el.innerHTML = '<span style="color:var(--muted)">No jobs in last 24h. Loops idle.</span>';
         } else {
           const statusColor = s => s === 'running' ? '#eab308' : s === 'succeeded' ? '#22c55e' : '#ef4444';
-          el.innerHTML = all.map(j =>
-            `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)">
+          el.innerHTML = all.map(j => {
+            const pthLabel = j.pth
+              ? `<span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">PTH: ${j.pth}</span>`
+              : `<span style="color:var(--muted);font-family:monospace;font-size:10px">${(j.name||'').split('/').pop().split('-').slice(-2).join('-')}</span>`;
+            return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)">
               <span style="background:${statusColor(j.status)};color:#000;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700">${j.status.toUpperCase()}</span>
-              <span style="font-weight:600">${j.label}</span>
-              <span style="color:var(--muted);font-family:monospace;font-size:11px">${j.name.split('-').slice(-2).join('-')}</span>
-              <span style="color:var(--muted);font-size:10px">${j.started ? new Date(j.started).toLocaleTimeString() : ''}</span>
-            </div>`
-          ).join('');
+              <span style="font-weight:600;font-size:11px">${j.label}</span>
+              ${pthLabel}
+              <span style="color:var(--muted);font-size:10px;margin-left:auto">${formatTimestamp(j.started)}</span>
+            </div>`;
+          }).join('');
         }
       } catch(e) {
         el.innerHTML = `<span style="color:#ef4444">Jobs API error: ${e.message}</span>`;
       }
 
-      // Show approved prompts with Launch buttons
+      // Approved prompts launch list — only recent (filtered server-side by not-cancelled)
       try {
         const promptsData = await api('/api/prompts/?status=approved&limit=10');
-        const approved = Array.isArray(promptsData) ? promptsData : (promptsData.prompts || []);
+        const approved = (Array.isArray(promptsData) ? promptsData : (promptsData.prompts || []))
+          .filter(p => p.status === 'approved');
         const launchEl = qs('approvedPromptsList');
         if (approved.length) {
-          launchEl.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Approved prompts ready to launch:</div>' +
+          launchEl.innerHTML = '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin:8px 0 4px">Approved — Ready to Launch</div>' +
+            `<div id="launchList">` +
             approved.map(p =>
-              `<div style="display:flex;align-items:center;gap:8px;padding:3px 0">
-                <span style="font-weight:600;font-size:12px">${p.pth || p.id}</span>
-                <span style="color:var(--muted);font-size:11px">${(p.sprint_id || '').slice(0,30)}</span>
-                <button onclick="launchJob('${p.pth}')" style="font-size:10px;padding:1px 8px;background:#3b82f6;color:#fff;border:none;border-radius:3px;cursor:pointer">Launch</button>
+              `<div id="launch-${p.pth}" style="display:flex;align-items:center;gap:8px;padding:3px 0">
+                <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">${p.pth || p.id}</span>
+                <span style="color:var(--muted);font-size:11px">${(p.sprint_id || '').slice(0,35)}</span>
+                <span style="color:var(--muted);font-size:10px">${formatTimestamp(p.created_at)}</span>
+                <button onclick="launchJob('${p.pth}', this)" style="font-size:10px;padding:1px 8px;background:#3b82f6;color:#fff;border:none;border-radius:3px;cursor:pointer;margin-left:auto">Launch</button>
               </div>`
-            ).join('');
+            ).join('') + `</div>`;
         } else {
           launchEl.innerHTML = '';
         }
       } catch(e) { /* non-fatal */ }
     }
 
-    async function launchJob(pth) {
+    async function launchJob(pth, btn) {
+      // MM10B: optimistic removal — hide row immediately
+      const row = document.getElementById('launch-' + pth);
+      if (row) row.style.display = 'none';
+      if (btn) btn.disabled = true;
       try {
-        const r = await api('/api/prompts/jobs/launch', {method:'POST', body: JSON.stringify({pth})});
-        alert(`Launched Loop 1 for PTH ${pth}`);
-        loadJobsStatus();
+        await api('/api/prompts/jobs/launch', {method:'POST', body: JSON.stringify({pth})});
       } catch(e) {
+        // Restore on failure
+        if (row) row.style.display = '';
+        if (btn) btn.disabled = false;
         alert(`Launch failed: ${e.message}`);
       }
     }

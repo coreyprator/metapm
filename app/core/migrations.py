@@ -1822,6 +1822,7 @@ def run_migrations():
         logger.warning(f"  Migration 53b warning: {e}")
 
     # Migration 54: AP09 — Add archive_reason column to uat_pages
+    # (keep existing)
     try:
         col_check = execute_query(
             "SELECT COUNT(*) as cnt FROM sys.columns WHERE object_id = OBJECT_ID('uat_pages') AND name = 'archive_reason'",
@@ -1834,5 +1835,32 @@ def run_migrations():
             logger.info("  Migration 54: archive_reason column already exists.")
     except Exception as e:
         logger.warning(f"  Migration 54 warning: {e}")
+
+    # Migration 55: MM10B — Create job_executions table for PTH-aware Jobs panel
+    try:
+        tbl_check = execute_query(
+            "SELECT COUNT(*) as cnt FROM sys.tables WHERE name = 'job_executions'",
+            fetch="one"
+        )
+        if not tbl_check or tbl_check["cnt"] == 0:
+            execute_query("""
+                CREATE TABLE job_executions (
+                    id           NVARCHAR(200) PRIMARY KEY,
+                    pth          NVARCHAR(20)  NULL,
+                    job_type     NVARCHAR(20)  NOT NULL DEFAULT 'loop1',
+                    handoff_id   NVARCHAR(36)  NULL,
+                    started_at   DATETIME2     NOT NULL DEFAULT GETUTCDATE(),
+                    status       NVARCHAR(20)  NOT NULL DEFAULT 'running'
+                )
+            """, fetch="none")
+            execute_query(
+                "CREATE INDEX ix_job_executions_started ON job_executions(started_at DESC)",
+                fetch="none"
+            )
+            logger.info("  Migration 55: job_executions table created.")
+        else:
+            logger.info("  Migration 55: job_executions table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 55 warning: {e}")
 
     logger.info("Migrations complete.")

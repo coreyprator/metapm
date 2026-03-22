@@ -30,6 +30,7 @@ async def trigger_cloud_run_job_immediate(job_name: str = "metapm-loop1-worker",
     """Fire a Cloud Run Job immediately with optional targeted args (AP06).
     Uses GCP metadata server to get identity token, then calls Cloud Run Jobs API.
     Non-blocking — never delays the caller response.
+    MM10B: records execution to job_executions table for PTH-aware Jobs panel.
 
     Args:
         job_name: Cloud Run Job name to execute.
@@ -70,6 +71,18 @@ async def trigger_cloud_run_job_immediate(job_name: str = "metapm-loop1-worker",
                               timeout=10)
         if resp.status_code in (200, 201, 202):
             logger.info(f"[AP06] Cloud Run trigger fired for {job_name}")
+            # MM10B: record to job_executions for PTH-aware Jobs panel
+            try:
+                exec_data = resp.json()
+                exec_name = exec_data.get("metadata", {}).get("name", f"{job_name}-{uuid.uuid4().hex[:8]}")
+                job_type = "loop1" if "loop1" in job_name else "loop2"
+                execute_query(
+                    """INSERT INTO job_executions (id, pth, job_type, handoff_id, status)
+                       VALUES (?, ?, ?, ?, 'running')""",
+                    (exec_name, pth, job_type, handoff_id), fetch="none"
+                )
+            except Exception as rec_err:
+                logger.warning(f"[MM10B] job_executions record failed (non-fatal): {rec_err}")
         else:
             logger.warning(f"[AP06] Cloud Run trigger failed (non-fatal): {resp.status_code} {resp.text[:200]}")
     except Exception as e:
@@ -439,7 +452,7 @@ async def update_prompt(prompt_id: int, patch: PromptPatch):
 
     if patch.status:
         valid = ('draft', 'prompt_ready', 'approved', 'sent', 'completed',
-                 'executing', 'complete', 'closed', 'rejected')
+                 'executing', 'complete', 'closed', 'rejected', 'cancelled')
         if patch.status not in valid:
             raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(valid)}")
         set_parts.append("status = ?")
@@ -496,16 +509,46 @@ async def update_prompt(prompt_id: int, patch: PromptPatch):
     return _row_to_response(row)
 
 
+# ── MM10B: Cancel prompt by PTH ──────────────────────────────────────────────
+
+@router.patch("/{pth}/cancel")
+async def cancel_prompt(pth: str, _: bool = Depends(verify_api_key)):
+    """MM10B: Mark a prompt as cancelled by PTH. Removes it from Active Prompts panel."""
+    row = execute_query("SELECT id, pth, status FROM cc_prompts WHERE pth = ?", (pth,), fetch="one")
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Prompt with PTH '{pth}' not found")
+    execute_query(
+        "UPDATE cc_prompts SET status='cancelled', updated_at=GETUTCDATE() WHERE pth=?",
+        (pth,), fetch="none"
+    )
+    logger.info(f"[MM10B] Prompt {pth} cancelled")
+    return {"pth": pth, "status": "cancelled"}
+
+
 # ── AP06: Jobs Status API ──
 
 @router.get("/jobs/status")
 async def get_jobs_status():
     """AP06: Query Cloud Run Jobs API for recent executions of both loop workers.
-    Uses GCP metadata server identity token (available in Cloud Run).
+    MM10B: enriches with PTH from job_executions table, filters to last 24h.
     """
+    from datetime import timezone
     project = "super-flashcards-475210"
     jobs = ["metapm-loop1-worker", "metapm-loop2-reviewer"]
     result = {}
+
+    # MM10B: load job_executions PTH lookup
+    pth_by_exec = {}
+    try:
+        rows = execute_query(
+            "SELECT id, pth FROM job_executions WHERE started_at >= DATEADD(hour, -24, GETUTCDATE())",
+            fetch="all"
+        ) or []
+        for r in rows:
+            if r.get("id") and r.get("pth"):
+                pth_by_exec[r["id"]] = r["pth"]
+    except Exception:
+        pass  # non-fatal — job_executions may not exist yet
 
     try:
         token_resp = _requests.get(
@@ -517,6 +560,7 @@ async def get_jobs_status():
     except Exception as e:
         return {"error": f"Could not obtain identity token: {e}", "loop1": [], "loop2": []}
 
+    cutoff_24h = datetime.now(timezone.utc).replace(microsecond=0)
     for job_name in jobs:
         key = "loop1" if "loop1" in job_name else "loop2"
         try:
@@ -524,21 +568,42 @@ async def get_jobs_status():
                         f"namespaces/{project}/executions")
             resp = _requests.get(
                 list_url,
-                params={"labelSelector": f"run.googleapis.com/job={job_name}", "limit": "5"},
+                params={"labelSelector": f"run.googleapis.com/job={job_name}", "limit": "10"},
                 headers={"Authorization": f"Bearer {token}"},
                 timeout=10
             )
             if resp.status_code == 200:
                 items = resp.json().get("items", [])
-                result[key] = [
-                    {
-                        "name": item.get("metadata", {}).get("name", ""),
+                filtered = []
+                for item in items:
+                    exec_name = item.get("metadata", {}).get("name", "")
+                    started_str = item.get("metadata", {}).get("creationTimestamp", "")
+                    status = _parse_execution_status(item)
+                    # MM10B: filter to last 24h
+                    if started_str:
+                        try:
+                            from dateutil.parser import parse as parse_dt
+                            started_dt = parse_dt(started_str)
+                            if started_dt.tzinfo is None:
+                                started_dt = started_dt.replace(tzinfo=timezone.utc)
+                            age_hours = (cutoff_24h - started_dt).total_seconds() / 3600
+                            if age_hours > 24:
+                                continue
+                            # MM10B: hide succeeded loop1 older than 2h
+                            if key == "loop1" and status == "succeeded" and age_hours > 2:
+                                continue
+                        except Exception:
+                            pass
+                    # MM10B: look up PTH from job_executions
+                    pth = pth_by_exec.get(exec_name)
+                    filtered.append({
+                        "name": exec_name,
                         "job": job_name,
-                        "status": _parse_execution_status(item),
-                        "started": item.get("metadata", {}).get("creationTimestamp", ""),
-                    }
-                    for item in items
-                ]
+                        "status": status,
+                        "started": started_str,
+                        "pth": pth,
+                    })
+                result[key] = filtered
             else:
                 result[key] = []
         except Exception as e:
