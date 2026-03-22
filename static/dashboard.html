@@ -750,6 +750,12 @@
         <input type="file" id="attachFileInput" style="font-size:11px;flex:1" />
         <button style="font-size:11px;padding:4px 8px" onclick="uploadAttachment()">Upload</button>
       </div>
+      <div id="screenshotPasteZone" tabindex="0"
+           style="margin-top:6px;border:2px dashed var(--line);border-radius:6px;padding:8px 12px;text-align:center;font-size:11px;color:var(--muted);cursor:pointer;transition:border-color .15s"
+           onmouseenter="this.style.borderColor='var(--accent)'"
+           onmouseleave="this.style.borderColor='var(--line)'">
+        📎 Paste screenshot here (Ctrl+V)
+      </div>
     </div>
     <div id="dPromptSection" style="display:none">
       <label>CC Prompt</label>
@@ -2819,32 +2825,34 @@
       }
     }
 
-    // ── C3: Screenshot paste in description ────────────────────────────────────
+    // ── C3: Screenshot paste — attaches image to requirement via attachment endpoint ──
     function initScreenshotPaste() {
-      const ta = qs('dDescription');
-      if (!ta) return;
-      ta.addEventListener('paste', async (e) => {
-        const items = e.clipboardData?.items || [];
-        for (const item of items) {
-          if (item.type.startsWith('image/')) {
-            e.preventDefault();
-            const file = item.getAsFile();
-            const fd = new FormData();
-            fd.append('file', file);
-            try {
-              const res = await fetch('/api/upload/screenshot', { method: 'POST', body: fd });
-              const data = await res.json();
-              const pos = ta.selectionStart;
-              const before = ta.value.substring(0, pos);
-              const after = ta.value.substring(pos);
-              ta.value = `${before}![screenshot](${data.url})${after}`;
-              showToast('Screenshot pasted', 'success');
-            } catch (err) {
-              showToast('Screenshot paste failed: ' + err.message);
+      ['dDescription', 'screenshotPasteZone'].forEach(id => {
+        const el = qs(id);
+        if (!el) return;
+        el.addEventListener('paste', async (e) => {
+          const items = e.clipboardData?.items || [];
+          for (const item of items) {
+            if (item.type.startsWith('image/')) {
+              e.preventDefault();
+              const req = state.selectedReq;
+              if (!req) return;
+              const file = item.getAsFile();
+              const fd = new FormData();
+              fd.append('file', file, `screenshot-${Date.now()}.png`);
+              fd.append('uploaded_by', 'PL');
+              try {
+                const resp = await fetch(`/api/roadmap/requirements/${req.id}/attachments`, { method: 'POST', body: fd });
+                if (!resp.ok) throw new Error(await resp.text());
+                showToast('Screenshot attached', 'success');
+                await openRequirement(req.id);
+              } catch (err) {
+                showToast('Screenshot paste failed: ' + err.message);
+              }
+              break;
             }
-            break;
           }
-        }
+        });
       });
     }
 

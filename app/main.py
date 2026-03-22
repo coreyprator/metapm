@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, JSONResponse, FileResponse
+from fastapi.responses import RedirectResponse, JSONResponse, FileResponse, HTMLResponse
 from fastapi.exceptions import RequestValidationError
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
@@ -28,8 +28,8 @@ app = FastAPI(
     title="MetaPM",
     description="Cross-project task management system for Corey's 2026 projects",
     version=settings.VERSION,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
 )
 
 # Log startup to verify deployment
@@ -144,6 +144,89 @@ async def architecture_redirect():
         url="https://storage.googleapis.com/corey-handoff-bridge/project-methodology/docs/Development_System_Architecture.html",
         status_code=302
     )
+
+
+_DOCS_PAGE_TEMPLATE = """<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Compliance Documents — MetaPM</title>
+<style>
+body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e0e0e0;margin:0;padding:20px}}
+h1{{font-size:1.4rem;margin-bottom:4px}}
+.sub{{color:#888;font-size:.85rem;margin-bottom:20px}}
+table{{width:100%;border-collapse:collapse;background:#1a1d27;border-radius:8px;overflow:hidden}}
+th{{background:#252836;padding:10px 14px;text-align:left;font-size:.8rem;color:#aaa;border-bottom:1px solid #2a2e3f}}
+td{{padding:10px 14px;border-bottom:1px solid #1e2130;font-size:.88rem}}
+tr:last-child td{{border-bottom:none}}
+tr:hover td{{background:#1e2130}}
+a{{color:#7eb8ff;text-decoration:none}}
+a:hover{{text-decoration:underline}}
+.badge{{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.75rem;background:#1e3a5f;color:#7eb8ff}}
+.back{{display:inline-block;margin-bottom:16px;color:#888;font-size:.85rem}}
+.back a{{color:#7eb8ff}}
+pre{{background:#0d1117;border:1px solid #2a2e3f;border-radius:6px;padding:16px;overflow-x:auto;font-size:.82rem;line-height:1.5}}
+.meta{{color:#888;font-size:.82rem;margin-bottom:12px}}
+#content h1,#content h2,#content h3{{color:#e0e0e0;margin-top:1.2em}}
+#content code{{background:#1a1d27;padding:1px 5px;border-radius:3px;font-family:monospace}}
+#content hr{{border:none;border-top:1px solid #2a2e3f;margin:1.5em 0}}
+#content table{{margin:1em 0}}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>{body}</body>
+</html>"""
+
+_DOCS_LIST_BODY = """
+<h1>📋 Compliance Documents</h1>
+<div class="sub">All documents stored in MetaPM — click to view rendered content</div>
+<div id="docs-list"><em style="color:#888">Loading...</em></div>
+<script>
+fetch('/api/compliance-docs').then(r=>r.json()).then(data=>{
+  const docs = data.docs || [];
+  if(!docs.length){{document.getElementById('docs-list').innerHTML='<em style="color:#f87171">No compliance documents found.</em>';return;}}
+  let html='<table><thead><tr><th>Document</th><th>Type</th><th>Version</th><th>Last Updated</th><th>Updated By</th></tr></thead><tbody>';
+  docs.forEach(d=>{{
+    const title = d.project_code ? d.project_code+' ('+d.doc_type+')' : d.id;
+    html+=`<tr><td><a href="/docs/${{d.id}}">${{title}}</a></td><td><span class="badge">${{d.doc_type||''}}</span></td><td>${{d.version||'—'}}</td><td>${{d.updated_at?String(d.updated_at).slice(0,10):'—'}}</td><td>${{d.updated_by||'—'}}</td></tr>`;
+  }});
+  html+='</tbody></table>';
+  document.getElementById('docs-list').innerHTML=html;
+}).catch(e=>{{document.getElementById('docs-list').innerHTML='<em style="color:#f87171">Error: '+e.message+'</em>';}});
+</script>
+"""
+
+_DOCS_DOC_BODY = """
+<div class="back"><a href="/docs">← All Compliance Documents</a></div>
+<div id="doc-view"><em style="color:#888">Loading...</em></div>
+<script>
+const docId = {doc_id_js};
+fetch('/api/compliance-docs/'+docId).then(r=>{{if(!r.ok)throw new Error('Not found');return r.json();}}).then(doc=>{{
+  const title = doc.project_code ? doc.project_code+' ('+doc.doc_type+')' : doc.id;
+  document.title = title + ' — MetaPM Docs';
+  let html = '<h1>'+title+'</h1>';
+  html += '<div class="meta">Version: <strong>'+(doc.version||'—')+'</strong> &nbsp;|&nbsp; Last updated: <strong>'+(doc.updated_at?String(doc.updated_at).slice(0,10):'—')+'</strong> &nbsp;|&nbsp; By: '+(doc.updated_by||'—')+'</div>';
+  html += '<hr>';
+  if(doc.content_md){{
+    html += '<div id="content">'+marked.parse(doc.content_md)+'</div>';
+  }}else{{html+='<em style="color:#888">No content available.</em>';}}
+  document.getElementById('doc-view').innerHTML = html;
+}}).catch(e=>{{document.getElementById('doc-view').innerHTML='<em style="color:#f87171">Document not found: '+e.message+'</em>';}});
+</script>
+"""
+
+
+@app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
+async def compliance_docs_list():
+    """Compliance documents viewer — lists all 12 compliance docs."""
+    return HTMLResponse(_DOCS_PAGE_TEMPLATE.format(body=_DOCS_LIST_BODY))
+
+
+@app.get("/docs/{doc_id}", response_class=HTMLResponse, include_in_schema=False)
+async def compliance_doc_view(doc_id: str):
+    """Render a single compliance document as formatted HTML with marked.js."""
+    safe_id = doc_id.replace("'", "").replace('"', "").replace(";", "")
+    body = _DOCS_DOC_BODY.format(doc_id_js=f'"{safe_id}"')
+    return HTMLResponse(_DOCS_PAGE_TEMPLATE.format(body=body))
 
 
 @app.get("/debug/routes")

@@ -147,3 +147,37 @@ async def sync_governance(payload: GovernanceSyncPayload):
         bootstrap_version=state["bootstrap_version"],
         updated_at=state["updated_at"]
     )
+
+
+@router.get("/compliance-docs", summary="List all compliance documents")
+async def list_compliance_docs():
+    """List all compliance documents stored in the compliance_docs table."""
+    try:
+        rows = execute_query(
+            "SELECT id, doc_type, project_code, version, updated_at, updated_by "
+            "FROM compliance_docs ORDER BY doc_type, project_code",
+            fetch="all"
+        )
+        return {"docs": [dict(r) for r in (rows or [])]}
+    except Exception as e:
+        logger.error(f"Failed to list compliance docs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/compliance-docs/{doc_id}", summary="Get a single compliance document with content")
+async def get_compliance_doc(doc_id: str):
+    """Retrieve a compliance document including its markdown content."""
+    try:
+        row = execute_query(
+            "SELECT id, doc_type, project_code, version, [checkpoint], content_md, updated_at, updated_by "
+            "FROM compliance_docs WHERE id = ?",
+            (doc_id,), fetch="one"
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Document '{doc_id}' not found")
+        return dict(row)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get compliance doc {doc_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
