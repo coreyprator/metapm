@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.38.7"  # EG06: /docs row onclick, formatTimestamp on docs, UAT project name resolve_project_name()
+    VERSION: str = "2.38.8"  # EG07: docsPanel reads compliance_docs SQL, UAT spec_data project fallback
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

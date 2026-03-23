@@ -233,7 +233,7 @@ async def serve_uat_page(request: Request, uat_id: str):
     from fastapi import Request as _Request
     # 1. Primary: uat_pages by id
     page = execute_query(
-        "SELECT id, html_content, status, pth, spec_source, spec_data, test_cases_json FROM uat_pages WHERE id = ?",
+        "SELECT id, project, html_content, status, pth, spec_source, spec_data, test_cases_json FROM uat_pages WHERE id = ?",
         (uat_id,), fetch="one"
     )
 
@@ -246,12 +246,17 @@ async def serve_uat_page(request: Request, uat_id: str):
         # PL is authenticated — render interactive spec page
         # Fetch full row including general_notes and pl_submitted_at
         full_page = execute_query(
-            "SELECT id, spec_data, test_cases_json, general_notes, pl_submitted_at, status FROM uat_pages WHERE id = ?",
+            "SELECT id, project, spec_data, test_cases_json, general_notes, pl_submitted_at, status FROM uat_pages WHERE id = ?",
             (uat_id,), fetch="one"
         ) or page
         from app.api.uat_spec import render_spec_uat_page
         email = get_session_email(request) or ""
         spec_data = json.loads(full_page.get("spec_data") or page.get("spec_data") or "{}") if (full_page.get("spec_data") or page.get("spec_data")) else {}
+        # BV-03 fix: inject project from uat_pages.project if spec_data lacks it
+        if not spec_data.get("project") and not spec_data.get("project_id"):
+            raw_proj = full_page.get("project") or page.get("project") or ""
+            if raw_proj:
+                spec_data["project"] = raw_proj
         tc_json = json.loads(full_page.get("test_cases_json") or page.get("test_cases_json") or "[]") if (full_page.get("test_cases_json") or page.get("test_cases_json")) else []
         # Strip to spec fields only (no result leakage for spec definition)
         spec_tests = [
