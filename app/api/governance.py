@@ -154,7 +154,7 @@ async def list_compliance_docs():
     """List all compliance documents stored in the compliance_docs table."""
     try:
         rows = execute_query(
-            "SELECT id, title, doc_type, project_code, version, updated_at, updated_by "
+            "SELECT id, doc_type, project_code, version, updated_at, updated_by "
             "FROM compliance_docs ORDER BY doc_type, project_code",
             fetch="all"
         )
@@ -169,7 +169,7 @@ async def get_compliance_doc(doc_id: str):
     """Retrieve a compliance document including its markdown content."""
     try:
         row = execute_query(
-            "SELECT id, title, doc_type, project_code, version, [checkpoint], content_md, updated_at, updated_by "
+            "SELECT id, doc_type, project_code, version, [checkpoint], content_md, updated_at, updated_by "
             "FROM compliance_docs WHERE id = ?",
             (doc_id,), fetch="one"
         )

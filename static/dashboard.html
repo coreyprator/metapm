@@ -2842,6 +2842,13 @@
       try { return new Date(iso).toLocaleString('en-US',{timeZone:'America/Chicago',month:'2-digit',day:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}); }
       catch(e) { return String(iso).slice(0,10); }
     }
+    const DOC_NAMES = {
+      'bootstrap': 'Bootstrap', 'cai-outbound': 'CAI Outbound Standard', 'cai-inbound': 'CAI Inbound Standard',
+      'pk-metapm': 'MetaPM PK.md', 'pk-mp': 'MetaPM PK.md', 'pk-sf': 'Super Flashcards PK.md',
+      'pk-harmonylab': 'HarmonyLab PK.md', 'pk-artforge': 'ArtForge PK.md', 'pk-etymython': 'Etymython PK.md',
+      'pk-portfolio-rag': 'Portfolio RAG PK.md', 'pk-personal-assistant': 'Personal Assistant PK.md',
+      'pk-project-methodology': 'Project Methodology PK.md'
+    };
     async function loadDocLibrary() {
       const container = qs('docsList');
       container.innerHTML = '<div style="color:var(--muted);padding:12px">Loading...</div>';
@@ -2851,7 +2858,7 @@
         const docs = data.docs || data;
         if (!docs.length) { container.innerHTML = '<div style="color:var(--muted);padding:12px;font-style:italic">No compliance docs found.</div>'; return; }
         container.innerHTML = docs.map(d => {
-          const title = d.title || d.id;
+          const title = DOC_NAMES[d.id] || d.id;
           return `<div onclick="window.open('/docs/${d.id}','_blank')"
             style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin-bottom:6px;background:var(--panel-soft);cursor:pointer"
             onmouseover="this.style.background='#13203a'" onmouseout="this.style.background='var(--panel-soft)'">

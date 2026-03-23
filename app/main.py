@@ -191,12 +191,19 @@ function formatTimestamp(iso) {
     });
   } catch(e) { return String(iso).slice(0,10); }
 }
+const DOC_NAMES = {
+  'bootstrap': 'Bootstrap', 'cai-outbound': 'CAI Outbound Standard', 'cai-inbound': 'CAI Inbound Standard',
+  'pk-metapm': 'MetaPM PK.md', 'pk-mp': 'MetaPM PK.md', 'pk-sf': 'Super Flashcards PK.md',
+  'pk-harmonylab': 'HarmonyLab PK.md', 'pk-artforge': 'ArtForge PK.md', 'pk-etymython': 'Etymython PK.md',
+  'pk-portfolio-rag': 'Portfolio RAG PK.md', 'pk-personal-assistant': 'Personal Assistant PK.md',
+  'pk-project-methodology': 'Project Methodology PK.md'
+};
 fetch('/api/compliance-docs').then(r=>r.json()).then(data=>{
   const docs = data.docs || [];
   if (!docs.length) { document.getElementById('docs-list').innerHTML='<em style="color:#f87171">No compliance documents found.</em>'; return; }
   let html = '<table><thead><tr><th>Document</th><th>Type</th><th>Version</th><th>Last Updated</th><th>Updated By</th></tr></thead><tbody>';
   docs.forEach(d => {
-    const title = d.title || d.id;
+    const title = DOC_NAMES[d.id] || d.id;
     html += '<tr style="cursor:pointer" onclick="window.location=\'/docs/' + d.id + '\'"><td><a href="/docs/' + d.id + '" onclick="event.stopPropagation()">' + title + '</a></td>'
           + '<td><span class="badge">' + (d.doc_type || '') + '</span></td>'
           + '<td>' + (d.version || '\u2014') + '</td>'
@@ -223,12 +230,19 @@ function formatTimestamp(iso) {{
     }});
   }} catch(e) {{ return String(iso).slice(0,10); }}
 }}
+const DOC_NAMES = {{
+  'bootstrap': 'Bootstrap', 'cai-outbound': 'CAI Outbound Standard', 'cai-inbound': 'CAI Inbound Standard',
+  'pk-metapm': 'MetaPM PK.md', 'pk-mp': 'MetaPM PK.md', 'pk-sf': 'Super Flashcards PK.md',
+  'pk-harmonylab': 'HarmonyLab PK.md', 'pk-artforge': 'ArtForge PK.md', 'pk-etymython': 'Etymython PK.md',
+  'pk-portfolio-rag': 'Portfolio RAG PK.md', 'pk-personal-assistant': 'Personal Assistant PK.md',
+  'pk-project-methodology': 'Project Methodology PK.md'
+}};
 const docId = {doc_id_js};
 fetch('/api/compliance-docs/' + docId).then(r => {{
   if (!r.ok) throw new Error('Not found');
   return r.json();
 }}).then(doc => {{
-  const title = doc.title || doc.id;
+  const title = DOC_NAMES[doc.id] || doc.id;
   document.title = title + ' \u2014 MetaPM Docs';
   let html = '<h1>' + title + '</h1>';
   html += '<div class="meta">Version: <strong>' + (doc.version || '\u2014') + '</strong>'
