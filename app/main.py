@@ -196,8 +196,8 @@ fetch('/api/compliance-docs').then(r=>r.json()).then(data=>{
   if (!docs.length) { document.getElementById('docs-list').innerHTML='<em style="color:#f87171">No compliance documents found.</em>'; return; }
   let html = '<table><thead><tr><th>Document</th><th>Type</th><th>Version</th><th>Last Updated</th><th>Updated By</th></tr></thead><tbody>';
   docs.forEach(d => {
-    const title = d.project_code ? d.project_code + ' (' + d.doc_type + ')' : d.id;
-    html += '<tr style="cursor:pointer" onclick="window.location=\'/docs/\'+d.id"><td><a href="/docs/' + d.id + '" onclick="event.stopPropagation()">' + title + '</a></td>'
+    const title = d.title || d.id;
+    html += '<tr style="cursor:pointer" onclick="window.location=\'/docs/' + d.id + '\'"><td><a href="/docs/' + d.id + '" onclick="event.stopPropagation()">' + title + '</a></td>'
           + '<td><span class="badge">' + (d.doc_type || '') + '</span></td>'
           + '<td>' + (d.version || '\u2014') + '</td>'
           + '<td>' + formatTimestamp(d.updated_at) + '</td>'
@@ -228,7 +228,7 @@ fetch('/api/compliance-docs/' + docId).then(r => {{
   if (!r.ok) throw new Error('Not found');
   return r.json();
 }}).then(doc => {{
-  const title = doc.project_code ? doc.project_code + ' (' + doc.doc_type + ')' : doc.id;
+  const title = doc.title || doc.id;
   document.title = title + ' \u2014 MetaPM Docs';
   let html = '<h1>' + title + '</h1>';
   html += '<div class="meta">Version: <strong>' + (doc.version || '\u2014') + '</strong>'

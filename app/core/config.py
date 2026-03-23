@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.38.8"  # EG07: docsPanel reads compliance_docs SQL, UAT spec_data project fallback
+    VERSION: str = "2.38.9"  # EG08: /docs page shows title from SQL, /api/compliance-docs includes title field
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

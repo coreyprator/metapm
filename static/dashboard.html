@@ -2851,7 +2851,7 @@
         const docs = data.docs || data;
         if (!docs.length) { container.innerHTML = '<div style="color:var(--muted);padding:12px;font-style:italic">No compliance docs found.</div>'; return; }
         container.innerHTML = docs.map(d => {
-          const title = d.project_code ? `${d.project_code} (${d.doc_type})` : d.id;
+          const title = d.title || d.id;
           return `<div onclick="window.open('/docs/${d.id}','_blank')"
             style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin-bottom:6px;background:var(--panel-soft);cursor:pointer"
             onmouseover="this.style.background='#13203a'" onmouseout="this.style.background='var(--panel-soft)'">
