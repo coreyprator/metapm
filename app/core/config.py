@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.40.1"  # PABUGS2: /api/project-radar filtered endpoint, hide STALE Active Jobs
+    VERSION: str = "2.41.0"  # AP10: Handoff POST gate — pth and uat_url required, non-null, non-N/A
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

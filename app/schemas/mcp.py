@@ -6,9 +6,21 @@ Pydantic models for MCP handoffs and tasks.
 import re
 from datetime import datetime
 from typing import Optional, List, Dict, Any
+from fastapi import HTTPException
 from pydantic import BaseModel, Field, model_validator, ValidationError
 from pydantic_core import PydanticCustomError
 from enum import Enum
+
+
+# AP10: Shared validation helper for required non-N/A fields
+_INVALID_VALUES = {'', 'n/a', 'na', 'null', 'none'}
+
+def _is_invalid_field(value) -> bool:
+    """Return True if value is null, empty, whitespace-only, or a placeholder like N/A."""
+    if value is None:
+        return True
+    s = str(value).strip().lower()
+    return s in _INVALID_VALUES
 
 
 class HandoffDirection(str, Enum):
@@ -66,7 +78,11 @@ class HandoffCreate(BaseModel):
     description: Optional[str] = None  # Used as content when content not provided
     completion_handoff_url: Optional[str] = Field(None, max_length=500)  # GCS URL
 
-    # PF5-MS2: Prompt linking
+    # AP10: pth and uat_url — required, validated at Pydantic level (un-bypassable)
+    pth: Optional[str] = Field(None, max_length=20)  # Prompt tracking hash
+    uat_url: Optional[str] = Field(None, max_length=500)  # UAT spec URL
+
+    # PF5-MS2: Prompt linking (pth aliases to this if set)
     prompt_pth: Optional[str] = Field(None, max_length=10)
 
     # MP-HANDOFF-GATE-001: Enforcement fields
@@ -82,7 +98,32 @@ class HandoffCreate(BaseModel):
     response_to: Optional[str] = None
 
     @model_validator(mode='after')
-    def normalize_ba04_fields(self) -> 'HandoffCreate':
+    def validate_and_normalize(self) -> 'HandoffCreate':
+        # ── AP10 Gate: pth and uat_url required, non-N/A (un-bypassable) ──
+        invalid_fields = []
+        if _is_invalid_field(self.pth):
+            invalid_fields.append('pth')
+        if _is_invalid_field(self.uat_url):
+            invalid_fields.append('uat_url')
+        if invalid_fields:
+            if len(invalid_fields) == 2:
+                msg = "pth and uat_url are required and cannot be N/A or empty"
+            else:
+                msg = f"{invalid_fields[0]} is required and cannot be N/A or empty"
+            raise HTTPException(status_code=422, detail={"error": msg})
+
+        # ── Normalize: pth → prompt_pth ──
+        if self.pth and not self.prompt_pth:
+            self.prompt_pth = self.pth
+
+        # ── Normalize: extract uat_spec_id from uat_url if not explicitly set ──
+        if self.uat_url and not self.uat_spec_id:
+            # uat_url format: https://metapm.rentyourcio.com/uat/{uuid}
+            match = re.search(r'/uat/([0-9a-fA-F-]{36})$', self.uat_url)
+            if match:
+                self.uat_spec_id = match.group(1)
+
+        # ── BA04 normalization ──
         # task falls back to title, then id
         if not self.task:
             self.task = self.title or self.id or 'handoff'
