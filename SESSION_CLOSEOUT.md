@@ -1,50 +1,48 @@
-# SESSION CLOSEOUT — AP10-HANDOFF-GATE-001
+# SESSION CLOSEOUT — MM12-DASHBOARD-FIX-001
 
 ## Session Identity
-- **PTH**: A73F
-- **Sprint**: AP10-HANDOFF-GATE-001
+- **PTH**: C91D
+- **Sprint**: MM12-DASHBOARD-FIX-001
 - **Project**: MetaPM
-- **Version**: v2.40.1 -> v2.41.0
+- **Version**: v2.41.0 -> v2.42.0
 - **Date**: 2026-03-24
-- **Commit**: ceb0bac
+- **Commit**: 8f5854b
 
 ## Requirements Delivered
 
-### AP10-REQ-001 — Validate `pth` on handoff POST
-- Added `pth` field to `HandoffCreate` Pydantic model (`app/schemas/mcp.py`)
-- `@model_validator` rejects null, empty, whitespace, "N/A", "n/a", "na"
-- Returns HTTP 422 with `{"error": "pth is required and cannot be N/A or empty"}`
-- Validation fires at Pydantic layer, un-bypassable
+### MM12-REQ-001 — Prompt detail markdown render on all statuses (FIXED)
+- `static/prompt-viewer.html`: Removed `isDraft` ternary that showed raw textarea for draft status
+- Now calls `buildCollapsibleContent()` for ALL statuses including draft/prompt_ready
+- Draft prompts get rendered markdown + "Edit Source" toggle button to access textarea
 
-### AP10-REQ-002 — Validate `uat_url` on handoff POST
-- Added `uat_url` field to `HandoffCreate` Pydantic model
-- Same validation pattern as pth
-- Combined error: `"pth and uat_url are required and cannot be N/A or empty"` when both fail
+### MM12-REQ-002 — Active Jobs STALE items (NO CHANGE NEEDED)
+- Phase 0 confirmed STALE items already filtered: `all.filter(j => j.status !== 'stale')` at dashboard.html:3101
+- Documented in PK.md
 
-### AP10-REQ-003 — Regression: existing valid flow unbroken
-- Valid POST with proper pth + uat_url + metadata returns 201
+### MM12-REQ-003 — Needs Approval updated_at filter (FIXED)
+- `app/api/prompts.py:457`: Changed `p.created_at` to `p.updated_at` in `days` filter
+- `app/api/radar.py:55`: Changed `p.created_at` to `p.updated_at` in approve_prompts query
+- Old seeds with recent activity no longer slip through the 14-day window
+
+### MM12-REQ-004 — Morning Brief Cloud Scheduler (NO CHANGE NEEDED)
+- Phase 0 confirmed: job is `personal-assistant-daily` at `0 13 * * *` America/Chicago = 8am CT
+- No `personal-assistant-morning-brief` job exists — the job name differs from prompt assumption
 
 ## Files Changed
-- `app/schemas/mcp.py` — Added `_is_invalid_field()` helper, `pth`/`uat_url` fields, `validate_and_normalize` model_validator
-- `app/core/config.py` — Version bump 2.40.1 -> 2.41.0
+- `app/api/prompts.py` — days filter: created_at -> updated_at
+- `app/api/radar.py` — approve_prompts query: created_at -> updated_at
+- `app/core/config.py` — Version bump 2.41.0 -> 2.42.0
+- `static/prompt-viewer.html` — Markdown render for all statuses + Edit Source toggle
 
-## Test Results (Production)
-
-| BV | Description | Expected | Actual | Status |
-|----|-------------|----------|--------|--------|
-| BV-001 | Missing pth | 422 | 422 `{"error":"pth is required..."}` | PASS |
-| BV-002 | pth="N/A" | 422 | 422 `{"error":"pth is required..."}` | PASS |
-| BV-003 | Missing uat_url | 422 | 422 `{"error":"uat_url is required..."}` | PASS |
-| BV-004 | uat_url="N/A" | 422 | 422 `{"error":"uat_url is required..."}` | PASS |
-| BV-005 | Both invalid | 422 naming both | 422 `{"error":"pth and uat_url are required..."}` | PASS |
-| BV-006 | Valid POST | 201 | 201, handoff created | PASS |
-| BV-007 | No DB rows for rejects | 0 rows | 0 rows (422 before DB) | PASS |
-
-## Deploy
-- Method: GitHub Actions CI/CD (push to main)
-- Health check: v2.41.0 confirmed
-- Run: 23510864497
+## Canary Evidence
+```
+Health: {"status":"healthy","version":"2.42.0","build":"unknown"}
+Scheduler: personal-assistant-daily  0 13 * * *  America/Chicago
+Commit: 8f5854b
+Deploy run: 23512605859 (success)
+```
 
 ## Handoff
-- Handoff ID: 9A31E738-7103-4F4F-86D8-05135EC7E96B
-- UAT spec_id: 1A1D0F93-8F31-406F-9831-125CDC8B52F6
+- Handoff ID: 85064F10-60D0-4F6D-AB94-8D05232B33BB
+- UAT spec_id: FA9A9F27-D340-48FD-891C-1ED5A3BB68F3
+- UAT URL: https://metapm.rentyourcio.com/uat/FA9A9F27-D340-48FD-891C-1ED5A3BB68F3

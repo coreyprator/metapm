@@ -1,10 +1,21 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-9E3F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-24 — Sprint "AP10-HANDOFF-GATE-001" (v2.41.0)
+Updated: 2026-03-24 — Sprint "MM12-DASHBOARD-FIX-001" (v2.42.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-24 (AP10-HANDOFF-GATE-001, v2.41.0)
+### Latest Session Update — 2026-03-24 (MM12-DASHBOARD-FIX-001, v2.42.0)
+
+- **Sprint MM12-DASHBOARD-FIX-001 (PTH: C91D)**: Dashboard bug fixes — 4 items
+- **Current Version**: v2.42.0 — **DEPLOYED** to Cloud Run via GitHub Actions CI
+- **Commit**: 8f5854b
+- **MM12-REQ-001**: Prompt detail page (`static/prompt-viewer.html`) now renders markdown via `buildCollapsibleContent()` for ALL statuses including draft/prompt_ready. Draft prompts show rendered content + "Edit Source" toggle button for textarea editing.
+- **MM12-REQ-002**: Active Jobs STALE items already hidden — confirmed `all.filter(j => j.status !== 'stale')` in `dashboard.html:3101`. No code change needed.
+- **MM12-REQ-003**: Needs Approval `days` filter in `app/api/prompts.py` changed from `p.created_at` to `p.updated_at`. Same fix applied to `app/api/radar.py` approve_prompts query. Old seeds no longer appear.
+- **MM12-REQ-004**: Morning Brief Cloud Scheduler job is `personal-assistant-daily` (not `personal-assistant-morning-brief`). Schedule: `0 13 * * *` America/Chicago = 8am CT. Already correct, no change needed.
+- **Handoff**: 85064F10-60D0-4F6D-AB94-8D05232B33BB | **UAT**: FA9A9F27-D340-48FD-891C-1ED5A3BB68F3
+
+### Previous Session Update — 2026-03-24 (AP10-HANDOFF-GATE-001, v2.41.0)
 
 - **Sprint AP10-HANDOFF-GATE-001 (PTH: A73F)**: Handoff POST gate — pth and uat_url required
 - **Current Version**: v2.41.0 — **DEPLOYED** to Cloud Run via GitHub Actions CI
