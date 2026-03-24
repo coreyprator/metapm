@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.41.0"  # AP10: Handoff POST gate — pth and uat_url required, non-null, non-N/A
+    VERSION: str = "2.42.0"  # MM12: Prompt detail markdown render fix, Needs Approval updated_at filter
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

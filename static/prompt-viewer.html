@@ -145,13 +145,20 @@ function renderPrompt(p) {
     : '';
 
   const isDraft = (p.status === 'draft' || p.status === 'prompt_ready');
-  const contentArea = isDraft
-    ? `<textarea id="content-editor" class="prompt-content-edit">${escapeHtml(p.content_md || p.content || '')}</textarea>
-       <div class="save-bar">
-         <button onclick="saveContent()">Save Changes</button>
-         <span class="save-status" id="save-status"></span>
+  const renderedContent = buildCollapsibleContent(p.content_md || p.content || 'No content');
+  const editArea = isDraft
+    ? `<div id="edit-toggle-bar" style="margin-top:12px;margin-bottom:8px">
+         <button onclick="toggleEditMode()" style="padding:6px 16px;background:#374151;color:#e2e8f0;border:1px solid #475569;border-radius:6px;font-size:13px;cursor:pointer" id="edit-toggle-btn">Edit Source</button>
+       </div>
+       <div id="edit-area" style="display:none">
+         <textarea id="content-editor" class="prompt-content-edit">${escapeHtml(p.content_md || p.content || '')}</textarea>
+         <div class="save-bar">
+           <button onclick="saveContent()">Save Changes</button>
+           <span class="save-status" id="save-status"></span>
+         </div>
        </div>`
-    : buildCollapsibleContent(p.content_md || p.content || 'No content');
+    : '';
+  const contentArea = renderedContent + editArea;
 
   // Build artifact chain
   const reqNode = p.requirement_id
@@ -293,6 +300,15 @@ function buildCollapsibleContent(raw) {
       <button class="section-expand-btn" onclick="collapseAll()">Collapse all</button>
     </div>
     <div class="prompt-content">${panels}</div>`;
+}
+
+function toggleEditMode() {
+  const area = document.getElementById('edit-area');
+  const btn = document.getElementById('edit-toggle-btn');
+  if (!area) return;
+  const show = area.style.display === 'none';
+  area.style.display = show ? '' : 'none';
+  btn.textContent = show ? 'Hide Editor' : 'Edit Source';
 }
 
 function toggleSection(id) {

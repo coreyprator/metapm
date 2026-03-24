@@ -52,8 +52,8 @@ async def get_project_radar(_: bool = Depends(verify_api_key)):
         LEFT JOIN roadmap_projects proj ON p.project_id = proj.id
         WHERE p.status = 'draft'
           AND p.estimated_hours > 0.1
-          AND p.created_at > DATEADD(day, -14, GETUTCDATE())
-        ORDER BY p.created_at DESC
+          AND p.updated_at > DATEADD(day, -14, GETUTCDATE())
+        ORDER BY p.updated_at DESC
     """, fetch="all") or []
 
     approve_prompts = [

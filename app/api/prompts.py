@@ -454,7 +454,7 @@ async def list_prompts(
         where_parts.append("p.estimated_hours > ?")
         params.append(min_hours)
     if days is not None:
-        where_parts.append("p.created_at > DATEADD(day, ?, GETUTCDATE())")
+        where_parts.append("p.updated_at > DATEADD(day, ?, GETUTCDATE())")
         params.append(-days)
 
     where_clause = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
