@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.40.0"  # MM11: Dashboard cleanup — approval filter, UAT history toggle, +Add z-index, cancel button, PTH newest, Loop3 machine-test auto-pass
+    VERSION: str = "2.40.1"  # PABUGS2: /api/project-radar filtered endpoint, hide STALE Active Jobs
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

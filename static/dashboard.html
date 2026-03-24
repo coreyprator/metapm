@@ -2324,7 +2324,7 @@
     async function loadActivePrompts() {
       try {
         // Section A: draft prompts awaiting PL approval — real sprints only (>0.1h, last 14 days)
-        const draftsRes = await api('/api/prompts/?status=draft&min_hours=0.2&days=14&limit=20');
+        const draftsRes = await api('/api/prompts?status=draft&min_hours=0.2&days=14&limit=20');
         const drafts = (Array.isArray(draftsRes) ? draftsRes : (draftsRes.prompts || []))
           .filter(p => p.status === 'draft');
 
@@ -3097,11 +3097,13 @@
           ...loop2.map(j => ({...j, label: 'Loop 2 (Review)'})),
           ...loop3.map(j => ({...j, label: 'Loop 3 (UAT)'}))
         ];
-        if (!all.length) {
+        // PABUGS2: hide STALE entries — they're useless noise once marked stale
+        const visible = all.filter(j => j.status !== 'stale');
+        if (!visible.length) {
           el.innerHTML = '<span style="color:var(--muted)">No jobs in last 24h. Loops idle.</span>';
         } else {
           const statusColor = s => s === 'running' ? '#eab308' : s === 'succeeded' ? '#22c55e' : '#ef4444';
-          el.innerHTML = all.map(j => {
+          el.innerHTML = visible.map(j => {
             const pthLabel = j.pth
               ? `<span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">PTH: ${j.pth}</span>`
               : `<span style="color:var(--muted);font-family:monospace;font-size:10px">${(j.name||'').split('/').pop().split('-').slice(-2).join('-')}</span>`;
