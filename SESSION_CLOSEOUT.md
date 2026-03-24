@@ -1,40 +1,50 @@
-# SESSION CLOSEOUT — MP-LESSON-INBOX-001
-**Date**: 2026-03-10
-**Sprint**: MP-LESSON-INBOX-001 (Lessons API: Field Validation + CRUD + Response Enhancement)
-**Version**: v2.17.0 -> v2.18.0
-**PTH**: C9F1
+# SESSION CLOSEOUT — AP10-HANDOFF-GATE-001
 
-## Summary
-Added Pydantic enum validation to lessons POST, soft delete (DELETE endpoint + deleted column), expanded PATCH to support all editable fields, and added edit/delete UI controls in dashboard lessons tab.
+## Session Identity
+- **PTH**: A73F
+- **Sprint**: AP10-HANDOFF-GATE-001
+- **Project**: MetaPM
+- **Version**: v2.40.1 -> v2.41.0
+- **Date**: 2026-03-24
+- **Commit**: ceb0bac
 
-## What Was Built
+## Requirements Delivered
 
-1. **Migration 39** — `deleted BIT DEFAULT 0` on lessons_learned + expanded CHECK constraints
-2. **Pydantic enums** — LessonCategory, LessonTarget, LessonBy, LessonStatus replace manual validation
-3. **Field aliases** — `text`↔`lesson`, `by`↔`proposed_by` for backward compat
-4. **POST returns 201** — includes `id` (LL-NNN) and `status` in response
-5. **DELETE /api/lessons/{id}** — soft delete, excluded from all list queries
-6. **PATCH expanded** — now supports category, target, project, proposed_by, source_sprint
-7. **Dashboard UI** — Edit/Delete buttons on lesson cards, inline edit form with enum dropdowns
-8. **RequirementUpdate schema** — added uat_url field for closeout gate
+### AP10-REQ-001 — Validate `pth` on handoff POST
+- Added `pth` field to `HandoffCreate` Pydantic model (`app/schemas/mcp.py`)
+- `@model_validator` rejects null, empty, whitespace, "N/A", "n/a", "na"
+- Returns HTTP 422 with `{"error": "pth is required and cannot be N/A or empty"}`
+- Validation fires at Pydantic layer, un-bypassable
 
-## Files Modified
-- `app/api/lessons.py` — enums, aliases, DELETE endpoint, expanded PATCH, soft-delete filters
-- `app/core/config.py` — VERSION 2.18.0
-- `app/core/migrations.py` — Migration 39
-- `app/schemas/roadmap.py` — uat_url in RequirementUpdate
-- `app/api/roadmap.py` — uat_url in PUT handler
-- `static/dashboard.html` — edit/delete controls, expanded filter dropdowns
-- `PROJECT_KNOWLEDGE.md` — sprint update
+### AP10-REQ-002 — Validate `uat_url` on handoff POST
+- Added `uat_url` field to `HandoffCreate` Pydantic model
+- Same validation pattern as pth
+- Combined error: `"pth and uat_url are required and cannot be N/A or empty"` when both fail
 
-## Canary Results
-- CANARY 1 — POST missing fields → 422 with field-level errors: PASS
-- CANARY 2 — POST valid → LL-056, status: draft: PASS
-- CANARY 3 — DELETE soft-deletes, excluded from list: PASS (HTTP:200)
-- CANARY 4 — PATCH updates source_sprint field: PASS (HTTP:200)
+### AP10-REQ-003 — Regression: existing valid flow unbroken
+- Valid POST with proper pth + uat_url + metadata returns 201
 
-## MetaPM State
-- MP-061: cc_complete (EB65)
-- Revision: metapm-v2-00173-dk2
-- Handoff ID: 1C6C5379-CDA1-4122-9E78-7BFB1CB2E345
-- UAT URL: https://metapm.rentyourcio.com/uat/EDD507F3-D842-4F71-9093-701726ED87BD
+## Files Changed
+- `app/schemas/mcp.py` — Added `_is_invalid_field()` helper, `pth`/`uat_url` fields, `validate_and_normalize` model_validator
+- `app/core/config.py` — Version bump 2.40.1 -> 2.41.0
+
+## Test Results (Production)
+
+| BV | Description | Expected | Actual | Status |
+|----|-------------|----------|--------|--------|
+| BV-001 | Missing pth | 422 | 422 `{"error":"pth is required..."}` | PASS |
+| BV-002 | pth="N/A" | 422 | 422 `{"error":"pth is required..."}` | PASS |
+| BV-003 | Missing uat_url | 422 | 422 `{"error":"uat_url is required..."}` | PASS |
+| BV-004 | uat_url="N/A" | 422 | 422 `{"error":"uat_url is required..."}` | PASS |
+| BV-005 | Both invalid | 422 naming both | 422 `{"error":"pth and uat_url are required..."}` | PASS |
+| BV-006 | Valid POST | 201 | 201, handoff created | PASS |
+| BV-007 | No DB rows for rejects | 0 rows | 0 rows (422 before DB) | PASS |
+
+## Deploy
+- Method: GitHub Actions CI/CD (push to main)
+- Health check: v2.41.0 confirmed
+- Run: 23510864497
+
+## Handoff
+- Handoff ID: 9A31E738-7103-4F4F-86D8-05135EC7E96B
+- UAT spec_id: 1A1D0F93-8F31-406F-9831-125CDC8B52F6

@@ -1,10 +1,22 @@
 # MetaPM -- Project Knowledge Document
 <!-- CHECKPOINT: MP-PK-9E3F -->
 Generated: 2026-02-15 by CC Session
-Updated: 2026-03-20 — Sprint "MM01" (v2.37.0)
+Updated: 2026-03-24 — Sprint "AP10-HANDOFF-GATE-001" (v2.41.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-20 (MM01, v2.37.0)
+### Latest Session Update — 2026-03-24 (AP10-HANDOFF-GATE-001, v2.41.0)
+
+- **Sprint AP10-HANDOFF-GATE-001 (PTH: A73F)**: Handoff POST gate — pth and uat_url required
+- **Current Version**: v2.41.0 — **DEPLOYED** to Cloud Run via GitHub Actions CI
+- **Commit**: ceb0bac
+- **AP10-REQ-001**: `pth` field now validated at Pydantic model level on `POST /mcp/handoffs`. Rejects null, empty, whitespace-only, "N/A", "n/a", "na" with HTTP 422.
+- **AP10-REQ-002**: `uat_url` field same validation. Combined error message when both fail.
+- **AP10-REQ-003**: Regression confirmed — valid handoff POST with proper pth + uat_url returns 201.
+- **Key change**: `HandoffCreate` schema in `app/schemas/mcp.py` now has `pth` and `uat_url` as explicit fields with `@model_validator` validation. Validation is un-bypassable (runs before route handler, not affected by `enforcement_bypass`).
+- **Normalization**: `pth` auto-populates `prompt_pth`; `uat_url` auto-extracts `uat_spec_id` via regex.
+- **Handoff**: 9A31E738-7103-4F4F-86D8-05135EC7E96B | **UAT**: 1A1D0F93-8F31-406F-9831-125CDC8B52F6
+
+### Previous Session Update — 2026-03-20 (MM01, v2.37.0)
 
 - **Sprint MM01 (PTH: MM01)**: Dashboard Mega Sprint — 14 items across 4 groups
 - **Current Version**: v2.37.0 — **DEPLOYED** to Cloud Run (revision metapm-v2-00265-xwp)
