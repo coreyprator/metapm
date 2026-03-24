@@ -128,7 +128,8 @@ function renderPrompt(p) {
   if (p.status === 'draft' || p.status === 'prompt_ready') {
     actionBar = `
       <button id="approve-btn" onclick="approvePrompt()">&#x2705; Approve</button>
-      <button id="reject-btn" onclick="rejectPrompt()">&#x274C; Reject</button>`;
+      <button id="reject-btn" onclick="rejectPrompt()">&#x274C; Reject</button>
+      <button id="cancel-btn" onclick="cancelPrompt()" style="background:#374151;color:#9ca3af">&#x2715; Cancel</button>`;
   } else if (p.status === 'approved') {
     actionBar = `<div class="approved-badge">&#x2705; Approved &mdash; ready for CC</div>`;
   } else if (p.status === 'executing') {
@@ -357,6 +358,17 @@ async function rejectPrompt() {
   });
   if (res.ok) location.reload();
   else alert('Reject failed: ' + (await res.text()));
+}
+
+async function cancelPrompt() {
+  if (!promptData) return;
+  if (!confirm(`Cancel prompt ${promptData.pth || promptData.id}? This cannot be undone.`)) return;
+  const res = await fetch(`/api/prompts/${encodeURIComponent(promptData.pth || promptData.id)}/cancel`, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'}
+  });
+  if (res.ok) location.reload();
+  else alert('Cancel failed: ' + (await res.text()));
 }
 
 loadPrompt();

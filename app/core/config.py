@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.39.0"  # AP09: Handoff gate, requirement auto-advance, stale jobs, Loop 2 UAT URL, Copy PTH, remove UAT tab
+    VERSION: str = "2.40.0"  # MM11: Dashboard cleanup — approval filter, UAT history toggle, +Add z-index, cancel button, PTH newest, Loop3 machine-test auto-pass
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

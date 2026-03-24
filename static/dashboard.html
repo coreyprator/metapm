@@ -108,7 +108,7 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       display: none;
-      z-index: 5;
+      z-index: 200;
     }
     .add-menu.open { display: block; }
     .add-menu button {
@@ -562,7 +562,10 @@
       </div>
       <!-- Section B: Run UATs -->
       <div id="runUatsSection">
-        <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Run These UATs</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em">Run These UATs</div>
+          <button id="uatHistoryToggle" type="button" onclick="showUATHistory=!showUATHistory;this.textContent=showUATHistory?'Recent Only':'Show History';loadActivePrompts()" style="font-size:10px;padding:1px 7px;background:var(--panel-soft);border:1px solid var(--line);border-radius:3px;color:var(--muted);cursor:pointer">Show History</button>
+        </div>
         <div id="runUatsList" style="font-size:12px"></div>
       </div>
     </div>
@@ -2315,17 +2318,23 @@
     }
 
     // MM10B: Active Prompts — two-section redesign
+    // MM11: Section A filtered to min_hours=0.2&days=14 (no seed noise)
+    // MM11: Section B filtered to days=14 by default + Show History toggle
+    let showUATHistory = false;
     async function loadActivePrompts() {
       try {
-        // Section A: draft prompts awaiting PL approval
-        const draftsRes = await api('/api/prompts/?status=draft&limit=20');
+        // Section A: draft prompts awaiting PL approval — real sprints only (>0.1h, last 14 days)
+        const draftsRes = await api('/api/prompts/?status=draft&min_hours=0.2&days=14&limit=20');
         const drafts = (Array.isArray(draftsRes) ? draftsRes : (draftsRes.prompts || []))
           .filter(p => p.status === 'draft');
 
-        // Section B: uat_ready requirements
+        // Section B: uat_ready requirements — recent only by default
         let uatItems = [];
         try {
-          const uatRes = await api('/api/roadmap/requirements?status=uat_ready&limit=20');
+          const uatUrl = showUATHistory
+            ? '/api/roadmap/requirements?status=uat_ready&limit=50'
+            : '/api/roadmap/requirements?status=uat_ready&days=14&limit=20';
+          const uatRes = await api(uatUrl);
           uatItems = uatRes.requirements || uatRes || [];
         } catch(e) { /* non-fatal */ }
 

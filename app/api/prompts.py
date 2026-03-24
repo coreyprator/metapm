@@ -339,7 +339,7 @@ async def create_prompt(prompt: PromptCreate, _: bool = Depends(verify_api_key))
 async def get_prompt_by_pth(pth: str):
     """Get a prompt by PTH code (public read)."""
     row = execute_query("""
-        SELECT p.*, proj.name as project_name, proj.emoji as project_emoji
+        SELECT TOP 1 p.*, proj.name as project_name, proj.emoji as project_emoji
         FROM cc_prompts p
         LEFT JOIN roadmap_projects proj ON p.project_id = proj.id
         WHERE p.pth = ?
@@ -437,6 +437,8 @@ async def list_prompts(
     status: Optional[str] = Query(None),
     project: Optional[str] = Query(None),
     limit: int = Query(20, ge=1, le=100),
+    min_hours: Optional[float] = Query(None),
+    days: Optional[int] = Query(None),
 ):
     """List prompts with optional filters (public read)."""
     where_parts = []
@@ -448,6 +450,12 @@ async def list_prompts(
     if project:
         where_parts.append("(proj.code = ? OR proj.name = ? OR p.project_id = ?)")
         params.extend([project, project, project])
+    if min_hours is not None:
+        where_parts.append("p.estimated_hours > ?")
+        params.append(min_hours)
+    if days is not None:
+        where_parts.append("p.created_at > DATEADD(day, ?, GETUTCDATE())")
+        params.append(-days)
 
     where_clause = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
     params.append(limit)

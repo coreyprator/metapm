@@ -470,7 +470,8 @@ async def list_requirements(
     sprint_id: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     limit: int = Query(50, le=500),
-    offset: int = Query(0)
+    offset: int = Query(0),
+    days: Optional[int] = Query(None),
 ):
     """List requirements with filters. status=not_done excludes done/closed."""
     try:
@@ -501,6 +502,9 @@ async def list_requirements(
         if sprint_id:
             where_clauses.append("r.sprint_id = ?")
             params.append(sprint_id)
+        if days is not None:
+            where_clauses.append("r.updated_at > DATEADD(day, ?, GETUTCDATE())")
+            params.append(-days)
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
