@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.38.9"  # EG08: /docs page shows title from SQL, /api/compliance-docs includes title field
+    VERSION: str = "2.39.0"  # AP09: Handoff gate, requirement auto-advance, stale jobs, Loop 2 UAT URL, Copy PTH, remove UAT tab
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

@@ -92,9 +92,9 @@
 <script>
 function copyPTH(pthVal) {
   if (!pthVal) return;
-  navigator.clipboard.writeText(pthVal).then(() => {
+  navigator.clipboard.writeText('PTH: ' + pthVal).then(() => {
     const badge = document.querySelector('.pth-badge');
-    if (badge) { const orig = badge.textContent; badge.textContent = 'Copied!'; setTimeout(() => badge.textContent = orig, 1200); }
+    if (badge) { const orig = badge.textContent; badge.textContent = '✓ Copied!'; setTimeout(() => badge.textContent = orig, 1500); }
   });
 }
 
@@ -178,7 +178,8 @@ function renderPrompt(p) {
 
   document.getElementById('content').innerHTML = `
     <div class="prompt-header">
-      <span class="badge pth-badge" style="cursor:pointer" onclick="copyPTH('${p.pth || ''}')" title="Click to copy PTH">PTH: ${p.pth || '?'}</span>
+      <span class="badge pth-badge" style="cursor:pointer" onclick="copyPTH('${p.pth || ''}')" title="Click to copy PTH: ${p.pth || ''}">PTH: ${p.pth || '?'}</span>
+      <button onclick="copyPTH('${p.pth || ''}')" style="padding:4px 10px;border:1px solid #475569;background:transparent;color:#94a3b8;border-radius:6px;font-size:12px;cursor:pointer" title="Copy to clipboard for VS Code CC">📋 Copy PTH</button>
       <span class="badge sprint-badge">${p.sprint_id || ''}</span>
       <span class="badge project-badge">${projectLabel}</span>
       <span class="status-badge ${statusClass}">${p.status}</span>

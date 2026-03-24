@@ -609,9 +609,12 @@ async def get_jobs_status():
                             age_hours = (cutoff_24h - started_dt).total_seconds() / 3600
                             if age_hours > 24:
                                 continue
-                            # MM10B: hide succeeded loop1 older than 2h
-                            if key == "loop1" and status == "succeeded" and age_hours > 2:
+                            # AP09: hide ALL succeeded jobs older than 2h (was loop1 only)
+                            if status == "succeeded" and age_hours > 2:
                                 continue
+                            # AP09: mark RUNNING jobs older than 3h as stale
+                            if status == "running" and age_hours > 3:
+                                status = "stale"
                         except Exception:
                             pass
                     # MM10B: look up PTH from job_executions

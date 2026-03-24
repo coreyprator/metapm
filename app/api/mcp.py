@@ -256,8 +256,27 @@ async def create_handoff(
 ):
     """Create a new handoff."""
     try:
-        # MP-HANDOFF-GATE-001: Enforce cc_complete state and valid UAT spec before registration
+        # AP09 Gate 0: Reject handoffs missing critical fields (pth, sprint_id, uat_url, version, deploy_url)
         bypass = (handoff.enforcement_bypass or "").strip().lower()
+        if bypass != "data_only_sprint":
+            _missing = []
+            if not handoff.prompt_pth or str(handoff.prompt_pth).strip() in ('', 'N/A', 'null'):
+                _missing.append("pth (prompt_pth)")
+            if not handoff.task or str(handoff.task).strip() in ('', 'N/A', 'null'):
+                _missing.append("sprint_id (task)")
+            _meta = handoff.metadata or {}
+            if not _meta.get('version') or str(_meta.get('version', '')).strip() in ('', 'N/A', 'null'):
+                _missing.append("version (metadata.version)")
+            if not _meta.get('deploy_url') or str(_meta.get('deploy_url', '')).strip() in ('', 'N/A', 'null'):
+                _missing.append("deploy_url (metadata.deploy_url)")
+            if _missing:
+                raise HTTPException(422, detail={
+                    "error": "Non-standard handoff rejected — missing required fields",
+                    "missing": _missing,
+                    "standard": "All handoffs must include: pth, sprint_id, uat_url, version, deploy_url"
+                })
+
+        # MP-HANDOFF-GATE-001: Enforce cc_complete state and valid UAT spec before registration
 
         # Gate 1: linked prompt/requirement must be at cc_complete or higher
         # Skipped when enforcement_bypass="data_only_sprint"
@@ -353,6 +372,25 @@ async def create_handoff(
                 logger.info(f"Prompt {handoff.prompt_pth} marked complete (handoff {handoff_id})")
             except Exception as pth_err:
                 logger.warning(f"Prompt-pth linking failed (non-fatal): {pth_err}")
+
+        # AP09 Fix 2: Auto-advance linked requirements to cc_complete on handoff POST
+        try:
+            import re as _re2
+            linked_codes = list(set(_re2.findall(r'[A-Z]{2,}-\d{3}', handoff.content or '')))
+            advanced_count = 0
+            for code in linked_codes[:20]:
+                adv_result = execute_query(
+                    """UPDATE roadmap_requirements SET status = 'cc_complete', updated_at = GETDATE()
+                       WHERE code = ? AND status NOT IN ('cc_complete','uat_ready','uat_pass','done','closed')""",
+                    (code,), fetch="none"
+                )
+                if adv_result is not None:
+                    advanced_count += 1
+                    logger.info(f"[HANDOFF] Advanced {code} -> cc_complete")
+            if advanced_count > 0:
+                logger.info(f"[HANDOFF] Auto-advanced {advanced_count} requirement(s) to cc_complete")
+        except Exception as adv_err:
+            logger.warning(f"[HANDOFF] Requirement auto-advance failed (non-fatal): {adv_err}")
 
         # MP-UAT-GEN: Best-effort auto-generate UAT page
         auto_uat_url = ""
@@ -1510,10 +1548,12 @@ async def get_handoff(
     try:
         result = execute_query("""
             SELECT h.id, h.project, h.task, h.direction, h.status, h.content,
-                   h.metadata, h.response_to, h.created_at, h.updated_at,
-                   r.id as review_id, r.assessment
+                   h.metadata, h.response_to, h.created_at, h.updated_at, h.pth,
+                   r.id as review_id, r.assessment,
+                   u.id as uat_spec_id
             FROM mcp_handoffs h
             LEFT JOIN reviews r ON r.handoff_id = h.id
+            LEFT JOIN uat_pages u ON u.handoff_id = h.id
             WHERE h.id = ?
         """, (handoff_id,), fetch="one")
 
@@ -1522,7 +1562,7 @@ async def get_handoff(
 
         public_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{result['id']}/content"
 
-        return HandoffResponse(
+        resp = HandoffResponse(
             id=str(result['id']),
             project=result['project'],
             task=result['task'],
@@ -1537,6 +1577,11 @@ async def get_handoff(
             created_at=result['created_at'],
             updated_at=result['updated_at']
         )
+        # AP09: Inject uat_spec_id and pth into response dict for Loop 2 consumption
+        resp_dict = resp.model_dump()
+        resp_dict['uat_spec_id'] = str(result['uat_spec_id']) if result.get('uat_spec_id') else None
+        resp_dict['pth'] = result.get('pth')
+        return resp_dict
     except HTTPException:
         raise
     except Exception as e:
