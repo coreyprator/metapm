@@ -599,11 +599,11 @@ async def get_jobs_status():
                     exec_name = item.get("metadata", {}).get("name", "")
                     started_str = item.get("metadata", {}).get("creationTimestamp", "")
                     status = _parse_execution_status(item)
-                    # MM10B: filter to last 24h
+                    # MM10B: filter to last 24h (AP09: use stdlib fromisoformat, dateutil not always available)
                     if started_str:
                         try:
-                            from dateutil.parser import parse as parse_dt
-                            started_dt = parse_dt(started_str)
+                            _ts = started_str.replace("Z", "+00:00")
+                            started_dt = datetime.fromisoformat(_ts)
                             if started_dt.tzinfo is None:
                                 started_dt = started_dt.replace(tzinfo=timezone.utc)
                             age_hours = (cutoff_24h - started_dt).total_seconds() / 3600
