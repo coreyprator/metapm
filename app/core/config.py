@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.44.0"  # G2B9: Loop 2 notified_at guard fix, description/uat_url email fallback, UAT submit banner, copy button removed
+    VERSION: str = "2.45.0"  # PA04: Active Jobs suppresses completed prompt entries
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

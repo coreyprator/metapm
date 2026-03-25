@@ -578,6 +578,18 @@ async def get_jobs_status():
     except Exception:
         pass  # non-fatal — job_executions may not exist yet
 
+    # PA04-REQ-004: load terminal-state PTHs from cc_prompts to suppress completed entries
+    terminal_pths: set = set()
+    try:
+        prompt_rows = execute_query(
+            "SELECT pth FROM cc_prompts WHERE status IN ('complete', 'closed', 'cancelled', 'completed') "
+            "AND updated_at >= DATEADD(hour, -48, GETUTCDATE())",
+            fetch="all"
+        ) or []
+        terminal_pths = {r["pth"] for r in prompt_rows if r.get("pth")}
+    except Exception:
+        pass  # non-fatal
+
     try:
         token_resp = _requests.get(
             "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
@@ -627,6 +639,9 @@ async def get_jobs_status():
                             pass
                     # MM10B: look up PTH from job_executions
                     pth = pth_by_exec.get(exec_name)
+                    # PA04-REQ-004: suppress entries whose linked prompt is terminal
+                    if pth and pth in terminal_pths:
+                        continue
                     filtered.append({
                         "name": exec_name,
                         "job": job_name,
