@@ -591,7 +591,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
     .btn:hover {{ opacity: 0.85; }}
     .btn:disabled {{ opacity: 0.5; cursor: not-allowed; }}
     .btn-submit {{ background: var(--pass); color: #0d1117; }}
-    .btn-copy {{ background: #21262d; color: var(--text); border: 1px solid var(--border); }}
+
     .btn-resubmit {{ background: #21262d; color: var(--text); border: 1px solid var(--border); }}
     .btn-mark-passed {{ background: #b45309; color: #fff; }}
     #submit-result {{ margin-top: 16px; padding: 14px 18px; border-radius: 8px;
@@ -655,7 +655,6 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
   </div>
 
   <div class="btn-row">
-    <button class="btn btn-copy" onclick="copyResults()">📋 Copy Results</button>
     <button class="btn btn-submit" id="submit-btn" onclick="submitResults()" {'style="display:none"' if is_submitted else ''}>📤 Submit Results</button>
     {resubmit_btn}
     {mark_passed_btn}
@@ -780,28 +779,6 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       }});
     }}
 
-    function copyResults() {{
-      const cards = document.querySelectorAll('.test-card');
-      const date = new Date().toISOString().slice(0,10);
-      let lines = [`{project} v{version} UAT — {pth}`, `Date: ${{date}}`];
-      cards.forEach(card => {{
-        const id = card.dataset.id;
-        const checked = card.querySelector(`input[name="${{id}}"]:checked`);
-        const status = checked ? checked.value.toUpperCase() : 'PENDING';
-        const titleEl = card.querySelector('.test-name');
-        const title = titleEl ? titleEl.textContent : id;
-        lines.push(`${{id}}: ${{status}} — ${{title}}`);
-      }});
-      const notes = document.getElementById('general-notes').value;
-      if (notes) lines.push(`General Notes: ${{notes}}`);
-      navigator.clipboard.writeText(lines.join('\\n')).then(() => {{
-        const btn = event.target;
-        const orig = btn.textContent;
-        btn.textContent = '✅ Copied!';
-        setTimeout(() => btn.textContent = orig, 2000);
-      }});
-    }}
-
     function enableResubmit() {{
       document.querySelectorAll('.test-card').forEach(c => c.classList.remove('submitted'));
       document.getElementById('general-notes').removeAttribute('readonly');
@@ -870,6 +847,11 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
           document.getElementById('general-notes').setAttribute('readonly', '');
           const resubmitBtn = document.querySelector('.btn-resubmit');
           if (resubmitBtn) resubmitBtn.style.display = '';
+          // G2B9-REQ-003: inject submitted badge into H1 immediately
+          const h1 = document.querySelector('header h1');
+          if (h1 && !h1.querySelector('.read-only-badge')) {{
+            h1.insertAdjacentHTML('beforeend', ' <span class="read-only-badge">✓ Submitted</span>');
+          }}
           // Fix 2a: show confirmation URL
           div.className = 'ok';
           div.innerHTML = `Results submitted. Status: ${{data.status}} — ${{data.passed}} passed, ${{data.failed}} failed. <a href="/uat/${{SPEC_ID}}">View UAT record &rarr;</a>`;
