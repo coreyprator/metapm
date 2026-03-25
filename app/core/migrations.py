@@ -1920,4 +1920,40 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 56 warning: {e}")
 
+    # Migration 57: PA02-REQ-001 — Add notified_at column to mcp_handoffs for email idempotency
+    try:
+        col_check = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'notified_at'
+        """, fetch="one")
+        if not col_check or col_check["cnt"] == 0:
+            logger.info("  Migration 57: Adding notified_at column to mcp_handoffs...")
+            execute_query(
+                "ALTER TABLE mcp_handoffs ADD notified_at DATETIME2 NULL",
+                fetch="none"
+            )
+            logger.info("  Migration 57: notified_at column added.")
+        else:
+            logger.info("  Migration 57: notified_at column already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 57 warning: {e}")
+
+    # Migration 58: PA02-REQ-004 — Add version column to mcp_handoffs
+    try:
+        col_check = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'version'
+        """, fetch="one")
+        if not col_check or col_check["cnt"] == 0:
+            logger.info("  Migration 58: Adding version column to mcp_handoffs...")
+            execute_query(
+                "ALTER TABLE mcp_handoffs ADD version NVARCHAR(50) NULL",
+                fetch="none"
+            )
+            logger.info("  Migration 58: version column added.")
+        else:
+            logger.info("  Migration 58: version column already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 58 warning: {e}")
+
     logger.info("Migrations complete.")

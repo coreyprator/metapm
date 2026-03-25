@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.42.0"  # MM12: Prompt detail markdown render fix, Needs Approval updated_at filter
+    VERSION: str = "2.43.0"  # PA02: Loop 2 idempotent email, description gate, deliverable in email, version field
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

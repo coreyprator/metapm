@@ -49,6 +49,7 @@ class RequirementStatus(str, Enum):
     BACKLOG = "backlog"
     EXECUTING = "executing"
     CLOSED = "closed"
+    BUILD = "build"
 
 
 class SprintStatus(str, Enum):

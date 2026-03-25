@@ -89,6 +89,9 @@ class HandoffCreate(BaseModel):
     uat_spec_id: Optional[str] = None  # Must reference a valid spec with BV items
     enforcement_bypass: Optional[str] = None  # "data_only_sprint" skips Gate 1 only
 
+    # PA02-REQ-004: Version field (e.g. "3.6.2 → 3.6.3")
+    version: Optional[str] = Field(None, max_length=50)
+
     # Existing fields (made optional for BA04 compat)
     project: str = Field(..., max_length=100)
     task: Optional[str] = Field(None, max_length=200)
@@ -99,17 +102,16 @@ class HandoffCreate(BaseModel):
 
     @model_validator(mode='after')
     def validate_and_normalize(self) -> 'HandoffCreate':
-        # ── AP10 Gate: pth and uat_url required, non-N/A (un-bypassable) ──
+        # ── AP10 Gate: pth, uat_url, description required, non-N/A (un-bypassable) ──
         invalid_fields = []
         if _is_invalid_field(self.pth):
             invalid_fields.append('pth')
         if _is_invalid_field(self.uat_url):
             invalid_fields.append('uat_url')
+        if _is_invalid_field(self.description):
+            invalid_fields.append('description')
         if invalid_fields:
-            if len(invalid_fields) == 2:
-                msg = "pth and uat_url are required and cannot be N/A or empty"
-            else:
-                msg = f"{invalid_fields[0]} is required and cannot be N/A or empty"
+            msg = ", ".join(invalid_fields) + " required and cannot be N/A or empty"
             raise HTTPException(status_code=422, detail={"error": msg})
 
         # ── Normalize: pth → prompt_pth ──
@@ -138,6 +140,7 @@ class HandoffCreate(BaseModel):
 
 class HandoffUpdate(BaseModel):
     status: Optional[HandoffStatus] = None
+    notified_at: Optional[str] = None  # PA02-REQ-001: ISO datetime string
 
 
 class HandoffResponse(BaseModel):
@@ -154,6 +157,9 @@ class HandoffResponse(BaseModel):
     assessment: Optional[str] = None
     pth: Optional[str] = None         # AP08 Fix 1: for Loop 2 email
     uat_spec_id: Optional[str] = None  # AP08 Fix 1: for Loop 2 email UAT URL
+    notified_at: Optional[datetime] = None  # PA02-REQ-001: email idempotency
+    version: Optional[str] = None           # PA02-REQ-004: version shipped
+    completion_handoff_url: Optional[str] = None  # PA02-REQ-003: GCS deliverable URL
     created_at: datetime
     updated_at: datetime
 
