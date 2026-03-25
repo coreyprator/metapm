@@ -4,7 +4,16 @@ Generated: 2026-02-15 by CC Session
 Updated: 2026-03-24 — Sprint "MM12-DASHBOARD-FIX-001" (v2.42.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-24 (MM12-DASHBOARD-FIX-001, v2.42.0)
+### Latest Session Update — 2026-03-25 (PABUGS3-RADAR-SIGNAL-001, v2.43.0)
+
+- **Sprint PABUGS3-RADAR-SIGNAL-001 (PTH: K7M3)**: PA radar 401 fix + Signal source additions
+- **Current Version**: v2.43.0 — NO MetaPM code changes, PA-side fixes only
+- **REQ-001**: PA radar 401 was caused by missing `METAPM_API_KEY` secret on personal-assistant Cloud Run service. Fixed via `--update-secrets=METAPM_API_KEY=metapm-api-key:latest`. PA `radar_source.py` already had correct `_get_api_key()` + `X-API-Key` header logic — just needed the secret mounted.
+- **REQ-002**: Signal has NO `to:` filter — queries by `from:` sender only. The Ground News `to:cprator@cbsware.com` concern was a non-issue.
+- **REQ-003**: Ground News senders (`daily@groundnewsletter.com`, `blindspot@ground-news.com`) added to PA `SIGNAL_SOURCES`. TLDR was already present. Inbox Brief exclusions updated with `groundnewsletter.com` and `ground-news.com` domains.
+- **Note**: `/api/project-radar` requires `X-API-Key` header (verify_api_key dependency). Any service calling it must have access to `metapm-api-key` secret.
+
+### Previous Session Update — 2026-03-24 (MM12-DASHBOARD-FIX-001, v2.42.0)
 
 - **Sprint MM12-DASHBOARD-FIX-001 (PTH: C91D)**: Dashboard bug fixes — 4 items
 - **Current Version**: v2.42.0 — **DEPLOYED** to Cloud Run via GitHub Actions CI
