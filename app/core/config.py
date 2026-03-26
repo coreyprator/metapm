@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.45.0"  # PA04: Active Jobs suppresses completed prompt entries
+    VERSION: str = "2.46.0"  # G2B10: Loop2 sweep 48h recency filter + UAT URL metadata fallback
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
