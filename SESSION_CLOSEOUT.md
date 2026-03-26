@@ -1,48 +1,31 @@
-# SESSION CLOSEOUT — MM12-DASHBOARD-FIX-001
+# SESSION CLOSEOUT — G2B10-EMAIL-FINAL-001
 
 ## Session Identity
-- **PTH**: C91D
-- **Sprint**: MM12-DASHBOARD-FIX-001
-- **Project**: MetaPM
-- **Version**: v2.41.0 -> v2.42.0
-- **Date**: 2026-03-24
-- **Commit**: 8f5854b
+- **PTH:** N3Q8
+- **Sprint:** G2B10-EMAIL-FINAL-001
+- **Version:** 2.45.0 → 2.46.0
+- **Date:** 2026-03-26
 
-## Requirements Delivered
+## Changes
 
-### MM12-REQ-001 — Prompt detail markdown render on all statuses (FIXED)
-- `static/prompt-viewer.html`: Removed `isDraft` ternary that showed raw textarea for draft status
-- Now calls `buildCollapsibleContent()` for ALL statuses including draft/prompt_ready
-- Draft prompts get rendered markdown + "Edit Source" toggle button to access textarea
+### G2B10-REQ-001 — Sweep recency filter + orphan bulk-mark
+- Root cause: Loop 2 fallback sweep had no recency filter. 282 unreviewed + 347 NULL notified_at orphan handoffs. 3 E509 handoffs kept generating duplicate emails.
+- Fix: 48h client-side recency filter in `run_fallback_sweep()`. Bulk-marked 328 orphans as notified.
+- File: `project-methodology/skills/auto-pickup/cloud/loop2_reviewer.py`
 
-### MM12-REQ-002 — Active Jobs STALE items (NO CHANGE NEEDED)
-- Phase 0 confirmed STALE items already filtered: `all.filter(j => j.status !== 'stale')` at dashboard.html:3101
-- Documented in PK.md
+### G2B10-REQ-002 — UAT URL metadata fallback
+- Root cause: `uat_url` not a column on mcp_handoffs, not in HandoffResponse. `handoff.get("uat_url")` always None. Metadata JSON has uat_url but code never checked.
+- Fix: Added metadata JSON fallback (Fallback 2) before final N/A fallback.
+- File: `project-methodology/skills/auto-pickup/cloud/loop2_reviewer.py`
 
-### MM12-REQ-003 — Needs Approval updated_at filter (FIXED)
-- `app/api/prompts.py:457`: Changed `p.created_at` to `p.updated_at` in `days` filter
-- `app/api/radar.py:55`: Changed `p.created_at` to `p.updated_at` in approve_prompts query
-- Old seeds with recent activity no longer slip through the 14-day window
+### Loop 2 image rebuild
+- `gcr.io/super-flashcards-475210/metapm-loops:latest` rebuilt + `metapm-loop2-reviewer` job updated
 
-### MM12-REQ-004 — Morning Brief Cloud Scheduler (NO CHANGE NEEDED)
-- Phase 0 confirmed: job is `personal-assistant-daily` at `0 13 * * *` America/Chicago = 8am CT
-- No `personal-assistant-morning-brief` job exists — the job name differs from prompt assumption
-
-## Files Changed
-- `app/api/prompts.py` — days filter: created_at -> updated_at
-- `app/api/radar.py` — approve_prompts query: created_at -> updated_at
-- `app/core/config.py` — Version bump 2.41.0 -> 2.42.0
-- `static/prompt-viewer.html` — Markdown render for all statuses + Edit Source toggle
-
-## Canary Evidence
-```
-Health: {"status":"healthy","version":"2.42.0","build":"unknown"}
-Scheduler: personal-assistant-daily  0 13 * * *  America/Chicago
-Commit: 8f5854b
-Deploy run: 23512605859 (success)
-```
+## Deployment
+- Health: `{"status":"healthy","version":"2.46.0"}`
+- MetaPM commit: 6edbc03 | project-methodology commit: 65cba82
+- GitHub Actions: 23591006388 SUCCESS
 
 ## Handoff
-- Handoff ID: 85064F10-60D0-4F6D-AB94-8D05232B33BB
-- UAT spec_id: FA9A9F27-D340-48FD-891C-1ED5A3BB68F3
-- UAT URL: https://metapm.rentyourcio.com/uat/FA9A9F27-D340-48FD-891C-1ED5A3BB68F3
+- Handoff ID: C0FCB3F4-40CB-451C-AA72-98D96C13D486
+- UAT URL: https://metapm.rentyourcio.com/uat/2DE1CB0E-FCAE-4A4B-8CB5-692526C8E34B

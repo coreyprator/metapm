@@ -4,7 +4,16 @@ Generated: 2026-02-15 by CC Session
 Updated: 2026-03-24 — Sprint "MM12-DASHBOARD-FIX-001" (v2.42.0)
 Purpose: Canonical reference for all AI sessions working on this project.
 
-### Latest Session Update — 2026-03-25 (PABUGS3-RADAR-SIGNAL-001, v2.43.0)
+### Latest Session Update — 2026-03-26 (G2B10-EMAIL-FINAL-001, v2.46.0)
+
+- **Sprint G2B10-EMAIL-FINAL-001 (PTH: N3Q8)**: Loop 2 sweep recency filter + UAT URL metadata fallback
+- **Current Version**: v2.46.0
+- **REQ-001**: Loop 2 sweep had no recency filter — processed ALL unreviewed handoffs. 328 orphans bulk-marked as notified. 48h client-side recency filter added in `run_fallback_sweep()`.
+- **REQ-002**: UAT URL was always N/A because `uat_url` is NOT a column on mcp_handoffs and NOT in HandoffResponse. Added metadata JSON fallback (`handoff["metadata"]["uat_url"]`).
+- **Loop 2 image**: MUST be rebuilt after every `loop2_reviewer.py` change — `gcloud builds submit --tag gcr.io/.../metapm-loops:latest` + `gcloud run jobs update metapm-loop2-reviewer --image ...`
+- **Key discovery**: `mcp_handoffs` table has NO `uat_url` or `uat_spec_id` columns. `uat_spec_id` comes from LEFT JOIN to `uat_pages`. `uat_url` lives in `metadata` JSON only.
+
+### Previous — 2026-03-25 (PABUGS3-RADAR-SIGNAL-001, v2.43.0)
 
 - **Sprint PABUGS3-RADAR-SIGNAL-001 (PTH: K7M3)**: PA radar 401 fix + Signal source additions
 - **Current Version**: v2.43.0 — NO MetaPM code changes, PA-side fixes only
