@@ -168,6 +168,28 @@ async def create_uat_spec(body: UATSpecCreate):
     uat_url = f"https://metapm.rentyourcio.com/uat/{spec_id}"
     logger.info(f"UAT spec upsert complete: {spec_id} PTH={body.pth}")
 
+    # MM14-REQ-001: Auto-advance linked requirement to uat_ready on spec creation
+    if body.pth:
+        try:
+            req_row = execute_query(
+                "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ?",
+                (body.pth,), fetch="one"
+            )
+            if req_row:
+                terminal_states = {"uat_ready", "done", "closed"}
+                if req_row["status"] not in terminal_states:
+                    execute_query(
+                        "UPDATE roadmap_requirements SET status = 'uat_ready', uat_url = ?, updated_at = GETUTCDATE() WHERE id = ?",
+                        (uat_url, req_row["id"]), fetch="none"
+                    )
+                    logger.info(f"Auto-advanced {req_row['code']} to uat_ready on UAT spec creation for PTH {body.pth}")
+                else:
+                    logger.info(f"Requirement {req_row['code']} already at {req_row['status']}, skipping uat_ready advance")
+            else:
+                logger.info(f"No requirement found for PTH {body.pth} — proceeding silently")
+        except Exception as e:
+            logger.warning(f"Auto-advance to uat_ready failed (non-fatal): {e}")
+
     # Fix 5 (MP08): notify PA *after* spec exists so email contains valid UAT URL
     asyncio.create_task(notify_pa("UAT Ready", {
         "pth": body.pth,
@@ -303,6 +325,28 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
     """, (json.dumps(existing_cases), new_status, body.general_notes or body.overall_notes, spec_id), fetch="none")
 
     logger.info(f"PL submitted results for spec {spec_id}: {passed}P/{failed}F/{skipped}S, status={new_status}")
+
+    # MM14-REQ-002: Auto-advance linked requirement to done on all-pass or conditional_pass
+    if new_status in ("passed", "conditional_pass"):
+        spec_pth_val = row.get("pth")
+        if spec_pth_val:
+            try:
+                req_row = execute_query(
+                    "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ?",
+                    (spec_pth_val,), fetch="one"
+                )
+                if req_row and req_row["status"] not in ("done", "closed"):
+                    execute_query(
+                        "UPDATE roadmap_requirements SET status = 'done', updated_at = GETUTCDATE() WHERE id = ?",
+                        (req_row["id"],), fetch="none"
+                    )
+                    logger.info(f"Auto-advanced {req_row['code']} to done on all-pass UAT submit for {spec_id}")
+                elif req_row:
+                    logger.info(f"Requirement {req_row['code']} already at {req_row['status']}, skipping done advance")
+            except Exception as e:
+                logger.warning(f"Auto-advance to done failed (non-fatal): {e}")
+    elif failed > 0 or (total - passed - skipped) > 0:
+        logger.info(f"UAT {spec_id} not all-pass: {failed} fail, {total - passed - skipped} pending — no auto-advance")
 
     # MF01: persist individual BV items to uat_bv_items table
     title_lookup = {c["id"]: c.get("title", "") for c in real_cases}

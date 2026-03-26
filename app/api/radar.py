@@ -107,8 +107,8 @@ async def get_project_radar(_: bool = Depends(verify_api_key)):
         FROM roadmap_requirements r
         LEFT JOIN roadmap_projects proj ON r.project_id = proj.id
         WHERE r.status = 'uat_ready'
-          AND r.created_at > DATEADD(day, -14, GETUTCDATE())
-        ORDER BY r.created_at DESC
+          AND r.updated_at > DATEADD(day, -14, GETUTCDATE())
+        ORDER BY r.updated_at DESC
     """, fetch="all") or []
 
     run_uats = [
