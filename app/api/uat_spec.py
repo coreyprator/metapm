@@ -17,7 +17,7 @@ import httpx
 from app.core.config import settings
 from app.core.database import execute_query
 from app.api.auth import is_pl_authenticated, render_login_required_page
-from app.api.prompts import notify_pa, trigger_cloud_run_job_immediate
+from app.api.prompts import trigger_cloud_run_job_immediate
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -189,15 +189,6 @@ async def create_uat_spec(body: UATSpecCreate):
                 logger.info(f"No requirement found for PTH {body.pth} — proceeding silently")
         except Exception as e:
             logger.warning(f"Auto-advance to uat_ready failed (non-fatal): {e}")
-
-    # Fix 5 (MP08): notify PA *after* spec exists so email contains valid UAT URL
-    asyncio.create_task(notify_pa("UAT Ready", {
-        "pth": body.pth,
-        "project": body.project,
-        "sprint": body.sprint,
-        "uat_url": uat_url,
-        "description": f"UAT ready for {body.sprint} ({len(body.test_cases)} tests)"
-    }))
 
     return UATSpecResponse(
         spec_id=spec_id,

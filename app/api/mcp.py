@@ -463,22 +463,6 @@ async def create_handoff(
 
         public_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{handoff_id}/content"
 
-        # Fire-and-forget PA notification for handoff received
-        try:
-            from app.api.prompts import notify_pa
-            import asyncio
-            asyncio.create_task(notify_pa("Handoff received", {
-                "pth": getattr(handoff, 'prompt_pth', '') or '',
-                "project": handoff.project,
-                "sprint": handoff.task,
-                "description": f"CC finished {handoff.task}",
-                "handoff_url": public_url,
-                "uat_url": auto_uat_url,
-                "handoff_id": handoff_id,  # MP-EMAIL-COMPLETE: include UUID for plain-text email
-            }))
-        except Exception as pa_err:
-            logger.warning(f"PA handoff notification failed (non-fatal): {pa_err}")
-
         # AP06: Fire Loop 2 immediately for this specific handoff (targeted mode)
         try:
             from app.api.prompts import trigger_cloud_run_job_immediate
