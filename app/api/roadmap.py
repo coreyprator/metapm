@@ -1573,9 +1573,9 @@ async def assign_pth(requirement_id: str, body: PthAssignRequest = None):
         assigned_by = 'cai'
 
         if body and body.pth:
-            # Validate format: exactly 4 uppercase hex chars
-            if not _re.match(r'^[0-9A-F]{4}$', body.pth):
-                raise HTTPException(status_code=400, detail="PTH must be exactly 4 uppercase hex characters (0-9, A-F).")
+            # Validate format: 4 uppercase alphanumeric chars (hex or mixed)
+            if not _re.match(r'^[0-9A-Z]{4}$', body.pth):
+                raise HTTPException(status_code=400, detail="PTH must be exactly 4 uppercase alphanumeric characters (0-9, A-Z).")
             pth_value = body.pth
             assigned_by = 'human'
         else:
