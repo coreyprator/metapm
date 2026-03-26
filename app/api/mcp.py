@@ -412,22 +412,30 @@ async def create_handoff(
                 version = None
                 if handoff.metadata and isinstance(handoff.metadata, dict):
                     version = handoff.metadata.get('version')
+                # G2B11-REQ-001: GUARD — if pth was already set from prompt_pth, do NOT overwrite
                 # PTH propagation (MP-PTH-FIELD-001): get PTH from first linked requirement
-                pth_value = None
-                for code in req_codes[:20]:
-                    pth_row = execute_query(
-                        "SELECT pth FROM roadmap_requirements WHERE code = ? AND pth IS NOT NULL",
-                        (code,), fetch="one"
-                    )
-                    if pth_row and pth_row.get('pth'):
-                        pth_value = pth_row['pth']
-                        break
-                # Store PTH on handoff
-                if pth_value:
-                    execute_query(
-                        "UPDATE mcp_handoffs SET pth = ? WHERE id = ?",
-                        (pth_value, handoff_id), fetch="none"
-                    )
+                existing_pth = execute_query(
+                    "SELECT pth FROM mcp_handoffs WHERE id = ?", (handoff_id,), fetch="one"
+                )
+                if existing_pth and existing_pth.get('pth') and existing_pth['pth'] != 'N/A':
+                    pth_value = existing_pth['pth']
+                    logger.info(f"[G2B11] PTH guard: keeping prompt_pth={pth_value}, skipping requirement lookup")
+                else:
+                    pth_value = None
+                    for code in req_codes[:20]:
+                        pth_row = execute_query(
+                            "SELECT pth FROM roadmap_requirements WHERE code = ? AND pth IS NOT NULL",
+                            (code,), fetch="one"
+                        )
+                        if pth_row and pth_row.get('pth'):
+                            pth_value = pth_row['pth']
+                            break
+                    # Store PTH on handoff only if not already set
+                    if pth_value:
+                        execute_query(
+                            "UPDATE mcp_handoffs SET pth = ? WHERE id = ?",
+                            (pth_value, handoff_id), fetch="none"
+                        )
                 test_cases = generate_test_cases(work_items, handoff.project, version or '?')
                 # Insert uat_pages record with PTH
                 uat_result = execute_query("""
@@ -474,9 +482,14 @@ async def create_handoff(
         try:
             from app.api.prompts import trigger_cloud_run_job_immediate
             import asyncio
+            # G2B11-REQ-004: pass pth via args_override so job_executions record includes it
+            effective_pth = getattr(handoff, 'prompt_pth', None) or getattr(handoff, 'pth', None)
+            loop2_args = [f"--handoff-id={handoff_id}"]
+            if effective_pth:
+                loop2_args.append(f"--pth={effective_pth}")
             asyncio.create_task(
                 trigger_cloud_run_job_immediate("metapm-loop2-reviewer",
-                                                handoff_id=str(handoff_id))
+                                                args_override=loop2_args)
             )
         except Exception as loop2_err:
             logger.warning(f"Loop 2 trigger failed (non-fatal): {loop2_err}")
@@ -1617,6 +1630,35 @@ async def get_handoff_content(handoff_id: str):
         raise
     except Exception as e:
         logger.error(f"Error getting handoff content: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/handoffs/{handoff_id}/claim-notification")
+async def claim_notification(
+    handoff_id: str,
+    _: bool = Depends(verify_api_key)
+):
+    """G2B11-REQ-002: Atomically claim notification rights for a handoff.
+    Uses UPDATE...WHERE notified_at IS NULL for race protection.
+    Returns {"claimed": true} if this caller won the race, {"claimed": false} if already taken.
+    """
+    try:
+        # Use OUTPUT INSERTED to atomically claim and confirm in one query
+        result = execute_query(
+            """UPDATE mcp_handoffs
+               SET notified_at = GETUTCDATE(), updated_at = GETUTCDATE()
+               OUTPUT INSERTED.id
+               WHERE id = ? AND notified_at IS NULL""",
+            (handoff_id,), fetch="one"
+        )
+        claimed = result is not None and result.get('id') is not None
+        if claimed:
+            logger.info(f"[G2B11] Notification claimed for handoff {handoff_id}")
+        else:
+            logger.info(f"[G2B11] Notification already claimed for handoff {handoff_id}")
+        return {"claimed": claimed, "handoff_id": handoff_id}
+    except Exception as e:
+        logger.error(f"Error claiming notification: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

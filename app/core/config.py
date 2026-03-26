@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.47.0"  # MM14: UAT spec auto-advances requirement to uat_ready; all-pass submit advances to done; radar uses updated_at
+    VERSION: str = "2.48.0"  # G2B11: PTH corruption guard, atomic notified_at claim, Loop 2 email via PA webhook, PTH in Active Jobs
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
