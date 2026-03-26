@@ -76,10 +76,14 @@
     .sprint-body.open { display: block; }
 
     /* Requirement (Level 3) */
-    .req-row { border-top: 1px solid var(--line); padding: 9px 16px 9px 52px;
-      cursor: pointer; transition: background 0.15s; }
-    .req-row:hover { background: #0e1625; }
-    .req-row-head { display: flex; align-items: center; gap: 8px; }
+    .req-row { border-top: 1px solid var(--line); padding: 0; }
+    .req-row-head { display: flex; align-items: center; gap: 8px;
+      padding: 9px 16px 9px 52px; cursor: pointer; transition: background 0.15s;
+      user-select: none; }
+    .req-row-head:hover { background: #0e1625; }
+    .req-chevron { font-size: 10px; color: var(--muted); transition: transform 0.2s;
+      flex-shrink: 0; }
+    .req-chevron.open { transform: rotate(90deg); }
     .req-code { font-family: monospace; font-size: 12px; color: var(--muted);
       flex-shrink: 0; min-width: 80px; }
     .req-title { font-size: 13px; flex: 1; }
@@ -90,7 +94,7 @@
     .p3 { background: #1e3a5f; color: #93c5fd; }
     .type-badge { font-size: 10px; color: var(--muted); flex-shrink: 0;
       text-transform: uppercase; }
-    .req-detail { display: none; margin-top: 8px; background: #0b1220;
+    .req-detail { display: none; margin: 0 16px 8px 52px; background: #0b1220;
       border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
     .req-detail.open { display: block; }
     .req-description { font-size: 13px; color: var(--text); line-height: 1.6;
@@ -189,16 +193,16 @@ let allExpanded = false;
 
 const WAVE_GROUPS = [
   { key: 'inflight', label: 'In Flight', emoji: '🔥',
-    statuses: ['cc_executing','cc_complete','uat_ready','cai_review','cc_prompt_ready','req_approved'],
+    statuses: ['cc_executing','executing','cc_complete','uat_ready','uat_pass','uat_fail','rework','cai_review'],
     cls: 'st-inflight' },
+  { key: 'ready', label: 'Ready', emoji: '✅',
+    statuses: ['cc_prompt_ready','req_approved','build','pl_approved'],
+    cls: 'st-ready' },
   { key: 'backlog', label: 'Backlog', emoji: '📥',
     statuses: ['req_created','backlog','definition'],
     cls: 'st-backlog' },
-  { key: 'build', label: 'Build Ready', emoji: '🔨',
-    statuses: ['build','pl_approved'],
-    cls: 'st-ready' },
-  { key: 'done', label: 'Complete', emoji: '✅',
-    statuses: ['done','closed','cc_complete'],
+  { key: 'done', label: 'Complete', emoji: '🏁',
+    statuses: ['done','closed'],
     cls: 'st-done' },
 ];
 
@@ -227,14 +231,14 @@ async function loadData() {
   try {
     const [reqResp, uatResp] = await Promise.all([
       fetch('/api/roadmap/requirements?limit=500'),
-      fetch('/mcp/uat/list?limit=200'),
+      fetch('/api/uat/pages?limit=100&include_passed=true'),
     ]);
     const reqData = await reqResp.json();
     allRequirements = reqData.requirements || reqData || [];
 
     if (uatResp.ok) {
       const uatData = await uatResp.json();
-      allUATs = uatData.results || uatData || [];
+      allUATs = uatData.pages || uatData.results || uatData || [];
     }
 
     // Populate project filter
@@ -253,16 +257,34 @@ async function loadData() {
   }
 }
 
+// Build PTH → sprint_code lookup from UAT data for search (Fix 2c)
+function buildPthSprintMap() {
+  const map = {};
+  for (const u of allUATs) {
+    if (u.pth && u.sprint_code) map[u.pth] = u.sprint_code;
+  }
+  return map;
+}
+
 // ── Filtering ──
 function applyFilters() {
   const q = document.getElementById('search-box').value.toLowerCase();
   const pri = document.getElementById('filter-priority').value;
   const proj = document.getElementById('filter-project').value;
+  const pthSprintMap = q ? buildPthSprintMap() : {};
 
   const filtered = allRequirements.filter(r => {
     if (pri && r.priority !== pri) return false;
     if (proj && r.project_name !== proj) return false;
-    if (q && !((r.title||'').toLowerCase().includes(q) || (r.description||'').toLowerCase().includes(q) || (r.code||'').toLowerCase().includes(q))) return false;
+    if (q) {
+      const sprintCode = (r.pth && pthSprintMap[r.pth]) ? pthSprintMap[r.pth].toLowerCase() : '';
+      if (!((r.title||'').toLowerCase().includes(q) ||
+            (r.description||'').toLowerCase().includes(q) ||
+            (r.code||'').toLowerCase().includes(q) ||
+            (r.project_name||'').toLowerCase().includes(q) ||
+            (r.pth||'').toLowerCase().includes(q) ||
+            sprintCode.includes(q))) return false;
+    }
     return true;
   });
 
@@ -328,13 +350,35 @@ function renderDrill(reqs) {
       const statusLabel = STATUS_LABEL[status] || status;
       const statusCls = STATUS_CLS[status] || 'st-backlog';
 
+      // Sprint title: use sprint_code from matching UAT if available (Fix 2a)
+      const matchingUAT = pth !== '__no_pth__' ? allUATs.find(u => u.pth === pth) : null;
+      const sprintCode = matchingUAT?.sprint_code || matchingUAT?.title || '';
+      // Fix 1 (MP08): Use first requirement title (truncated) if no sprint_code
+      const firstReqTitle = sprintReqs[0]?.title || '';
+      const sprintLabel = sprintCode || (firstReqTitle.length > 60 ? firstReqTitle.slice(0, 57) + '...' : firstReqTitle);
+      const sprintTitle = pth !== '__no_pth__'
+        ? (sprintLabel ? `${sprintLabel}` : projName)
+        : projName;
+
+      // Fix 1 (MP08): Build status distribution pills
+      const statusCounts = {};
+      for (const r of sprintReqs) {
+        const s = r.status || 'unknown';
+        statusCounts[s] = (statusCounts[s] || 0) + 1;
+      }
+      const statusPills = Object.entries(statusCounts).map(([s, c]) => {
+        const cls = STATUS_CLS[s] || 'st-backlog';
+        const label = STATUS_LABEL[s] || s;
+        return `<span class="status-badge ${cls}" style="font-size:10px;padding:1px 7px">${c} ${esc(label)}</span>`;
+      }).join(' ');
+
       html += `<div class="sprint" id="sprint-${sprintId}">
         <div class="sprint-header" onclick="toggleSprint('${sprintId}')">
           <span class="sprint-chevron${isSprintOpen ? ' open' : ''}" id="schev-${sprintId}">&#9658;</span>
           <span class="sprint-pth">${esc(displayPTH)}</span>
-          <span class="sprint-name">${esc(projEmoji)} ${esc(projName)}</span>
+          <span class="sprint-name">${esc(projEmoji)} ${esc(sprintTitle)}</span>
           <span class="proj-badge" style="background:#1e2a40;color:var(--info)">${sprintReqs.length} req${sprintReqs.length !== 1 ? 's' : ''}</span>
-          <span class="status-badge ${statusCls}">${esc(statusLabel)}</span>
+          ${statusPills}
         </div>
         <div class="sprint-body${isSprintOpen ? ' open' : ''}" id="sbody-${sprintId}">`;
 
@@ -349,11 +393,15 @@ function renderDrill(reqs) {
           (pth !== '__no_pth__' && u.pth === pth && u.feature && u.feature.includes(req.code))
         );
 
-        html += `<div class="req-row" id="req-${reqId}" onclick="toggleReq('${reqId}')">
-          <div class="req-row-head">
+        const reqStatusLabel = STATUS_LABEL[req.status] || req.status || '';
+        const reqStatusCls = STATUS_CLS[req.status] || 'st-backlog';
+        html += `<div class="req-row" id="req-${reqId}">
+          <div class="req-row-head" onclick="toggleReq('${reqId}')">
+            <span class="req-chevron${isReqOpen ? ' open' : ''}" id="rchev-${reqId}">&#9658;</span>
             <span class="req-code">${esc(req.code || '—')}</span>
             <span class="req-title">${esc(req.title)}</span>
             <span class="priority-badge ${priCls}">${esc(req.priority || 'P2')}</span>
+            <span class="status-badge ${reqStatusCls}">${esc(reqStatusLabel)}</span>
             <span class="type-badge">${esc(req.type || '')}</span>
           </div>
           <div class="req-detail${isReqOpen ? ' open' : ''}" id="rdetail-${reqId}">
@@ -383,25 +431,25 @@ function renderDrill(reqs) {
 }
 
 function renderUATSection(req, pthUATs) {
-  // Find UATs linked to this requirement
+  // Find UATs linked to this requirement (uat_pages response uses uat_id field)
   const uats = allUATs.filter(u =>
-    (req.uat_id && u.uat_id === req.uat_id) ||
-    (req.pth && u.pth === req.pth)
+    (req.pth && u.pth === req.pth) ||
+    (req.uat_id && u.uat_id === req.uat_id)
   );
 
-  if (uats.length === 0) return '';
+  if (uats.length === 0) return '<div class="uat-section"><div style="font-size:12px;color:var(--muted);padding:8px 0">No UAT history for this requirement.</div></div>';
 
   let html = `<div class="uat-section">
     <div class="uat-section-title">UAT History (${uats.length})</div>`;
 
   for (const u of uats) {
-    const uatShort = (u.uat_id || '').slice(0, 8).toUpperCase();
+    const uatKey = u.uat_id || u.id || '';
+    const uatShort = uatKey.slice(0, 8).toUpperCase();
     const dotColor = UAT_STATUS_COLOR[u.status] || '#9aa8c7';
     const tc = u.test_cases || [];
     const pass = tc.filter(t => t.status === 'pass' || t.status === 'passed').length;
     const fail = tc.filter(t => t.status === 'fail' || t.status === 'failed').length;
     const pend = tc.filter(t => !t.status || t.status === 'pending').length;
-    const uatKey = u.uat_id || u.handoff_id;
     const isUATOpen = sessionGet(`uat_${uatKey}`) === 'open';
 
     html += `<div class="uat-row">
@@ -436,11 +484,8 @@ function renderUATSection(req, pthUATs) {
       html += `<div style="font-size:12px;color:var(--muted)">No BV items recorded.</div>`;
     }
 
-    if (u.uat_id) {
-      html += `<a class="uat-link" href="https://metapm.rentyourcio.com/uat/${esc(u.uat_id)}" target="_blank">Open full UAT &rarr;</a>`;
-    }
-    if (u.notes) {
-      html += `<div style="margin-top:8px;font-size:12px;color:var(--warn)">Notes: ${esc(u.notes)}</div>`;
+    if (uatKey) {
+      html += `<a class="uat-link" href="/uat/${esc(uatKey)}" target="_blank">Open full UAT &rarr;</a>`;
     }
 
     html += `</div></div>`;
@@ -469,7 +514,10 @@ function toggleSprint(id) {
 
 function toggleReq(id) {
   const detail = document.getElementById(`rdetail-${id}`);
+  if (!detail) return;
+  const chev = document.getElementById(`rchev-${id}`);
   const isOpen = detail.classList.toggle('open');
+  if (chev) chev.classList.toggle('open', isOpen);
   sessionSet(`req_${id}`, isOpen ? 'open' : 'closed');
 }
 
@@ -483,18 +531,12 @@ function toggleUAT(id, event) {
 
 function toggleAll() {
   allExpanded = !allExpanded;
-  document.querySelectorAll('.wave-body').forEach(el => {
-    el.classList.toggle('open', allExpanded);
-  });
-  document.querySelectorAll('.wave-chevron').forEach(el => {
-    el.classList.toggle('open', allExpanded);
-  });
-  document.querySelectorAll('.sprint-body').forEach(el => {
-    el.classList.toggle('open', allExpanded);
-  });
-  document.querySelectorAll('.sprint-chevron').forEach(el => {
-    el.classList.toggle('open', allExpanded);
-  });
+  document.querySelectorAll('.wave-body').forEach(el => el.classList.toggle('open', allExpanded));
+  document.querySelectorAll('.wave-chevron').forEach(el => el.classList.toggle('open', allExpanded));
+  document.querySelectorAll('.sprint-body').forEach(el => el.classList.toggle('open', allExpanded));
+  document.querySelectorAll('.sprint-chevron').forEach(el => el.classList.toggle('open', allExpanded));
+  document.querySelectorAll('.req-detail').forEach(el => el.classList.toggle('open', allExpanded));
+  document.querySelectorAll('.req-chevron').forEach(el => el.classList.toggle('open', allExpanded));
   document.querySelector('.btn-expand-all').textContent = allExpanded ? 'Collapse All' : 'Expand All';
 }
 

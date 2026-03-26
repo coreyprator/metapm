@@ -3097,12 +3097,22 @@
           ...loop2.map(j => ({...j, label: 'Loop 2 (Review)'})),
           ...loop3.map(j => ({...j, label: 'Loop 3 (UAT)'}))
         ];
-        // PABUGS2: hide STALE entries — they're useless noise once marked stale
-        const visible = all.filter(j => j.status !== 'stale');
+        // MM13-REQ-002: hide ALL terminal states + running jobs older than 60 min
+        const TERMINAL = new Set(['stale', 'succeeded', 'failed', 'done', 'complete']);
+        const now = Date.now();
+        const visible = all.filter(j => {
+          if (TERMINAL.has(j.status)) return false;
+          // Running jobs older than 60 min are likely finished — Cloud Run Jobs API doesn't always report terminal
+          if (j.status === 'running' && j.started) {
+            const age = now - new Date(j.started).getTime();
+            if (age > 60 * 60 * 1000) return false;
+          }
+          return true;
+        });
         if (!visible.length) {
-          el.innerHTML = '<span style="color:var(--muted)">No jobs in last 24h. Loops idle.</span>';
+          el.innerHTML = '<span style="color:var(--muted)">No active jobs. Loops idle.</span>';
         } else {
-          const statusColor = s => s === 'running' ? '#eab308' : s === 'succeeded' ? '#22c55e' : '#ef4444';
+          const statusColor = s => s === 'running' ? '#eab308' : '#ef4444';
           el.innerHTML = visible.map(j => {
             const pthLabel = j.pth
               ? `<span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">PTH: ${j.pth}</span>`

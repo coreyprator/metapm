@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.46.0"  # G2B10: Loop2 sweep 48h recency filter + UAT URL metadata fallback
+    VERSION: str = "2.46.0"  # MM13: Active Jobs terminal-state filter + stale-running 60min cutoff
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

@@ -1,6 +1,6 @@
 {
-  "checkpoint": "BOOT-1.5.9-D4F1",
-  "bootstrap_version": "1.5.9",
+  "checkpoint": "BOOT-1.5.10-Q7A2",
+  "bootstrap_version": "1.5.10",
   "updated_at": "2026-03-15",
   "source": "project-methodology/templates/CC_Bootstrap_v1.md"
 }
