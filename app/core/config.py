@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.49.0"  # MM15: completion_content on handoffs, dashboard Refresh buttons, PA radar cache disabled
+    VERSION: str = "2.50.0"  # MM16: handoff content HTML page, Active Prompts always-visible, PA radar active_jobs
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

@@ -123,13 +123,42 @@ async def get_project_radar(_: bool = Depends(verify_api_key)):
         for r in uat_rows
     ]
 
+    # Queue 4 (MM16-REQ-003): Active CC jobs — executing prompts with PTH
+    active_rows = execute_query("""
+        SELECT TOP 10
+            p.pth,
+            p.sprint_id,
+            COALESCE(proj.name, p.project_id) AS project,
+            COALESCE(proj.emoji, '') AS emoji,
+            p.updated_at
+        FROM cc_prompts p
+        LEFT JOIN roadmap_projects proj ON p.project_id = proj.id
+        WHERE p.status IN ('executing', 'sent')
+          AND p.updated_at > DATEADD(day, -3, GETUTCDATE())
+        ORDER BY p.updated_at DESC
+    """, fetch="all") or []
+
+    active_jobs = [
+        {
+            "pth": r["pth"],
+            "project": r["project"] or "",
+            "emoji": r["emoji"] or "",
+            "title": r["sprint_id"] or r["pth"],
+            "status": "Running",
+            "started": r["updated_at"],
+        }
+        for r in active_rows
+    ]
+
     logger.info(
         f"[PABUGS2] project-radar: {len(approve_prompts)} to approve, "
-        f"{len(ready_to_launch)} ready to launch, {len(run_uats)} UATs to run"
+        f"{len(ready_to_launch)} ready to launch, {len(run_uats)} UATs to run, "
+        f"{len(active_jobs)} active jobs"
     )
 
     return {
         "approve_prompts": approve_prompts,
         "ready_to_launch": ready_to_launch,
         "run_uats": run_uats,
+        "active_jobs": active_jobs,
     }

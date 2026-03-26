@@ -1612,26 +1612,66 @@ async def get_handoff(
 @router.get("/handoffs/{handoff_id}/content")
 async def get_handoff_content(handoff_id: str):
     """
-    Get handoff content (PUBLIC - no auth required).
-    Returns raw markdown for Claude.ai's web_fetch.
+    Get handoff content as rendered HTML page (PUBLIC - no auth required).
+    MM16-REQ-001: serves HTML with marked.js rendering, not raw markdown.
+    Raw markdown still available via Accept: text/markdown header.
     """
+    from fastapi.responses import HTMLResponse
     try:
         result = execute_query("""
-            SELECT content, completion_content FROM mcp_handoffs WHERE id = ?
+            SELECT id, pth, content, completion_content, created_at
+            FROM mcp_handoffs WHERE id = ?
         """, (handoff_id,), fetch="one")
 
         if not result:
             raise HTTPException(status_code=404, detail="Handoff not found")
 
         # MM15-REQ-002: prefer completion_content (full CC report) over generic content
-        body = result.get('completion_content') or result['content']
-        if not body:
-            return Response(content="No content available.", media_type="text/plain")
+        body = result.get('completion_content') or result.get('content') or ''
+        pth = result.get('pth') or ''
+        created = result.get('created_at') or ''
 
-        return Response(
-            content=body,
-            media_type="text/markdown"
-        )
+        if not body:
+            body = 'No content available for this handoff.'
+
+        import html as html_mod
+        safe_body = html_mod.escape(body).replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
+        safe_pth = html_mod.escape(str(pth))
+        safe_id = html_mod.escape(str(handoff_id))
+
+        page = f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Handoff {safe_pth or safe_id} — MetaPM</title>
+<style>
+body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e0e0e0;margin:0;padding:20px;max-width:900px;margin:0 auto}}
+.back{{display:inline-block;margin-bottom:16px;color:#888;font-size:.85rem}}
+.back a{{color:#7eb8ff;text-decoration:none}}
+.back a:hover{{text-decoration:underline}}
+.meta{{color:#888;font-size:.82rem;margin-bottom:12px}}
+.pth-badge{{background:#fef3c7;color:#92400e;font-size:12px;font-weight:700;padding:2px 8px;border-radius:4px;display:inline-block;margin-right:8px}}
+#content h1,#content h2,#content h3{{color:#e0e0e0;margin-top:1.2em}}
+#content code{{background:#1a1d27;padding:1px 5px;border-radius:3px;font-family:monospace}}
+#content pre{{background:#0d1117;border:1px solid #2a2e3f;border-radius:6px;padding:16px;overflow-x:auto;font-size:.82rem;line-height:1.5}}
+#content table{{width:100%;border-collapse:collapse;background:#1a1d27;border-radius:8px;overflow:hidden;margin:1em 0}}
+#content th{{background:#252836;padding:8px 12px;text-align:left;font-size:.8rem;color:#aaa;border-bottom:1px solid #2a2e3f}}
+#content td{{padding:8px 12px;border-bottom:1px solid #1e2130;font-size:.85rem}}
+#content hr{{border:none;border-top:1px solid #2a2e3f;margin:1.5em 0}}
+a{{color:#7eb8ff}}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+<div class="back"><a href="/handoffs.html">&larr; All Handoffs</a></div>
+<div class="meta"><span class="pth-badge">{safe_pth}</span> Handoff {safe_id} &mdash; {safe_pth}</div>
+<div id="content"><em style="color:#888">Rendering...</em></div>
+<script>
+const raw = `{safe_body}`;
+document.getElementById('content').innerHTML = marked.parse(raw);
+</script>
+</body>
+</html>"""
+        return HTMLResponse(page)
     except HTTPException:
         raise
     except Exception as e:

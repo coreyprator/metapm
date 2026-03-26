@@ -550,7 +550,8 @@
     </div>
 
     <!-- MM10B: Active Prompts — two-section panel -->
-    <div class="card" id="promptsPanel" style="display:none;border-left:3px solid #f0b429">
+    <!-- MM16-REQ-002: panel always visible, shows "No active prompts" when empty -->
+    <div class="card" id="promptsPanel" style="border-left:3px solid #f0b429">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <strong style="color:#f0b429">Active Prompts</strong>
         <div style="display:flex;align-items:center;gap:8px">
@@ -647,7 +648,8 @@
       <div id="uatList" style="padding:8px"></div>
     </div>
 
-    <div class="card" id="promptsPanel" style="display:none">
+    <!-- MM16: renamed from duplicate promptsPanel to promptsTabPanel -->
+    <div class="card" id="promptsTabPanel" style="display:none">
       <div class="ll-filter-bar" style="align-items:center">
         <select id="prompts-filter-status">
           <option value="">Active (Draft+Approved)</option>
@@ -1328,7 +1330,7 @@
       if (uatTabActive) {
         if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); vb.style.display = 'none'; }
         if (lessonsActive) { lessonsActive = false; qs('lessonsBtn').classList.remove('active'); lp.style.display = 'none'; }
-        if (promptsTabActive) { promptsTabActive = false; qs('promptsTabBtn').classList.remove('active'); qs('promptsPanel').style.display = 'none'; }
+        if (promptsTabActive) { promptsTabActive = false; qs('promptsTabBtn').classList.remove('active'); qs('promptsTabPanel').style.display = 'none'; }
         btn.classList.add('active');
         hierarchy.style.display = 'none';
         panel.style.display = 'block';
@@ -1426,7 +1428,7 @@
     function togglePromptsTab() {
       promptsTabActive = !promptsTabActive;
       const btn = qs('promptsTabBtn');
-      const panel = qs('promptsPanel');
+      const panel = qs('promptsTabPanel');
       const hierarchy = qs('hierarchy');
       const vb = qs('visionBoard');
       const lp = qs('lessonsPanel');
@@ -1532,7 +1534,7 @@
         // Deactivate other views
         if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); vb.style.display = 'none'; }
         if (uatTabActive) { uatTabActive = false; qs('uatTabBtn').classList.remove('active'); qs('uatPanel').style.display = 'none'; }
-        if (promptsTabActive) { promptsTabActive = false; qs('promptsTabBtn').classList.remove('active'); qs('promptsPanel').style.display = 'none'; }
+        if (promptsTabActive) { promptsTabActive = false; qs('promptsTabBtn').classList.remove('active'); qs('promptsTabPanel').style.display = 'none'; }
         btn.classList.add('active');
         hierarchy.style.display = 'none';
         panel.style.display = 'block';
@@ -2342,11 +2344,14 @@
         } catch(e) { /* non-fatal */ }
 
         const hasContent = drafts.length || uatItems.length;
+        // MM16-REQ-002: always show panel — display empty state when no items
         if (!hasContent) {
-          qs('promptsPanel').style.display = 'none';
+          qs('needsApprovalList').innerHTML = '';
+          qs('needsApprovalSection').style.display = 'none';
+          qs('runUatsList').innerHTML = '<div style="color:var(--muted);font-size:12px;padding:4px 0">No active prompts or UATs. Click Refresh to check again.</div>';
+          qs('runUatsSection').style.display = '';
           return;
         }
-        qs('promptsPanel').style.display = '';
 
         // Section A: Needs Approval
         const needsEl = qs('needsApprovalList');
@@ -2392,7 +2397,9 @@
           qs('runUatsSection').style.display = 'none';
         }
       } catch(e) {
-        qs('promptsPanel').style.display = 'none';
+        // MM16-REQ-002: show error in panel instead of hiding
+        qs('needsApprovalSection').style.display = 'none';
+        qs('runUatsList').innerHTML = '<div style="color:var(--muted);font-size:12px;padding:4px 0">Could not load active prompts.</div>';
       }
     }
 
