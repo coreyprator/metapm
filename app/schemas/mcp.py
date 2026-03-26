@@ -99,6 +99,7 @@ class HandoffCreate(BaseModel):
     content: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     response_to: Optional[str] = None
+    completion_content: Optional[str] = None  # MM15-REQ-002: full CC deliverable report
 
     @model_validator(mode='after')
     def validate_and_normalize(self) -> 'HandoffCreate':

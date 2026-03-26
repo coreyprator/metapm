@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.48.0"  # G2B11: PTH corruption guard, atomic notified_at claim, Loop 2 email via PA webhook, PTH in Active Jobs
+    VERSION: str = "2.49.0"  # MM15: completion_content on handoffs, dashboard Refresh buttons, PA radar cache disabled
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

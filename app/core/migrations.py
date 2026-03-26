@@ -1956,4 +1956,22 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 58 warning: {e}")
 
+    # Migration 59: MM15-REQ-002 — Add completion_content column to mcp_handoffs
+    try:
+        col_check = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'completion_content'
+        """, fetch="one")
+        if not col_check or col_check["cnt"] == 0:
+            logger.info("  Migration 59: Adding completion_content column to mcp_handoffs...")
+            execute_query(
+                "ALTER TABLE mcp_handoffs ADD completion_content NVARCHAR(MAX) NULL",
+                fetch="none"
+            )
+            logger.info("  Migration 59: completion_content column added.")
+        else:
+            logger.info("  Migration 59: completion_content column already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 59 warning: {e}")
+
     logger.info("Migrations complete.")

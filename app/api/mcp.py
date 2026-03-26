@@ -337,11 +337,11 @@ async def create_handoff(
         metadata_json = json.dumps(handoff.metadata) if handoff.metadata else None
 
         result = execute_query("""
-            INSERT INTO mcp_handoffs (project, task, direction, content, metadata, response_to, version)
+            INSERT INTO mcp_handoffs (project, task, direction, content, metadata, response_to, version, completion_content)
             OUTPUT INSERTED.id, INSERTED.project, INSERTED.task, INSERTED.direction,
                    INSERTED.status, INSERTED.metadata, INSERTED.response_to,
                    INSERTED.created_at, INSERTED.updated_at, INSERTED.version
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             handoff.project,
             handoff.task,
@@ -349,7 +349,8 @@ async def create_handoff(
             handoff.content,
             metadata_json,
             handoff.response_to,
-            handoff.version
+            handoff.version,
+            handoff.completion_content
         ), fetch="one")
 
         if not result:
@@ -1616,14 +1617,19 @@ async def get_handoff_content(handoff_id: str):
     """
     try:
         result = execute_query("""
-            SELECT content FROM mcp_handoffs WHERE id = ?
+            SELECT content, completion_content FROM mcp_handoffs WHERE id = ?
         """, (handoff_id,), fetch="one")
 
         if not result:
             raise HTTPException(status_code=404, detail="Handoff not found")
 
+        # MM15-REQ-002: prefer completion_content (full CC report) over generic content
+        body = result.get('completion_content') or result['content']
+        if not body:
+            return Response(content="No content available.", media_type="text/plain")
+
         return Response(
-            content=result['content'],
+            content=body,
             media_type="text/markdown"
         )
     except HTTPException:
