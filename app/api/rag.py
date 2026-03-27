@@ -56,8 +56,8 @@ async def rag_query(
                 UNION ALL
                 SELECT TOP 10
                   'compliance_doc' AS source_type,
-                  c.doc_id AS code,
-                  c.doc_id AS title,
+                  c.id AS code,
+                  c.id AS title,
                   c.content_md AS description,
                   c.project_code,
                   c.doc_type AS status
@@ -445,8 +445,8 @@ async def search_knowledge(q: str = Query(..., min_length=1), limit: int = 20):
                 UNION ALL
                 SELECT TOP 10
                   'compliance_doc' AS source_type,
-                  c.doc_id AS code,
-                  c.doc_id AS title,
+                  c.id AS code,
+                  c.id AS title,
                   c.content_md AS description,
                   c.project_code,
                   c.doc_type AS status
