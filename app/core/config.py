@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.54.0"  # MP12: self-service UAT form at /self-uat + +Add menu entry
+    VERSION: str = "2.54.1"  # MP13: fix self-uat screenshot state leak + 422 status mapping
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

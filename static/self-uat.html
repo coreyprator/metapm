@@ -522,6 +522,7 @@
     for (const item of items) {
       if (item.type.startsWith('image/')) {
         e.preventDefault();
+        e.stopPropagation();
         const file = item.getAsFile();
         handleFile(file, target);
         return;
@@ -596,21 +597,23 @@
     const ids = Object.keys(bvState);
     if (ids.length === 0) { showStatus('error', 'Add at least one test case.'); return; }
 
+    const statusMap = { pass: 'passed', fail: 'failed', skip: 'conditional_pass', pending: 'pending' };
+
+    const counts = { pass: 0, fail: 0, skip: 0, pending: 0 };
+    ids.forEach(id => { const s = bvState[id]?.status; if (s && counts[s] !== undefined) counts[s]++; });
+
     const results = ids.map(id => {
       const bv = bvState[id];
       const note = [bv.notes, bv.imageName ? `[attachment: ${bv.imageName}]` : null].filter(Boolean).join(' | ');
       return {
         id,
         title: bv.title || `(untitled ${id})`,
-        status: bv.status,
+        status: statusMap[bv.status] || 'pending',
         note: note || null
       };
     });
 
-    const counts = { pass: 0, fail: 0, skip: 0, pending: 0 };
-    results.forEach(r => { if (counts[r.status] !== undefined) counts[r.status]++; });
-
-    const overallStatus = counts.fail > 0 ? 'fail' : (counts.pending > 0 ? 'partial' : 'pass');
+    const overallStatus = counts.fail > 0 ? 'failed' : (counts.pending > 0 ? 'partial' : 'passed');
 
     const payload = {
       project,
