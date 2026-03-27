@@ -149,6 +149,18 @@ TOOLS = [
         },
     },
     {
+        "name": "reject_prompt",
+        "description": "Mark a draft CC prompt as rejected/superseded. Use when CAI has posted a better version or the sprint scope changed. Removes from PL approval queue.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pth": {"type": "string", "description": "Prompt tracking hash to reject (e.g. 'W9A3')"},
+                "reason": {"type": "string", "description": "Why it is being rejected (e.g. 'superseded by W9A3B — scope corrected')"},
+            },
+            "required": ["pth", "reason"],
+        },
+    },
+    {
         "name": "list_projects",
         "description": "List all portfolio projects. Returns project UUID, code, and name. Use the 'id' field as project_id when calling post_prompt.",
         "inputSchema": {
@@ -347,6 +359,29 @@ def _tool_list_requirements(args: dict) -> dict:
     }
 
 
+def _tool_reject_prompt(args: dict) -> dict:
+    pth = args["pth"]
+    reason = args.get("reason", "")
+    row = execute_query(
+        "SELECT id, pth, status FROM cc_prompts WHERE pth = ?", (pth,), fetch="one"
+    )
+    if not row:
+        return {"error": f"Prompt '{pth}' not found"}
+    current = row.get("status", "")
+    if current not in ("draft", "prompt_ready"):
+        return {"error": f"Cannot reject prompt in status '{current}'. Must be draft or prompt_ready."}
+    execute_query(
+        "UPDATE cc_prompts SET status='rejected', rejection_reason=?, updated_at=GETUTCDATE() WHERE pth=?",
+        (reason[:500] if reason else None, pth), fetch="none"
+    )
+    return {
+        "pth": pth,
+        "status": "rejected",
+        "reason": reason,
+        "message": f"Prompt {pth} rejected and removed from PL approval queue.",
+    }
+
+
 def _tool_list_projects(args: dict) -> dict:
     rows = execute_query("""
         SELECT id, code, name, deploy_url
@@ -475,6 +510,7 @@ TOOL_HANDLERS = {
     "trigger_rag_sync": _tool_trigger_rag_sync,
     "list_requirements": _tool_list_requirements,
     "patch_requirement_status": _tool_patch_requirement_status,
+    "reject_prompt": _tool_reject_prompt,
     "list_projects": _tool_list_projects,
     "get_compliance_doc": _tool_get_compliance_doc,
     "update_compliance_doc": _tool_update_compliance_doc,
@@ -508,7 +544,7 @@ async def mcp_jsonrpc(request: Request):
         return JSONResponse(_jsonrpc_result(req_id, {
             "protocolVersion": "2024-11-05",
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "metapm", "version": "2.37.4"},
+            "serverInfo": {"name": "metapm", "version": "2.53.0"},
         }))
 
     if method == "tools/list":

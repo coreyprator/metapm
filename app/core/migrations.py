@@ -1974,4 +1974,41 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 59 warning: {e}")
 
+    # Migration 60: MP11 — Add rejection_reason column to cc_prompts + update status constraint
+    try:
+        col_check = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'cc_prompts' AND COLUMN_NAME = 'rejection_reason'
+        """, fetch="one")
+        if not col_check or col_check["cnt"] == 0:
+            logger.info("  Migration 60: Adding rejection_reason column to cc_prompts...")
+            execute_query(
+                "ALTER TABLE cc_prompts ADD rejection_reason NVARCHAR(500) NULL",
+                fetch="none"
+            )
+            logger.info("  Migration 60: rejection_reason column added.")
+        else:
+            logger.info("  Migration 60: rejection_reason column already exists.")
+
+        # Ensure status constraint includes 'cancelled' and 'rejected'
+        try:
+            execute_query("""
+                DECLARE @constraint_name NVARCHAR(200)
+                SELECT @constraint_name = name FROM sys.check_constraints
+                WHERE parent_object_id = OBJECT_ID('cc_prompts') AND definition LIKE '%status%'
+                IF @constraint_name IS NOT NULL
+                    EXEC('ALTER TABLE cc_prompts DROP CONSTRAINT ' + @constraint_name)
+            """, fetch="none")
+            execute_query("""
+                ALTER TABLE cc_prompts ADD CONSTRAINT CK_cc_prompts_status
+                CHECK (status IN ('draft','prompt_ready','approved','sent','completed',
+                                  'executing','complete','closed','rejected','cancelled'))
+            """, fetch="none")
+            logger.info("  Migration 60: Status constraint updated to include cancelled+rejected.")
+        except Exception as ck_err:
+            logger.warning(f"  Migration 60: Status constraint update skipped: {ck_err}")
+
+    except Exception as e:
+        logger.warning(f"  Migration 60 warning: {e}")
+
     logger.info("Migrations complete.")

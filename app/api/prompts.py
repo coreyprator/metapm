@@ -553,6 +553,41 @@ async def cancel_prompt(pth: str, _: bool = Depends(verify_api_key)):
     return {"pth": pth, "status": "cancelled"}
 
 
+# ── MP11: Reject/status update by PTH ────────────────────────────────────────
+
+class PromptStatusPatch(BaseModel):
+    status: str
+    reason: Optional[str] = None
+
+
+@router.patch("/{pth}/status")
+async def update_prompt_status_by_pth(pth: str, patch: PromptStatusPatch, _: bool = Depends(verify_api_key)):
+    """MP11: Update prompt status by PTH. CAI uses this to reject superseded drafts."""
+    allowed_statuses = ('rejected', 'cancelled')
+    if patch.status not in allowed_statuses:
+        raise HTTPException(status_code=400, detail=f"Allowed statuses: {', '.join(allowed_statuses)}")
+
+    row = execute_query("SELECT id, pth, status FROM cc_prompts WHERE pth = ?", (pth,), fetch="one")
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Prompt with PTH '{pth}' not found")
+
+    current_status = row.get("status", "")
+    rejectable = ('draft', 'prompt_ready')
+    if patch.status == 'rejected' and current_status not in rejectable:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Can only reject prompts in draft/prompt_ready status. Current: {current_status}"
+        )
+
+    reason = patch.reason or ""
+    execute_query(
+        "UPDATE cc_prompts SET status=?, rejection_reason=?, updated_at=GETUTCDATE() WHERE pth=?",
+        (patch.status, reason[:500] if reason else None, pth), fetch="none"
+    )
+    logger.info(f"[MP11] Prompt {pth} → {patch.status}. Reason: {reason}")
+    return {"pth": pth, "status": patch.status, "reason": reason}
+
+
 # ── AP06: Jobs Status API ──
 
 @router.get("/jobs/status")

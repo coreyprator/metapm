@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.52.0"  # G2B15: Fix Loop 2 args_override, review URL, check-handoffs dedup
+    VERSION: str = "2.53.0"  # MP11: reject_prompt MCP tool + PATCH /api/prompts/{pth}/status endpoint
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
