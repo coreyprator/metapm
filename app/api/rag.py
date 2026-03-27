@@ -429,9 +429,20 @@ async def search_knowledge(q: str = Query(..., min_length=1), limit: int = 20):
     except Exception as fts_err:
         logger.warning(f"CONTAINS() failed (FTS not enabled?), falling back to LIKE: {fts_err}")
         try:
-            like_q = f"%{q}%"
+            # Build per-word OR conditions for better recall on multi-word queries
+            words = [w.strip() for w in q.split() if len(w.strip()) >= 2]
+            if not words:
+                words = [q]
+            req_conditions = " OR ".join(
+                f"(r.title LIKE ? OR r.description LIKE ?)" for _ in words
+            )
+            doc_conditions = " OR ".join(f"c.content_md LIKE ?" for _ in words)
+            req_params = []
+            for w in words:
+                req_params.extend([f"%{w}%", f"%{w}%"])
+            doc_params = [f"%{w}%" for w in words]
             rows = execute_query(
-                """
+                f"""
                 SELECT TOP 20
                   'requirement' AS source_type,
                   r.code,
@@ -441,7 +452,7 @@ async def search_knowledge(q: str = Query(..., min_length=1), limit: int = 20):
                   r.status
                 FROM roadmap_requirements r
                 JOIN roadmap_projects p ON r.project_id = p.id
-                WHERE r.title LIKE ? OR r.description LIKE ?
+                WHERE {req_conditions}
                 UNION ALL
                 SELECT TOP 10
                   'compliance_doc' AS source_type,
@@ -451,10 +462,10 @@ async def search_knowledge(q: str = Query(..., min_length=1), limit: int = 20):
                   c.project_code,
                   c.doc_type AS status
                 FROM compliance_docs c
-                WHERE c.content_md LIKE ?
+                WHERE {doc_conditions}
                 ORDER BY source_type
                 """,
-                (like_q, like_q, like_q),
+                tuple(req_params + doc_params),
                 fetch="all",
             )
             results = [dict(r) for r in rows] if rows else []
