@@ -23,19 +23,82 @@ TIMEOUT = 15.0
 SYNC_TIMEOUT = 300.0
 
 
+ETYMOLOGY_COLLECTIONS = {"etymology", "dcc", "wiktionary"}
+SQL_COLLECTIONS = {"portfolio", "metapm", "code", "jazz_theory"}
+
+
 @router.get("/rag/query")
-async def rag_query(q: str = Query(..., min_length=1)):
-    """Proxy search query to Portfolio RAG."""
-    try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            resp = await client.get(f"{RAG_BASE}/query", params={"q": q})
-            resp.raise_for_status()
-            return resp.json()
-    except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=e.response.status_code, detail=str(e))
-    except Exception as e:
-        logger.error(f"RAG query proxy error: {e}")
-        raise HTTPException(status_code=502, detail=f"RAG service error: {e}")
+async def rag_query(
+    q: str = Query(..., min_length=1),
+    collection: Optional[str] = None,
+    n: int = 5,
+):
+    """Route search by collection.
+    etymology/dcc/wiktionary → Portfolio RAG /search/etymology (semantic)
+    portfolio/metapm/code/jazz_theory → MetaPM SQL /api/search/knowledge
+    No collection → Portfolio RAG /search/etymology (default etymology search)
+    """
+    if collection and collection in SQL_COLLECTIONS:
+        # Route to MetaPM SQL full-text search
+        try:
+            rows = execute_query(
+                """
+                SELECT TOP 20
+                  'requirement' AS source_type,
+                  r.code,
+                  r.title,
+                  r.description,
+                  p.code AS project_code,
+                  r.status
+                FROM roadmap_requirements r
+                JOIN roadmap_projects p ON r.project_id = p.id
+                WHERE r.title LIKE ? OR r.description LIKE ?
+                UNION ALL
+                SELECT TOP 10
+                  'compliance_doc' AS source_type,
+                  c.doc_id AS code,
+                  c.doc_id AS title,
+                  c.content_md AS description,
+                  c.project_code,
+                  c.doc_type AS status
+                FROM compliance_docs c
+                WHERE c.content_md LIKE ?
+                ORDER BY source_type
+                """,
+                (f"%{q}%", f"%{q}%", f"%{q}%"),
+                fetch="all",
+            )
+            results = [dict(r) for r in rows] if rows else []
+            return {"query": q, "collection": collection, "source": "metapm_sql", "total": len(results), "results": results}
+        except Exception as e:
+            logger.error(f"RAG query SQL fallback error: {e}")
+            raise HTTPException(status_code=500, detail=f"SQL search failed: {e}")
+    else:
+        # Route to Portfolio RAG semantic search (etymology/dcc/wiktionary or default)
+        effective_collection = collection if collection in ETYMOLOGY_COLLECTIONS else "etymology"
+        try:
+            async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+                resp = await client.get(
+                    f"{RAG_BASE}/search/etymology",
+                    params={"q": q, "collection": effective_collection, "n": n},
+                )
+                resp.raise_for_status()
+                return resp.json()
+        except httpx.HTTPStatusError as e:
+            # Fallback to legacy /semantic if /search/etymology not yet deployed
+            try:
+                async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+                    resp2 = await client.get(
+                        f"{RAG_BASE}/semantic",
+                        params={"q": q, "collection": effective_collection, "n": n},
+                    )
+                    resp2.raise_for_status()
+                    return resp2.json()
+            except Exception as e2:
+                raise HTTPException(status_code=502, detail=f"RAG service error: {e2}")
+        except Exception as e:
+            logger.error(f"RAG query proxy error: {e}")
+            raise HTTPException(status_code=502, detail=f"RAG service error: {e}")
 
 
 @router.get("/rag/documents")
@@ -320,6 +383,91 @@ async def sync_requirements_to_rag():
         "elapsed_seconds": round(elapsed, 1),
         "collection": "metapm",
         "timestamp": sync_start.isoformat(),
+    }
+
+
+@router.get("/search/knowledge")
+async def search_knowledge(q: str = Query(..., min_length=1), limit: int = 20):
+    """Full-text search across MetaPM requirements and compliance docs.
+    Replaces Portfolio RAG for project knowledge queries. No RAG latency.
+    Falls back to LIKE-based search if SQL Server full-text index not enabled.
+    """
+    limit = min(max(limit, 1), 50)
+    results = []
+
+    # Try CONTAINS() full-text search first; fall back to LIKE if FTS not enabled
+    try:
+        rows = execute_query(
+            """
+            SELECT TOP 20
+              'requirement' AS source_type,
+              r.code,
+              r.title,
+              r.description,
+              p.code AS project_code,
+              r.status
+            FROM roadmap_requirements r
+            JOIN roadmap_projects p ON r.project_id = p.id
+            WHERE CONTAINS((r.title, r.description), ?)
+            UNION ALL
+            SELECT TOP 10
+              'compliance_doc' AS source_type,
+              c.doc_id AS code,
+              c.doc_id AS title,
+              c.content_md AS description,
+              c.project_code,
+              c.doc_type AS status
+            FROM compliance_docs c
+            WHERE CONTAINS(c.content_md, ?)
+            ORDER BY source_type
+            """,
+            (q, q),
+            fetch="all",
+        )
+        results = [dict(r) for r in rows] if rows else []
+        search_method = "full_text"
+    except Exception as fts_err:
+        logger.warning(f"CONTAINS() failed (FTS not enabled?), falling back to LIKE: {fts_err}")
+        try:
+            like_q = f"%{q}%"
+            rows = execute_query(
+                """
+                SELECT TOP 20
+                  'requirement' AS source_type,
+                  r.code,
+                  r.title,
+                  r.description,
+                  p.code AS project_code,
+                  r.status
+                FROM roadmap_requirements r
+                JOIN roadmap_projects p ON r.project_id = p.id
+                WHERE r.title LIKE ? OR r.description LIKE ?
+                UNION ALL
+                SELECT TOP 10
+                  'compliance_doc' AS source_type,
+                  c.doc_id AS code,
+                  c.doc_id AS title,
+                  c.content_md AS description,
+                  c.project_code,
+                  c.doc_type AS status
+                FROM compliance_docs c
+                WHERE c.content_md LIKE ?
+                ORDER BY source_type
+                """,
+                (like_q, like_q, like_q),
+                fetch="all",
+            )
+            results = [dict(r) for r in rows] if rows else []
+            search_method = "like"
+        except Exception as like_err:
+            logger.error(f"Knowledge search failed: {like_err}")
+            raise HTTPException(status_code=500, detail=f"Search failed: {like_err}")
+
+    return {
+        "query": q,
+        "total": len(results),
+        "search_method": search_method,
+        "results": results[:limit],
     }
 
 
