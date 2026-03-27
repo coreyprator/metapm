@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MetaPM — Ad-hoc UAT Session</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f1117;
+      --bg2: #1a1d27;
+      --bg3: #22263a;
+      --accent: #ef4444;
+      --green: #22c55e;
+      --green-fill: #166534;
+      --red: #ef4444;
+      --red-fill: #991b1b;
+      --yellow: #f59e0b;
+      --yellow-fill: #92400e;
+      --gray: #6b7280;
+      --gray-fill: #374151;
+      --blue: #3b82f6;
+      --purple: #8b5cf6;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --border: #2d3148;
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    .page-header {
+      background: linear-gradient(135deg, #1a1d27 0%, #12152080 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .logo-badge {
+      background: var(--accent);
+      color: white;
+      font-weight: 700;
+      font-size: 0.8rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+      letter-spacing: 0.05em;
+    }
+    .page-header h1 { font-size: 1.2rem; font-weight: 600; }
+    .page-header .sub { font-size: 0.85rem; color: var(--muted); margin-left: auto; }
+    .container { max-width: 860px; margin: 0 auto; padding: 24px 16px 80px; }
+    .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+    .card-title { font-size: 0.8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; }
+    .form-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 160px; }
+    .form-group label { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
+    .form-control {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 9px 12px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      width: 100%;
+      transition: border-color 0.15s;
+    }
+    .form-control:focus { outline: none; border-color: var(--accent); }
+    select.form-control option { background: var(--bg3); }
+
+    /* BV Card */
+    .bv-list { display: flex; flex-direction: column; gap: 12px; }
+    .bv-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+    .bv-card.status-pass { border-color: var(--green); }
+    .bv-card.status-fail { border-color: var(--red); }
+    .bv-card.status-skip { border-color: var(--gray); }
+    .bv-card.status-pending { border-color: var(--yellow); }
+    .bv-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+    }
+    .bv-num {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--muted);
+      min-width: 48px;
+    }
+    .bv-title-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-size: 0.95rem;
+      font-weight: 500;
+      font-family: inherit;
+      padding: 0;
+      outline: none;
+    }
+    .bv-title-input::placeholder { color: var(--muted); }
+    .bv-remove {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1.1rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .bv-remove:hover { color: var(--red); background: rgba(239,68,68,0.1); }
+    .bv-body { padding: 14px 16px; }
+
+    /* Result buttons */
+    .result-buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .result-btn {
+      min-height: 42px;
+      border: 2px solid transparent;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      font-family: inherit;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+    .result-btn.btn-pass   { background: #0f2d1a; border-color: #166534; color: #86efac; }
+    .result-btn.btn-fail   { background: #2d0f0f; border-color: #991b1b; color: #fca5a5; }
+    .result-btn.btn-skip   { background: #1e2229; border-color: #4b5563; color: #d1d5db; }
+    .result-btn.btn-pending{ background: #2a1f06; border-color: #92400e; color: #fcd34d; }
+
+    .result-btn.active.btn-pass   { background: var(--green-fill); border-color: var(--green); color: white; box-shadow: 0 0 0 3px rgba(34,197,94,0.25); }
+    .result-btn.active.btn-fail   { background: var(--red-fill); border-color: var(--red); color: white; box-shadow: 0 0 0 3px rgba(239,68,68,0.25); }
+    .result-btn.active.btn-skip   { background: var(--gray-fill); border-color: #9ca3af; color: white; box-shadow: 0 0 0 3px rgba(107,114,128,0.25); }
+    .result-btn.active.btn-pending{ background: var(--yellow-fill); border-color: var(--yellow); color: white; box-shadow: 0 0 0 3px rgba(245,158,11,0.25); }
+
+    .result-btn:not(.active):hover { opacity: 0.85; transform: translateY(-1px); }
+
+    /* Notes */
+    .notes-textarea {
+      width: 100%;
+      min-height: 64px;
+      padding: 10px 12px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--text);
+      font-size: 0.875rem;
+      font-family: inherit;
+      resize: vertical;
+      transition: border-color 0.15s;
+    }
+    .notes-textarea:focus { outline: none; border-color: var(--accent); }
+    .notes-label { font-size: 0.78rem; color: var(--muted); font-weight: 500; margin-bottom: 5px; }
+
+    /* Paste/attach zone */
+    .media-zone {
+      margin-top: 10px;
+      border: 2px dashed var(--border);
+      border-radius: 7px;
+      background: #111525;
+      padding: 10px 14px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .media-zone.drag-over { border-color: var(--blue); background: rgba(59,130,246,0.08); }
+    .media-zone.has-file  { border-color: var(--green); border-style: solid; background: rgba(34,197,94,0.05); }
+    .media-zone-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .media-zone-label { font-size: 0.8rem; color: var(--muted); flex: 1; }
+    .attach-btn {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-size: 0.78rem;
+      font-family: inherit;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .attach-btn:hover { border-color: var(--blue); background: rgba(59,130,246,0.1); }
+    .media-preview { margin-top: 8px; }
+    .media-thumb { max-width: 140px; max-height: 90px; border-radius: 5px; display: block; cursor: zoom-in; }
+    .media-filename { font-size: 0.78rem; color: var(--blue); }
+    .media-error { font-size: 0.78rem; color: var(--red); margin-top: 4px; }
+
+    /* Add BV button */
+    .add-bv-btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--bg2);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .add-bv-btn:hover { border-color: var(--accent); color: var(--text); background: rgba(239,68,68,0.05); }
+
+    /* General notes */
+    .gen-notes-card {
+      background: var(--bg2);
+      border: 1px solid #4c1d95;
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-top: 8px;
+    }
+    .gen-notes-title { color: #a78bfa; font-weight: 600; font-size: 0.9rem; margin-bottom: 12px; }
+
+    /* Stats bar */
+    .stats-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .stat-chip {
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .stat-chip.total   { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+    .stat-chip.pass    { background: rgba(34,197,94,0.15);  color: #86efac; border: 1px solid rgba(34,197,94,0.3); }
+    .stat-chip.fail    { background: rgba(239,68,68,0.15);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+    .stat-chip.pending { background: rgba(245,158,11,0.15); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
+    .stat-chip.skip    { background: rgba(107,114,128,0.15);color: #d1d5db; border: 1px solid rgba(107,114,128,0.3); }
+
+    /* Submit area */
+    .submit-section { margin-top: 24px; }
+    .submit-btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius);
+      color: white;
+      font-size: 1rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .submit-btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status-msg {
+      padding: 12px 16px;
+      border-radius: 7px;
+      font-size: 0.875rem;
+      margin-top: 12px;
+      display: none;
+    }
+    .status-msg.success { background: rgba(34,197,94,0.15); border: 1px solid var(--green); color: #86efac; display: block; }
+    .status-msg.error   { background: rgba(239,68,68,0.1);  border: 1px solid var(--red); color: #fca5a5; display: block; }
+
+    /* Lightbox */
+    #lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      cursor: zoom-out;
+    }
+    #lightbox.open { display: flex; }
+    #lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
+
+    @media (max-width: 600px) {
+      .result-buttons { grid-template-columns: repeat(2, 1fr); }
+      .form-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-header">
+  <span class="logo-badge">MetaPM</span>
+  <h1>Ad-hoc UAT Session</h1>
+  <span class="sub" id="sessionDate"></span>
+</div>
+
+<div class="container">
+
+  <!-- Session config -->
+  <div class="card">
+    <div class="card-title">Session Setup</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Project</label>
+        <select class="form-control" id="sessionProject">
+          <option value="">— select —</option>
+          <option value="MetaPM">MetaPM 🔴</option>
+          <option value="Super Flashcards">Super Flashcards 🟡</option>
+          <option value="ArtForge">ArtForge 🟠</option>
+          <option value="HarmonyLab">HarmonyLab 🔵</option>
+          <option value="Etymython">Etymython 🟣</option>
+          <option value="PIE Network Graph">PIE Network Graph 🔷</option>
+          <option value="Portfolio RAG">Portfolio RAG</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Feature / Sprint</label>
+        <input type="text" class="form-control" id="sessionFeature" placeholder="e.g. Self-service UAT form">
+      </div>
+      <div class="form-group">
+        <label>Version</label>
+        <input type="text" class="form-control" id="sessionVersion" placeholder="e.g. 2.54.0">
+      </div>
+      <div class="form-group" style="max-width:100px">
+        <label>PTH (optional)</label>
+        <input type="text" class="form-control" id="sessionPTH" placeholder="MP12" maxlength="4">
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="stats-bar" id="statsBar">
+    <span class="stat-chip total"  id="statTotal">0 total</span>
+    <span class="stat-chip pass"   id="statPass">0 pass</span>
+    <span class="stat-chip fail"   id="statFail">0 fail</span>
+    <span class="stat-chip pending"id="statPending">0 pending</span>
+    <span class="stat-chip skip"   id="statSkip">0 skip</span>
+  </div>
+
+  <!-- BV cards -->
+  <div class="bv-list" id="bvList"></div>
+  <button class="add-bv-btn" id="addBvBtn" onclick="addBV()">+ Add test case</button>
+
+  <!-- General notes -->
+  <div class="gen-notes-card">
+    <div class="gen-notes-title">📝 General Notes</div>
+    <div class="notes-label">Overall session observations, context, environment notes…</div>
+    <textarea class="notes-textarea" id="genNotes" style="min-height:80px" placeholder="Any general notes about this UAT session, environment, or overall findings…"></textarea>
+    <div class="media-zone" id="genMediaZone" data-target="gen">
+      <div class="media-zone-header">
+        <span class="media-zone-label">📋 Paste screenshot or attach file</span>
+        <input type="file" accept="image/*,.pdf,.txt,.log" style="display:none" id="genFileInput">
+        <button class="attach-btn" onclick="document.getElementById('genFileInput').click()">📎 Attach file</button>
+      </div>
+      <div class="media-preview" id="genMediaPreview"></div>
+    </div>
+  </div>
+
+  <!-- Submit -->
+  <div class="submit-section">
+    <button class="submit-btn" id="submitBtn" onclick="submitUAT()">Submit UAT to MetaPM</button>
+    <div class="status-msg" id="statusMsg"></div>
+  </div>
+
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox" onclick="closeLightbox()">
+  <img id="lightboxImg" src="" alt="screenshot">
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let bvCounter = 0;
+  const bvState = {}; // bvId → { title, status, notes, image, imageType, imageName }
+  const genMedia = { image: null, imageType: null, imageName: null };
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('sessionDate').textContent = new Date().toLocaleDateString('en-US', {
+      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
+    });
+    addBV();
+    setupGenMedia();
+  });
+
+  // ── Add BV card ────────────────────────────────────────────────────────────
+  function addBV() {
+    bvCounter++;
+    const id = `BV-${String(bvCounter).padStart(3, '0')}`;
+    bvState[id] = { title: '', status: 'pending', notes: '', image: null, imageType: null, imageName: null };
+
+    const card = document.createElement('div');
+    card.className = 'bv-card status-pending';
+    card.id = `card-${id}`;
+    card.innerHTML = `
+      <div class="bv-header">
+        <span class="bv-num">${id}</span>
+        <input type="text" class="bv-title-input" placeholder="Test case title / description…"
+               oninput="updateTitle('${id}', this.value)">
+        <button class="bv-remove" onclick="removeBV('${id}')" title="Remove">×</button>
+      </div>
+      <div class="bv-body">
+        <div class="result-buttons">
+          <button class="result-btn btn-pass"    onclick="setStatus('${id}','pass')">✓ Pass</button>
+          <button class="result-btn btn-fail"    onclick="setStatus('${id}','fail')">✗ Fail</button>
+          <button class="result-btn btn-skip"    onclick="setStatus('${id}','skip')">⊘ Skip</button>
+          <button class="result-btn btn-pending active" onclick="setStatus('${id}','pending')">⏳ Pending</button>
+        </div>
+        <div class="notes-label">Notes</div>
+        <textarea class="notes-textarea" placeholder="Notes, observations, comments about this test case…"
+                  oninput="updateNotes('${id}', this.value)"></textarea>
+        <div class="media-zone" id="zone-${id}" data-target="${id}">
+          <div class="media-zone-header">
+            <span class="media-zone-label">📋 Paste screenshot or attach file</span>
+            <input type="file" accept="image/*,.pdf,.txt,.log" style="display:none" id="file-${id}">
+            <button class="attach-btn" onclick="document.getElementById('file-${id}').click()">📎 Attach file</button>
+          </div>
+          <div class="media-preview" id="preview-${id}"></div>
+        </div>
+      </div>`;
+
+    document.getElementById('bvList').appendChild(card);
+
+    // File input handler
+    document.getElementById(`file-${id}`).addEventListener('change', (e) => handleFile(e.target.files[0], id));
+
+    // Paste handler on zone
+    const zone = document.getElementById(`zone-${id}`);
+    zone.addEventListener('paste', (e) => handlePaste(e, id));
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', (e) => { e.preventDefault(); zone.classList.remove('drag-over'); const f = e.dataTransfer.files[0]; if (f) handleFile(f, id); });
+
+    updateStats();
+  }
+
+  function removeBV(id) {
+    const card = document.getElementById(`card-${id}`);
+    if (card) card.remove();
+    delete bvState[id];
+    updateStats();
+  }
+
+  function updateTitle(id, val) { if (bvState[id]) bvState[id].title = val; }
+  function updateNotes(id, val) { if (bvState[id]) bvState[id].notes = val; }
+
+  function setStatus(id, status) {
+    if (!bvState[id]) return;
+    bvState[id].status = status;
+    const card = document.getElementById(`card-${id}`);
+    card.className = `bv-card status-${status}`;
+    const btns = card.querySelectorAll('.result-btn');
+    btns.forEach(b => {
+      b.classList.remove('active');
+      if (b.classList.contains(`btn-${status}`)) b.classList.add('active');
+    });
+    updateStats();
+  }
+
+  function updateStats() {
+    const ids = Object.keys(bvState);
+    const counts = { pass: 0, fail: 0, skip: 0, pending: 0 };
+    ids.forEach(id => { if (bvState[id]) counts[bvState[id].status]++; });
+    document.getElementById('statTotal').textContent   = `${ids.length} total`;
+    document.getElementById('statPass').textContent    = `${counts.pass} pass`;
+    document.getElementById('statFail').textContent    = `${counts.fail} fail`;
+    document.getElementById('statPending').textContent = `${counts.pending} pending`;
+    document.getElementById('statSkip').textContent    = `${counts.skip} skip`;
+  }
+
+  // ── File / paste handling ──────────────────────────────────────────────────
+  const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+  function handleFile(file, target) {
+    if (!file) return;
+    if (file.size > MAX_FILE_BYTES) {
+      showMediaError(target, `File too large (${(file.size/1024/1024).toFixed(1)} MB). Max 5 MB.`);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const data = e.target.result;
+      if (target === 'gen') {
+        genMedia.image = data;
+        genMedia.imageType = file.type;
+        genMedia.imageName = file.name;
+        renderMediaPreview('genMediaPreview', data, file.type, file.name, 'genMediaZone');
+      } else {
+        bvState[target].image = data;
+        bvState[target].imageType = file.type;
+        bvState[target].imageName = file.name;
+        renderMediaPreview(`preview-${target}`, data, file.type, file.name, `zone-${target}`);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handlePaste(e, target) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        handleFile(file, target);
+        return;
+      }
+    }
+  }
+
+  function renderMediaPreview(previewId, data, type, name, zoneId) {
+    const preview = document.getElementById(previewId);
+    const zone = document.getElementById(zoneId);
+    if (!preview || !zone) return;
+    zone.classList.add('has-file');
+    if (type && type.startsWith('image/')) {
+      preview.innerHTML = `<img class="media-thumb" src="${data}" alt="screenshot" onclick="openLightbox('${data}')">`;
+    } else {
+      preview.innerHTML = `<span class="media-filename">📎 ${name}</span>`;
+    }
+  }
+
+  function showMediaError(target, msg) {
+    const previewId = target === 'gen' ? 'genMediaPreview' : `preview-${target}`;
+    const preview = document.getElementById(previewId);
+    if (preview) preview.innerHTML = `<span class="media-error">${msg}</span>`;
+  }
+
+  // ── General media setup ────────────────────────────────────────────────────
+  function setupGenMedia() {
+    document.getElementById('genFileInput').addEventListener('change', (e) => handleFile(e.target.files[0], 'gen'));
+    const zone = document.getElementById('genMediaZone');
+    zone.addEventListener('paste', (e) => handlePaste(e, 'gen'));
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', (e) => { e.preventDefault(); zone.classList.remove('drag-over'); const f = e.dataTransfer.files[0]; if (f) handleFile(f, 'gen'); });
+  }
+
+  // Global paste listener (catches paste anywhere on page for convenience)
+  document.addEventListener('paste', (e) => {
+    // Only handle if not already focused on a zone or textarea
+    if (e.target.classList.contains('notes-textarea') || e.target.classList.contains('form-control')) return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        // Paste to gen notes if no BV zone is focused
+        handleFile(item.getAsFile(), 'gen');
+        return;
+      }
+    }
+  });
+
+  // ── Lightbox ───────────────────────────────────────────────────────────────
+  function openLightbox(src) {
+    document.getElementById('lightboxImg').src = src;
+    document.getElementById('lightbox').classList.add('open');
+  }
+  function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('open');
+    document.getElementById('lightboxImg').src = '';
+  }
+
+  // ── Submit ─────────────────────────────────────────────────────────────────
+  async function submitUAT() {
+    const project  = document.getElementById('sessionProject').value;
+    const feature  = document.getElementById('sessionFeature').value.trim();
+    const version  = document.getElementById('sessionVersion').value.trim();
+    const pth      = document.getElementById('sessionPTH').value.trim();
+    const genNotes = document.getElementById('genNotes').value.trim();
+
+    if (!project) { showStatus('error', 'Please select a project.'); return; }
+    if (!feature)  { showStatus('error', 'Please enter a Feature / Sprint name.'); return; }
+
+    const ids = Object.keys(bvState);
+    if (ids.length === 0) { showStatus('error', 'Add at least one test case.'); return; }
+
+    const results = ids.map(id => {
+      const bv = bvState[id];
+      const note = [bv.notes, bv.imageName ? `[attachment: ${bv.imageName}]` : null].filter(Boolean).join(' | ');
+      return {
+        id,
+        title: bv.title || `(untitled ${id})`,
+        status: bv.status,
+        note: note || null
+      };
+    });
+
+    const counts = { pass: 0, fail: 0, skip: 0, pending: 0 };
+    results.forEach(r => { if (counts[r.status] !== undefined) counts[r.status]++; });
+
+    const overallStatus = counts.fail > 0 ? 'fail' : (counts.pending > 0 ? 'partial' : 'pass');
+
+    const payload = {
+      project,
+      version: version || undefined,
+      feature: feature,
+      uat_title: `Ad-hoc UAT — ${feature}`,
+      uat_date: new Date().toISOString().split('T')[0],
+      status: overallStatus,
+      total_tests: ids.length,
+      passed:  counts.pass,
+      failed:  counts.fail,
+      skipped: counts.skip,
+      blocked: counts.pending,
+      results,
+      notes: [
+        genNotes,
+        genMedia.imageName ? `[general attachment: ${genMedia.imageName}]` : null
+      ].filter(Boolean).join('\n') || null,
+      submitted_at: new Date().toISOString(),
+      url: 'https://metapm.rentyourcio.com/self-uat'
+    };
+    if (pth) payload.pth = pth;
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+
+    try {
+      const res = await fetch('https://metapm.rentyourcio.com/api/uat/direct-submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (res.ok) {
+        const handoffId = json.handoff_id || json.id || '—';
+        showStatus('success', `✓ Submitted! Handoff ID: ${handoffId} | ${counts.pass} pass / ${counts.fail} fail / ${counts.pending} pending / ${counts.skip} skip`);
+        btn.textContent = 'Submitted ✓';
+      } else {
+        const detail = json.detail || JSON.stringify(json);
+        showStatus('error', `Server error (${res.status}): ${detail}`);
+        btn.disabled = false;
+        btn.textContent = 'Submit UAT to MetaPM';
+      }
+    } catch (err) {
+      showStatus('error', `Network error: ${err.message}`);
+      btn.disabled = false;
+      btn.textContent = 'Submit UAT to MetaPM';
+    }
+  }
+
+  function showStatus(type, msg) {
+    const el = document.getElementById('statusMsg');
+    el.className = `status-msg ${type}`;
+    el.textContent = msg;
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+</script>
+</body>
+</html>

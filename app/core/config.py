@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.53.0"  # MP11: reject_prompt MCP tool + PATCH /api/prompts/{pth}/status endpoint
+    VERSION: str = "2.54.0"  # MP12: self-service UAT form at /self-uat + +Add menu entry
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

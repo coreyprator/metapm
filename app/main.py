@@ -388,6 +388,16 @@ async def prompt_viewer_page(pth: str):
     raise HTTPException(status_code=404, detail="Prompt viewer page not found")
 
 
+@app.get("/self-uat")
+async def self_uat_page():
+    """Serve the self-service ad-hoc UAT form (MP12)."""
+    self_uat_file = static_dir / "self-uat.html"
+    if self_uat_file.exists():
+        return FileResponse(str(self_uat_file), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Self-UAT page not found")
+
+
 @app.get("/favicon.ico")
 async def favicon():
     """Serve favicon from static directory."""
