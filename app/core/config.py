@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.51.0"  # G2B13: Remove duplicate notify_pa() calls from mcp.py and uat_spec.py
+    VERSION: str = "2.52.0"  # G2B15: Fix Loop 2 args_override, review URL, check-handoffs dedup
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

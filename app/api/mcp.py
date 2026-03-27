@@ -469,7 +469,7 @@ async def create_handoff(
             import asyncio
             # G2B11-REQ-004: pass pth via args_override so job_executions record includes it
             effective_pth = getattr(handoff, 'prompt_pth', None) or getattr(handoff, 'pth', None)
-            loop2_args = [f"--handoff-id={handoff_id}"]
+            loop2_args = ["loop2_reviewer.py", f"--handoff-id={handoff_id}"]  # G2B15: script name must be first element
             if effective_pth:
                 loop2_args.append(f"--pth={effective_pth}")
             asyncio.create_task(
