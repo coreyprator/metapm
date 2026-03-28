@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.55.0"  # PR01: add /api/search/knowledge SQL endpoint; RAG proxy routes by collection
+    VERSION: str = "2.55.1"  # MP14: expand uat_results CHECK to include partial/blocked
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

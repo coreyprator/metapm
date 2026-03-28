@@ -2011,4 +2011,27 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 60 warning: {e}")
 
+    # Migration 61: MP14 — Expand uat_results status CHECK to include 'partial' and 'blocked'
+    try:
+        cursor = execute_query("""
+            SELECT name, definition FROM sys.check_constraints
+            WHERE parent_object_id = OBJECT_ID('uat_results')
+              AND definition LIKE '%status%'
+        """, fetch="one")
+        if cursor and ('partial' not in cursor['definition'].lower() or 'blocked' not in cursor['definition'].lower()):
+            constraint_name = cursor['name']
+            logger.info(f"  Migration 61: Expanding uat_results status CHECK ({constraint_name})...")
+            execute_query(f"ALTER TABLE uat_results DROP CONSTRAINT [{constraint_name}]", fetch="none")
+            execute_query("""
+                ALTER TABLE uat_results
+                ADD CONSTRAINT CK_uat_results_status_v4
+                CHECK (status IN ('passed', 'failed', 'pending', 'blocked', 'partial',
+                                  'conditional_pass', 'archived'))
+            """, fetch="none")
+            logger.info("  Migration 61: uat_results status CHECK updated to include 'partial' and 'blocked'.")
+        else:
+            logger.info("  Migration 61: uat_results status CHECK already includes 'partial' and 'blocked'.")
+    except Exception as e:
+        logger.warning(f"  Migration 61 warning: {e}")
+
     logger.info("Migrations complete.")
