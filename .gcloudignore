@@ -13,3 +13,6 @@ scripts/
 venv/
 incoming_zip/
 project-methodology/
+# MM18: Explicitly include static HTML files (override any implicit gcloud HTML filter)
+!static/
+!static/*.html
