@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.55.1"  # MP14: expand uat_results CHECK to include partial/blocked
+    VERSION: str = "2.56.0"  # MP15: lifecycle dropdown valid transitions + Mark Done button
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

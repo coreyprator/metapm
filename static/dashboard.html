@@ -733,35 +733,9 @@
       </div>
       <div>
         <label>Status</label>
-        <select id="dStatus">
-          <optgroup label="── Definition ──">
-            <option value="req_created">Req Created</option>
-            <option value="req_approved">Req Approved</option>
-          </optgroup>
-          <optgroup label="── Design ──">
-            <option value="cai_designing">CAI Designing</option>
-            <option value="cc_prompt_ready">Prompt Ready</option>
-          </optgroup>
-          <optgroup label="── Build ──">
-            <option value="cc_executing">CC Executing</option>
-            <option value="cc_complete">CC Complete</option>
-          </optgroup>
-          <optgroup label="── Validate ──">
-            <option value="uat_ready">UAT Ready</option>
-            <option value="uat_pass">UAT Pass</option>
-            <option value="uat_fail">UAT Fail</option>
-          </optgroup>
-          <optgroup label="── Complete ──">
-            <option value="done">Done</option>
-            <option value="rework">Rework</option>
-          </optgroup>
-          <optgroup label="── Legacy ──">
-            <option value="backlog">Backlog</option>
-            <option value="executing">Executing</option>
-            <option value="closed">Closed</option>
-          </optgroup>
-        </select>
+        <select id="dStatus"></select>
         <div id="dCheckpoint" style="display:none;margin-top:4px;font-size:11px;color:#86efac;font-family:monospace"></div>
+        <button id="btnMarkDone" style="display:none;margin-top:6px;padding:4px 12px;background:#166534;color:#bbf7d0;border:1px solid #22c55e;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600" onclick="markDone()">&#x2705; Mark Done</button>
       </div>
       <div>
         <label>Target Version</label>
@@ -1024,6 +998,88 @@
     };
 
     const CLOSED_STATUSES = ['closed', 'done'];
+
+    // MP15: Valid lifecycle transitions — dropdown only shows valid next states
+    const VALID_TRANSITIONS = {
+      'req_created':     ['req_approved', 'backlog', 'closed'],
+      'req_approved':    ['cai_designing', 'req_created'],
+      'cai_designing':   ['cc_prompt_ready', 'req_approved'],
+      'cc_prompt_ready': ['cc_executing', 'cai_designing'],
+      'cc_executing':    ['cc_complete', 'cc_prompt_ready'],
+      'cc_complete':     ['uat_ready', 'cc_executing'],
+      'uat_ready':       ['uat_pass', 'uat_fail'],
+      'uat_pass':        ['done'],
+      'uat_fail':        ['cc_prompt_ready', 'rework'],
+      'done':            ['rework'],
+      'rework':          ['cc_prompt_ready'],
+      'backlog':         ['req_created', 'closed'],
+      'executing':       ['cc_executing', 'closed'],
+      'closed':          [],
+    };
+
+    const STATUS_DISPLAY = {
+      req_created: 'Req Created', req_approved: 'Req Approved', cai_designing: 'CAI Designing',
+      cc_prompt_ready: 'Prompt Ready', cc_executing: 'CC Executing', cc_complete: 'CC Complete',
+      uat_ready: 'UAT Ready', uat_pass: 'UAT Pass', uat_fail: 'UAT Fail',
+      done: 'Done', rework: 'Rework', backlog: 'Backlog', executing: 'Executing', closed: 'Closed'
+    };
+
+    function populateStatusDropdown(currentStatus) {
+      const sel = qs('dStatus');
+      sel.innerHTML = '';
+      // Current status as selected disabled option
+      const cur = document.createElement('option');
+      cur.value = currentStatus;
+      cur.textContent = `● ${STATUS_DISPLAY[currentStatus] || currentStatus}`;
+      cur.selected = true;
+      cur.disabled = true;
+      sel.appendChild(cur);
+      // Valid next states
+      const valid = VALID_TRANSITIONS[currentStatus] || [];
+      for (const s of valid) {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = STATUS_DISPLAY[s] || s;
+        sel.appendChild(opt);
+      }
+      // Show/hide Mark Done button
+      const markDoneStates = ['cc_complete', 'uat_ready', 'uat_pass'];
+      qs('btnMarkDone').style.display = markDoneStates.includes(currentStatus) ? 'inline-block' : 'none';
+    }
+
+    async function markDone() {
+      const req = state.selectedReq;
+      if (!req) return;
+      const pathToDone = {
+        'cc_complete': ['uat_ready', 'uat_pass', 'done'],
+        'uat_ready':   ['uat_pass', 'done'],
+        'uat_pass':    ['done'],
+      };
+      const steps = pathToDone[req.status];
+      if (!steps) return;
+      const btn = qs('btnMarkDone');
+      btn.disabled = true;
+      btn.textContent = 'Walking lifecycle...';
+      try {
+        for (const nextStatus of steps) {
+          await api(`/api/roadmap/requirements/${req.id}/state`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: nextStatus })
+          });
+        }
+        // Update local state
+        const r = state.requirements.find(x => x.id === req.id);
+        if (r) r.status = 'done';
+        req.status = 'done';
+        populateStatusDropdown('done');
+        showToast(`${req.code} marked done`);
+      } catch (err) {
+        showToast('Mark Done failed: ' + (err.message || err));
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '\u2705 Mark Done';
+      }
+    }
 
     function getFilteredRequirements() {
       const category = qs('categoryFilter').value;
@@ -1966,7 +2022,7 @@
       qs('dSprint').value = req.sprint_id || '';
       qs('dPriority').value = req.priority;
       qs('dType').value = req.type;
-      qs('dStatus').value = req.status;
+      populateStatusDropdown(req.status);
       qs('dCheckpoint').style.display = 'none';
       qs('dCheckpoint').textContent = '';
       qs('dVersion').value = req.target_version || '';
@@ -1991,6 +2047,8 @@
           const r = state.requirements.find(x => x.id === targetReq.id);
           if (r) r.status = newStatus;
           state.selectedReq.status = newStatus;
+          // MP15: Refresh dropdown to show valid transitions from new state
+          populateStatusDropdown(newStatus);
         } catch (err) {
           showToast('State update failed: ' + (err.message || err));
         }
