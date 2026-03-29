@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.58.0"  # G2B18: Store description + uat_url on mcp_handoffs (Migration 62)
+    VERSION: str = "2.58.1"  # G2B19: Fix Loop 2 email description + UAT URL fallback chain
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
