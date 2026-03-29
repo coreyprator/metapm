@@ -366,19 +366,17 @@
       cursor: pointer;
     }
     .card.header .header-content {
-      max-height: 500px;
-      overflow: hidden;
-      transition: max-height 0.3s ease-out;
       display: flex;
       justify-content: space-between;
       align-items: center;
       width: 100%;
     }
-    .card.header.is-collapsed .header-content {
-      max-height: 0;
-    }
     @media (max-width: 768px) {
-      .card.header .header-content { max-height: 0; }
+      .card.header .header-content {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease-out;
+      }
       .card.header:not(.is-collapsed) .header-content { max-height: 500px; }
       .header-toggle { display: block; }
     }
