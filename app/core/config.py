@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.56.0"  # MP15: lifecycle dropdown valid transitions + Mark Done button
+    VERSION: str = "2.57.0"  # G2B16: Loop 2 email pulls PTH/description from prompt record
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
