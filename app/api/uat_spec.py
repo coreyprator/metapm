@@ -23,6 +23,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _validate_uuid(value: str) -> str:
+    """Validate UUID format. Returns value or raises 400."""
+    try:
+        uuid.UUID(value)
+        return value
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail=f"Invalid UUID: {value}")
+
+
 async def sync_uat_to_rag(spec_id: str):
     """Fix 7 (MP08): Fire-and-forget — trigger Portfolio RAG re-ingestion after UAT submit."""
     # MF01: rewired from /ingest/metapm (does not exist) to /api/rag/sync on MetaPM itself
@@ -206,6 +215,7 @@ async def get_uat_spec(spec_id: str):
     Get UAT spec metadata and test case list. CC uses this as canary after POST.
     Does NOT return result values (those are PL-only).
     """
+    _validate_uuid(spec_id)
     row = execute_query(
         """SELECT id, project, sprint_code, pth, version, status,
                   spec_source, spec_locked_at, spec_data, test_cases_json
@@ -252,6 +262,7 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
     Requires Google OAuth session (cprator@cbsware.com).
     Returns 403 if accessed without valid PL session — CC/SA cannot submit results.
     """
+    _validate_uuid(spec_id)
     if not is_pl_authenticated(request):
         raise HTTPException(
             status_code=403,
@@ -398,6 +409,7 @@ async def override_uat_status(spec_id: str, body: UATOverride, request: Request)
     PL-only: Override UAT result status (e.g. conditional_pass → passed).
     Requires PL Google auth session.
     """
+    _validate_uuid(spec_id)
     if not is_pl_authenticated(request):
         raise HTTPException(status_code=403, detail="PL authentication required")
     allowed = {"passed", "conditional_pass", "failed", "in_progress"}
@@ -424,6 +436,7 @@ async def get_uat_results(spec_id: str):
     Public read-only endpoint for submitted UAT results.
     CC and CAI can query this after PL submits.
     """
+    _validate_uuid(spec_id)
     row = execute_query("""
         SELECT id, project, pth, status, test_cases_json, general_notes,
                pl_submitted_at, spec_json

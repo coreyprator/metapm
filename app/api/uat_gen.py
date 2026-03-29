@@ -4,6 +4,7 @@ Endpoints for generating and serving UAT pages.
 """
 import json
 import logging
+import uuid as _uuid_mod
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field
@@ -16,6 +17,15 @@ from app.schemas.mcp import UATResultsUpdate, BulkArchiveRequest, BulkCloseReque
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _validate_uuid(value: str) -> str:
+    """Validate that value is a valid UUID string. Returns normalized UUID or raises 400."""
+    try:
+        _uuid_mod.UUID(value)
+        return value
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail=f"Invalid UUID: {value}")
 
 
 def _render_fallback_uat(row: dict) -> str:
@@ -230,7 +240,7 @@ async def serve_uat_page(request: Request, uat_id: str):
     Lookup chain: uat_pages.id → uat_pages.handoff_id →
     uat_results.id→handoff_id→uat_pages → render fallback from handoff data.
     """
-    from fastapi import Request as _Request
+    _validate_uuid(uat_id)
     # 1. Primary: uat_pages by id
     page = execute_query(
         "SELECT id, project, html_content, status, pth, spec_source, spec_data, test_cases_json FROM uat_pages WHERE id = ?",
@@ -640,6 +650,7 @@ class UATStatusUpdate(BaseModel):
 @router.patch("/api/uat/{uat_id}/status")
 async def update_uat_status(uat_id: str, body: UATStatusUpdate):
     """Update UAT page status (e.g. archive a legacy page)."""
+    _validate_uuid(uat_id)
     valid_statuses = {'active', 'archived', 'pending', 'passed', 'failed', 'ready', 'in_progress', 'submitted', 'approved'}
     if body.status not in valid_statuses:
         raise HTTPException(400, f"Invalid status '{body.status}'. Valid: {sorted(valid_statuses)}")
@@ -739,6 +750,7 @@ async def universal_search(q: str = Query(..., min_length=1, max_length=100)):
 @router.get("/api/uat/{uat_id}/results")
 async def get_uat_results(uat_id: str):
     """Get current test case results for a UAT page. Used by page JS to pre-populate on load."""
+    _validate_uuid(uat_id)
     page = execute_query(
         "SELECT id, test_cases_json, status FROM uat_pages WHERE id = ?",
         (uat_id,), fetch="one"
@@ -760,6 +772,7 @@ async def get_uat_results(uat_id: str):
 async def update_uat_results(uat_id: str, body: UATResultsUpdate):
     """Update individual test case results from PL interaction.
     Updates test_cases_json in uat_pages and re-renders HTML."""
+    _validate_uuid(uat_id)
     page = execute_query(
         "SELECT id, test_cases_json, handoff_id, project, pth, version FROM uat_pages WHERE id = ?",
         (uat_id,), fetch="one"

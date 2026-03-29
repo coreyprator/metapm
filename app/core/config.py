@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.58.1"  # G2B19: Fix Loop 2 email description + UAT URL fallback chain
+    VERSION: str = "2.58.2"  # MP16: Fix UAT UUID validation — prevent SQL conversion error on invalid/truncated UUIDs
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
