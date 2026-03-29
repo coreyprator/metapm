@@ -2034,4 +2034,59 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 61 warning: {e}")
 
+    # Migration 62: G2B18 — Add description and uat_url columns to mcp_handoffs
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME IN ('description', 'uat_url')
+        """, fetch="one")
+        if not result or result['cnt'] < 2:
+            if not result or result['cnt'] == 0:
+                logger.info("  Migration 62: Adding description and uat_url columns to mcp_handoffs...")
+                execute_query("""
+                    IF NOT EXISTS (
+                        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'description'
+                    )
+                    BEGIN
+                        ALTER TABLE mcp_handoffs ADD description NVARCHAR(500) NULL
+                    END
+                """, fetch="none")
+                execute_query("""
+                    IF NOT EXISTS (
+                        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'uat_url'
+                    )
+                    BEGIN
+                        ALTER TABLE mcp_handoffs ADD uat_url NVARCHAR(500) NULL
+                    END
+                """, fetch="none")
+            else:
+                # One column exists, add the missing one
+                logger.info("  Migration 62: Adding missing column to mcp_handoffs...")
+                execute_query("""
+                    IF NOT EXISTS (
+                        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'description'
+                    )
+                    BEGIN
+                        ALTER TABLE mcp_handoffs ADD description NVARCHAR(500) NULL
+                    END
+                """, fetch="none")
+                execute_query("""
+                    IF NOT EXISTS (
+                        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'uat_url'
+                    )
+                    BEGIN
+                        ALTER TABLE mcp_handoffs ADD uat_url NVARCHAR(500) NULL
+                    END
+                """, fetch="none")
+            logger.info("  Migration 62: description and uat_url columns added.")
+        else:
+            logger.info("  Migration 62: description and uat_url columns already exist.")
+    except Exception as e:
+        logger.warning(f"  Migration 62 warning: {e}")
+
     logger.info("Migrations complete.")

@@ -157,6 +157,8 @@ class HandoffResponse(BaseModel):
     review_id: Optional[str] = None
     assessment: Optional[str] = None
     pth: Optional[str] = None         # AP08 Fix 1: for Loop 2 email
+    description: Optional[str] = None  # G2B18: stored on handoff record
+    uat_url: Optional[str] = None      # G2B18: stored on handoff record
     uat_spec_id: Optional[str] = None  # AP08 Fix 1: for Loop 2 email UAT URL
     notified_at: Optional[datetime] = None  # PA02-REQ-001: email idempotency
     version: Optional[str] = None           # PA02-REQ-004: version shipped

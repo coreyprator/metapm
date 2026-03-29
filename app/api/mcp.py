@@ -337,11 +337,11 @@ async def create_handoff(
         metadata_json = json.dumps(handoff.metadata) if handoff.metadata else None
 
         result = execute_query("""
-            INSERT INTO mcp_handoffs (project, task, direction, content, metadata, response_to, version, completion_content)
+            INSERT INTO mcp_handoffs (project, task, direction, content, metadata, response_to, version, completion_content, description, uat_url)
             OUTPUT INSERTED.id, INSERTED.project, INSERTED.task, INSERTED.direction,
                    INSERTED.status, INSERTED.metadata, INSERTED.response_to,
                    INSERTED.created_at, INSERTED.updated_at, INSERTED.version
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             handoff.project,
             handoff.task,
@@ -350,7 +350,9 @@ async def create_handoff(
             metadata_json,
             handoff.response_to,
             handoff.version,
-            handoff.completion_content
+            handoff.completion_content,
+            handoff.description or None,
+            handoff.uat_url or None
         ), fetch="one")
 
         if not result:
@@ -488,6 +490,8 @@ async def create_handoff(
             metadata=_parse_json_field(result['metadata']),
             response_to=str(result['response_to']) if result['response_to'] else None,
             public_url=public_url,
+            description=handoff.description or None,
+            uat_url=handoff.uat_url or None,
             created_at=result['created_at'],
             updated_at=result['updated_at']
         )
@@ -541,6 +545,7 @@ async def list_handoffs(
         results = execute_query(f"""
             SELECT h.id, h.project, h.task, h.direction, h.status, h.metadata, h.response_to,
                    h.created_at, h.updated_at, h.pth, h.notified_at, h.version,
+                   h.description, h.uat_url,
                    r.id as review_id, r.assessment,
                    u.id as uat_spec_id
             FROM mcp_handoffs h
@@ -564,6 +569,8 @@ async def list_handoffs(
                 response_to=str(row['response_to']) if row['response_to'] else None,
                 public_url=public_url,
                 pth=row.get('pth'),
+                description=row.get('description'),
+                uat_url=row.get('uat_url'),
                 review_id=str(row['review_id']) if row.get('review_id') else None,
                 assessment=row.get('assessment'),
                 uat_spec_id=str(row['uat_spec_id']) if row.get('uat_spec_id') else None,
@@ -1550,7 +1557,7 @@ async def get_handoff(
         result = execute_query("""
             SELECT h.id, h.project, h.task, h.direction, h.status, h.content,
                    h.metadata, h.response_to, h.created_at, h.updated_at, h.pth,
-                   h.notified_at, h.version,
+                   h.notified_at, h.version, h.description, h.uat_url,
                    r.id as review_id, r.assessment,
                    u.id as uat_spec_id
             FROM mcp_handoffs h
@@ -1576,6 +1583,8 @@ async def get_handoff(
             public_url=public_url,
             review_id=str(result['review_id']) if result.get('review_id') else None,
             assessment=result.get('assessment'),
+            description=result.get('description'),
+            uat_url=result.get('uat_url'),
             notified_at=result.get('notified_at'),
             version=result.get('version'),
             created_at=result['created_at'],
