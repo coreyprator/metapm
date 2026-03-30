@@ -63,7 +63,7 @@ class UATSpecCreate(BaseModel):
     project: str
     version: str
     sprint: str
-    pth: str = Field(..., max_length=8)
+    pth: str = Field(..., max_length=20)
     linked_requirements: List[str] = Field(default_factory=list)
     test_cases: List[TestCaseSpec] = Field(..., min_length=1)
 

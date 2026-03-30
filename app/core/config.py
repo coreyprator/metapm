@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.59.0"  # MP-PTH-001: patch_requirement_status PTH/project_code discriminators
+    VERSION: str = "2.59.1"  # MP-UAT-001: empty UAT spec guard + admin backfill + pth max_length fix
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
