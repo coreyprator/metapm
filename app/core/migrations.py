@@ -2089,4 +2089,37 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 62 warning: {e}")
 
+    # Migration 63: Create handoff_shells table (MP-BA17)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'handoff_shells'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 63: Creating handoff_shells table...")
+            execute_query("""
+                CREATE TABLE handoff_shells (
+                    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+                    pth NVARCHAR(20) NOT NULL,
+                    sprint_id NVARCHAR(100) NOT NULL,
+                    project_code NVARCHAR(20) NOT NULL,
+                    version_from NVARCHAR(20) NULL,
+                    version_to NVARCHAR(20) NULL,
+                    commit_hash NVARCHAR(40) NULL,
+                    deploy_url NVARCHAR(500) NULL,
+                    uat_spec_id NVARCHAR(100) NULL,
+                    machine_tests NVARCHAR(MAX) NULL,
+                    deviations NVARCHAR(MAX) NULL,
+                    notes NVARCHAR(MAX) NULL,
+                    created_at DATETIME DEFAULT GETUTCDATE(),
+                    updated_at DATETIME DEFAULT GETUTCDATE()
+                )
+            """, fetch="none")
+            logger.info("  Migration 63: handoff_shells table created.")
+        else:
+            logger.info("  Migration 63: handoff_shells table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 63 warning: {e}")
+
     logger.info("Migrations complete.")

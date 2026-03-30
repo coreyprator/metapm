@@ -142,6 +142,39 @@ class HandoffCreate(BaseModel):
 class HandoffUpdate(BaseModel):
     status: Optional[HandoffStatus] = None
     notified_at: Optional[str] = None  # PA02-REQ-001: ISO datetime string
+    # BA17: shell field updates (used when patching a handoff_shell record)
+    version_from: Optional[str] = None
+    version_to: Optional[str] = None
+    commit_hash: Optional[str] = None
+    deploy_url: Optional[str] = None
+    machine_tests: Optional[str] = None  # JSON array string
+    deviations: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class HandoffShellCreate(BaseModel):
+    pth: str
+    sprint_id: str
+    project_code: str
+    uat_spec_id: Optional[str] = None  # CAI pre-fills if UAT spec was already created
+
+
+class HandoffShellResponse(BaseModel):
+    handoff_id: str
+    pth: str
+    sprint_id: str
+    project_code: str
+    version_from: Optional[str] = None
+    version_to: Optional[str] = None
+    commit_hash: Optional[str] = None
+    deploy_url: Optional[str] = None
+    uat_spec_id: Optional[str] = None
+    machine_tests: Optional[str] = None
+    deviations: Optional[str] = None
+    notes: Optional[str] = None
+    patch_url: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 class HandoffResponse(BaseModel):

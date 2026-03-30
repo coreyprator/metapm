@@ -170,6 +170,48 @@ TOOLS = [
             "properties": {},
         },
     },
+    {
+        "name": "post_uat_spec",
+        "description": "Post a UAT spec with BVs to MetaPM. CAI calls this at prompt-creation time. Returns spec_id and uat_url. CC never writes a UAT spec — CAI creates it here.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pth": {"type": "string", "description": "Prompt tracking hash (e.g. 'HM24')"},
+                "sprint_id": {"type": "string", "description": "Sprint identifier (e.g. 'HM24-ACCEPT-DELEGATION-FIX-001')"},
+                "project_code": {"type": "string", "description": "Project short code e.g. 'HL', 'AF', 'SF', 'MP'"},
+                "version": {"type": "string", "description": "Version string e.g. '2.28.0 to 2.29.0'"},
+                "test_cases": {
+                    "type": "array",
+                    "description": "Array of BV objects",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "title": {"type": "string"},
+                            "type": {"type": "string", "default": "pl_visual"},
+                            "expected": {"type": "string"},
+                        },
+                        "required": ["id", "title", "expected"],
+                    },
+                },
+            },
+            "required": ["pth", "sprint_id", "project_code", "version", "test_cases"],
+        },
+    },
+    {
+        "name": "create_handoff_shell",
+        "description": "Pre-create a handoff shell UUID that CC will fill in at closeout. CAI calls this at prompt-creation time alongside post_uat_spec. Returns handoff_id and patch_url for CC to use.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pth": {"type": "string", "description": "Prompt tracking hash (e.g. 'HM24')"},
+                "sprint_id": {"type": "string", "description": "Sprint identifier"},
+                "project_code": {"type": "string", "description": "Project short code e.g. 'HL', 'AF', 'SF', 'MP'"},
+                "uat_spec_id": {"type": "string", "description": "UUID of UAT spec created by post_uat_spec (optional, pre-fills shell)", "default": ""},
+            },
+            "required": ["pth", "sprint_id", "project_code"],
+        },
+    },
 ]
 
 
@@ -437,6 +479,27 @@ def _tool_patch_requirement_status(args: dict) -> dict:
     req_id = req["id"]
     current = req["status"]
 
+    # BA17 Closeout gate: block cc_complete if handoff shell exists for this PTH and is incomplete
+    if status == "cc_complete" and pth:
+        shell = execute_query(
+            "SELECT id, version_from, version_to, commit_hash, deploy_url, machine_tests, deviations FROM handoff_shells WHERE pth = ?",
+            (pth,), fetch="one"
+        )
+        if shell:
+            missing = []
+            for field in ["version_from", "version_to", "commit_hash", "deploy_url", "machine_tests", "deviations"]:
+                val = shell.get(field)
+                if not val or (isinstance(val, str) and not val.strip()):
+                    missing.append(field)
+            if missing:
+                shell_id = str(shell["id"])
+                patch_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{shell_id}"
+                return {
+                    "error": f"Handoff incomplete — missing fields: {', '.join(missing)}. Fill via PATCH {patch_url} before advancing to cc_complete.",
+                    "handoff_shell_id": shell_id,
+                    "missing_fields": missing,
+                }
+
     execute_query(
         "UPDATE roadmap_requirements SET status = ?, updated_at = GETDATE() WHERE id = ?",
         (status, req_id), fetch="none"
@@ -520,6 +583,129 @@ def _tool_get_checkpoint(args: dict) -> dict:
     }
 
 
+def _tool_post_uat_spec(args: dict) -> dict:
+    """BA17: CAI posts UAT spec at prompt-creation time."""
+    import uuid as _uuid
+    from datetime import datetime
+
+    pth = args["pth"]
+    sprint_id = args["sprint_id"]
+    project_code = args["project_code"]
+    version = args["version"]
+    test_cases_raw = args.get("test_cases", [])
+
+    if not test_cases_raw:
+        return {"error": "test_cases must not be empty (BA15 guard)"}
+
+    tc_json = json.dumps([
+        {
+            "id": tc.get("id", ""),
+            "title": tc.get("title", ""),
+            "url": tc.get("url"),
+            "steps": tc.get("steps", []),
+            "expected": tc.get("expected", ""),
+            "type": tc.get("type", "pl_visual"),
+            "status": "pending",
+            "notes": "",
+        }
+        for tc in test_cases_raw
+    ])
+
+    spec_data = json.dumps({
+        "project": project_code,
+        "sprint": sprint_id,
+        "pth": pth,
+        "version": version,
+        "test_cases": test_cases_raw,
+    })
+
+    # Upsert by PTH (same as POST /api/uat/spec)
+    existing = execute_query(
+        "SELECT TOP 1 id FROM uat_pages WHERE pth = ? AND spec_source = 'cc_spec' ORDER BY created_at DESC",
+        (pth,), fetch="one"
+    )
+
+    if existing:
+        spec_id = str(existing["id"])
+        execute_query("""
+            UPDATE uat_pages SET
+                project = ?, sprint_code = ?, version = ?,
+                test_cases_json = ?, html_content = 'spec_created',
+                status = 'ready', spec_data = ?
+            WHERE id = ?
+        """, (project_code, sprint_id, version, tc_json, spec_data, spec_id), fetch="none")
+    else:
+        spec_id = str(_uuid.uuid4()).upper()
+        execute_query("""
+            INSERT INTO uat_pages
+                (id, handoff_id, project, sprint_code, pth, version,
+                 test_cases_json, html_content, status,
+                 spec_source, spec_locked_at, spec_data)
+            VALUES (?, ?, ?, ?, ?, ?,
+                    ?, 'spec_created', 'ready',
+                    'cc_spec', ?, ?)
+        """, (
+            spec_id, spec_id, project_code, sprint_id, pth, version,
+            tc_json, datetime.utcnow(), spec_data,
+        ), fetch="none")
+
+    uat_url = f"https://metapm.rentyourcio.com/uat/{spec_id}"
+
+    # Auto-advance linked requirement to uat_ready
+    try:
+        req_row = execute_query(
+            "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ?",
+            (pth,), fetch="one"
+        )
+        if req_row and req_row["status"] not in {"uat_ready", "done", "closed"}:
+            execute_query(
+                "UPDATE roadmap_requirements SET status = 'uat_ready', uat_url = ?, updated_at = GETUTCDATE() WHERE id = ?",
+                (uat_url, req_row["id"]), fetch="none"
+            )
+    except Exception as e:
+        logger.warning(f"post_uat_spec: requirement auto-advance failed (non-fatal): {e}")
+
+    return {
+        "spec_id": spec_id,
+        "uat_url": uat_url,
+        "test_count": len(test_cases_raw),
+        "pth": pth,
+        "status": "spec_created",
+    }
+
+
+def _tool_create_handoff_shell(args: dict) -> dict:
+    """BA17: CAI pre-creates a handoff shell UUID. CC fills in fields via PATCH."""
+    pth = args["pth"]
+    sprint_id = args["sprint_id"]
+    project_code = args["project_code"]
+    uat_spec_id = args.get("uat_spec_id") or None
+
+    result = execute_query("""
+        INSERT INTO handoff_shells (pth, sprint_id, project_code, uat_spec_id)
+        OUTPUT INSERTED.id, INSERTED.pth, INSERTED.sprint_id, INSERTED.project_code,
+               INSERTED.uat_spec_id, INSERTED.created_at
+        VALUES (?, ?, ?, ?)
+    """, (pth, sprint_id, project_code, uat_spec_id), fetch="one")
+
+    if not result:
+        return {"error": "Failed to create handoff shell"}
+
+    handoff_id = str(result["id"])
+    patch_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{handoff_id}"
+
+    return {
+        "handoff_id": handoff_id,
+        "pth": result["pth"],
+        "sprint_id": result["sprint_id"],
+        "project_code": result["project_code"],
+        "uat_spec_id": result.get("uat_spec_id"),
+        "patch_url": patch_url,
+        "created_at": str(result["created_at"]) if result.get("created_at") else None,
+        "message": f"Handoff shell created. CC fills in via PATCH {patch_url}",
+    }
+
+
 # Tool dispatch map
 TOOL_HANDLERS = {
     "post_prompt": _tool_post_prompt,
@@ -534,6 +720,8 @@ TOOL_HANDLERS = {
     "get_compliance_doc": _tool_get_compliance_doc,
     "update_compliance_doc": _tool_update_compliance_doc,
     "get_checkpoint": _tool_get_checkpoint,
+    "post_uat_spec": _tool_post_uat_spec,
+    "create_handoff_shell": _tool_create_handoff_shell,
 }
 
 

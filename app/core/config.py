@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.59.1"  # MP-UAT-001: empty UAT spec guard + admin backfill + pth max_length fix
+    VERSION: str = "2.60.0"  # MP-BA17: CAI-generated UAT specs + structured handoff shells
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.core.database import execute_query
 from app.schemas.mcp import (
     HandoffCreate, HandoffUpdate, HandoffResponse, HandoffListResponse,
+    HandoffShellCreate, HandoffShellResponse,
     TaskCreate, TaskUpdate, TaskResponse, TaskListResponse,
     LogEntry, LogResponse, LogEntryType,
     HandoffDirection, HandoffStatus, TaskStatus, TaskPriority,
@@ -248,6 +249,51 @@ def _auto_close_requirements_for_handoff(handoff_id: str, approved: bool) -> int
 # ============================================
 # HANDOFF ENDPOINTS
 # ============================================
+
+SEMVER_RE = re.compile(r'^\d+\.\d+\.\d+$')
+COMMIT_HASH_RE = re.compile(r'^[a-f0-9]{7,40}$', re.IGNORECASE)
+
+SHELL_REQUIRED_FIELDS = ["version_from", "version_to", "commit_hash", "deploy_url", "machine_tests", "deviations"]
+
+
+@router.post("/handoffs/shell", response_model=HandoffShellResponse, status_code=201)
+async def create_handoff_shell(
+    body: HandoffShellCreate,
+    _: bool = Depends(verify_api_key)
+):
+    """BA17: CAI calls this at prompt-creation time to pre-create a handoff shell.
+    CC fills in the required fields via PATCH /mcp/handoffs/{id}."""
+    try:
+        result = execute_query("""
+            INSERT INTO handoff_shells (pth, sprint_id, project_code, uat_spec_id)
+            OUTPUT INSERTED.id, INSERTED.pth, INSERTED.sprint_id, INSERTED.project_code,
+                   INSERTED.uat_spec_id, INSERTED.created_at, INSERTED.updated_at
+            VALUES (?, ?, ?, ?)
+        """, (body.pth, body.sprint_id, body.project_code, body.uat_spec_id), fetch="one")
+
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to create handoff shell")
+
+        handoff_id = str(result['id'])
+        patch_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{handoff_id}"
+        logger.info(f"[BA17] Handoff shell created: {handoff_id} PTH={body.pth}")
+
+        return HandoffShellResponse(
+            handoff_id=handoff_id,
+            pth=result['pth'],
+            sprint_id=result['sprint_id'],
+            project_code=result['project_code'],
+            uat_spec_id=result.get('uat_spec_id'),
+            patch_url=patch_url,
+            created_at=str(result['created_at']) if result.get('created_at') else None,
+            updated_at=str(result['updated_at']) if result.get('updated_at') else None,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating handoff shell: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/handoffs", response_model=HandoffResponse, status_code=201)
 async def create_handoff(
@@ -1707,8 +1753,16 @@ async def update_handoff(
     update: HandoffUpdate,
     _: bool = Depends(verify_api_key)
 ):
-    """Update handoff status and/or notified_at."""
+    """Update handoff status/notified_at, OR fill in shell fields for a handoff_shell record (BA17)."""
     try:
+        # BA17: Check if this ID is a handoff_shell record first
+        shell_row = execute_query(
+            "SELECT id FROM handoff_shells WHERE id = ?", (handoff_id,), fetch="one"
+        )
+        if shell_row:
+            return await _update_handoff_shell(handoff_id, update)
+
+        # Original behavior: update mcp_handoffs status/notified_at
         if update.status:
             execute_query("""
                 UPDATE mcp_handoffs
@@ -1731,6 +1785,82 @@ async def update_handoff(
     except Exception as e:
         logger.error(f"Error updating handoff: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _update_handoff_shell(handoff_id: str, update: HandoffUpdate):
+    """BA17: Validate and apply partial updates to a handoff_shell record."""
+    from fastapi.responses import JSONResponse as _JSONResponse
+
+    errors = []
+
+    # Validate commit_hash format
+    if update.commit_hash is not None:
+        if not COMMIT_HASH_RE.match(update.commit_hash):
+            errors.append(f"commit_hash '{update.commit_hash}' must be 7-40 hex characters (git SHA)")
+
+    # Validate semver for version fields
+    for field_name, value in [("version_from", update.version_from), ("version_to", update.version_to)]:
+        if value is not None and not SEMVER_RE.match(value):
+            errors.append(f"{field_name} '{value}' must be semver (e.g. '2.59.1')")
+
+    # Validate deviations non-empty
+    if update.deviations is not None and not update.deviations.strip():
+        errors.append("deviations cannot be empty string — use 'None' or describe deviations")
+
+    if errors:
+        raise HTTPException(status_code=400, detail={"errors": errors})
+
+    # Build UPDATE clause from non-None fields
+    set_clauses = []
+    params = []
+    for col, val in [
+        ("version_from", update.version_from),
+        ("version_to", update.version_to),
+        ("commit_hash", update.commit_hash),
+        ("deploy_url", update.deploy_url),
+        ("machine_tests", update.machine_tests),
+        ("deviations", update.deviations),
+        ("notes", update.notes),
+    ]:
+        if val is not None:
+            set_clauses.append(f"{col} = ?")
+            params.append(val)
+
+    if set_clauses:
+        set_clauses.append("updated_at = GETUTCDATE()")
+        params.append(handoff_id)
+        execute_query(
+            f"UPDATE handoff_shells SET {', '.join(set_clauses)} WHERE id = ?",
+            tuple(params), fetch="none"
+        )
+
+    # Return updated shell record
+    row = execute_query("""
+        SELECT id, pth, sprint_id, project_code, version_from, version_to, commit_hash,
+               deploy_url, uat_spec_id, machine_tests, deviations, notes, created_at, updated_at
+        FROM handoff_shells WHERE id = ?
+    """, (handoff_id,), fetch="one")
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Handoff shell {handoff_id} not found")
+
+    patch_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{handoff_id}"
+    return _JSONResponse(content={
+        "handoff_id": str(row['id']),
+        "pth": row['pth'],
+        "sprint_id": row['sprint_id'],
+        "project_code": row['project_code'],
+        "version_from": row.get('version_from'),
+        "version_to": row.get('version_to'),
+        "commit_hash": row.get('commit_hash'),
+        "deploy_url": row.get('deploy_url'),
+        "uat_spec_id": row.get('uat_spec_id'),
+        "machine_tests": row.get('machine_tests'),
+        "deviations": row.get('deviations'),
+        "notes": row.get('notes'),
+        "patch_url": patch_url,
+        "created_at": str(row['created_at']) if row.get('created_at') else None,
+        "updated_at": str(row['updated_at']) if row.get('updated_at') else None,
+    })
 
 
 # ============================================
