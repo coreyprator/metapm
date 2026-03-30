@@ -65,7 +65,7 @@ class UATSpecCreate(BaseModel):
     sprint: str
     pth: str = Field(..., max_length=8)
     linked_requirements: List[str] = Field(default_factory=list)
-    test_cases: List[TestCaseSpec]
+    test_cases: List[TestCaseSpec] = Field(..., min_length=1)
 
 
 class UATSpecResponse(BaseModel):
@@ -99,6 +99,10 @@ async def create_uat_spec(body: UATSpecCreate):
     the existing spec rather than creating a duplicate (AP04 Fix 4).
     No auth required (CC runs this as SA).
     """
+    # REQ-002 (BA15): reject empty UAT specs at handler level (belt-and-suspenders with Field min_length)
+    if not body.test_cases:
+        raise HTTPException(status_code=400, detail="UAT spec must contain at least one test case (BA15).")
+
     now = datetime.utcnow()
     spec_data = body.model_dump()
 
@@ -473,6 +477,109 @@ async def get_uat_results(spec_id: str):
             for c in real_cases
         ],
         "general_notes": row.get("general_notes") or "",
+    }
+
+
+# ── POST /api/uat/{spec_id}/admin-backfill ───────────────────────────────────
+
+class AdminBackfillResult(BaseModel):
+    id: str
+    status: str  # pass | fail | skip | pending
+    notes: Optional[str] = None
+
+
+class AdminBackfillRequest(BaseModel):
+    test_cases: List[AdminBackfillResult]
+    general_notes: Optional[str] = None
+    backfill_reason: str  # required — must document why backfill is needed
+
+
+@router.post("/api/uat/{spec_id}/admin-backfill")
+async def admin_backfill_uat_results(spec_id: str, body: AdminBackfillRequest, request: Request):
+    """
+    API-key-authenticated admin endpoint for backfilling historical UAT results
+    when PL browser session is unavailable. Use only for documented historical records.
+    REQ-004 (MP-UAT-001): backfill HM22 and HM24 empty specs.
+    """
+    _validate_uuid(spec_id)
+    api_key = request.headers.get("X-API-Key") or request.headers.get("x-api-key")
+    if not api_key or api_key not in (settings.MCP_API_KEY, settings.API_KEY):
+        raise HTTPException(status_code=403, detail="API key required for admin backfill")
+
+    row = execute_query(
+        "SELECT id, test_cases_json, spec_source, status, pth FROM uat_pages WHERE id = ?",
+        (spec_id,), fetch="one"
+    )
+    if not row:
+        raise HTTPException(404, f"UAT spec {spec_id} not found")
+    if row.get("spec_source") != "cc_spec":
+        raise HTTPException(400, "Admin backfill only allowed for cc_spec UATs")
+
+    existing_cases = json.loads(row["test_cases_json"]) if row.get("test_cases_json") else []
+    updates_by_id = {tc.id: tc for tc in body.test_cases}
+
+    for case in existing_cases:
+        if case.get("id", "").startswith("_"):
+            continue
+        update = updates_by_id.get(case["id"])
+        if update:
+            case["status"] = update.status
+            if update.notes is not None:
+                case["notes"] = update.notes
+
+    real_cases = [c for c in existing_cases if not c.get("id", "").startswith("_")]
+    passed = sum(1 for c in real_cases if c.get("status") == "pass")
+    failed = sum(1 for c in real_cases if c.get("status") == "fail")
+    skipped = sum(1 for c in real_cases if c.get("status") == "skip")
+    total = len(real_cases)
+
+    if failed > 0:
+        new_status = "failed"
+    elif passed == total:
+        new_status = "passed"
+    elif failed == 0 and (passed + skipped) == total:
+        new_status = "conditional_pass"
+    else:
+        new_status = "in_progress"
+
+    execute_query("""
+        UPDATE uat_pages
+        SET test_cases_json = ?, status = ?, pl_submitted_at = GETUTCDATE(), general_notes = ?
+        WHERE id = ?
+    """, (json.dumps(existing_cases), new_status, body.general_notes, spec_id), fetch="none")
+
+    # Persist individual BV items to uat_bv_items table
+    title_lookup = {c["id"]: c.get("title", "") for c in real_cases}
+    for tc in body.test_cases:
+        try:
+            bv_title = title_lookup.get(tc.id, "")
+            execute_query("""
+                IF EXISTS (SELECT 1 FROM uat_bv_items WHERE spec_id=? AND bv_id=?)
+                    UPDATE uat_bv_items SET status=?, notes=?, updated_at=GETUTCDATE()
+                    WHERE spec_id=? AND bv_id=?
+                ELSE
+                    INSERT INTO uat_bv_items (spec_id, bv_id, title, status, notes)
+                    VALUES (?, ?, ?, ?, ?)
+            """, (
+                spec_id, tc.id,
+                tc.status or "pending", tc.notes or "",
+                spec_id, tc.id,
+                spec_id, tc.id, bv_title,
+                tc.status or "pending", tc.notes or "",
+            ), fetch="none")
+        except Exception as bv_err:
+            logger.warning(f"BV item upsert failed for {tc.id}: {bv_err}")
+
+    logger.info(f"[ADMIN-BACKFILL] spec={spec_id} PTH={row.get('pth')} reason='{body.backfill_reason}' "
+                f"status={new_status} {passed}P/{failed}F/{skipped}S")
+
+    return {
+        "spec_id": spec_id,
+        "status": new_status,
+        "passed": passed,
+        "failed": failed,
+        "skipped": skipped,
+        "backfill_reason": body.backfill_reason,
     }
 
 
