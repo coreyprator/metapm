@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.58.2"  # MP16: Fix UAT UUID validation — prevent SQL conversion error on invalid/truncated UUIDs
+    VERSION: str = "2.59.0"  # MP-PTH-001: patch_requirement_status PTH/project_code discriminators
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

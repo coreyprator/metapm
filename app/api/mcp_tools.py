@@ -98,13 +98,15 @@ TOOLS = [
     },
     {
         "name": "patch_requirement_status",
-        "description": "Advance a requirement to a new status. Use to close a requirement after UAT passes.",
+        "description": "Advance a requirement to a new status. Use to close a requirement after UAT passes. Provide pth or project_code to disambiguate when multiple requirements share the same code.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "code": {"type": "string", "description": "Requirement code (e.g. 'MP-064')"},
+                "code": {"type": "string", "description": "Requirement code (e.g. 'MP-064' or 'REQ-001')"},
                 "status": {"type": "string", "description": "Target status (e.g. 'uat_ready', 'done', 'closed')"},
                 "note": {"type": "string", "description": "Optional note", "default": ""},
+                "pth": {"type": "string", "description": "Optional PTH discriminator (e.g. '91C1'). When provided, filters to the specific requirement matching both code and pth.", "default": ""},
+                "project_code": {"type": "string", "description": "Optional project code discriminator (e.g. 'AF', 'MP', 'SF'). When provided, filters to the specific requirement in that project.", "default": ""},
             },
             "required": ["code", "status"],
         },
@@ -407,13 +409,30 @@ def _tool_patch_requirement_status(args: dict) -> dict:
     code = args["code"]
     status = args["status"]
     note = args.get("note", "")
+    pth = args.get("pth", "")
+    project_code = args.get("project_code", "")
 
-    req = execute_query(
-        "SELECT id, status FROM roadmap_requirements WHERE code = ?",
-        (code,), fetch="one"
-    )
-    if not req:
-        return {"error": f"Requirement '{code}' not found"}
+    if pth:
+        req = execute_query(
+            "SELECT id, status FROM roadmap_requirements WHERE code = ? AND pth = ?",
+            (code, pth), fetch="one"
+        )
+        if not req:
+            return {"error": f"Requirement '{code}' with pth '{pth}' not found"}
+    elif project_code:
+        req = execute_query(
+            "SELECT id, status FROM roadmap_requirements WHERE code = ? AND project_code = ?",
+            (code, project_code), fetch="one"
+        )
+        if not req:
+            return {"error": f"Requirement '{code}' in project '{project_code}' not found"}
+    else:
+        req = execute_query(
+            "SELECT id, status FROM roadmap_requirements WHERE code = ?",
+            (code,), fetch="one"
+        )
+        if not req:
+            return {"error": f"Requirement '{code}' not found"}
 
     req_id = req["id"]
     current = req["status"]
