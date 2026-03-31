@@ -287,10 +287,16 @@ def _tool_post_review(args: dict) -> dict:
     if assessment not in ('pass', 'conditional_pass', 'fail'):
         return {"error": f"Invalid assessment '{assessment}'"}
 
+    # BA17 fix: try handoff_shells first (BA17 flow), fall back to mcp_handoffs (pre-BA17)
     handoff = execute_query(
-        "SELECT id FROM mcp_handoffs WHERE id = ?",
+        "SELECT id FROM handoff_shells WHERE id = ?",
         (handoff_id,), fetch="one"
     )
+    if not handoff:
+        handoff = execute_query(
+            "SELECT id FROM mcp_handoffs WHERE id = ?",
+            (handoff_id,), fetch="one"
+        )
     if not handoff:
         return {"error": f"Handoff {handoff_id} not found"}
 
@@ -650,6 +656,28 @@ def _tool_post_uat_spec(args: dict) -> dict:
         ), fetch="none")
 
     uat_url = f"https://metapm.rentyourcio.com/uat/{spec_id}"
+
+    # BA17 fix: persist individual BV items to uat_bv_items (so get_uat_results can read them)
+    for tc in test_cases_raw:
+        try:
+            bv_id = tc.get("id", "")
+            bv_title = tc.get("title", "")
+            execute_query("""
+                IF EXISTS (SELECT 1 FROM uat_bv_items WHERE spec_id=? AND bv_id=?)
+                    UPDATE uat_bv_items
+                    SET title=?, status='pending', notes='', updated_at=GETUTCDATE()
+                    WHERE spec_id=? AND bv_id=?
+                ELSE
+                    INSERT INTO uat_bv_items (spec_id, bv_id, title, status, notes)
+                    VALUES (?, ?, ?, 'pending', '')
+            """, (
+                spec_id, bv_id,            # EXISTS check
+                bv_title,                   # UPDATE SET
+                spec_id, bv_id,            # UPDATE WHERE
+                spec_id, bv_id, bv_title,  # INSERT
+            ), fetch="none")
+        except Exception as bv_err:
+            logger.warning(f"post_uat_spec BV item upsert failed for {bv_id}: {bv_err}")
 
     # Auto-advance linked requirement to uat_ready
     try:

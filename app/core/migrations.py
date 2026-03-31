@@ -2122,4 +2122,33 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 63 warning: {e}")
 
+    # Migration 64: MF001 — Widen PTH columns from NVARCHAR(4)/NVARCHAR(10) to NVARCHAR(20)
+    try:
+        pth_alters = [
+            ("roadmap_requirements", "pth", 4),
+            ("pth_registry", "pth", 4),
+            ("mcp_handoffs", "pth", 4),
+            ("cc_prompts", "pth", 10),
+            ("reviews", "prompt_pth", 10),
+        ]
+        altered = []
+        for table, col, old_size in pth_alters:
+            try:
+                row = execute_query(f"""
+                    SELECT CHARACTER_MAXIMUM_LENGTH as max_len
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME = ? AND COLUMN_NAME = ?
+                """, (table, col), fetch="one")
+                if row and row["max_len"] is not None and row["max_len"] < 20:
+                    execute_query(f"ALTER TABLE [{table}] ALTER COLUMN [{col}] NVARCHAR(20)", fetch="none")
+                    altered.append(f"{table}.{col}")
+            except Exception as col_err:
+                logger.warning(f"  Migration 64: {table}.{col} alter failed: {col_err}")
+        if altered:
+            logger.info(f"  Migration 64: Widened PTH columns to NVARCHAR(20): {', '.join(altered)}")
+        else:
+            logger.info("  Migration 64: All PTH columns already NVARCHAR(20) or wider.")
+    except Exception as e:
+        logger.warning(f"  Migration 64 warning: {e}")
+
     logger.info("Migrations complete.")

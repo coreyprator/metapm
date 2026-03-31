@@ -188,7 +188,7 @@ def _all_bv_urls_are_root(content_md: str) -> bool:
 class PromptCreate(BaseModel):
     requirement_id: Optional[str] = None
     sprint_id: str
-    pth: str = Field(..., max_length=10)
+    pth: str = Field(..., max_length=20)
     content_md: str
     project_id: Optional[str] = None
     estimated_hours: Optional[float] = None

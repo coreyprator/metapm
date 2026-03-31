@@ -174,7 +174,7 @@ class RequirementUpdate(BaseModel):
     sprint_id: Optional[str] = None
     handoff_id: Optional[str] = None
     uat_id: Optional[str] = None
-    pth: Optional[str] = Field(None, max_length=4)
+    pth: Optional[str] = Field(None, max_length=20)
 
 
 class RequirementResponse(RequirementBase):

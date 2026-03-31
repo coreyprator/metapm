@@ -83,7 +83,7 @@ class HandoffCreate(BaseModel):
     uat_url: Optional[str] = Field(None, max_length=500)  # UAT spec URL
 
     # PF5-MS2: Prompt linking (pth aliases to this if set)
-    prompt_pth: Optional[str] = Field(None, max_length=10)
+    prompt_pth: Optional[str] = Field(None, max_length=20)
 
     # MP-HANDOFF-GATE-001: Enforcement fields
     uat_spec_id: Optional[str] = None  # Must reference a valid spec with BV items
@@ -380,7 +380,7 @@ class UATDirectSubmit(BaseModel):
     checklist_path: Optional[str] = None
     url: Optional[str] = None
     tested_by: Optional[str] = Field(None, max_length=100)
-    pth: Optional[str] = Field(None, max_length=4, description="Prompt Tracking Hash")
+    pth: Optional[str] = Field(None, max_length=20, description="Prompt Tracking Hash")
     cc_summary: Optional[str] = Field(None, max_length=5000, description="CC summary block (version, canaries, items to delete)")
     test_cases: Optional[List[TestCaseInput]] = Field(None, description="Structured test cases for server-side UAT generation")
     uat_checkpoint: Optional[str] = Field(None, max_length=100)
