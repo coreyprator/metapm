@@ -229,6 +229,29 @@ TOOLS = [
             "required": ["pth", "sprint_id", "project_code"],
         },
     },
+    {
+        "name": "get_challenge",
+        "description": "Generate a one-time challenge token for a sprint PTH. CAI calls this at prompt-creation time and embeds the token in the prompt as required BV evidence. CC must include the exact token in the handoff. CAI verifies via verify_challenge at review time.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pth": {"type": "string", "description": "PTH of the sprint being challenged"},
+            },
+            "required": ["pth"],
+        },
+    },
+    {
+        "name": "verify_challenge",
+        "description": "Verify a challenge token submitted by CC in a handoff. Returns valid:true if token matches and hasn't been used. Marks token as used on success.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pth": {"type": "string", "description": "PTH of the sprint"},
+                "token": {"type": "string", "description": "Token from CC handoff machine_tests field"},
+            },
+            "required": ["pth", "token"],
+        },
+    },
 ]
 
 
@@ -834,6 +857,35 @@ def _tool_create_handoff_shell(args: dict) -> dict:
     }
 
 
+def _tool_get_challenge(args: dict) -> dict:
+    import secrets as _secrets
+    pth = args["pth"]
+    token = _secrets.token_hex(16)
+    execute_query(
+        "INSERT INTO challenge_tokens (pth, token) VALUES (?, ?)",
+        (pth, token), fetch="none",
+    )
+    return {"pth": pth, "token": token}
+
+
+def _tool_verify_challenge(args: dict) -> dict:
+    pth = args["pth"]
+    token = args["token"]
+    row = execute_query(
+        "SELECT id, used FROM challenge_tokens WHERE pth = ? AND token = ?",
+        (pth, token), fetch="one",
+    )
+    if not row:
+        return {"valid": False, "reason": "token not found"}
+    if row["used"]:
+        return {"valid": False, "reason": "token already used"}
+    execute_query(
+        "UPDATE challenge_tokens SET used = 1, used_at = GETDATE() WHERE id = ?",
+        (row["id"],), fetch="none",
+    )
+    return {"valid": True}
+
+
 # Tool dispatch map
 TOOL_HANDLERS = {
     "post_prompt": _tool_post_prompt,
@@ -851,6 +903,8 @@ TOOL_HANDLERS = {
     "post_uat_spec": _tool_post_uat_spec,
     "post_requirement": _tool_post_requirement,
     "create_handoff_shell": _tool_create_handoff_shell,
+    "get_challenge": _tool_get_challenge,
+    "verify_challenge": _tool_verify_challenge,
 }
 
 

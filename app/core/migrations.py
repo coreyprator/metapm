@@ -2016,4 +2016,30 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 59 warning: {e}")
 
+    # Migration 60: Create challenge_tokens table (MPCH1 — Tier 2 anti-fabrication)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'challenge_tokens'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 60: Creating challenge_tokens table...")
+            execute_query("""
+                CREATE TABLE challenge_tokens (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    pth NVARCHAR(20) NOT NULL,
+                    token NVARCHAR(64) NOT NULL,
+                    used BIT DEFAULT 0,
+                    created_at DATETIME DEFAULT GETDATE(),
+                    used_at DATETIME NULL
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_challenge_tokens_pth ON challenge_tokens(pth)", fetch="none")
+            logger.info("  Migration 60: challenge_tokens table created.")
+        else:
+            logger.info("  Migration 60: challenge_tokens table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 60 warning: {e}")
+
     logger.info("Migrations complete.")

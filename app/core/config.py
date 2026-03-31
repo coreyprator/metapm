@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.64.0"  # MF003B: confirm post_requirement MCP tool visibility
+    VERSION: str = "2.66.0"  # MPCH1: challenge token endpoint (Tier 2 anti-fabrication)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
