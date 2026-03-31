@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.61.0"  # MF001: post_review→handoff_shells, post_uat_spec→uat_bv_items, PTH max_length 20
+    VERSION: str = "2.62.0"  # MF002: drop reviews FK, PTH NVARCHAR(20), unauthenticated handoff PATCH
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

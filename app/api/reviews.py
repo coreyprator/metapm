@@ -78,11 +78,16 @@ def _row_to_response(row: dict) -> dict:
 @router.post("", status_code=201)
 async def create_review(review: ReviewCreate, _: bool = Depends(verify_api_key)):
     """Create a new handoff review (CAI calls this after reviewing)."""
-    # Verify handoff exists
+    # Verify handoff exists — try handoff_shells first (BA17), fall back to mcp_handoffs
     handoff = execute_query(
-        "SELECT id FROM mcp_handoffs WHERE id = ?",
+        "SELECT id FROM handoff_shells WHERE id = ?",
         (review.handoff_id,), fetch="one"
     )
+    if not handoff:
+        handoff = execute_query(
+            "SELECT id FROM mcp_handoffs WHERE id = ?",
+            (review.handoff_id,), fetch="one"
+        )
     if not handoff:
         raise HTTPException(status_code=404, detail=f"Handoff {review.handoff_id} not found")
 
@@ -111,8 +116,11 @@ async def create_review(review: ReviewCreate, _: bool = Depends(verify_api_key))
     # Auto-create draft lessons from lesson_candidates
     if review.lesson_candidates:
         # Determine project from handoff
-        ho = execute_query("SELECT project FROM mcp_handoffs WHERE id = ?",
+        ho = execute_query("SELECT project_code as project FROM handoff_shells WHERE id = ?",
                            (review.handoff_id,), fetch="one")
+        if not ho:
+            ho = execute_query("SELECT project FROM mcp_handoffs WHERE id = ?",
+                               (review.handoff_id,), fetch="one")
         project = ho['project'] if ho else 'MetaPM'
 
         for lc in review.lesson_candidates:

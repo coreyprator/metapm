@@ -1920,235 +1920,91 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 56 warning: {e}")
 
-    # Migration 57: PA02-REQ-001 — Add notified_at column to mcp_handoffs for email idempotency
+    # Migration 57: MF002 — Drop FK on reviews.handoff_id (allow refs to handoff_shells)
     try:
-        col_check = execute_query("""
-            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'notified_at'
+        fk_check = execute_query("""
+            SELECT name FROM sys.foreign_keys
+            WHERE parent_object_id = OBJECT_ID('reviews')
+            AND name LIKE '%handoff%'
         """, fetch="one")
-        if not col_check or col_check["cnt"] == 0:
-            logger.info("  Migration 57: Adding notified_at column to mcp_handoffs...")
-            execute_query(
-                "ALTER TABLE mcp_handoffs ADD notified_at DATETIME2 NULL",
-                fetch="none"
-            )
-            logger.info("  Migration 57: notified_at column added.")
+        if fk_check:
+            fk_name = fk_check["name"]
+            logger.info(f"  Migration 57: Dropping FK {fk_name} on reviews...")
+            execute_query(f"ALTER TABLE reviews DROP CONSTRAINT [{fk_name}]", fetch="none")
+            logger.info(f"  Migration 57: FK {fk_name} dropped.")
         else:
-            logger.info("  Migration 57: notified_at column already exists.")
+            logger.info("  Migration 57: No handoff FK on reviews — already dropped or absent.")
     except Exception as e:
         logger.warning(f"  Migration 57 warning: {e}")
 
-    # Migration 58: PA02-REQ-004 — Add version column to mcp_handoffs
+    # Migration 58: MF002 — Extend PTH columns to NVARCHAR(20) across all tables
     try:
-        col_check = execute_query("""
-            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'version'
-        """, fetch="one")
-        if not col_check or col_check["cnt"] == 0:
-            logger.info("  Migration 58: Adding version column to mcp_handoffs...")
-            execute_query(
-                "ALTER TABLE mcp_handoffs ADD version NVARCHAR(50) NULL",
-                fetch="none"
-            )
-            logger.info("  Migration 58: version column added.")
-        else:
-            logger.info("  Migration 58: version column already exists.")
+        pth_alters = [
+            ("uat_pages", "pth"),
+            ("roadmap_requirements", "pth"),
+            ("pth_registry", "pth"),
+            ("mcp_handoffs", "pth"),
+            ("cc_prompts", "pth"),
+            ("reviews", "prompt_pth"),
+        ]
+        for table, col in pth_alters:
+            try:
+                col_check = execute_query(f"""
+                    SELECT character_maximum_length as max_len
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME = '{table}' AND COLUMN_NAME = '{col}'
+                """, fetch="one")
+                if col_check and col_check["max_len"] and col_check["max_len"] < 20:
+                    execute_query(f"ALTER TABLE [{table}] ALTER COLUMN [{col}] NVARCHAR(20) NULL", fetch="none")
+                    logger.info(f"  Migration 58: {table}.{col} extended to NVARCHAR(20).")
+                else:
+                    logger.info(f"  Migration 58: {table}.{col} already >= 20 or not found.")
+            except Exception as inner_e:
+                logger.warning(f"  Migration 58: {table}.{col} — {inner_e}")
     except Exception as e:
         logger.warning(f"  Migration 58 warning: {e}")
 
-    # Migration 59: MM15-REQ-002 — Add completion_content column to mcp_handoffs
+    # Migration 59: MF002 — Ensure handoff_shells table exists (BA17 prerequisite)
     try:
-        col_check = execute_query("""
-            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'completion_content'
-        """, fetch="one")
-        if not col_check or col_check["cnt"] == 0:
-            logger.info("  Migration 59: Adding completion_content column to mcp_handoffs...")
-            execute_query(
-                "ALTER TABLE mcp_handoffs ADD completion_content NVARCHAR(MAX) NULL",
-                fetch="none"
-            )
-            logger.info("  Migration 59: completion_content column added.")
-        else:
-            logger.info("  Migration 59: completion_content column already exists.")
-    except Exception as e:
-        logger.warning(f"  Migration 59 warning: {e}")
-
-    # Migration 60: MP11 — Add rejection_reason column to cc_prompts + update status constraint
-    try:
-        col_check = execute_query("""
-            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_NAME = 'cc_prompts' AND COLUMN_NAME = 'rejection_reason'
-        """, fetch="one")
-        if not col_check or col_check["cnt"] == 0:
-            logger.info("  Migration 60: Adding rejection_reason column to cc_prompts...")
-            execute_query(
-                "ALTER TABLE cc_prompts ADD rejection_reason NVARCHAR(500) NULL",
-                fetch="none"
-            )
-            logger.info("  Migration 60: rejection_reason column added.")
-        else:
-            logger.info("  Migration 60: rejection_reason column already exists.")
-
-        # Ensure status constraint includes 'cancelled' and 'rejected'
-        try:
-            execute_query("""
-                DECLARE @constraint_name NVARCHAR(200)
-                SELECT @constraint_name = name FROM sys.check_constraints
-                WHERE parent_object_id = OBJECT_ID('cc_prompts') AND definition LIKE '%status%'
-                IF @constraint_name IS NOT NULL
-                    EXEC('ALTER TABLE cc_prompts DROP CONSTRAINT ' + @constraint_name)
-            """, fetch="none")
-            execute_query("""
-                ALTER TABLE cc_prompts ADD CONSTRAINT CK_cc_prompts_status
-                CHECK (status IN ('draft','prompt_ready','approved','sent','completed',
-                                  'executing','complete','closed','rejected','cancelled'))
-            """, fetch="none")
-            logger.info("  Migration 60: Status constraint updated to include cancelled+rejected.")
-        except Exception as ck_err:
-            logger.warning(f"  Migration 60: Status constraint update skipped: {ck_err}")
-
-    except Exception as e:
-        logger.warning(f"  Migration 60 warning: {e}")
-
-    # Migration 61: MP14 — Expand uat_results status CHECK to include 'partial' and 'blocked'
-    try:
-        cursor = execute_query("""
-            SELECT name, definition FROM sys.check_constraints
-            WHERE parent_object_id = OBJECT_ID('uat_results')
-              AND definition LIKE '%status%'
-        """, fetch="one")
-        if cursor and ('partial' not in cursor['definition'].lower() or 'blocked' not in cursor['definition'].lower()):
-            constraint_name = cursor['name']
-            logger.info(f"  Migration 61: Expanding uat_results status CHECK ({constraint_name})...")
-            execute_query(f"ALTER TABLE uat_results DROP CONSTRAINT [{constraint_name}]", fetch="none")
-            execute_query("""
-                ALTER TABLE uat_results
-                ADD CONSTRAINT CK_uat_results_status_v4
-                CHECK (status IN ('passed', 'failed', 'pending', 'blocked', 'partial',
-                                  'conditional_pass', 'archived'))
-            """, fetch="none")
-            logger.info("  Migration 61: uat_results status CHECK updated to include 'partial' and 'blocked'.")
-        else:
-            logger.info("  Migration 61: uat_results status CHECK already includes 'partial' and 'blocked'.")
-    except Exception as e:
-        logger.warning(f"  Migration 61 warning: {e}")
-
-    # Migration 62: G2B18 — Add description and uat_url columns to mcp_handoffs
-    try:
-        result = execute_query("""
-            SELECT COUNT(*) as cnt
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME IN ('description', 'uat_url')
-        """, fetch="one")
-        if not result or result['cnt'] < 2:
-            if not result or result['cnt'] == 0:
-                logger.info("  Migration 62: Adding description and uat_url columns to mcp_handoffs...")
-                execute_query("""
-                    IF NOT EXISTS (
-                        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-                        WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'description'
-                    )
-                    BEGIN
-                        ALTER TABLE mcp_handoffs ADD description NVARCHAR(500) NULL
-                    END
-                """, fetch="none")
-                execute_query("""
-                    IF NOT EXISTS (
-                        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-                        WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'uat_url'
-                    )
-                    BEGIN
-                        ALTER TABLE mcp_handoffs ADD uat_url NVARCHAR(500) NULL
-                    END
-                """, fetch="none")
-            else:
-                # One column exists, add the missing one
-                logger.info("  Migration 62: Adding missing column to mcp_handoffs...")
-                execute_query("""
-                    IF NOT EXISTS (
-                        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-                        WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'description'
-                    )
-                    BEGIN
-                        ALTER TABLE mcp_handoffs ADD description NVARCHAR(500) NULL
-                    END
-                """, fetch="none")
-                execute_query("""
-                    IF NOT EXISTS (
-                        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-                        WHERE TABLE_NAME = 'mcp_handoffs' AND COLUMN_NAME = 'uat_url'
-                    )
-                    BEGIN
-                        ALTER TABLE mcp_handoffs ADD uat_url NVARCHAR(500) NULL
-                    END
-                """, fetch="none")
-            logger.info("  Migration 62: description and uat_url columns added.")
-        else:
-            logger.info("  Migration 62: description and uat_url columns already exist.")
-    except Exception as e:
-        logger.warning(f"  Migration 62 warning: {e}")
-
-    # Migration 63: Create handoff_shells table (MP-BA17)
-    try:
-        result = execute_query("""
-            SELECT COUNT(*) as cnt
-            FROM INFORMATION_SCHEMA.TABLES
+        tbl_check = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES
             WHERE TABLE_NAME = 'handoff_shells'
         """, fetch="one")
-        if result and result['cnt'] == 0:
-            logger.info("  Migration 63: Creating handoff_shells table...")
+        if not tbl_check or tbl_check["cnt"] == 0:
+            logger.info("  Migration 59: Creating handoff_shells table...")
             execute_query("""
                 CREATE TABLE handoff_shells (
-                    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-                    pth NVARCHAR(20) NOT NULL,
-                    sprint_id NVARCHAR(100) NOT NULL,
-                    project_code NVARCHAR(20) NOT NULL,
-                    version_from NVARCHAR(20) NULL,
-                    version_to NVARCHAR(20) NULL,
-                    commit_hash NVARCHAR(40) NULL,
-                    deploy_url NVARCHAR(500) NULL,
-                    uat_spec_id NVARCHAR(100) NULL,
-                    machine_tests NVARCHAR(MAX) NULL,
-                    deviations NVARCHAR(MAX) NULL,
-                    notes NVARCHAR(MAX) NULL,
-                    created_at DATETIME DEFAULT GETUTCDATE(),
-                    updated_at DATETIME DEFAULT GETUTCDATE()
+                    id             UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+                    pth            NVARCHAR(20) NOT NULL,
+                    sprint_id      NVARCHAR(100) NULL,
+                    project_code   NVARCHAR(20) NULL,
+                    uat_spec_id    UNIQUEIDENTIFIER NULL,
+                    status         NVARCHAR(20) NOT NULL DEFAULT 'shell_created',
+                    version_from   NVARCHAR(50) NULL,
+                    version_to     NVARCHAR(50) NULL,
+                    commit_hash    NVARCHAR(50) NULL,
+                    deploy_url     NVARCHAR(500) NULL,
+                    machine_tests  NVARCHAR(MAX) NULL,
+                    deviations     NVARCHAR(MAX) NULL,
+                    notes          NVARCHAR(MAX) NULL,
+                    created_at     DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                    updated_at     DATETIME2 NOT NULL DEFAULT GETUTCDATE()
                 )
             """, fetch="none")
-            logger.info("  Migration 63: handoff_shells table created.")
+            execute_query("CREATE INDEX idx_handoff_shells_pth ON handoff_shells(pth)", fetch="none")
+            logger.info("  Migration 59: handoff_shells table created.")
         else:
-            logger.info("  Migration 63: handoff_shells table already exists.")
+            # Ensure updated_at column exists (may be missing from manual creation)
+            col_check = execute_query("""
+                SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'handoff_shells' AND COLUMN_NAME = 'updated_at'
+            """, fetch="one")
+            if not col_check or col_check["cnt"] == 0:
+                execute_query("ALTER TABLE handoff_shells ADD updated_at DATETIME2 NOT NULL DEFAULT GETUTCDATE()", fetch="none")
+                logger.info("  Migration 59: Added updated_at to handoff_shells.")
+            else:
+                logger.info("  Migration 59: handoff_shells table already exists.")
     except Exception as e:
-        logger.warning(f"  Migration 63 warning: {e}")
-
-    # Migration 64: MF001 — Widen PTH columns from NVARCHAR(4)/NVARCHAR(10) to NVARCHAR(20)
-    try:
-        pth_alters = [
-            ("roadmap_requirements", "pth", 4),
-            ("pth_registry", "pth", 4),
-            ("mcp_handoffs", "pth", 4),
-            ("cc_prompts", "pth", 10),
-            ("reviews", "prompt_pth", 10),
-        ]
-        altered = []
-        for table, col, old_size in pth_alters:
-            try:
-                row = execute_query(f"""
-                    SELECT CHARACTER_MAXIMUM_LENGTH as max_len
-                    FROM INFORMATION_SCHEMA.COLUMNS
-                    WHERE TABLE_NAME = ? AND COLUMN_NAME = ?
-                """, (table, col), fetch="one")
-                if row and row["max_len"] is not None and row["max_len"] < 20:
-                    execute_query(f"ALTER TABLE [{table}] ALTER COLUMN [{col}] NVARCHAR(20)", fetch="none")
-                    altered.append(f"{table}.{col}")
-            except Exception as col_err:
-                logger.warning(f"  Migration 64: {table}.{col} alter failed: {col_err}")
-        if altered:
-            logger.info(f"  Migration 64: Widened PTH columns to NVARCHAR(20): {', '.join(altered)}")
-        else:
-            logger.info("  Migration 64: All PTH columns already NVARCHAR(20) or wider.")
-    except Exception as e:
-        logger.warning(f"  Migration 64 warning: {e}")
+        logger.warning(f"  Migration 59 warning: {e}")
 
     logger.info("Migrations complete.")

@@ -18,7 +18,6 @@ from app.core.config import settings
 from app.core.database import execute_query
 from app.schemas.mcp import (
     HandoffCreate, HandoffUpdate, HandoffResponse, HandoffListResponse,
-    HandoffShellCreate, HandoffShellResponse,
     TaskCreate, TaskUpdate, TaskResponse, TaskListResponse,
     LogEntry, LogResponse, LogEntryType,
     HandoffDirection, HandoffStatus, TaskStatus, TaskPriority,
@@ -250,51 +249,6 @@ def _auto_close_requirements_for_handoff(handoff_id: str, approved: bool) -> int
 # HANDOFF ENDPOINTS
 # ============================================
 
-SEMVER_RE = re.compile(r'^\d+\.\d+\.\d+$')
-COMMIT_HASH_RE = re.compile(r'^[a-f0-9]{7,40}$', re.IGNORECASE)
-
-SHELL_REQUIRED_FIELDS = ["version_from", "version_to", "commit_hash", "deploy_url", "machine_tests", "deviations"]
-
-
-@router.post("/handoffs/shell", response_model=HandoffShellResponse, status_code=201)
-async def create_handoff_shell(
-    body: HandoffShellCreate,
-    _: bool = Depends(verify_api_key)
-):
-    """BA17: CAI calls this at prompt-creation time to pre-create a handoff shell.
-    CC fills in the required fields via PATCH /mcp/handoffs/{id}."""
-    try:
-        result = execute_query("""
-            INSERT INTO handoff_shells (pth, sprint_id, project_code, uat_spec_id)
-            OUTPUT INSERTED.id, INSERTED.pth, INSERTED.sprint_id, INSERTED.project_code,
-                   INSERTED.uat_spec_id, INSERTED.created_at, INSERTED.updated_at
-            VALUES (?, ?, ?, ?)
-        """, (body.pth, body.sprint_id, body.project_code, body.uat_spec_id), fetch="one")
-
-        if not result:
-            raise HTTPException(status_code=500, detail="Failed to create handoff shell")
-
-        handoff_id = str(result['id'])
-        patch_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{handoff_id}"
-        logger.info(f"[BA17] Handoff shell created: {handoff_id} PTH={body.pth}")
-
-        return HandoffShellResponse(
-            handoff_id=handoff_id,
-            pth=result['pth'],
-            sprint_id=result['sprint_id'],
-            project_code=result['project_code'],
-            uat_spec_id=result.get('uat_spec_id'),
-            patch_url=patch_url,
-            created_at=str(result['created_at']) if result.get('created_at') else None,
-            updated_at=str(result['updated_at']) if result.get('updated_at') else None,
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error creating handoff shell: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.post("/handoffs", response_model=HandoffResponse, status_code=201)
 async def create_handoff(
     handoff: HandoffCreate,
@@ -302,27 +256,8 @@ async def create_handoff(
 ):
     """Create a new handoff."""
     try:
-        # AP09 Gate 0: Reject handoffs missing critical fields (pth, sprint_id, uat_url, version, deploy_url)
-        bypass = (handoff.enforcement_bypass or "").strip().lower()
-        if bypass != "data_only_sprint":
-            _missing = []
-            if not handoff.prompt_pth or str(handoff.prompt_pth).strip() in ('', 'N/A', 'null'):
-                _missing.append("pth (prompt_pth)")
-            if not handoff.task or str(handoff.task).strip() in ('', 'N/A', 'null'):
-                _missing.append("sprint_id (task)")
-            _meta = handoff.metadata or {}
-            if not _meta.get('version') or str(_meta.get('version', '')).strip() in ('', 'N/A', 'null'):
-                _missing.append("version (metadata.version)")
-            if not _meta.get('deploy_url') or str(_meta.get('deploy_url', '')).strip() in ('', 'N/A', 'null'):
-                _missing.append("deploy_url (metadata.deploy_url)")
-            if _missing:
-                raise HTTPException(422, detail={
-                    "error": "Non-standard handoff rejected — missing required fields",
-                    "missing": _missing,
-                    "standard": "All handoffs must include: pth, sprint_id, uat_url, version, deploy_url"
-                })
-
         # MP-HANDOFF-GATE-001: Enforce cc_complete state and valid UAT spec before registration
+        bypass = (handoff.enforcement_bypass or "").strip().lower()
 
         # Gate 1: linked prompt/requirement must be at cc_complete or higher
         # Skipped when enforcement_bypass="data_only_sprint"
@@ -383,22 +318,18 @@ async def create_handoff(
         metadata_json = json.dumps(handoff.metadata) if handoff.metadata else None
 
         result = execute_query("""
-            INSERT INTO mcp_handoffs (project, task, direction, content, metadata, response_to, version, completion_content, description, uat_url)
+            INSERT INTO mcp_handoffs (project, task, direction, content, metadata, response_to)
             OUTPUT INSERTED.id, INSERTED.project, INSERTED.task, INSERTED.direction,
                    INSERTED.status, INSERTED.metadata, INSERTED.response_to,
-                   INSERTED.created_at, INSERTED.updated_at, INSERTED.version
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   INSERTED.created_at, INSERTED.updated_at
+            VALUES (?, ?, ?, ?, ?, ?)
         """, (
             handoff.project,
             handoff.task,
             handoff.direction.value,
             handoff.content,
             metadata_json,
-            handoff.response_to,
-            handoff.version,
-            handoff.completion_content,
-            handoff.description or None,
-            handoff.uat_url or None
+            handoff.response_to
         ), fetch="one")
 
         if not result:
@@ -423,25 +354,6 @@ async def create_handoff(
             except Exception as pth_err:
                 logger.warning(f"Prompt-pth linking failed (non-fatal): {pth_err}")
 
-        # AP09 Fix 2: Auto-advance linked requirements to cc_complete on handoff POST
-        try:
-            import re as _re2
-            linked_codes = list(set(_re2.findall(r'[A-Z]{2,}-\d{3}', handoff.content or '')))
-            advanced_count = 0
-            for code in linked_codes[:20]:
-                adv_result = execute_query(
-                    """UPDATE roadmap_requirements SET status = 'cc_complete', updated_at = GETDATE()
-                       WHERE code = ? AND status NOT IN ('cc_complete','uat_ready','uat_pass','done','closed')""",
-                    (code,), fetch="none"
-                )
-                if adv_result is not None:
-                    advanced_count += 1
-                    logger.info(f"[HANDOFF] Advanced {code} -> cc_complete")
-            if advanced_count > 0:
-                logger.info(f"[HANDOFF] Auto-advanced {advanced_count} requirement(s) to cc_complete")
-        except Exception as adv_err:
-            logger.warning(f"[HANDOFF] Requirement auto-advance failed (non-fatal): {adv_err}")
-
         # MP-UAT-GEN: Best-effort auto-generate UAT page
         auto_uat_url = ""
         try:
@@ -461,30 +373,22 @@ async def create_handoff(
                 version = None
                 if handoff.metadata and isinstance(handoff.metadata, dict):
                     version = handoff.metadata.get('version')
-                # G2B11-REQ-001: GUARD — if pth was already set from prompt_pth, do NOT overwrite
                 # PTH propagation (MP-PTH-FIELD-001): get PTH from first linked requirement
-                existing_pth = execute_query(
-                    "SELECT pth FROM mcp_handoffs WHERE id = ?", (handoff_id,), fetch="one"
-                )
-                if existing_pth and existing_pth.get('pth') and existing_pth['pth'] != 'N/A':
-                    pth_value = existing_pth['pth']
-                    logger.info(f"[G2B11] PTH guard: keeping prompt_pth={pth_value}, skipping requirement lookup")
-                else:
-                    pth_value = None
-                    for code in req_codes[:20]:
-                        pth_row = execute_query(
-                            "SELECT pth FROM roadmap_requirements WHERE code = ? AND pth IS NOT NULL",
-                            (code,), fetch="one"
-                        )
-                        if pth_row and pth_row.get('pth'):
-                            pth_value = pth_row['pth']
-                            break
-                    # Store PTH on handoff only if not already set
-                    if pth_value:
-                        execute_query(
-                            "UPDATE mcp_handoffs SET pth = ? WHERE id = ?",
-                            (pth_value, handoff_id), fetch="none"
-                        )
+                pth_value = None
+                for code in req_codes[:20]:
+                    pth_row = execute_query(
+                        "SELECT pth FROM roadmap_requirements WHERE code = ? AND pth IS NOT NULL",
+                        (code,), fetch="one"
+                    )
+                    if pth_row and pth_row.get('pth'):
+                        pth_value = pth_row['pth']
+                        break
+                # Store PTH on handoff
+                if pth_value:
+                    execute_query(
+                        "UPDATE mcp_handoffs SET pth = ? WHERE id = ?",
+                        (pth_value, handoff_id), fetch="none"
+                    )
                 test_cases = generate_test_cases(work_items, handoff.project, version or '?')
                 # Insert uat_pages record with PTH
                 uat_result = execute_query("""
@@ -511,18 +415,29 @@ async def create_handoff(
 
         public_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{handoff_id}/content"
 
+        # Fire-and-forget PA notification for handoff received
+        try:
+            from app.api.prompts import notify_pa
+            import asyncio
+            asyncio.create_task(notify_pa("Handoff received", {
+                "pth": getattr(handoff, 'prompt_pth', '') or '',
+                "project": handoff.project,
+                "sprint": handoff.task,
+                "description": f"CC finished {handoff.task}",
+                "handoff_url": public_url,
+                "uat_url": auto_uat_url,
+                "handoff_id": handoff_id,  # MP-EMAIL-COMPLETE: include UUID for plain-text email
+            }))
+        except Exception as pa_err:
+            logger.warning(f"PA handoff notification failed (non-fatal): {pa_err}")
+
         # AP06: Fire Loop 2 immediately for this specific handoff (targeted mode)
         try:
             from app.api.prompts import trigger_cloud_run_job_immediate
             import asyncio
-            # G2B11-REQ-004: pass pth via args_override so job_executions record includes it
-            effective_pth = getattr(handoff, 'prompt_pth', None) or getattr(handoff, 'pth', None)
-            loop2_args = ["loop2_reviewer.py", f"--handoff-id={handoff_id}"]  # G2B15: script name must be first element
-            if effective_pth:
-                loop2_args.append(f"--pth={effective_pth}")
             asyncio.create_task(
                 trigger_cloud_run_job_immediate("metapm-loop2-reviewer",
-                                                args_override=loop2_args)
+                                                handoff_id=str(handoff_id))
             )
         except Exception as loop2_err:
             logger.warning(f"Loop 2 trigger failed (non-fatal): {loop2_err}")
@@ -536,8 +451,6 @@ async def create_handoff(
             metadata=_parse_json_field(result['metadata']),
             response_to=str(result['response_to']) if result['response_to'] else None,
             public_url=public_url,
-            description=handoff.description or None,
-            uat_url=handoff.uat_url or None,
             created_at=result['created_at'],
             updated_at=result['updated_at']
         )
@@ -590,8 +503,7 @@ async def list_handoffs(
         # Get paginated results — LEFT JOIN reviews (AP07) + uat_pages + pth (AP08 Fix 1)
         results = execute_query(f"""
             SELECT h.id, h.project, h.task, h.direction, h.status, h.metadata, h.response_to,
-                   h.created_at, h.updated_at, h.pth, h.notified_at, h.version,
-                   h.description, h.uat_url,
+                   h.created_at, h.updated_at, h.pth,
                    r.id as review_id, r.assessment,
                    u.id as uat_spec_id
             FROM mcp_handoffs h
@@ -615,13 +527,9 @@ async def list_handoffs(
                 response_to=str(row['response_to']) if row['response_to'] else None,
                 public_url=public_url,
                 pth=row.get('pth'),
-                description=row.get('description'),
-                uat_url=row.get('uat_url'),
                 review_id=str(row['review_id']) if row.get('review_id') else None,
                 assessment=row.get('assessment'),
                 uat_spec_id=str(row['uat_spec_id']) if row.get('uat_spec_id') else None,
-                notified_at=row.get('notified_at'),
-                version=row.get('version'),
                 created_at=row['created_at'],
                 updated_at=row['updated_at']
             ))
@@ -1602,13 +1510,10 @@ async def get_handoff(
     try:
         result = execute_query("""
             SELECT h.id, h.project, h.task, h.direction, h.status, h.content,
-                   h.metadata, h.response_to, h.created_at, h.updated_at, h.pth,
-                   h.notified_at, h.version, h.description, h.uat_url,
-                   r.id as review_id, r.assessment,
-                   u.id as uat_spec_id
+                   h.metadata, h.response_to, h.created_at, h.updated_at,
+                   r.id as review_id, r.assessment
             FROM mcp_handoffs h
             LEFT JOIN reviews r ON r.handoff_id = h.id
-            LEFT JOIN uat_pages u ON u.handoff_id = h.id
             WHERE h.id = ?
         """, (handoff_id,), fetch="one")
 
@@ -1617,7 +1522,7 @@ async def get_handoff(
 
         public_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{result['id']}/content"
 
-        resp = HandoffResponse(
+        return HandoffResponse(
             id=str(result['id']),
             project=result['project'],
             task=result['task'],
@@ -1629,18 +1534,9 @@ async def get_handoff(
             public_url=public_url,
             review_id=str(result['review_id']) if result.get('review_id') else None,
             assessment=result.get('assessment'),
-            description=result.get('description'),
-            uat_url=result.get('uat_url'),
-            notified_at=result.get('notified_at'),
-            version=result.get('version'),
             created_at=result['created_at'],
             updated_at=result['updated_at']
         )
-        # AP09: Inject uat_spec_id and pth into response dict for Loop 2 consumption
-        resp_dict = resp.model_dump()
-        resp_dict['uat_spec_id'] = str(result['uat_spec_id']) if result.get('uat_spec_id') else None
-        resp_dict['pth'] = result.get('pth')
-        return resp_dict
     except HTTPException:
         raise
     except Exception as e:
@@ -1651,66 +1547,21 @@ async def get_handoff(
 @router.get("/handoffs/{handoff_id}/content")
 async def get_handoff_content(handoff_id: str):
     """
-    Get handoff content as rendered HTML page (PUBLIC - no auth required).
-    MM16-REQ-001: serves HTML with marked.js rendering, not raw markdown.
-    Raw markdown still available via Accept: text/markdown header.
+    Get handoff content (PUBLIC - no auth required).
+    Returns raw markdown for Claude.ai's web_fetch.
     """
-    from fastapi.responses import HTMLResponse
     try:
         result = execute_query("""
-            SELECT id, pth, content, completion_content, created_at
-            FROM mcp_handoffs WHERE id = ?
+            SELECT content FROM mcp_handoffs WHERE id = ?
         """, (handoff_id,), fetch="one")
 
         if not result:
             raise HTTPException(status_code=404, detail="Handoff not found")
 
-        # MM15-REQ-002: prefer completion_content (full CC report) over generic content
-        body = result.get('completion_content') or result.get('content') or ''
-        pth = result.get('pth') or ''
-        created = result.get('created_at') or ''
-
-        if not body:
-            body = 'No content available for this handoff.'
-
-        import html as html_mod
-        safe_body = html_mod.escape(body).replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
-        safe_pth = html_mod.escape(str(pth))
-        safe_id = html_mod.escape(str(handoff_id))
-
-        page = f"""<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Handoff {safe_pth or safe_id} — MetaPM</title>
-<style>
-body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e0e0e0;margin:0;padding:20px;max-width:900px;margin:0 auto}}
-.back{{display:inline-block;margin-bottom:16px;color:#888;font-size:.85rem}}
-.back a{{color:#7eb8ff;text-decoration:none}}
-.back a:hover{{text-decoration:underline}}
-.meta{{color:#888;font-size:.82rem;margin-bottom:12px}}
-.pth-badge{{background:#fef3c7;color:#92400e;font-size:12px;font-weight:700;padding:2px 8px;border-radius:4px;display:inline-block;margin-right:8px}}
-#content h1,#content h2,#content h3{{color:#e0e0e0;margin-top:1.2em}}
-#content code{{background:#1a1d27;padding:1px 5px;border-radius:3px;font-family:monospace}}
-#content pre{{background:#0d1117;border:1px solid #2a2e3f;border-radius:6px;padding:16px;overflow-x:auto;font-size:.82rem;line-height:1.5}}
-#content table{{width:100%;border-collapse:collapse;background:#1a1d27;border-radius:8px;overflow:hidden;margin:1em 0}}
-#content th{{background:#252836;padding:8px 12px;text-align:left;font-size:.8rem;color:#aaa;border-bottom:1px solid #2a2e3f}}
-#content td{{padding:8px 12px;border-bottom:1px solid #1e2130;font-size:.85rem}}
-#content hr{{border:none;border-top:1px solid #2a2e3f;margin:1.5em 0}}
-a{{color:#7eb8ff}}
-</style>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-</head>
-<body>
-<div class="back"><a href="/handoffs.html">&larr; All Handoffs</a></div>
-<div class="meta"><span class="pth-badge">{safe_pth}</span> Handoff {safe_id} &mdash; {safe_pth}</div>
-<div id="content"><em style="color:#888">Rendering...</em></div>
-<script>
-const raw = `{safe_body}`;
-document.getElementById('content').innerHTML = marked.parse(raw);
-</script>
-</body>
-</html>"""
-        return HTMLResponse(page)
+        return Response(
+            content=result['content'],
+            media_type="text/markdown"
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -1718,51 +1569,67 @@ document.getElementById('content').innerHTML = marked.parse(raw);
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/handoffs/{handoff_id}/claim-notification")
-async def claim_notification(
-    handoff_id: str,
-    _: bool = Depends(verify_api_key)
-):
-    """G2B11-REQ-002: Atomically claim notification rights for a handoff.
-    Uses UPDATE...WHERE notified_at IS NULL for race protection.
-    Returns {"claimed": true} if this caller won the race, {"claimed": false} if already taken.
-    """
-    try:
-        # Use OUTPUT INSERTED to atomically claim and confirm in one query
-        result = execute_query(
-            """UPDATE mcp_handoffs
-               SET notified_at = GETUTCDATE(), updated_at = GETUTCDATE()
-               OUTPUT INSERTED.id
-               WHERE id = ? AND notified_at IS NULL""",
-            (handoff_id,), fetch="one"
-        )
-        claimed = result is not None and result.get('id') is not None
-        if claimed:
-            logger.info(f"[G2B11] Notification claimed for handoff {handoff_id}")
-        else:
-            logger.info(f"[G2B11] Notification already claimed for handoff {handoff_id}")
-        return {"claimed": claimed, "handoff_id": handoff_id}
-    except Exception as e:
-        logger.error(f"Error claiming notification: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.patch("/handoffs/{handoff_id}", response_model=HandoffResponse)
+@router.patch("/handoffs/{handoff_id}")
 async def update_handoff(
     handoff_id: str,
     update: HandoffUpdate,
-    _: bool = Depends(verify_api_key)
 ):
-    """Update handoff status/notified_at, OR fill in shell fields for a handoff_shell record (BA17)."""
+    """Update handoff — unauthenticated (UUID is access control). Supports both handoff_shells and mcp_handoffs."""
     try:
-        # BA17: Check if this ID is a handoff_shell record first
-        shell_row = execute_query(
-            "SELECT id FROM handoff_shells WHERE id = ?", (handoff_id,), fetch="one"
+        # Try handoff_shells first (BA17 flow)
+        shell = execute_query(
+            "SELECT id FROM handoff_shells WHERE id = ?",
+            (handoff_id,), fetch="one"
         )
-        if shell_row:
-            return await _update_handoff_shell(handoff_id, update)
+        if shell:
+            # Build dynamic UPDATE for non-None fields
+            updates = []
+            params = []
+            for field in ["version_from", "version_to", "commit_hash", "deploy_url",
+                          "machine_tests", "deviations", "notes"]:
+                val = getattr(update, field, None)
+                if val is not None:
+                    updates.append(f"{field} = ?")
+                    params.append(val)
+            if update.status:
+                updates.append("status = ?")
+                params.append(update.status.value)
+            if updates:
+                params.append(handoff_id)
+                execute_query(f"""
+                    UPDATE handoff_shells
+                    SET {', '.join(updates)}, updated_at = GETUTCDATE()
+                    WHERE id = ?
+                """, tuple(params), fetch="none")
 
-        # Original behavior: update mcp_handoffs status/notified_at
+            updated = execute_query(
+                "SELECT id, pth, sprint_id, project_code, status, version_from, version_to, commit_hash, deploy_url, machine_tests, deviations, notes, created_at FROM handoff_shells WHERE id = ?",
+                (handoff_id,), fetch="one"
+            )
+            return {
+                "id": str(updated["id"]),
+                "pth": updated.get("pth"),
+                "sprint_id": updated.get("sprint_id"),
+                "project_code": updated.get("project_code"),
+                "status": updated.get("status"),
+                "version_from": updated.get("version_from"),
+                "version_to": updated.get("version_to"),
+                "commit_hash": updated.get("commit_hash"),
+                "deploy_url": updated.get("deploy_url"),
+                "machine_tests": updated.get("machine_tests"),
+                "deviations": updated.get("deviations"),
+                "notes": updated.get("notes"),
+                "created_at": str(updated["created_at"]) if updated.get("created_at") else None,
+            }
+
+        # Fall back to mcp_handoffs (pre-BA17)
+        mcp = execute_query(
+            "SELECT id FROM mcp_handoffs WHERE id = ?",
+            (handoff_id,), fetch="one"
+        )
+        if not mcp:
+            raise HTTPException(status_code=404, detail=f"Handoff {handoff_id} not found in handoff_shells or mcp_handoffs")
+
         if update.status:
             execute_query("""
                 UPDATE mcp_handoffs
@@ -1770,97 +1637,37 @@ async def update_handoff(
                 WHERE id = ?
             """, (update.status.value, handoff_id), fetch="none")
 
-        # PA02-REQ-001: Set notified_at for email idempotency
-        if update.notified_at:
-            execute_query("""
-                UPDATE mcp_handoffs
-                SET notified_at = ?, updated_at = GETUTCDATE()
-                WHERE id = ?
-            """, (update.notified_at, handoff_id), fetch="none")
+        # Return mcp_handoffs record
+        result = execute_query("""
+            SELECT h.id, h.project, h.task, h.direction, h.status, h.content,
+                   h.metadata, h.response_to, h.created_at, h.updated_at,
+                   r.id as review_id, r.assessment
+            FROM mcp_handoffs h
+            LEFT JOIN reviews r ON r.handoff_id = h.id
+            WHERE h.id = ?
+        """, (handoff_id,), fetch="one")
 
-        # Return updated handoff
-        return await get_handoff(handoff_id, _)
+        public_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{result['id']}/content"
+        return HandoffResponse(
+            id=str(result['id']),
+            project=result['project'],
+            task=result['task'],
+            direction=HandoffDirection(result['direction']),
+            status=HandoffStatus(result['status']),
+            content=result['content'],
+            metadata=_parse_json_field(result['metadata']),
+            response_to=str(result['response_to']) if result['response_to'] else None,
+            public_url=public_url,
+            review_id=str(result['review_id']) if result.get('review_id') else None,
+            assessment=result.get('assessment'),
+            created_at=result['created_at'],
+            updated_at=result['updated_at']
+        )
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating handoff: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-async def _update_handoff_shell(handoff_id: str, update: HandoffUpdate):
-    """BA17: Validate and apply partial updates to a handoff_shell record."""
-    from fastapi.responses import JSONResponse as _JSONResponse
-
-    errors = []
-
-    # Validate commit_hash format
-    if update.commit_hash is not None:
-        if not COMMIT_HASH_RE.match(update.commit_hash):
-            errors.append(f"commit_hash '{update.commit_hash}' must be 7-40 hex characters (git SHA)")
-
-    # Validate semver for version fields
-    for field_name, value in [("version_from", update.version_from), ("version_to", update.version_to)]:
-        if value is not None and not SEMVER_RE.match(value):
-            errors.append(f"{field_name} '{value}' must be semver (e.g. '2.59.1')")
-
-    # Validate deviations non-empty
-    if update.deviations is not None and not update.deviations.strip():
-        errors.append("deviations cannot be empty string — use 'None' or describe deviations")
-
-    if errors:
-        raise HTTPException(status_code=400, detail={"errors": errors})
-
-    # Build UPDATE clause from non-None fields
-    set_clauses = []
-    params = []
-    for col, val in [
-        ("version_from", update.version_from),
-        ("version_to", update.version_to),
-        ("commit_hash", update.commit_hash),
-        ("deploy_url", update.deploy_url),
-        ("machine_tests", update.machine_tests),
-        ("deviations", update.deviations),
-        ("notes", update.notes),
-    ]:
-        if val is not None:
-            set_clauses.append(f"{col} = ?")
-            params.append(val)
-
-    if set_clauses:
-        set_clauses.append("updated_at = GETUTCDATE()")
-        params.append(handoff_id)
-        execute_query(
-            f"UPDATE handoff_shells SET {', '.join(set_clauses)} WHERE id = ?",
-            tuple(params), fetch="none"
-        )
-
-    # Return updated shell record
-    row = execute_query("""
-        SELECT id, pth, sprint_id, project_code, version_from, version_to, commit_hash,
-               deploy_url, uat_spec_id, machine_tests, deviations, notes, created_at, updated_at
-        FROM handoff_shells WHERE id = ?
-    """, (handoff_id,), fetch="one")
-    if not row:
-        raise HTTPException(status_code=404, detail=f"Handoff shell {handoff_id} not found")
-
-    patch_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{handoff_id}"
-    return _JSONResponse(content={
-        "handoff_id": str(row['id']),
-        "pth": row['pth'],
-        "sprint_id": row['sprint_id'],
-        "project_code": row['project_code'],
-        "version_from": row.get('version_from'),
-        "version_to": row.get('version_to'),
-        "commit_hash": row.get('commit_hash'),
-        "deploy_url": row.get('deploy_url'),
-        "uat_spec_id": row.get('uat_spec_id'),
-        "machine_tests": row.get('machine_tests'),
-        "deviations": row.get('deviations'),
-        "notes": row.get('notes'),
-        "patch_url": patch_url,
-        "created_at": str(row['created_at']) if row.get('created_at') else None,
-        "updated_at": str(row['updated_at']) if row.get('updated_at') else None,
-    })
 
 
 # ============================================
