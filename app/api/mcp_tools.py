@@ -15,6 +15,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from app.core.config import Settings
 from app.core.database import execute_query
 
 logger = logging.getLogger(__name__)
@@ -879,7 +880,7 @@ async def mcp_jsonrpc(request: Request):
         return JSONResponse(_jsonrpc_result(req_id, {
             "protocolVersion": "2024-11-05",
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "metapm", "version": "2.53.0"},
+            "serverInfo": {"name": "metapm", "version": Settings().VERSION},
         }))
 
     if method == "tools/list":

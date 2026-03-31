@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.63.0"  # MF003: post_requirement MCP tool
+    VERSION: str = "2.64.0"  # MF003B: confirm post_requirement MCP tool visibility
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
