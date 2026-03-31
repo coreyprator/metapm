@@ -199,6 +199,22 @@ TOOLS = [
         },
     },
     {
+        "name": "post_requirement",
+        "description": "Create a new requirement in MetaPM. CAI calls this to seed backlog items directly from conversation without PL having to use the UI. Auto-generates the next sequential code for the project.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_code": {"type": "string", "description": "Project short code (e.g. 'MP', 'AF', 'SF', 'EM', 'HL', 'EFG')"},
+                "title": {"type": "string", "description": "Requirement title"},
+                "description": {"type": "string", "description": "Optional longer description", "default": ""},
+                "priority": {"type": "string", "description": "P1, P2, or P3 (default P2)", "enum": ["P1", "P2", "P3"], "default": "P2"},
+                "type": {"type": "string", "description": "Requirement type", "enum": ["feature", "bug", "task", "enhancement", "vision"], "default": "feature"},
+                "sprint_id": {"type": "string", "description": "Optional sprint assignment", "default": ""},
+            },
+            "required": ["project_code", "title"],
+        },
+    },
+    {
         "name": "create_handoff_shell",
         "description": "Pre-create a handoff shell UUID that CC will fill in at closeout. CAI calls this at prompt-creation time alongside post_uat_spec. Returns handoff_id and patch_url for CC to use.",
         "inputSchema": {
@@ -702,6 +718,89 @@ def _tool_post_uat_spec(args: dict) -> dict:
     }
 
 
+def _tool_post_requirement(args: dict) -> dict:
+    """MF003: Create a requirement via project_code. Auto-generates next sequential code."""
+    import uuid as _uuid
+
+    project_code = args["project_code"].upper()
+    title = args["title"]
+    description = args.get("description", "") or ""
+    priority = args.get("priority", "P2") or "P2"
+    req_type = args.get("type", "feature") or "feature"
+    sprint_id = args.get("sprint_id", "") or None
+
+    # 1. Resolve project_code → project_id
+    proj = execute_query(
+        "SELECT id FROM roadmap_projects WHERE code = ?",
+        (project_code,), fetch="one"
+    )
+    if not proj:
+        return {"error": f"Project '{project_code}' not found. Use list_projects to see valid codes."}
+    project_id = str(proj["id"])
+
+    # 2. Auto-generate next sequential code
+    prefix_map = {
+        "feature": "REQ", "enhancement": "REQ",
+        "bug": "BUG", "task": "TSK", "vision": "VIS",
+    }
+    prefix = prefix_map.get(req_type.lower(), "REQ")
+
+    max_row = execute_query("""
+        SELECT MAX(
+            TRY_CAST(
+                SUBSTRING(r.code, CHARINDEX('-', r.code) + 1, LEN(r.code)) AS INT
+            )
+        ) as maxNum
+        FROM roadmap_requirements r
+        WHERE r.project_id = ? AND r.code LIKE ?
+    """, (project_id, f"{prefix}-%"), fetch="one")
+
+    next_num = (max_row["maxNum"] or 0) + 1 if max_row else 1
+
+    # Skip over existing codes (uniqueness loop)
+    code = None
+    for _ in range(100):
+        candidate = f"{prefix}-{next_num:03d}"
+        existing = execute_query(
+            "SELECT id FROM roadmap_requirements WHERE project_id = ? AND code = ?",
+            (project_id, candidate), fetch="one"
+        )
+        if not existing:
+            code = candidate
+            break
+        next_num += 1
+
+    if not code:
+        return {"error": "Could not generate unique code after 100 attempts"}
+
+    # 3. Insert requirement
+    req_id = str(_uuid.uuid4())
+    status = "req_created"
+
+    execute_query("""
+        INSERT INTO roadmap_requirements
+            (id, project_id, code, title, description, type, priority, status,
+             target_version, sprint_id, handoff_id, uat_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?,
+                NULL, ?, NULL, NULL)
+    """, (
+        req_id, project_id, code, title, description,
+        req_type.lower(), priority, status, sprint_id,
+    ), fetch="none")
+
+    url = f"https://metapm.rentyourcio.com/requirements/{req_id}"
+    return {
+        "id": req_id,
+        "code": code,
+        "title": title,
+        "project_code": project_code,
+        "status": status,
+        "priority": priority,
+        "type": req_type.lower(),
+        "url": url,
+    }
+
+
 def _tool_create_handoff_shell(args: dict) -> dict:
     """BA17: CAI pre-creates a handoff shell UUID. CC fills in fields via PATCH."""
     pth = args["pth"]
@@ -749,6 +848,7 @@ TOOL_HANDLERS = {
     "update_compliance_doc": _tool_update_compliance_doc,
     "get_checkpoint": _tool_get_checkpoint,
     "post_uat_spec": _tool_post_uat_spec,
+    "post_requirement": _tool_post_requirement,
     "create_handoff_shell": _tool_create_handoff_shell,
 }
 

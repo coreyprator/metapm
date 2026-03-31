@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.62.0"  # MF002: drop reviews FK, PTH NVARCHAR(20), unauthenticated handoff PATCH
+    VERSION: str = "2.63.0"  # MF003: post_requirement MCP tool
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
