@@ -36,6 +36,9 @@ class HandoffStatus(str, Enum):
     PENDING_UAT = "pending_uat"
     NEEDS_FIXES = "needs_fixes"
     DONE = "done"
+    # BA17 handoff_shells statuses
+    SHELL_CREATED = "shell_created"
+    CC_COMPLETE = "cc_complete"
 
 
 class UATStatus(str, Enum):
