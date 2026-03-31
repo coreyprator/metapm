@@ -1994,16 +1994,25 @@ def run_migrations():
             execute_query("CREATE INDEX idx_handoff_shells_pth ON handoff_shells(pth)", fetch="none")
             logger.info("  Migration 59: handoff_shells table created.")
         else:
-            # Ensure updated_at column exists (may be missing from manual creation)
-            col_check = execute_query("""
-                SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_NAME = 'handoff_shells' AND COLUMN_NAME = 'updated_at'
-            """, fetch="one")
-            if not col_check or col_check["cnt"] == 0:
-                execute_query("ALTER TABLE handoff_shells ADD updated_at DATETIME2 NOT NULL DEFAULT GETUTCDATE()", fetch="none")
-                logger.info("  Migration 59: Added updated_at to handoff_shells.")
-            else:
-                logger.info("  Migration 59: handoff_shells table already exists.")
+            # Ensure missing columns exist (table may have been created manually without these)
+            missing_cols = {
+                "status": "NVARCHAR(20) NOT NULL DEFAULT 'shell_created'",
+                "notes": "NVARCHAR(MAX) NULL",
+                "updated_at": "DATETIME2 NOT NULL DEFAULT GETUTCDATE()",
+            }
+            for col_name, col_def in missing_cols.items():
+                col_check = execute_query(f"""
+                    SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME = 'handoff_shells' AND COLUMN_NAME = '{col_name}'
+                """, fetch="one")
+                if not col_check or col_check["cnt"] == 0:
+                    try:
+                        execute_query(f"ALTER TABLE handoff_shells ADD [{col_name}] {col_def}", fetch="none")
+                        logger.info(f"  Migration 59: Added {col_name} to handoff_shells.")
+                    except Exception as col_e:
+                        logger.warning(f"  Migration 59: Failed to add {col_name}: {col_e}")
+                else:
+                    logger.info(f"  Migration 59: handoff_shells.{col_name} already exists.")
     except Exception as e:
         logger.warning(f"  Migration 59 warning: {e}")
 
