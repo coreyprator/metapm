@@ -441,11 +441,15 @@ async def reopen_uat(spec_id: str, request: Request):
     """
     MP-UAT-001: Reopen a submitted UAT for editing.
     Resets status to 'ready' and all test case statuses to pending.
-    Requires PL Google OAuth session.
+    Accepts PL Google OAuth session OR X-API-Key header.
     """
     _validate_uuid(spec_id)
-    if not is_pl_authenticated(request):
-        raise HTTPException(status_code=403, detail="PL authentication required")
+    # Accept either PL session or API key
+    api_key = request.headers.get("x-api-key") or request.headers.get("X-API-Key")
+    expected_key = settings.MCP_API_KEY or ""
+    has_api_key = api_key and api_key == expected_key
+    if not is_pl_authenticated(request) and not has_api_key:
+        raise HTTPException(status_code=403, detail="PL authentication or API key required")
 
     row = execute_query(
         "SELECT id, test_cases_json, status FROM uat_pages WHERE id = ?",
