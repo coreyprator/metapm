@@ -12,7 +12,7 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.core.config import Settings
@@ -230,6 +230,17 @@ TOOLS = [
         },
     },
     {
+        "name": "get_uat_results_by_pth",
+        "description": "Get the most recent UAT results for a PTH. Returns uat_status, submitted_at, and parsed test_cases array. CAI calls this to check UAT outcome without PL OAuth.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pth": {"type": "string", "description": "Prompt tracking hash (e.g. 'SF01')"},
+            },
+            "required": ["pth"],
+        },
+    },
+    {
         "name": "get_challenge",
         "description": "Generate a one-time challenge token for a sprint PTH. CAI calls this at prompt-creation time and embeds the token in the prompt as required BV evidence. CC must include the exact token in the handoff. CAI verifies via verify_challenge at review time.",
         "inputSchema": {
@@ -280,6 +291,23 @@ def _tool_post_prompt(args: dict) -> dict:
     if not result:
         return {"error": "Failed to create prompt"}
 
+    # Auto-advance linked requirement from cai_designing → cc_prompt_ready
+    requirement_advanced = None
+    try:
+        req_row = execute_query(
+            "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ? AND status = 'cai_designing'",
+            (pth,), fetch="one"
+        )
+        if req_row:
+            execute_query(
+                "UPDATE roadmap_requirements SET status = 'cc_prompt_ready', updated_at = GETUTCDATE() WHERE id = ?",
+                (req_row["id"],), fetch="none"
+            )
+            requirement_advanced = {"code": req_row["code"], "new_status": "cc_prompt_ready"}
+            logger.info(f"post_prompt: auto-advanced {req_row['code']} to cc_prompt_ready for PTH {pth}")
+    except Exception as e:
+        logger.warning(f"post_prompt: requirement auto-advance failed (non-fatal): {e}")
+
     return {
         "id": result["id"],
         "pth": result.get("pth"),
@@ -287,6 +315,7 @@ def _tool_post_prompt(args: dict) -> dict:
         "status": "draft",
         "url": f"https://metapm.rentyourcio.com/prompts/{result['pth']}",
         "created_at": str(result["created_at"]) if result.get("created_at") else None,
+        "requirement_advanced": requirement_advanced,
     }
 
 
@@ -509,7 +538,7 @@ def _tool_patch_requirement_status(args: dict) -> dict:
             return {"error": f"Requirement '{code}' with pth '{pth}' not found"}
     elif project_code:
         req = execute_query(
-            "SELECT id, status FROM roadmap_requirements WHERE code = ? AND project_code = ?",
+            "SELECT r.id, r.status FROM roadmap_requirements r JOIN roadmap_projects p ON r.project_id = p.id WHERE r.code = ? AND p.code = ?",
             (code, project_code), fetch="one"
         )
         if not req:
@@ -719,17 +748,18 @@ def _tool_post_uat_spec(args: dict) -> dict:
         except Exception as bv_err:
             logger.warning(f"post_uat_spec BV item upsert failed for {bv_id}: {bv_err}")
 
-    # Auto-advance linked requirement to uat_ready
+    # Auto-advance linked requirement from cc_complete → uat_ready
     try:
         req_row = execute_query(
-            "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ?",
+            "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ? AND status = 'cc_complete'",
             (pth,), fetch="one"
         )
-        if req_row and req_row["status"] not in {"uat_ready", "done", "closed"}:
+        if req_row:
             execute_query(
                 "UPDATE roadmap_requirements SET status = 'uat_ready', uat_url = ?, updated_at = GETUTCDATE() WHERE id = ?",
                 (uat_url, req_row["id"]), fetch="none"
             )
+            logger.info(f"post_uat_spec: auto-advanced {req_row['code']} to uat_ready for PTH {pth}")
     except Exception as e:
         logger.warning(f"post_uat_spec: requirement auto-advance failed (non-fatal): {e}")
 
@@ -845,6 +875,23 @@ def _tool_create_handoff_shell(args: dict) -> dict:
     handoff_id = str(result["id"])
     patch_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{handoff_id}"
 
+    # Auto-advance linked requirement from cc_executing → cc_complete
+    requirement_advanced = None
+    try:
+        req_row = execute_query(
+            "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ? AND status = 'cc_executing'",
+            (pth,), fetch="one"
+        )
+        if req_row:
+            execute_query(
+                "UPDATE roadmap_requirements SET status = 'cc_complete', updated_at = GETUTCDATE() WHERE id = ?",
+                (req_row["id"],), fetch="none"
+            )
+            requirement_advanced = {"code": req_row["code"], "new_status": "cc_complete"}
+            logger.info(f"create_handoff_shell: auto-advanced {req_row['code']} to cc_complete for PTH {pth}")
+    except Exception as e:
+        logger.warning(f"create_handoff_shell: requirement auto-advance failed (non-fatal): {e}")
+
     return {
         "handoff_id": handoff_id,
         "pth": result["pth"],
@@ -854,6 +901,38 @@ def _tool_create_handoff_shell(args: dict) -> dict:
         "patch_url": patch_url,
         "created_at": str(result["created_at"]) if result.get("created_at") else None,
         "message": f"Handoff shell created. CC fills in via PATCH {patch_url}",
+        "requirement_advanced": requirement_advanced,
+    }
+
+
+def _tool_get_uat_results_by_pth(args: dict) -> dict:
+    """Get most recent UAT results by PTH. No auth required (read-only)."""
+    pth = args["pth"]
+    page = execute_query(
+        "SELECT TOP 1 id, pth, status, test_cases_json, pl_submitted_at, created_at FROM uat_pages WHERE pth = ? ORDER BY created_at DESC",
+        (pth,), fetch="one"
+    )
+    if not page:
+        return {"error": f"No UAT results found for PTH '{pth}'"}
+
+    test_cases = []
+    if page.get("test_cases_json"):
+        try:
+            raw = json.loads(page["test_cases_json"])
+            test_cases = [
+                {"id": tc.get("id", ""), "title": tc.get("title", ""), "status": tc.get("status", "pending"), "notes": tc.get("notes", "")}
+                for tc in raw if not tc.get("id", "").startswith("_")
+            ]
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    submitted_at = page.get("pl_submitted_at") or page.get("created_at")
+    return {
+        "pth": pth,
+        "spec_id": str(page["id"]),
+        "uat_status": page.get("status"),
+        "submitted_at": str(submitted_at) if submitted_at else None,
+        "test_cases": test_cases,
     }
 
 
@@ -903,6 +982,7 @@ TOOL_HANDLERS = {
     "post_uat_spec": _tool_post_uat_spec,
     "post_requirement": _tool_post_requirement,
     "create_handoff_shell": _tool_create_handoff_shell,
+    "get_uat_results_by_pth": _tool_get_uat_results_by_pth,
     "get_challenge": _tool_get_challenge,
     "verify_challenge": _tool_verify_challenge,
 }
@@ -961,3 +1041,14 @@ async def mcp_jsonrpc(request: Request):
             }))
 
     return JSONResponse(_jsonrpc_error(req_id, -32601, f"Unknown method: {method}"))
+
+
+# ── REST endpoint: GET /mcp/uat/{pth}/results ──
+
+@router.get("/mcp/uat/{pth}/results")
+async def get_uat_results_by_pth_rest(pth: str):
+    """Read-only REST endpoint for CAI to fetch UAT results by PTH. No auth required."""
+    result = _tool_get_uat_results_by_pth({"pth": pth})
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result

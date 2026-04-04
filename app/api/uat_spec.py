@@ -181,25 +181,19 @@ async def create_uat_spec(body: UATSpecCreate):
     uat_url = f"https://metapm.rentyourcio.com/uat/{spec_id}"
     logger.info(f"UAT spec upsert complete: {spec_id} PTH={body.pth}")
 
-    # MM14-REQ-001: Auto-advance linked requirement to uat_ready on spec creation
+    # MM14-REQ-001: Auto-advance linked requirement from cc_complete → uat_ready
     if body.pth:
         try:
             req_row = execute_query(
-                "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ?",
+                "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ? AND status = 'cc_complete'",
                 (body.pth,), fetch="one"
             )
             if req_row:
-                terminal_states = {"uat_ready", "done", "closed"}
-                if req_row["status"] not in terminal_states:
-                    execute_query(
-                        "UPDATE roadmap_requirements SET status = 'uat_ready', uat_url = ?, updated_at = GETUTCDATE() WHERE id = ?",
-                        (uat_url, req_row["id"]), fetch="none"
-                    )
-                    logger.info(f"Auto-advanced {req_row['code']} to uat_ready on UAT spec creation for PTH {body.pth}")
-                else:
-                    logger.info(f"Requirement {req_row['code']} already at {req_row['status']}, skipping uat_ready advance")
-            else:
-                logger.info(f"No requirement found for PTH {body.pth} — proceeding silently")
+                execute_query(
+                    "UPDATE roadmap_requirements SET status = 'uat_ready', uat_url = ?, updated_at = GETUTCDATE() WHERE id = ?",
+                    (uat_url, req_row["id"]), fetch="none"
+                )
+                logger.info(f"Auto-advanced {req_row['code']} to uat_ready on UAT spec creation for PTH {body.pth}")
         except Exception as e:
             logger.warning(f"Auto-advance to uat_ready failed (non-fatal): {e}")
 
@@ -332,27 +326,28 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
 
     logger.info(f"PL submitted results for spec {spec_id}: {passed}P/{failed}F/{skipped}S, status={new_status}")
 
-    # MM14-REQ-002: Auto-advance linked requirement to done on all-pass or conditional_pass
-    if new_status in ("passed", "conditional_pass"):
-        spec_pth_val = row.get("pth")
-        if spec_pth_val:
-            try:
-                req_row = execute_query(
-                    "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ?",
-                    (spec_pth_val,), fetch="one"
+    # Auto-advance linked requirement based on UAT outcome
+    spec_pth_val = row.get("pth")
+    if spec_pth_val and new_status in ("passed", "failed", "conditional_pass"):
+        # passed → uat_pass, failed/conditional_pass → uat_fail (conservative)
+        target_status = "uat_pass" if new_status == "passed" else "uat_fail"
+        try:
+            req_row = execute_query(
+                "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ?",
+                (spec_pth_val,), fetch="one"
+            )
+            if req_row and req_row["status"] not in ("done", "closed", "uat_pass", "uat_fail"):
+                execute_query(
+                    "UPDATE roadmap_requirements SET status = ?, updated_at = GETUTCDATE() WHERE id = ?",
+                    (target_status, req_row["id"]), fetch="none"
                 )
-                if req_row and req_row["status"] not in ("done", "closed"):
-                    execute_query(
-                        "UPDATE roadmap_requirements SET status = 'done', updated_at = GETUTCDATE() WHERE id = ?",
-                        (req_row["id"],), fetch="none"
-                    )
-                    logger.info(f"Auto-advanced {req_row['code']} to done on all-pass UAT submit for {spec_id}")
-                elif req_row:
-                    logger.info(f"Requirement {req_row['code']} already at {req_row['status']}, skipping done advance")
-            except Exception as e:
-                logger.warning(f"Auto-advance to done failed (non-fatal): {e}")
-    elif failed > 0 or (total - passed - skipped) > 0:
-        logger.info(f"UAT {spec_id} not all-pass: {failed} fail, {total - passed - skipped} pending — no auto-advance")
+                logger.info(f"Auto-advanced {req_row['code']} to {target_status} on UAT submit ({new_status}) for {spec_id}")
+            elif req_row:
+                logger.info(f"Requirement {req_row['code']} already at {req_row['status']}, skipping {target_status} advance")
+        except Exception as e:
+            logger.warning(f"Auto-advance to {target_status} failed (non-fatal): {e}")
+    elif new_status == "in_progress":
+        logger.info(f"UAT {spec_id} incomplete: {failed} fail, {total - passed - skipped} pending — no auto-advance")
 
     # MF01: persist individual BV items to uat_bv_items table
     title_lookup = {c["id"]: c.get("title", "") for c in real_cases}
