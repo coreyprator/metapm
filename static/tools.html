@@ -75,6 +75,7 @@
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('ingest')">Document Ingest</button>
     <button class="tab-btn" onclick="switchTab('search')">RAG Search</button>
+    <button class="tab-btn" onclick="switchTab('intelligence')">Intelligence</button>
   </div>
 
   <!-- DOCUMENT INGEST TAB -->
@@ -132,15 +133,90 @@
     </div>
     <div id="search-results" style="display:none"></div>
   </div>
+
+  <!-- INTELLIGENCE TAB -->
+  <div class="tab-content" id="tab-intelligence">
+    <!-- Sub-tabs -->
+    <div style="display:flex;gap:0;margin-bottom:16px">
+      <button class="tab-btn active" id="intel-sub-analysis" onclick="switchIntelSub('analysis')" style="font-size:12px;padding:7px 16px">Domain Analysis</button>
+      <button class="tab-btn" id="intel-sub-health" onclick="switchIntelSub('health')" style="font-size:12px;padding:7px 16px">Knowledge Health</button>
+      <button class="tab-btn" id="intel-sub-queue" onclick="switchIntelSub('queue')" style="font-size:12px;padding:7px 16px">Staging Queue</button>
+    </div>
+
+    <!-- SUB-TAB: Domain Analysis -->
+    <div id="intel-analysis" class="intel-panel">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+        <label style="margin:0;min-width:60px">Domain</label>
+        <select id="intel-domain" onchange="onDomainChange()" style="width:180px;margin:0">
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input type="text" id="intel-search" style="margin:0;flex:1" onkeydown="if(event.key==='Enter') runAnalyze()">
+        <button class="action-btn btn-primary" onclick="runAnalyze()" id="analyze-btn">Analyze</button>
+      </div>
+      <div id="analyze-results" style="display:none"></div>
+    </div>
+
+    <!-- SUB-TAB: Knowledge Health -->
+    <div id="intel-health" class="intel-panel" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-size:13px;color:var(--muted)">Database connectivity &amp; pf_readonly verification</span>
+        <button class="action-btn btn-primary" onclick="runHealthCheck()" id="health-btn" style="font-size:12px;padding:6px 14px">Refresh</button>
+      </div>
+      <div id="health-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">
+        <div class="result-box" style="text-align:center;color:var(--muted)">Loading...</div>
+      </div>
+      <div id="health-timestamp" style="font-size:11px;color:var(--muted);margin-top:8px;text-align:right"></div>
+    </div>
+
+    <!-- SUB-TAB: Staging Queue -->
+    <div id="intel-queue" class="intel-panel" style="display:none">
+      <p style="color:var(--muted);font-size:13px;margin:0 0 12px">Corrections staged by PromptForge. Approve to see the curl command; Dismiss to remove.</p>
+      <div id="queue-list">
+        <div class="result-box" style="text-align:center;color:var(--muted)">Loading...</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
+  const PORTFOLIO_SQL_URL = 'https://portfolio-sql-svc-57478301787.us-central1.run.app';
+
+  // ── Domain-Agnostic Config (REQ-027) ──
+  const DOMAIN_CONFIG = {
+    etymology: {
+      label: "Etymology",
+      searchPlaceholder: "Enter word or PIE root (e.g. la divagation, *dhei-)",
+      analyzeTools: ["correction_impact_report", "pie_root_audit"],
+      resultFields: ["word_or_phrase", "pie_root", "pie_meaning", "label", "gloss"],
+      exploreTools: ["pie_root_audit"],
+      exploreFields: ["word_or_phrase", "label", "source_app", "pie_root", "language"]
+    },
+    music_theory: {
+      label: "Music Theory",
+      searchPlaceholder: "Enter chord, key, or concept",
+      analyzeTools: ["app_health_check"],
+      resultFields: [],
+      exploreTools: [],
+      exploreFields: []
+    }
+  };
+
+  let currentDomain = 'etymology';
+
   function switchTab(tab) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    // Top-level tab buttons (first 3 in .tabs)
+    const topBtns = document.querySelectorAll('.tabs > .tab-btn');
+    topBtns.forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    const idx = tab === 'ingest' ? 0 : 1;
-    document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+    const tabMap = { ingest: 0, search: 1, intelligence: 2 };
+    const idx = tabMap[tab] ?? 0;
+    topBtns[idx].classList.add('active');
     document.getElementById('tab-' + tab).classList.add('active');
+
+    if (tab === 'intelligence') {
+      initIntelligence();
+    }
   }
 
   function esc(s) {
@@ -261,6 +337,243 @@
   function clearSearch() {
     document.getElementById('search-query').value = '';
     document.getElementById('search-results').style.display = 'none';
+  }
+
+  // ═════════════════════════════════════════════════
+  //  INTELLIGENCE TAB — Domain-Agnostic (REQ-027)
+  // ═════════════════════════════════════════════════
+
+  let intelInitialized = false;
+
+  function initIntelligence() {
+    if (intelInitialized) return;
+    intelInitialized = true;
+
+    // Populate domain selector
+    const sel = document.getElementById('intel-domain');
+    sel.innerHTML = '';
+    for (const [key, cfg] of Object.entries(DOMAIN_CONFIG)) {
+      const opt = document.createElement('option');
+      opt.value = key;
+      opt.textContent = cfg.label;
+      sel.appendChild(opt);
+    }
+    sel.value = currentDomain;
+    onDomainChange();
+
+    // Auto-load health check
+    runHealthCheck();
+    loadQueue();
+  }
+
+  function onDomainChange() {
+    currentDomain = document.getElementById('intel-domain').value;
+    const cfg = DOMAIN_CONFIG[currentDomain];
+    document.getElementById('intel-search').placeholder = cfg.searchPlaceholder;
+    document.getElementById('analyze-results').style.display = 'none';
+  }
+
+  function switchIntelSub(sub) {
+    document.querySelectorAll('[id^="intel-sub-"]').forEach(b => b.classList.remove('active'));
+    document.getElementById('intel-sub-' + sub).classList.add('active');
+    document.querySelectorAll('.intel-panel').forEach(p => p.style.display = 'none');
+    document.getElementById('intel-' + sub).style.display = 'block';
+  }
+
+  // ── Domain Analysis ──
+
+  async function runAnalyze() {
+    const q = document.getElementById('intel-search').value.trim();
+    if (!q) return;
+    const cfg = DOMAIN_CONFIG[currentDomain];
+    const btn = document.getElementById('analyze-btn');
+    const el = document.getElementById('analyze-results');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Analyzing...';
+
+    try {
+      const resp = await fetch(`${PORTFOLIO_SQL_URL}/api/tools/correction_impact_report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word_label: q })
+      });
+      const data = await resp.json();
+
+      let html = `<div style="font-size:12px;color:var(--muted);margin-bottom:8px">${data.row_count} result(s) in ${data.duration_ms}ms — ${data.status}</div>`;
+
+      if (data.data && data.data.length > 0) {
+        html += '<div class="results-list">';
+        for (const item of data.data) {
+          const app = item.source_app || '';
+          const appBadge = app ? `<span style="background:var(--info);color:white;padding:2px 6px;border-radius:3px;font-size:10px;margin-left:6px">${esc(app)}</span>` : '';
+
+          // Render relevant fields from domain config
+          let fields = '';
+          for (const f of cfg.resultFields) {
+            if (item[f] != null && item[f] !== '') {
+              fields += `<div style="font-size:12px;color:var(--muted)"><strong>${f}:</strong> ${esc(String(item[f]))}</div>`;
+            }
+          }
+
+          // Find PIE root for explore button
+          const pieRoot = item.pie_root || item.greek_root || '';
+          const exploreBtn = pieRoot && cfg.exploreTools.length > 0
+            ? `<button class="action-btn btn-primary" style="font-size:11px;padding:4px 10px;margin-top:6px" onclick="runExplore('${esc(pieRoot)}')">Explore ${esc(pieRoot)}</button>`
+            : '';
+
+          html += `<div class="result-item">
+            <strong style="font-size:13px">${esc(item.word_or_phrase || item.label || item.greek_name || item.english_name || 'N/A')}</strong>${appBadge}
+            ${fields}${exploreBtn}
+          </div>`;
+        }
+        html += '</div>';
+      }
+
+      if (data.errors && data.errors.length > 0) {
+        html += `<div class="result-box err" style="margin-top:8px"><div class="result-value">${data.errors.map(e => esc(e)).join('<br>')}</div></div>`;
+      }
+
+      el.innerHTML = html;
+      el.style.display = 'block';
+    } catch (e) {
+      el.innerHTML = `<div class="result-box err"><div class="result-value">Error: ${esc(e.message)}</div></div>`;
+      el.style.display = 'block';
+    }
+    btn.disabled = false;
+    btn.textContent = 'Analyze';
+  }
+
+  async function runExplore(pieRoot) {
+    const el = document.getElementById('analyze-results');
+    const cfg = DOMAIN_CONFIG[currentDomain];
+
+    el.innerHTML += '<div style="margin-top:12px;font-size:12px;color:var(--muted)"><span class="spinner"></span>Exploring ' + esc(pieRoot) + '...</div>';
+
+    try {
+      const resp = await fetch(`${PORTFOLIO_SQL_URL}/api/tools/pie_root_audit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pie_root_label: pieRoot })
+      });
+      const data = await resp.json();
+
+      let html = `<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:8px">PIE Root Audit: ${esc(pieRoot)} — ${data.row_count} word(s)</div>`;
+
+      if (data.data && data.data.length > 0) {
+        html += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+        html += '<tr style="border-bottom:1px solid var(--line)">';
+        for (const f of cfg.exploreFields) {
+          html += `<th style="text-align:left;padding:6px 8px;color:var(--muted)">${f}</th>`;
+        }
+        html += '</tr>';
+        for (const item of data.data) {
+          html += '<tr style="border-bottom:1px solid var(--line)">';
+          for (const f of cfg.exploreFields) {
+            html += `<td style="padding:6px 8px">${esc(String(item[f] || ''))}</td>`;
+          }
+          html += '</tr>';
+        }
+        html += '</table>';
+      }
+      html += '</div>';
+      el.innerHTML += html;
+    } catch (e) {
+      el.innerHTML += `<div class="result-box err" style="margin-top:8px"><div class="result-value">Explore error: ${esc(e.message)}</div></div>`;
+    }
+  }
+
+  // ── Knowledge Health ──
+
+  async function runHealthCheck() {
+    const btn = document.getElementById('health-btn');
+    const grid = document.getElementById('health-grid');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+
+    try {
+      const resp = await fetch(`${PORTFOLIO_SQL_URL}/api/tools/app_health_check`);
+      const data = await resp.json();
+
+      const statusColors = { green: 'var(--ok)', amber: 'var(--warn)', red: 'var(--accent)' };
+      let html = '';
+      for (const db of (data.data || [])) {
+        const color = statusColors[db.status] || 'var(--muted)';
+        const dot = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:6px"></span>`;
+        const roLine = db.pf_readonly_confirmed != null
+          ? `<div style="font-size:11px;margin-top:4px">${db.pf_readonly_confirmed ? '✓' : '✗'} pf_readonly: ${esc(db.pf_readonly_login || 'N/A')}</div>`
+          : '';
+        html += `<div class="result-box" style="padding:12px">
+          <div style="font-size:14px;font-weight:600">${dot}${esc(db.database)}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">Login: ${esc(db.login_name)} ${db.login_confirmed ? '✓' : '✗'}</div>
+          <div style="font-size:12px;color:var(--muted)">Table: ${esc(db.key_table)} — ${(db.row_count || 0).toLocaleString()} rows</div>
+          ${roLine}
+          ${db.error ? `<div style="font-size:11px;color:var(--accent);margin-top:4px">${esc(db.error)}</div>` : ''}
+        </div>`;
+      }
+      grid.innerHTML = html;
+      document.getElementById('health-timestamp').textContent = 'Last checked: ' + new Date().toLocaleString() + ' (' + (data.duration_ms || 0) + 'ms)';
+    } catch (e) {
+      grid.innerHTML = `<div class="result-box err"><div class="result-value">${esc(e.message)}</div></div>`;
+    }
+    btn.disabled = false;
+    btn.textContent = 'Refresh';
+  }
+
+  // ── Staging Queue ──
+
+  async function loadQueue() {
+    const el = document.getElementById('queue-list');
+    try {
+      const resp = await fetch('/api/intelligence/staged-corrections');
+      const data = await resp.json();
+
+      if (!data.length) {
+        el.innerHTML = '<div class="result-box" style="text-align:center;color:var(--muted)">No staged corrections.</div>';
+        return;
+      }
+      let html = '';
+      for (const c of data) {
+        html += `<div class="result-item" id="correction-${c.id}" style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong>${esc(c.word)}</strong>
+            <span style="color:var(--muted);font-size:12px;margin-left:8px">${esc(c.old_root || '?')} → ${esc(c.new_root || '?')}</span>
+            <span style="background:var(--info);color:white;padding:1px 5px;border-radius:3px;font-size:10px;margin-left:6px">${esc(c.source_app || '')}</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="action-btn btn-primary" style="font-size:11px;padding:4px 10px" onclick="approveCorrection(${c.id}, '${esc(c.word)}', '${esc(c.new_root || '')}')">Approve</button>
+            <button class="action-btn btn-clear" style="font-size:11px;padding:4px 10px" onclick="dismissCorrection(${c.id})">Dismiss</button>
+          </div>
+        </div>`;
+      }
+      el.innerHTML = html;
+    } catch (e) {
+      el.innerHTML = `<div class="result-box err"><div class="result-value">${esc(e.message)}</div></div>`;
+    }
+  }
+
+  function approveCorrection(id, word, newRoot) {
+    const el = document.getElementById('correction-' + id);
+    const curlCmd = `curl -X PATCH "https://portfolio-sql-svc-57478301787.us-central1.run.app/api/tools/correction_impact_report" -H "Content-Type: application/json" -d '{"word_label": "${word}", "new_root": "${newRoot}"}'`;
+    el.innerHTML = `<div style="width:100%">
+      <div style="font-size:12px;color:var(--ok);margin-bottom:6px">✓ Approved — Run this command to execute:</div>
+      <pre style="background:var(--bg);padding:8px;border-radius:4px;font-size:11px;overflow-x:auto;white-space:pre-wrap;color:var(--text)">${esc(curlCmd)}</pre>
+    </div>`;
+    fetch('/api/intelligence/staged-corrections/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'approved' })
+    });
+  }
+
+  function dismissCorrection(id) {
+    document.getElementById('correction-' + id).style.display = 'none';
+    fetch('/api/intelligence/staged-corrections/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'dismissed' })
+    });
   }
 </script>
 </body>

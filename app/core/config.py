@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.67.0"  # MP-UAT-001: UAT submit confirmation + reopen/edit
+    VERSION: str = "2.68.0"  # MP-INTELLIGENCE-001: Portfolio SQL Intelligence Service + Intelligence Tab
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
