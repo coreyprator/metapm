@@ -434,6 +434,48 @@ async def override_uat_status(spec_id: str, body: UATOverride, request: Request)
     return {"spec_id": spec_id, "status": body.status, "override_note": body.override_note}
 
 
+# ── POST /api/uat/{spec_id}/reopen ─────────────────────────────────────────
+
+@router.post("/api/uat/{spec_id}/reopen")
+async def reopen_uat(spec_id: str, request: Request):
+    """
+    MP-UAT-001: Reopen a submitted UAT for editing.
+    Resets status to 'ready' and all test case statuses to pending.
+    Requires PL Google OAuth session.
+    """
+    _validate_uuid(spec_id)
+    if not is_pl_authenticated(request):
+        raise HTTPException(status_code=403, detail="PL authentication required")
+
+    row = execute_query(
+        "SELECT id, test_cases_json, status FROM uat_pages WHERE id = ?",
+        (spec_id,), fetch="one"
+    )
+    if not row:
+        raise HTTPException(404, f"UAT spec {spec_id} not found")
+
+    # Reset test case statuses to pending and clear notes
+    existing_cases = json.loads(row["test_cases_json"]) if row.get("test_cases_json") else []
+    for case in existing_cases:
+        if case.get("id", "").startswith("_"):
+            continue
+        case["status"] = "pending"
+        case["notes"] = ""
+        case.pop("attachments", None)
+
+    execute_query("""
+        UPDATE uat_pages
+        SET status = 'ready',
+            test_cases_json = ?,
+            pl_submitted_at = NULL,
+            general_notes = NULL
+        WHERE id = ?
+    """, (json.dumps(existing_cases), spec_id), fetch="none")
+
+    logger.info(f"UAT spec {spec_id} reopened — status reset to ready, test cases reset to pending")
+    return {"status": "reopened", "spec_id": spec_id}
+
+
 @router.get("/api/uat/{spec_id}/results")
 async def get_uat_results(spec_id: str):
     """
@@ -614,7 +656,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
     result_by_id = {tc["id"]: tc for tc in current_results if not tc.get("id", "").startswith("_")}
     submitted_cls = "submitted" if is_submitted else ""
     submitted_badge = '<span class="read-only-badge">✓ Submitted</span>' if is_submitted else ""
-    resubmit_btn = '<button class="btn btn-resubmit" onclick="enableResubmit()">🔄 Resubmit</button>' if is_submitted else ""
+    resubmit_btn = f'<button class="btn btn-resubmit" onclick="reopenUAT(\'{spec_id}\')">↩ Reopen &amp; Edit Results</button>' if is_submitted else ""
     # REQ-011: PL-only override button for conditional_pass
     mark_passed_btn = ('<button class="btn btn-mark-passed" onclick="markAsPassed()">'
                        '✅ Mark as Passed</button>') if spec_status == "conditional_pass" else ""
@@ -934,14 +976,27 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       }});
     }}
 
-    function enableResubmit() {{
-      document.querySelectorAll('.test-card').forEach(c => c.classList.remove('submitted'));
-      document.getElementById('general-notes').removeAttribute('readonly');
-      const resubmitBtn = document.querySelector('.btn-resubmit');
-      if (resubmitBtn) resubmitBtn.style.display = 'none';
-      const submitBtn = document.getElementById('submit-btn');
-      if (submitBtn) {{ submitBtn.style.display = ''; submitBtn.disabled = false; submitBtn.textContent = '📤 Submit Results'; }}
-      document.getElementById('submit-result').style.display = 'none';
+    async function reopenUAT(specId) {{
+      const confirmed = confirm('Reopen this UAT for editing? Current results will be cleared.');
+      if (!confirmed) return;
+      const btn = document.querySelector('.btn-resubmit');
+      if (btn) {{ btn.disabled = true; btn.textContent = '⏳ Reopening...'; }}
+      try {{
+        const r = await fetch(`/api/uat/${{specId}}/reopen`, {{
+          method: 'POST',
+          headers: {{'Content-Type': 'application/json'}}
+        }});
+        if (r.ok) {{
+          window.location.reload();
+        }} else {{
+          const data = await r.json();
+          alert(`Reopen failed: ${{data.detail || JSON.stringify(data)}}`);
+          if (btn) {{ btn.disabled = false; btn.textContent = '↩ Reopen & Edit Results'; }}
+        }}
+      }} catch(e) {{
+        alert(`Reopen error: ${{e.message}}`);
+        if (btn) {{ btn.disabled = false; btn.textContent = '↩ Reopen & Edit Results'; }}
+      }}
     }}
 
     async function markAsPassed() {{
@@ -971,6 +1026,13 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
     }}
 
     async function submitResults() {{
+      // MP-UAT-001: Confirmation dialog before submission
+      const confirmed = confirm(
+        'Submit UAT results?\\n\\nThis will record your test results. ' +
+        'You can reopen and edit results after submission.'
+      );
+      if (!confirmed) return;
+
       const cards = document.querySelectorAll('.test-card');
       const test_cases = [];
       cards.forEach(card => {{
@@ -996,20 +1058,10 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
         const div = document.getElementById('submit-result');
         div.style.display = 'block';
         if (resp.ok) {{
-          // Fix 2g: switch to read-only mode
-          btn.style.display = 'none';
-          document.querySelectorAll('.test-card').forEach(c => c.classList.add('submitted'));
-          document.getElementById('general-notes').setAttribute('readonly', '');
-          const resubmitBtn = document.querySelector('.btn-resubmit');
-          if (resubmitBtn) resubmitBtn.style.display = '';
-          // G2B9-REQ-003: inject submitted badge into H1 immediately
-          const h1 = document.querySelector('header h1');
-          if (h1 && !h1.querySelector('.read-only-badge')) {{
-            h1.insertAdjacentHTML('beforeend', ' <span class="read-only-badge">✓ Submitted</span>');
-          }}
-          // Fix 2a: show confirmation URL
-          div.className = 'ok';
-          div.innerHTML = `Results submitted. Status: ${{data.status}} — ${{data.passed}} passed, ${{data.failed}} failed. <a href="/uat/${{SPEC_ID}}">View UAT record &rarr;</a>`;
+          // MP-UAT-001: POST-Redirect-GET — redirect to GET page
+          // This replaces the current history entry so F5 reloads the GET page, not the form
+          window.location.replace('/uat/' + SPEC_ID);
+          return;
         }} else {{
           btn.disabled = false;
           btn.textContent = '📤 Submit Results';

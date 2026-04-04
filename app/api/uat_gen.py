@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.core.database import execute_query
 from app.services.uat_generator import generate_test_cases, render_uat_html
@@ -228,6 +228,17 @@ async def generate_uat(body: UATGenerateRequest):
         test_count=len(test_cases),
         status="ready"
     )
+
+
+@router.post("/uat/{uat_id}/submit")
+async def submit_uat_redirect(uat_id: str):
+    """
+    MP-UAT-001: POST-Redirect-GET endpoint for UAT submission.
+    Redirects to GET /uat/{uat_id} so browser F5 reloads the GET page,
+    not the form submission.
+    """
+    _validate_uuid(uat_id)
+    return RedirectResponse(url=f"/uat/{uat_id}", status_code=302)
 
 
 @router.get("/uat/{uat_id}")
