@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.69.0"  # MP-STATUS-FIX-001: Lifecycle auto-advance + patch SQL fix + CAI UAT read access
+    VERSION: str = "2.70.0"  # MP-DASHBOARD-INTEGRITY-001: Session signals, RUNNING display, Copy PTH, stale drafts, Bootstrap BA26-BA28
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

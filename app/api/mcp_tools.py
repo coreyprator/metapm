@@ -263,6 +263,20 @@ TOOLS = [
             "required": ["pth", "token"],
         },
     },
+    {
+        "name": "post_session_signal",
+        "description": "Fire a CC session start/end signal. CC must fire 'started' before implementation and 'completed'/'stopped'/'blocked' at session end. Updates prompt status and session timestamps.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pth": {"type": "string", "description": "PTH of the current sprint"},
+                "status": {"type": "string", "enum": ["started", "completed", "stopped", "blocked"], "description": "Session signal type"},
+                "timestamp": {"type": "string", "description": "ISO 8601 timestamp of the signal"},
+                "reason": {"type": "string", "description": "Required when status is stopped or blocked — one sentence explaining why", "default": ""},
+            },
+            "required": ["pth", "status", "timestamp"],
+        },
+    },
 ]
 
 
@@ -322,10 +336,11 @@ def _tool_post_prompt(args: dict) -> dict:
 def _tool_get_prompt(args: dict) -> dict:
     pth = args["pth"]
     row = execute_query("""
-        SELECT id, sprint_id, project_id, pth, status,
+        SELECT TOP 1 id, sprint_id, project_id, pth, status,
                LEN(content_md) as content_length,
                created_by, approved_by, approved_at, created_at
         FROM cc_prompts WHERE pth = ?
+        ORDER BY id DESC
     """, (pth,), fetch="one")
 
     if not row:
@@ -482,16 +497,18 @@ def _tool_reject_prompt(args: dict) -> dict:
     pth = args["pth"]
     reason = args.get("reason", "")
     row = execute_query(
-        "SELECT id, pth, status FROM cc_prompts WHERE pth = ?", (pth,), fetch="one"
+        "SELECT TOP 1 id, pth, status FROM cc_prompts WHERE pth = ? ORDER BY id DESC",
+        (pth,), fetch="one"
     )
     if not row:
         return {"error": f"Prompt '{pth}' not found"}
     current = row.get("status", "")
-    if current not in ("draft", "prompt_ready"):
-        return {"error": f"Cannot reject prompt in status '{current}'. Must be draft or prompt_ready."}
+    terminal = ("rejected", "completed", "stopped", "closed", "cancelled")
+    if current in terminal:
+        return {"error": f"Cannot reject prompt in terminal status '{current}'."}
     execute_query(
-        "UPDATE cc_prompts SET status='rejected', rejection_reason=?, updated_at=GETUTCDATE() WHERE pth=?",
-        (reason[:500] if reason else None, pth), fetch="none"
+        "UPDATE cc_prompts SET status='rejected', rejection_reason=?, updated_at=GETUTCDATE() WHERE id=?",
+        (reason[:500] if reason else None, row["id"]), fetch="none"
     )
     return {
         "pth": pth,
@@ -965,6 +982,62 @@ def _tool_verify_challenge(args: dict) -> dict:
     return {"valid": True}
 
 
+def _tool_post_session_signal(args: dict) -> dict:
+    pth = args["pth"]
+    status = args["status"]
+    timestamp = args["timestamp"]
+    reason = args.get("reason", "")
+
+    if status in ("stopped", "blocked") and not reason:
+        return {"error": "reason is required when status is stopped or blocked"}
+
+    # Find the newest prompt for this PTH
+    row = execute_query(
+        "SELECT TOP 1 id, status FROM cc_prompts WHERE pth = ? ORDER BY id DESC",
+        (pth,), fetch="one"
+    )
+    if not row:
+        return {"error": f"Prompt '{pth}' not found"}
+
+    prompt_id = row["id"]
+
+    if status == "started":
+        execute_query("""
+            UPDATE cc_prompts
+            SET status = 'executing',
+                session_started_at = ?,
+                session_outcome = 'started',
+                updated_at = GETUTCDATE()
+            WHERE id = ?
+        """, (timestamp, prompt_id), fetch="none")
+    elif status == "completed":
+        execute_query("""
+            UPDATE cc_prompts
+            SET status = 'completed',
+                session_ended_at = ?,
+                session_outcome = 'completed',
+                updated_at = GETUTCDATE()
+            WHERE id = ?
+        """, (timestamp, prompt_id), fetch="none")
+    elif status in ("stopped", "blocked"):
+        execute_query("""
+            UPDATE cc_prompts
+            SET status = 'stopped',
+                session_ended_at = ?,
+                session_outcome = ?,
+                session_stop_reason = ?,
+                updated_at = GETUTCDATE()
+            WHERE id = ?
+        """, (timestamp, status, reason[:500], prompt_id), fetch="none")
+
+    return {
+        "pth": pth,
+        "signal": status,
+        "timestamp": timestamp,
+        "message": f"Session signal '{status}' recorded for {pth}.",
+    }
+
+
 # Tool dispatch map
 TOOL_HANDLERS = {
     "post_prompt": _tool_post_prompt,
@@ -985,6 +1058,7 @@ TOOL_HANDLERS = {
     "get_uat_results_by_pth": _tool_get_uat_results_by_pth,
     "get_challenge": _tool_get_challenge,
     "verify_challenge": _tool_verify_challenge,
+    "post_session_signal": _tool_post_session_signal,
 }
 
 

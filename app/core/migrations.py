@@ -2042,4 +2042,50 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 60 warning: {e}")
 
+    # Migration 61: MP10 — Add session signal columns to cc_prompts
+    try:
+        session_cols = {
+            "session_started_at": "DATETIME NULL",
+            "session_ended_at": "DATETIME NULL",
+            "session_outcome": "NVARCHAR(50) NULL",
+            "session_stop_reason": "NVARCHAR(500) NULL",
+        }
+        for col_name, col_def in session_cols.items():
+            col_check = execute_query(f"""
+                SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'cc_prompts' AND COLUMN_NAME = '{col_name}'
+            """, fetch="one")
+            if not col_check or col_check["cnt"] == 0:
+                execute_query(f"ALTER TABLE cc_prompts ADD [{col_name}] {col_def}", fetch="none")
+                logger.info(f"  Migration 61: Added {col_name} to cc_prompts.")
+            else:
+                logger.info(f"  Migration 61: cc_prompts.{col_name} already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 61 warning: {e}")
+
+    # Migration 61b: MP10 — Add 'stopped' to cc_prompts status constraint
+    try:
+        execute_query("""
+            DECLARE @ck NVARCHAR(200)
+            SELECT @ck = name FROM sys.check_constraints
+            WHERE parent_object_id = OBJECT_ID('cc_prompts') AND definition LIKE '%status%'
+              AND definition NOT LIKE '%stopped%'
+            IF @ck IS NOT NULL
+                EXEC('ALTER TABLE cc_prompts DROP CONSTRAINT [' + @ck + ']')
+        """, fetch="none")
+        try:
+            execute_query("""
+                ALTER TABLE cc_prompts ADD CONSTRAINT CK_cc_prompts_status
+                CHECK (status IN ('draft','prompt_ready','approved','sent','completed',
+                                  'executing','complete','closed','rejected','cancelled','stopped'))
+            """, fetch="none")
+            logger.info("  Migration 61b: cc_prompts status constraint updated to include 'stopped'.")
+        except Exception as ck_err:
+            if 'already exists' in str(ck_err).lower():
+                logger.info("  Migration 61b: CK_cc_prompts_status already includes 'stopped'.")
+            else:
+                raise
+    except Exception as e:
+        logger.warning(f"  Migration 61b warning: {e}")
+
     logger.info("Migrations complete.")

@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Header, Query, Response
 from fastapi.security import APIKeyHeader
+from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.database import execute_query
@@ -2064,3 +2065,65 @@ async def get_rag_sync_status(_: bool = Depends(verify_api_key)):
         return _json.loads(row["value_json"])
     except Exception:
         return {"status": "error", "raw": row["value_json"]}
+
+
+# ── MP10: CC Session Signals ──
+
+class SessionSignalRequest(BaseModel):
+    pth: str
+    status: str  # started | completed | stopped | blocked
+    timestamp: str
+    reason: Optional[str] = ""
+
+@router.post("/sessions", status_code=200)
+async def post_session_signal(req: SessionSignalRequest):
+    """CC fires session start/end signals. Updates prompt status and session timestamps."""
+    if req.status not in ("started", "completed", "stopped", "blocked"):
+        raise HTTPException(400, f"Invalid status '{req.status}'. Must be started/completed/stopped/blocked.")
+    if req.status in ("stopped", "blocked") and not req.reason:
+        raise HTTPException(400, "reason is required when status is stopped or blocked")
+
+    row = execute_query(
+        "SELECT TOP 1 id, status FROM cc_prompts WHERE pth = ? ORDER BY id DESC",
+        (req.pth,), fetch="one"
+    )
+    if not row:
+        raise HTTPException(404, f"Prompt '{req.pth}' not found")
+
+    prompt_id = row["id"]
+
+    if req.status == "started":
+        execute_query("""
+            UPDATE cc_prompts
+            SET status = 'executing',
+                session_started_at = ?,
+                session_outcome = 'started',
+                updated_at = GETUTCDATE()
+            WHERE id = ?
+        """, (req.timestamp, prompt_id), fetch="none")
+    elif req.status == "completed":
+        execute_query("""
+            UPDATE cc_prompts
+            SET status = 'completed',
+                session_ended_at = ?,
+                session_outcome = 'completed',
+                updated_at = GETUTCDATE()
+            WHERE id = ?
+        """, (req.timestamp, prompt_id), fetch="none")
+    elif req.status in ("stopped", "blocked"):
+        execute_query("""
+            UPDATE cc_prompts
+            SET status = 'stopped',
+                session_ended_at = ?,
+                session_outcome = ?,
+                session_stop_reason = ?,
+                updated_at = GETUTCDATE()
+            WHERE id = ?
+        """, (req.timestamp, req.status, (req.reason or "")[:500], prompt_id), fetch="none")
+
+    return {
+        "pth": req.pth,
+        "signal": req.status,
+        "timestamp": req.timestamp,
+        "message": f"Session signal '{req.status}' recorded for {req.pth}.",
+    }

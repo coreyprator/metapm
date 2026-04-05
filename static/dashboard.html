@@ -1,4 +1,3 @@
-<!-- MM18-FIX 2026-03-28: force rebuild to restore static file serving -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -109,7 +108,7 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       display: none;
-      z-index: 200;
+      z-index: 5;
     }
     .add-menu.open { display: block; }
     .add-menu button {
@@ -366,17 +365,19 @@
       cursor: pointer;
     }
     .card.header .header-content {
+      max-height: 500px;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
       display: flex;
       justify-content: space-between;
       align-items: center;
       width: 100%;
     }
+    .card.header.is-collapsed .header-content {
+      max-height: 0;
+    }
     @media (max-width: 768px) {
-      .card.header .header-content {
-        max-height: 0;
-        overflow: hidden;
-        transition: max-height 0.3s ease-out;
-      }
+      .card.header .header-content { max-height: 0; }
       .card.header:not(.is-collapsed) .header-content { max-height: 500px; }
       .header-toggle { display: block; }
     }
@@ -467,7 +468,7 @@
         <button type="button" id="wipBtn" onclick="activateWipView()">📋 WIP</button>
         <button type="button" id="visionBoardBtn" onclick="toggleVisionBoard()">👁 Vision Board</button>
         <button type="button" id="lessonsBtn" onclick="toggleLessonsView()">📚 Lessons <span id="lessonsDraftBadge" style="display:none;background:#854d0e;color:#fde68a;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:3px"></span></button>
-        <!-- AP09: UAT tab removed — replaced by Active Prompts workflow -->
+        <button type="button" id="uatTabBtn" onclick="toggleUatTab()">🧪 UAT</button>
         <button type="button" id="promptsTabBtn" onclick="togglePromptsTab()">📝 Prompts</button>
         <button type="button" id="ragSearchBtn" onclick="toggleRagSearch()">🔍 RAG</button>
         <button type="button" id="docsTabBtn" onclick="toggleDocsTab()">📚 Docs</button>
@@ -484,10 +485,7 @@
             <button data-kind="bug">Bug</button>
             <button data-kind="task">Task</button>
             <button data-kind="vision">Vision</button>
-            <!-- AP09: Seed removed — replaced by Active Prompts workflow -->
-          </div>
-          <div style="margin-left:4px">
-            <a href="/self-uat" target="_blank" style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;background:#1a1d27;border:1px solid #2d3148;border-radius:6px;color:#e5e7eb;text-decoration:none;font-size:0.85rem;font-weight:500;white-space:nowrap;" onmouseover="this.style.borderColor='#ef4444'" onmouseout="this.style.borderColor='#2d3148'">🧪 Ad-hoc UAT Session</a>
+            <button data-kind="seed" onclick="window.location.href='/static/seed.html'">Seed (batch)</button>
           </div>
         </div>
       </div>
@@ -552,14 +550,10 @@
     </div>
 
     <!-- MM10B: Active Prompts — two-section panel -->
-    <!-- MM16-REQ-002: panel always visible, shows "No active prompts" when empty -->
-    <div class="card" id="promptsPanel" style="border-left:3px solid #f0b429">
+    <div class="card" id="promptsPanel" style="display:none;border-left:3px solid #f0b429">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <strong style="color:#f0b429">Active Prompts</strong>
-        <div style="display:flex;align-items:center;gap:8px">
-          <button id="promptsRefreshBtn" onclick="this.textContent='⟳';loadActivePrompts().then(()=>this.textContent='Refresh')" style="font-size:11px;padding:2px 8px;background:var(--panel-soft);border:1px solid var(--line);border-radius:4px;color:var(--muted);cursor:pointer">Refresh</button>
-          <button class="icon-btn" onclick="qs('promptsPanel').style.display='none'" title="Dismiss">✕</button>
-        </div>
+        <button class="icon-btn" onclick="qs('promptsPanel').style.display='none'" title="Dismiss">✕</button>
       </div>
       <!-- Section A: Needs Approval -->
       <div id="needsApprovalSection" style="margin-bottom:12px">
@@ -568,10 +562,7 @@
       </div>
       <!-- Section B: Run UATs -->
       <div id="runUatsSection">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em">Run These UATs</div>
-          <button id="uatHistoryToggle" type="button" onclick="showUATHistory=!showUATHistory;this.textContent=showUATHistory?'Recent Only':'Show History';loadActivePrompts()" style="font-size:10px;padding:1px 7px;background:var(--panel-soft);border:1px solid var(--line);border-radius:3px;color:var(--muted);cursor:pointer">Show History</button>
-        </div>
+        <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Run These UATs</div>
         <div id="runUatsList" style="font-size:12px"></div>
       </div>
     </div>
@@ -583,6 +574,8 @@
       <button type="button" onclick="bulkAssignSprint()" style="padding:4px 12px;background:var(--info);color:#fff;border:none;border-radius:4px;font-size:12px;cursor:pointer">Assign</button>
       <button type="button" onclick="clearBulkSelection()" style="padding:4px 10px;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:4px;font-size:12px;cursor:pointer">Clear</button>
     </div>
+    <!-- MP10: Stale Drafts Banner -->
+    <div id="staleDraftsBanner" style="display:none"></div>
     <!-- MM10B: Active Jobs Panel -->
     <div class="card" id="jobsPanel" style="margin-bottom:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -650,8 +643,7 @@
       <div id="uatList" style="padding:8px"></div>
     </div>
 
-    <!-- MM16: renamed from duplicate promptsPanel to promptsTabPanel -->
-    <div class="card" id="promptsTabPanel" style="display:none">
+    <div class="card" id="promptsPanel" style="display:none">
       <div class="ll-filter-bar" style="align-items:center">
         <select id="prompts-filter-status">
           <option value="">Active (Draft+Approved)</option>
@@ -731,9 +723,35 @@
       </div>
       <div>
         <label>Status</label>
-        <select id="dStatus"></select>
+        <select id="dStatus">
+          <optgroup label="── Definition ──">
+            <option value="req_created">Req Created</option>
+            <option value="req_approved">Req Approved</option>
+          </optgroup>
+          <optgroup label="── Design ──">
+            <option value="cai_designing">CAI Designing</option>
+            <option value="cc_prompt_ready">Prompt Ready</option>
+          </optgroup>
+          <optgroup label="── Build ──">
+            <option value="cc_executing">CC Executing</option>
+            <option value="cc_complete">CC Complete</option>
+          </optgroup>
+          <optgroup label="── Validate ──">
+            <option value="uat_ready">UAT Ready</option>
+            <option value="uat_pass">UAT Pass</option>
+            <option value="uat_fail">UAT Fail</option>
+          </optgroup>
+          <optgroup label="── Complete ──">
+            <option value="done">Done</option>
+            <option value="rework">Rework</option>
+          </optgroup>
+          <optgroup label="── Legacy ──">
+            <option value="backlog">Backlog</option>
+            <option value="executing">Executing</option>
+            <option value="closed">Closed</option>
+          </optgroup>
+        </select>
         <div id="dCheckpoint" style="display:none;margin-top:4px;font-size:11px;color:#86efac;font-family:monospace"></div>
-        <button id="btnMarkDone" style="display:none;margin-top:6px;padding:4px 12px;background:#166534;color:#bbf7d0;border:1px solid #22c55e;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600" onclick="markDone()">&#x2705; Mark Done</button>
       </div>
       <div>
         <label>Target Version</label>
@@ -996,88 +1014,6 @@
     };
 
     const CLOSED_STATUSES = ['closed', 'done'];
-
-    // MP15: Valid lifecycle transitions — dropdown only shows valid next states
-    const VALID_TRANSITIONS = {
-      'req_created':     ['req_approved', 'backlog', 'closed'],
-      'req_approved':    ['cai_designing', 'req_created'],
-      'cai_designing':   ['cc_prompt_ready', 'req_approved'],
-      'cc_prompt_ready': ['cc_executing', 'cai_designing'],
-      'cc_executing':    ['cc_complete', 'cc_prompt_ready'],
-      'cc_complete':     ['uat_ready', 'cc_executing'],
-      'uat_ready':       ['uat_pass', 'uat_fail'],
-      'uat_pass':        ['done'],
-      'uat_fail':        ['cc_prompt_ready', 'rework'],
-      'done':            ['rework'],
-      'rework':          ['cc_prompt_ready'],
-      'backlog':         ['req_created', 'closed'],
-      'executing':       ['cc_executing', 'closed'],
-      'closed':          [],
-    };
-
-    const STATUS_DISPLAY = {
-      req_created: 'Req Created', req_approved: 'Req Approved', cai_designing: 'CAI Designing',
-      cc_prompt_ready: 'Prompt Ready', cc_executing: 'CC Executing', cc_complete: 'CC Complete',
-      uat_ready: 'UAT Ready', uat_pass: 'UAT Pass', uat_fail: 'UAT Fail',
-      done: 'Done', rework: 'Rework', backlog: 'Backlog', executing: 'Executing', closed: 'Closed'
-    };
-
-    function populateStatusDropdown(currentStatus) {
-      const sel = qs('dStatus');
-      sel.innerHTML = '';
-      // Current status as selected disabled option
-      const cur = document.createElement('option');
-      cur.value = currentStatus;
-      cur.textContent = `● ${STATUS_DISPLAY[currentStatus] || currentStatus}`;
-      cur.selected = true;
-      cur.disabled = true;
-      sel.appendChild(cur);
-      // Valid next states
-      const valid = VALID_TRANSITIONS[currentStatus] || [];
-      for (const s of valid) {
-        const opt = document.createElement('option');
-        opt.value = s;
-        opt.textContent = STATUS_DISPLAY[s] || s;
-        sel.appendChild(opt);
-      }
-      // Show/hide Mark Done button
-      const markDoneStates = ['cc_complete', 'uat_ready', 'uat_pass'];
-      qs('btnMarkDone').style.display = markDoneStates.includes(currentStatus) ? 'inline-block' : 'none';
-    }
-
-    async function markDone() {
-      const req = state.selectedReq;
-      if (!req) return;
-      const pathToDone = {
-        'cc_complete': ['uat_ready', 'uat_pass', 'done'],
-        'uat_ready':   ['uat_pass', 'done'],
-        'uat_pass':    ['done'],
-      };
-      const steps = pathToDone[req.status];
-      if (!steps) return;
-      const btn = qs('btnMarkDone');
-      btn.disabled = true;
-      btn.textContent = 'Walking lifecycle...';
-      try {
-        for (const nextStatus of steps) {
-          await api(`/api/roadmap/requirements/${req.id}/state`, {
-            method: 'PATCH',
-            body: JSON.stringify({ status: nextStatus })
-          });
-        }
-        // Update local state
-        const r = state.requirements.find(x => x.id === req.id);
-        if (r) r.status = 'done';
-        req.status = 'done';
-        populateStatusDropdown('done');
-        showToast(`${req.code} marked done`);
-      } catch (err) {
-        showToast('Mark Done failed: ' + (err.message || err));
-      } finally {
-        btn.disabled = false;
-        btn.textContent = '\u2705 Mark Done';
-      }
-    }
 
     function getFilteredRequirements() {
       const category = qs('categoryFilter').value;
@@ -1388,7 +1324,7 @@
       if (uatTabActive) {
         if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); vb.style.display = 'none'; }
         if (lessonsActive) { lessonsActive = false; qs('lessonsBtn').classList.remove('active'); lp.style.display = 'none'; }
-        if (promptsTabActive) { promptsTabActive = false; qs('promptsTabBtn').classList.remove('active'); qs('promptsTabPanel').style.display = 'none'; }
+        if (promptsTabActive) { promptsTabActive = false; qs('promptsTabBtn').classList.remove('active'); qs('promptsPanel').style.display = 'none'; }
         btn.classList.add('active');
         hierarchy.style.display = 'none';
         panel.style.display = 'block';
@@ -1486,7 +1422,7 @@
     function togglePromptsTab() {
       promptsTabActive = !promptsTabActive;
       const btn = qs('promptsTabBtn');
-      const panel = qs('promptsTabPanel');
+      const panel = qs('promptsPanel');
       const hierarchy = qs('hierarchy');
       const vb = qs('visionBoard');
       const lp = qs('lessonsPanel');
@@ -1592,7 +1528,7 @@
         // Deactivate other views
         if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); vb.style.display = 'none'; }
         if (uatTabActive) { uatTabActive = false; qs('uatTabBtn').classList.remove('active'); qs('uatPanel').style.display = 'none'; }
-        if (promptsTabActive) { promptsTabActive = false; qs('promptsTabBtn').classList.remove('active'); qs('promptsTabPanel').style.display = 'none'; }
+        if (promptsTabActive) { promptsTabActive = false; qs('promptsTabBtn').classList.remove('active'); qs('promptsPanel').style.display = 'none'; }
         btn.classList.add('active');
         hierarchy.style.display = 'none';
         panel.style.display = 'block';
@@ -2020,7 +1956,7 @@
       qs('dSprint').value = req.sprint_id || '';
       qs('dPriority').value = req.priority;
       qs('dType').value = req.type;
-      populateStatusDropdown(req.status);
+      qs('dStatus').value = req.status;
       qs('dCheckpoint').style.display = 'none';
       qs('dCheckpoint').textContent = '';
       qs('dVersion').value = req.target_version || '';
@@ -2045,8 +1981,6 @@
           const r = state.requirements.find(x => x.id === targetReq.id);
           if (r) r.status = newStatus;
           state.selectedReq.status = newStatus;
-          // MP15: Refresh dropdown to show valid transitions from new state
-          populateStatusDropdown(newStatus);
         } catch (err) {
           showToast('State update failed: ' + (err.message || err));
         }
@@ -2383,35 +2317,26 @@
     }
 
     // MM10B: Active Prompts — two-section redesign
-    // MM11: Section A filtered to min_hours=0.2&days=14 (no seed noise)
-    // MM11: Section B filtered to days=14 by default + Show History toggle
-    let showUATHistory = false;
     async function loadActivePrompts() {
       try {
-        // Section A: draft prompts awaiting PL approval — real sprints only (>0.1h, last 14 days)
-        const draftsRes = await api('/api/prompts?status=draft&min_hours=0.2&days=14&limit=20');
+        // Section A: draft prompts awaiting PL approval
+        const draftsRes = await api('/api/prompts/?status=draft&limit=20');
         const drafts = (Array.isArray(draftsRes) ? draftsRes : (draftsRes.prompts || []))
           .filter(p => p.status === 'draft');
 
-        // Section B: uat_ready requirements — recent only by default
+        // Section B: uat_ready requirements
         let uatItems = [];
         try {
-          const uatUrl = showUATHistory
-            ? '/api/roadmap/requirements?status=uat_ready&limit=50'
-            : '/api/roadmap/requirements?status=uat_ready&days=14&limit=20';
-          const uatRes = await api(uatUrl);
+          const uatRes = await api('/api/roadmap/requirements?status=uat_ready&limit=20');
           uatItems = uatRes.requirements || uatRes || [];
         } catch(e) { /* non-fatal */ }
 
         const hasContent = drafts.length || uatItems.length;
-        // MM16-REQ-002: always show panel — display empty state when no items
         if (!hasContent) {
-          qs('needsApprovalList').innerHTML = '';
-          qs('needsApprovalSection').style.display = 'none';
-          qs('runUatsList').innerHTML = '<div style="color:var(--muted);font-size:12px;padding:4px 0">No active prompts or UATs. Click Refresh to check again.</div>';
-          qs('runUatsSection').style.display = '';
+          qs('promptsPanel').style.display = 'none';
           return;
         }
+        qs('promptsPanel').style.display = '';
 
         // Section A: Needs Approval
         const needsEl = qs('needsApprovalList');
@@ -2457,9 +2382,7 @@
           qs('runUatsSection').style.display = 'none';
         }
       } catch(e) {
-        // MM16-REQ-002: show error in panel instead of hiding
-        qs('needsApprovalSection').style.display = 'none';
-        qs('runUatsList').innerHTML = '<div style="color:var(--muted);font-size:12px;padding:4px 0">Could not load active prompts.</div>';
+        qs('promptsPanel').style.display = 'none';
       }
     }
 
@@ -3152,11 +3075,36 @@
       } catch(e) { return isoString; }
     }
 
-    // MM10B: Active Jobs Panel
+    // MP10: Active Jobs Panel with CC Session Signals + Copy PTH
     async function loadJobsStatus() {
       const el = qs('jobsList');
       const lastUpdatedEl = qs('jobsLastUpdated');
       if (lastUpdatedEl) lastUpdatedEl.textContent = 'Last updated: ' + formatTimestamp(new Date().toISOString());
+
+      // MP10 BUG-016: RUNNING section — active CC sessions only
+      let sessionsHtml = '';
+      try {
+        const sessData = await api('/api/prompts/active-sessions');
+        const sessions = sessData.sessions || [];
+        if (sessions.length) {
+          sessionsHtml = '<div style="font-size:11px;font-weight:700;color:#eab308;text-transform:uppercase;letter-spacing:.05em;margin:0 0 4px">RUNNING</div>' +
+            sessions.map(s =>
+              `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)">
+                <span style="background:#eab308;color:#000;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700">RUNNING</span>
+                <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">PTH: ${s.pth}</span>
+                <span style="font-weight:600;font-size:11px">${(s.sprint_id || '').slice(0,35)}</span>
+                <span style="color:var(--muted);font-size:10px;margin-left:auto">${formatTimestamp(s.session_started_at)}</span>
+              </div>`
+            ).join('') + '<div style="margin-bottom:8px"></div>';
+        } else {
+          sessionsHtml = '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin:0 0 4px">RUNNING</div>' +
+            '<span style="color:var(--muted);font-size:12px">No active sessions</span>' +
+            '<div style="margin-bottom:8px"></div>';
+        }
+      } catch(e) { /* non-fatal */ }
+
+      // Jobs section
+      let jobsHtml = '';
       try {
         const data = await api('/api/prompts/jobs/status');
         const loop1 = data.loop1 || [];
@@ -3167,23 +3115,11 @@
           ...loop2.map(j => ({...j, label: 'Loop 2 (Review)'})),
           ...loop3.map(j => ({...j, label: 'Loop 3 (UAT)'}))
         ];
-        // MM13-REQ-002: hide ALL terminal states + running jobs older than 60 min
-        const TERMINAL = new Set(['stale', 'succeeded', 'failed', 'done', 'complete']);
-        const now = Date.now();
-        const visible = all.filter(j => {
-          if (TERMINAL.has(j.status)) return false;
-          // Running jobs older than 60 min are likely finished — Cloud Run Jobs API doesn't always report terminal
-          if (j.status === 'running' && j.started) {
-            const age = now - new Date(j.started).getTime();
-            if (age > 60 * 60 * 1000) return false;
-          }
-          return true;
-        });
-        if (!visible.length) {
-          el.innerHTML = '<span style="color:var(--muted)">No active jobs. Loops idle.</span>';
+        if (!all.length) {
+          jobsHtml = '<span style="color:var(--muted)">No jobs in last 24h. Loops idle.</span>';
         } else {
-          const statusColor = s => s === 'running' ? '#eab308' : '#ef4444';
-          el.innerHTML = visible.map(j => {
+          const statusColor = s => s === 'running' ? '#eab308' : s === 'succeeded' ? '#22c55e' : '#ef4444';
+          jobsHtml = all.map(j => {
             const pthLabel = j.pth
               ? `<span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">PTH: ${j.pth}</span>`
               : `<span style="color:var(--muted);font-family:monospace;font-size:10px">${(j.name||'').split('/').pop().split('-').slice(-2).join('-')}</span>`;
@@ -3196,44 +3132,56 @@
           }).join('');
         }
       } catch(e) {
-        el.innerHTML = `<span style="color:#ef4444">Jobs API error: ${e.message}</span>`;
+        jobsHtml = `<span style="color:#ef4444">Jobs API error: ${e.message}</span>`;
       }
+      el.innerHTML = sessionsHtml + jobsHtml;
 
-      // Approved prompts launch list — only recent (filtered server-side by not-cancelled)
+      // MP10 BUG-014: Approved prompts — Copy PTH (replaces Launch button)
       try {
         const promptsData = await api('/api/prompts/?status=approved&limit=10');
         const approved = (Array.isArray(promptsData) ? promptsData : (promptsData.prompts || []))
           .filter(p => p.status === 'approved');
         const launchEl = qs('approvedPromptsList');
         if (approved.length) {
-          launchEl.innerHTML = '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin:8px 0 4px">Approved — Ready to Launch</div>' +
-            `<div id="launchList">` +
+          launchEl.innerHTML = '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin:8px 0 4px">Approved — Ready for CC</div>' +
             approved.map(p =>
-              `<div id="launch-${p.pth}" style="display:flex;align-items:center;gap:8px;padding:3px 0">
+              `<div style="display:flex;align-items:center;gap:8px;padding:3px 0">
                 <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">${p.pth || p.id}</span>
                 <span style="color:var(--muted);font-size:11px">${(p.sprint_id || '').slice(0,35)}</span>
                 <span style="color:var(--muted);font-size:10px">${formatTimestamp(p.created_at)}</span>
-                <button onclick="launchJob('${p.pth}', this)" style="font-size:10px;padding:1px 8px;background:#3b82f6;color:#fff;border:none;border-radius:3px;cursor:pointer;margin-left:auto">Launch</button>
+                <button onclick="copyPth('${p.pth}', this)" style="font-size:10px;padding:1px 8px;background:#6366f1;color:#fff;border:none;border-radius:3px;cursor:pointer;margin-left:auto">Copy PTH</button>
               </div>`
-            ).join('') + `</div>`;
+            ).join('');
         } else {
           launchEl.innerHTML = '';
         }
       } catch(e) { /* non-fatal */ }
+
+      // MP10 REQ-028: Stale drafts banner
+      try {
+        const staleData = await api('/api/prompts/stale-drafts');
+        const staleBanner = document.getElementById('staleDraftsBanner');
+        if (staleData.count > 0 && staleBanner) {
+          staleBanner.innerHTML = `<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:8px 12px;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:#92400e;font-weight:600">${staleData.count} prompt${staleData.count > 1 ? 's have' : ' has'} been waiting &gt;24h — <a href="/prompts" style="color:#b45309;text-decoration:underline">review</a></span>
+            <button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;color:#92400e;cursor:pointer;font-size:14px">&times;</button>
+          </div>`;
+          staleBanner.style.display = '';
+        } else if (staleBanner) {
+          staleBanner.style.display = 'none';
+        }
+      } catch(e) { /* non-fatal */ }
     }
 
-    async function launchJob(pth, btn) {
-      // MM10B: optimistic removal — hide row immediately
-      const row = document.getElementById('launch-' + pth);
-      if (row) row.style.display = 'none';
-      if (btn) btn.disabled = true;
+    async function copyPth(pth, btn) {
       try {
-        await api('/api/prompts/jobs/launch', {method:'POST', body: JSON.stringify({pth})});
+        await navigator.clipboard.writeText(pth);
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.style.background = '#22c55e';
+        setTimeout(() => { btn.textContent = orig; btn.style.background = '#6366f1'; }, 1500);
       } catch(e) {
-        // Restore on failure
-        if (row) row.style.display = '';
-        if (btn) btn.disabled = false;
-        alert(`Launch failed: ${e.message}`);
+        alert('Copy failed: ' + e.message);
       }
     }
 

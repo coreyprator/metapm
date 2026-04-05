@@ -712,3 +712,60 @@ async def launch_job(payload: dict):
         raise HTTPException(status_code=400, detail="pth required")
     await trigger_cloud_run_job_immediate("metapm-loop1-worker", pth=pth)
     return {"launched": True, "pth": pth}
+
+
+@router.get("/active-sessions")
+async def get_active_sessions():
+    """MP10: Return prompts with active CC sessions (started but not ended)."""
+    rows = execute_query("""
+        SELECT p.id, p.pth, p.sprint_id, p.status, p.session_started_at,
+               proj.name as project_name, proj.emoji as project_emoji
+        FROM cc_prompts p
+        LEFT JOIN roadmap_projects proj ON p.project_id = proj.id
+        WHERE p.session_started_at IS NOT NULL AND p.session_ended_at IS NULL
+        ORDER BY p.session_started_at DESC
+    """, fetch="all") or []
+    return {
+        "sessions": [
+            {
+                "id": r["id"],
+                "pth": r.get("pth"),
+                "sprint_id": r.get("sprint_id"),
+                "status": r.get("status"),
+                "session_started_at": str(r["session_started_at"]) if r.get("session_started_at") else None,
+                "project_name": r.get("project_name"),
+                "project_emoji": r.get("project_emoji"),
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.get("/stale-drafts")
+async def get_stale_drafts():
+    """MP10 REQ-028: Return prompts in draft/approved status older than 24h with no session started."""
+    rows = execute_query("""
+        SELECT p.id, p.pth, p.sprint_id, p.status, p.created_at,
+               proj.name as project_name, proj.emoji as project_emoji
+        FROM cc_prompts p
+        LEFT JOIN roadmap_projects proj ON p.project_id = proj.id
+        WHERE p.status IN ('draft', 'approved')
+          AND p.created_at < DATEADD(hour, -24, GETUTCDATE())
+          AND p.session_started_at IS NULL
+        ORDER BY p.created_at ASC
+    """, fetch="all") or []
+    return {
+        "count": len(rows),
+        "prompts": [
+            {
+                "id": r["id"],
+                "pth": r.get("pth"),
+                "sprint_id": r.get("sprint_id"),
+                "status": r.get("status"),
+                "created_at": str(r["created_at"]) if r.get("created_at") else None,
+                "project_name": r.get("project_name"),
+                "project_emoji": r.get("project_emoji"),
+            }
+            for r in rows
+        ]
+    }
