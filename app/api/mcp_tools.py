@@ -17,6 +17,10 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import Settings
 from app.core.database import execute_query
+from app.core.state_machine import (
+    validate_prompt_transition, write_prompt_history, write_prompt_failure,
+    write_requirement_failure, write_failure_event, InvalidTransitionError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -277,6 +281,18 @@ TOOLS = [
             "required": ["pth", "status", "timestamp"],
         },
     },
+    {
+        "name": "get_requirement_history",
+        "description": "Get the full transition history for a requirement by code and project_code. Returns all state changes with success/failure status.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "code": {"type": "string", "description": "Requirement code (e.g. REQ-035)"},
+                "project_code": {"type": "string", "description": "Project code (e.g. MP)"},
+            },
+            "required": ["code", "project_code"],
+        },
+    },
 ]
 
 
@@ -288,6 +304,17 @@ def _tool_post_prompt(args: dict) -> dict:
     project_id = args["project_id"]
     content_md = args["content_md"]
     estimated_hours = args.get("estimated_hours", 1.0)
+
+    # MP12B GATE 3: PTH uniqueness — reject if active prompt exists for this PTH
+    active = execute_query(
+        "SELECT id, status FROM cc_prompts WHERE pth = ? AND project_id = ? "
+        "AND status NOT IN ('rejected', 'completed', 'stopped', 'blocked', 'cancelled', 'closed')",
+        (pth, project_id), fetch="one"
+    )
+    if active:
+        write_failure_event('duplicate_pth', pth, 'post_prompt',
+                            f"PTH '{pth}' already has active prompt (id={active['id']}) in status '{active['status']}'")
+        return {"error": f"PTH '{pth}' already has an active prompt in status '{active['status']}'. Reject or complete it first."}
 
     result = execute_query("""
         INSERT INTO cc_prompts
@@ -305,7 +332,10 @@ def _tool_post_prompt(args: dict) -> dict:
     if not result:
         return {"error": "Failed to create prompt"}
 
-    # Auto-advance linked requirement from cai_designing → cc_prompt_ready
+    # MP12B: Write initial history row for draft creation
+    write_prompt_history(result["id"], pth, None, 'draft', 'CAI', 'post_prompt')
+
+    # Auto-advance linked requirement from cai_designing -> cc_prompt_ready
     requirement_advanced = None
     try:
         req_row = execute_query(
@@ -319,6 +349,10 @@ def _tool_post_prompt(args: dict) -> dict:
             )
             requirement_advanced = {"code": req_row["code"], "new_status": "cc_prompt_ready"}
             logger.info(f"post_prompt: auto-advanced {req_row['code']} to cc_prompt_ready for PTH {pth}")
+        else:
+            # MP12B: orphan detection
+            write_failure_event('orphan_pth', pth, 'post_prompt',
+                                f"No requirement found at cai_designing for PTH '{pth}' during post_prompt.")
     except Exception as e:
         logger.warning(f"post_prompt: requirement auto-advance failed (non-fatal): {e}")
 
@@ -505,11 +539,14 @@ def _tool_reject_prompt(args: dict) -> dict:
     current = row.get("status", "")
     terminal = ("rejected", "completed", "stopped", "closed", "cancelled")
     if current in terminal:
+        write_prompt_failure(row["id"], pth, current, 'rejected', 'CAI', 'reject_prompt',
+                             f"Cannot reject prompt in terminal status '{current}'.")
         return {"error": f"Cannot reject prompt in terminal status '{current}'."}
     execute_query(
         "UPDATE cc_prompts SET status='rejected', rejection_reason=?, updated_at=GETUTCDATE() WHERE id=?",
         (reason[:500] if reason else None, row["id"]), fetch="none"
     )
+    write_prompt_history(row["id"], pth, current, 'rejected', 'CAI', 'reject_prompt')
     return {
         "pth": pth,
         "status": "rejected",
@@ -586,11 +623,21 @@ def _tool_patch_requirement_status(args: dict) -> dict:
             if missing:
                 shell_id = str(shell["id"])
                 patch_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{shell_id}"
+                reason = f"Handoff incomplete - missing fields: {', '.join(missing)}"
+                write_requirement_failure(req_id, current, 'cc_complete', 'CC', 'patch_requirement_status', reason)
                 return {
-                    "error": f"Handoff incomplete — missing fields: {', '.join(missing)}. Fill via PATCH {patch_url} before advancing to cc_complete.",
+                    "error": f"{reason}. Fill via PATCH {patch_url} before advancing to cc_complete.",
                     "handoff_shell_id": shell_id,
                     "missing_fields": missing,
                 }
+
+    # MP12B GATE 2: manual patch to uat_ready requires uat_url
+    if status == 'uat_ready':
+        req_full = execute_query("SELECT uat_url FROM roadmap_requirements WHERE id = ?", (req_id,), fetch="one")
+        if req_full and not req_full.get('uat_url'):
+            reason = 'missing_uat_url: cannot advance to uat_ready without a linked UAT spec'
+            write_requirement_failure(req_id, current, 'uat_ready', 'CAI', 'patch_requirement_status', reason)
+            return {"error": "Cannot advance to uat_ready: no UAT spec linked. Call post_uat_spec first."}
 
     execute_query(
         "UPDATE roadmap_requirements SET status = ?, updated_at = GETDATE() WHERE id = ?",
@@ -687,7 +734,9 @@ def _tool_post_uat_spec(args: dict) -> dict:
     test_cases_raw = args.get("test_cases", [])
 
     if not test_cases_raw:
-        return {"error": "test_cases must not be empty (BA15 guard)"}
+        write_failure_event('empty_test_cases', pth, 'post_uat_spec',
+                            'UAT spec rejected: test_cases array was empty. Zero-BV spec produces zero-evidence pass.')
+        return {"error": "UAT spec requires at least one test case. A zero-BV spec produces a zero-evidence pass and is not permitted."}
 
     tc_json = json.dumps([
         {
@@ -765,7 +814,7 @@ def _tool_post_uat_spec(args: dict) -> dict:
         except Exception as bv_err:
             logger.warning(f"post_uat_spec BV item upsert failed for {bv_id}: {bv_err}")
 
-    # Auto-advance linked requirement from cc_complete → uat_ready
+    # Auto-advance linked requirement from cc_complete -> uat_ready
     try:
         req_row = execute_query(
             "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ? AND status = 'cc_complete'",
@@ -777,6 +826,9 @@ def _tool_post_uat_spec(args: dict) -> dict:
                 (uat_url, req_row["id"]), fetch="none"
             )
             logger.info(f"post_uat_spec: auto-advanced {req_row['code']} to uat_ready for PTH {pth}")
+        else:
+            write_failure_event('orphan_pth', pth, 'post_uat_spec',
+                                f"No requirement found at cc_complete for PTH '{pth}' during post_uat_spec.")
     except Exception as e:
         logger.warning(f"post_uat_spec: requirement auto-advance failed (non-fatal): {e}")
 
@@ -892,7 +944,7 @@ def _tool_create_handoff_shell(args: dict) -> dict:
     handoff_id = str(result["id"])
     patch_url = f"https://metapm.rentyourcio.com/mcp/handoffs/{handoff_id}"
 
-    # Auto-advance linked requirement from cc_executing → cc_complete
+    # Auto-advance linked requirement from cc_executing -> cc_complete
     requirement_advanced = None
     try:
         req_row = execute_query(
@@ -906,6 +958,9 @@ def _tool_create_handoff_shell(args: dict) -> dict:
             )
             requirement_advanced = {"code": req_row["code"], "new_status": "cc_complete"}
             logger.info(f"create_handoff_shell: auto-advanced {req_row['code']} to cc_complete for PTH {pth}")
+        else:
+            write_failure_event('orphan_pth', pth, 'create_handoff_shell',
+                                f"No requirement found at cc_executing for PTH '{pth}' during create_handoff_shell.")
     except Exception as e:
         logger.warning(f"create_handoff_shell: requirement auto-advance failed (non-fatal): {e}")
 
@@ -1000,8 +1055,11 @@ def _tool_post_session_signal(args: dict) -> dict:
         return {"error": f"Prompt '{pth}' not found"}
 
     prompt_id = row["id"]
+    from_status = row["status"]
+    response = {"pth": pth, "signal": status, "timestamp": timestamp}
 
     if status == "started":
+        new_status = 'executing'
         execute_query("""
             UPDATE cc_prompts
             SET status = 'executing',
@@ -1010,7 +1068,29 @@ def _tool_post_session_signal(args: dict) -> dict:
                 updated_at = GETUTCDATE()
             WHERE id = ?
         """, (timestamp, prompt_id), fetch="none")
+        write_prompt_history(prompt_id, pth, from_status, new_status, 'CC', 'post_session_signal')
+
+        # MP12B ITEM 6: Auto-advance requirement cc_prompt_ready -> cc_executing
+        try:
+            req_row = execute_query(
+                "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ? AND status = 'cc_prompt_ready'",
+                (pth,), fetch="one"
+            )
+            if req_row:
+                execute_query(
+                    "UPDATE roadmap_requirements SET status = 'cc_executing', updated_at = GETUTCDATE() WHERE id = ?",
+                    (req_row["id"],), fetch="none"
+                )
+                response['requirement_advanced'] = {'code': req_row['code'], 'new_status': 'cc_executing'}
+                logger.info(f"post_session_signal: auto-advanced {req_row['code']} to cc_executing for PTH {pth}")
+            else:
+                write_failure_event('orphan_pth', pth, 'post_session_signal',
+                                    f"session-start for PTH '{pth}' found no requirement at cc_prompt_ready.")
+        except Exception as e:
+            logger.warning(f"post_session_signal: requirement auto-advance failed (non-fatal): {e}")
+
     elif status == "completed":
+        new_status = 'completed'
         execute_query("""
             UPDATE cc_prompts
             SET status = 'completed',
@@ -1019,7 +1099,10 @@ def _tool_post_session_signal(args: dict) -> dict:
                 updated_at = GETUTCDATE()
             WHERE id = ?
         """, (timestamp, prompt_id), fetch="none")
+        write_prompt_history(prompt_id, pth, from_status, new_status, 'CC', 'post_session_signal')
+
     elif status in ("stopped", "blocked"):
+        new_status = 'stopped'
         execute_query("""
             UPDATE cc_prompts
             SET status = 'stopped',
@@ -1029,12 +1112,51 @@ def _tool_post_session_signal(args: dict) -> dict:
                 updated_at = GETUTCDATE()
             WHERE id = ?
         """, (timestamp, status, reason[:500], prompt_id), fetch="none")
+        write_prompt_history(prompt_id, pth, from_status, new_status, 'CC', 'post_session_signal')
+
+    response["message"] = f"Session signal '{status}' recorded for {pth}."
+    return response
+
+
+def _tool_get_requirement_history(args: dict) -> dict:
+    """MP12B: Get requirement transition history by code and project_code."""
+    code = args["code"]
+    project_code = args["project_code"]
+
+    req = execute_query(
+        "SELECT r.id, r.code FROM roadmap_requirements r "
+        "JOIN roadmap_projects p ON r.project_id = p.id "
+        "WHERE r.code = ? AND p.code = ?",
+        (code, project_code), fetch="one"
+    )
+    if not req:
+        return {"error": f"Requirement '{code}' in project '{project_code}' not found"}
+
+    rows = execute_query("""
+        SELECT id, requirement_id, changed_at, changed_by, field_name,
+               old_value, new_value, sprint_id, notes, success, blocked_reason
+        FROM requirement_history
+        WHERE requirement_id = ? AND field_name = 'status'
+        ORDER BY changed_at DESC
+    """, (req["id"],), fetch="all") or []
 
     return {
-        "pth": pth,
-        "signal": status,
-        "timestamp": timestamp,
-        "message": f"Session signal '{status}' recorded for {pth}.",
+        "code": code,
+        "project_code": project_code,
+        "count": len(rows),
+        "history": [
+            {
+                "id": r["id"],
+                "from_status": r.get("old_value"),
+                "to_status": r.get("new_value"),
+                "changed_at": str(r["changed_at"]) if r.get("changed_at") else None,
+                "changed_by": r.get("changed_by"),
+                "notes": r.get("notes"),
+                "success": bool(r.get("success", 1)),
+                "blocked_reason": r.get("blocked_reason"),
+            }
+            for r in rows
+        ],
     }
 
 
@@ -1059,6 +1181,7 @@ TOOL_HANDLERS = {
     "get_challenge": _tool_get_challenge,
     "verify_challenge": _tool_verify_challenge,
     "post_session_signal": _tool_post_session_signal,
+    "get_requirement_history": _tool_get_requirement_history,
 }
 
 

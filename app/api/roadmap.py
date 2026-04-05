@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import PlainTextResponse
 
 from app.core.database import execute_query
+from app.core.state_machine import write_requirement_failure, write_failure_event
 from app.schemas.roadmap import (
     ProjectCreate, ProjectUpdate, ProjectResponse, ProjectListResponse,
     SprintCreate, SprintUpdate, SprintResponse, SprintListResponse,
@@ -470,8 +471,7 @@ async def list_requirements(
     sprint_id: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     limit: int = Query(50, le=500),
-    offset: int = Query(0),
-    days: Optional[int] = Query(None),
+    offset: int = Query(0)
 ):
     """List requirements with filters. status=not_done excludes done/closed."""
     try:
@@ -502,9 +502,6 @@ async def list_requirements(
         if sprint_id:
             where_clauses.append("r.sprint_id = ?")
             params.append(sprint_id)
-        if days is not None:
-            where_clauses.append("r.updated_at > DATEADD(day, ?, GETUTCDATE())")
-            params.append(-days)
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
@@ -1573,9 +1570,9 @@ async def assign_pth(requirement_id: str, body: PthAssignRequest = None):
         assigned_by = 'cai'
 
         if body and body.pth:
-            # Validate format: 4 uppercase alphanumeric chars (hex or mixed)
-            if not _re.match(r'^[0-9A-Z]{4}$', body.pth):
-                raise HTTPException(status_code=400, detail="PTH must be exactly 4 uppercase alphanumeric characters (0-9, A-Z).")
+            # Validate format: exactly 4 uppercase hex chars
+            if not _re.match(r'^[0-9A-F]{4}$', body.pth):
+                raise HTTPException(status_code=400, detail="PTH must be exactly 4 uppercase hex characters (0-9, A-F).")
             pth_value = body.pth
             assigned_by = 'human'
         else:
@@ -1668,10 +1665,10 @@ async def transition_requirement_status(requirement_id: str, body: StatusTransit
         # Validate transition (None = legacy, allow any)
         allowed = VALID_TRANSITIONS.get(current_status)
         if allowed is not None and new_status not in allowed:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid transition: {current_status} → {new_status}. Allowed: {', '.join(allowed)}"
-            )
+            reason = f"Invalid transition: {current_status} -> {new_status}. Allowed: {', '.join(allowed)}"
+            write_requirement_failure(requirement_id, current_status, new_status,
+                                      body.changed_by, 'transition_requirement_status', reason)
+            raise HTTPException(status_code=400, detail=reason)
 
         # Update status
         execute_query("""
@@ -1819,6 +1816,8 @@ async def update_requirement_state(req_id: str, body: StateTransition):
 
         # PTH gate: block cc_prompt_ready without PTH (MP-PTH-GATE-001)
         if new_status == 'cc_prompt_ready' and not req.get('pth') and not body.override_gate:
+            reason = "PTH required before advancing to cc_prompt_ready"
+            write_requirement_failure(req_id, current_status, new_status, 'system', 'update_requirement_state', reason)
             raise HTTPException(
                 status_code=400,
                 detail="PTH required before advancing to cc_prompt_ready. Call POST /api/roadmap/requirements/{id}/assign-pth first."
@@ -1828,10 +1827,9 @@ async def update_requirement_state(req_id: str, body: StateTransition):
         if new_status != current_status:
             allowed = LIFECYCLE_VALID_TRANSITIONS.get(current_status)
             if allowed is not None and new_status not in allowed:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid transition: {current_status} -> {new_status}. Allowed: {allowed}"
-                )
+                reason = f"Invalid transition: {current_status} -> {new_status}. Allowed: {allowed}"
+                write_requirement_failure(req_id, current_status, new_status, 'system', 'update_requirement_state', reason)
+                raise HTTPException(status_code=400, detail=reason)
 
         execute_query(
             "UPDATE roadmap_requirements SET status = ?, updated_at = GETDATE() WHERE id = ?",

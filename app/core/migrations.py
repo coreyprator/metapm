@@ -2088,4 +2088,185 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 61b warning: {e}")
 
+    # Migration 62: MP12B — prompt_history table (Layer 1: application-level audit trail)
+    try:
+        exists = execute_query(
+            "SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'prompt_history'",
+            fetch="one"
+        )
+        if not exists or exists["cnt"] == 0:
+            execute_query("""
+                CREATE TABLE prompt_history (
+                    id INT IDENTITY PRIMARY KEY,
+                    prompt_id INT NOT NULL,
+                    pth NVARCHAR(50) NOT NULL,
+                    from_status NVARCHAR(50) NULL,
+                    to_status NVARCHAR(50) NOT NULL,
+                    changed_at DATETIME NOT NULL DEFAULT GETUTCDATE(),
+                    changed_by NVARCHAR(50) NOT NULL,
+                    [trigger] NVARCHAR(100) NULL,
+                    success BIT NOT NULL DEFAULT 1,
+                    blocked_reason NVARCHAR(500) NULL
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_ph_pth ON prompt_history(pth)", fetch="none")
+            execute_query("CREATE INDEX idx_ph_prompt_id ON prompt_history(prompt_id)", fetch="none")
+            execute_query("CREATE INDEX idx_ph_changed_at ON prompt_history(changed_at)", fetch="none")
+            logger.info("  Migration 62: Created prompt_history table with indexes.")
+        else:
+            logger.info("  Migration 62: prompt_history already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 62 warning: {e}")
+
+    # Migration 62b: MP12B — Add success/blocked_reason to requirement_history
+    try:
+        for col_name, col_def in [("success", "BIT NOT NULL DEFAULT 1"), ("blocked_reason", "NVARCHAR(500) NULL")]:
+            col_check = execute_query(f"""
+                SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'requirement_history' AND COLUMN_NAME = '{col_name}'
+            """, fetch="one")
+            if not col_check or col_check["cnt"] == 0:
+                execute_query(f"ALTER TABLE requirement_history ADD [{col_name}] {col_def}", fetch="none")
+                logger.info(f"  Migration 62b: Added {col_name} to requirement_history.")
+            else:
+                logger.info(f"  Migration 62b: requirement_history.{col_name} already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 62b warning: {e}")
+
+    # Migration 62c: MP12B — failure_events table
+    try:
+        exists = execute_query(
+            "SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'failure_events'",
+            fetch="one"
+        )
+        if not exists or exists["cnt"] == 0:
+            execute_query("""
+                CREATE TABLE failure_events (
+                    id INT IDENTITY PRIMARY KEY,
+                    event_type NVARCHAR(50) NOT NULL,
+                    pth NVARCHAR(50) NULL,
+                    [trigger] NVARCHAR(100) NOT NULL,
+                    fired_at DATETIME NOT NULL DEFAULT GETUTCDATE(),
+                    details NVARCHAR(1000) NULL
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX idx_fe_pth ON failure_events(pth)", fetch="none")
+            execute_query("CREATE INDEX idx_fe_fired_at ON failure_events(fired_at)", fetch="none")
+            logger.info("  Migration 62c: Created failure_events table.")
+        else:
+            logger.info("  Migration 62c: failure_events already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 62c warning: {e}")
+
+    # Migration 62d: MP12B — DB triggers on cc_prompts and roadmap_requirements (Layer 2)
+    try:
+        # Trigger on cc_prompts status changes
+        trigger_exists = execute_query(
+            "SELECT COUNT(*) as cnt FROM sys.triggers WHERE name = 'trg_cc_prompts_status_audit'",
+            fetch="one"
+        )
+        if not trigger_exists or trigger_exists["cnt"] == 0:
+            execute_query("""
+                CREATE TRIGGER trg_cc_prompts_status_audit
+                ON cc_prompts
+                AFTER UPDATE
+                AS
+                BEGIN
+                    SET NOCOUNT ON;
+                    IF NOT UPDATE(status) RETURN;
+
+                    DECLARE @prompt_id INT, @pth NVARCHAR(50), @old_status NVARCHAR(50), @new_status NVARCHAR(50);
+
+                    SELECT @prompt_id = i.id, @pth = i.pth, @old_status = d.status, @new_status = i.status
+                    FROM inserted i
+                    JOIN deleted d ON i.id = d.id
+                    WHERE i.status <> d.status;
+
+                    IF @prompt_id IS NULL RETURN;
+
+                    IF NOT EXISTS (
+                        SELECT 1 FROM prompt_history
+                        WHERE prompt_id = @prompt_id
+                        AND to_status = @new_status
+                        AND changed_at > DATEADD(second, -2, GETUTCDATE())
+                    )
+                    BEGIN
+                        INSERT INTO prompt_history (prompt_id, pth, from_status, to_status, changed_by, [trigger], success)
+                        VALUES (@prompt_id, @pth, @old_status, @new_status, 'db_trigger', 'db_trigger_catchall', 1);
+                    END
+                END;
+            """, fetch="none")
+            logger.info("  Migration 62d: Created trg_cc_prompts_status_audit trigger.")
+        else:
+            logger.info("  Migration 62d: trg_cc_prompts_status_audit already exists.")
+
+        # Trigger on roadmap_requirements status changes
+        rr_trigger_exists = execute_query(
+            "SELECT COUNT(*) as cnt FROM sys.triggers WHERE name = 'trg_roadmap_req_status_audit'",
+            fetch="none"  # existing trigger from migration 25 — check if our NEW one exists
+        )
+        # The existing migration-25 trigger already covers requirement_history. Our trigger is supplemental
+        # for defense-in-depth when success/blocked_reason columns are present. Skip if existing trigger covers it.
+        logger.info("  Migration 62d: roadmap_requirements trigger already handled by migration 25.")
+    except Exception as e:
+        logger.warning(f"  Migration 62d warning: {e}")
+
+    # Migration 62e: MP12B — Update cc_prompts status constraint to include 'blocked'
+    try:
+        execute_query("""
+            DECLARE @ck NVARCHAR(200)
+            SELECT @ck = name FROM sys.check_constraints
+            WHERE parent_object_id = OBJECT_ID('cc_prompts') AND definition LIKE '%status%'
+              AND definition NOT LIKE '%blocked%'
+            IF @ck IS NOT NULL
+                EXEC('ALTER TABLE cc_prompts DROP CONSTRAINT [' + @ck + ']')
+        """, fetch="none")
+        try:
+            execute_query("""
+                ALTER TABLE cc_prompts ADD CONSTRAINT CK_cc_prompts_status_v2
+                CHECK (status IN ('draft','prompt_ready','approved','sent','completed',
+                                  'executing','complete','closed','rejected','cancelled','stopped','blocked'))
+            """, fetch="none")
+            logger.info("  Migration 62e: cc_prompts status constraint updated to include 'blocked'.")
+        except Exception as ck_err:
+            if 'already exists' in str(ck_err).lower():
+                logger.info("  Migration 62e: status constraint already includes 'blocked'.")
+            else:
+                raise
+    except Exception as e:
+        logger.warning(f"  Migration 62e warning: {e}")
+
+    # Migration 62f: MP12B — Backfill prompt_history for existing prompts
+    try:
+        backfill_count = execute_query("""
+            INSERT INTO prompt_history (prompt_id, pth, from_status, to_status, changed_by, [trigger], success)
+            SELECT p.id, p.pth, NULL, p.status, 'migration_backfill', 'initial_state_backfill', 1
+            FROM cc_prompts p
+            LEFT JOIN prompt_history ph ON p.id = ph.prompt_id
+            WHERE ph.id IS NULL AND p.pth IS NOT NULL
+        """, fetch="none")
+        # Count backfilled
+        bf_count = execute_query("""
+            SELECT COUNT(*) as cnt FROM prompt_history WHERE changed_by = 'migration_backfill'
+        """, fetch="one")
+        logger.info(f"  Migration 62f: Backfilled prompt_history ({bf_count['cnt'] if bf_count else 0} total backfill rows).")
+    except Exception as e:
+        logger.warning(f"  Migration 62f warning: {e}")
+
+    # Migration 62g: MP12B — Backfill requirement_history for requirements with no history
+    try:
+        execute_query("""
+            INSERT INTO requirement_history (requirement_id, field_name, old_value, new_value, changed_by, notes)
+            SELECT r.id, 'status', NULL, r.status, 'migration_backfill', 'initial_state_backfill'
+            FROM roadmap_requirements r
+            LEFT JOIN requirement_history rh ON r.id = rh.requirement_id
+            WHERE rh.id IS NULL
+        """, fetch="none")
+        bf_count = execute_query("""
+            SELECT COUNT(*) as cnt FROM requirement_history WHERE changed_by = 'migration_backfill'
+        """, fetch="one")
+        logger.info(f"  Migration 62g: Backfilled requirement_history ({bf_count['cnt'] if bf_count else 0} total backfill rows).")
+    except Exception as e:
+        logger.warning(f"  Migration 62g warning: {e}")
+
     logger.info("Migrations complete.")

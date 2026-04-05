@@ -580,10 +580,10 @@
     </div>
     <!-- MP10: Stale Drafts Banner -->
     <div id="staleDraftsBanner" style="display:none"></div>
-    <!-- MM10B: Active Jobs Panel -->
+    <!-- MP12B: Active Jobs Panel + Job History Grid -->
     <div class="card" id="jobsPanel" style="margin-bottom:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <span style="font-weight:600;font-size:13px">⚡ Active Jobs</span>
+        <span style="font-weight:600;font-size:13px">Active Jobs</span>
         <div style="display:flex;align-items:center;gap:8px">
           <span id="jobsLastUpdated" style="font-size:10px;color:var(--muted)"></span>
           <button onclick="loadJobsStatus()" style="font-size:11px;padding:2px 8px;background:var(--panel-soft);border:1px solid var(--line);border-radius:4px;color:var(--muted);cursor:pointer">Refresh</button>
@@ -591,6 +591,34 @@
       </div>
       <div id="jobsList" style="font-size:12px;color:var(--muted)">Loading...</div>
       <div id="approvedPromptsList" style="margin-top:8px"></div>
+      <!-- MP12B: Job History Grid -->
+      <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em">Job History</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="jhStatusFilter" onchange="loadJobHistory()" style="font-size:10px;padding:2px 4px;background:var(--panel-soft);color:var(--text);border:1px solid var(--line);border-radius:3px">
+              <option value="">All statuses</option>
+              <option value="executing">Executing</option>
+              <option value="completed">Completed</option>
+              <option value="stopped">Stopped</option>
+              <option value="draft">Draft</option>
+              <option value="approved">Approved</option>
+            </select>
+            <select id="jhProjectFilter" onchange="loadJobHistory()" style="font-size:10px;padding:2px 4px;background:var(--panel-soft);color:var(--text);border:1px solid var(--line);border-radius:3px">
+              <option value="">All projects</option>
+            </select>
+          </div>
+        </div>
+        <div id="jobHistoryGrid" style="font-size:12px;color:var(--muted)">Loading history...</div>
+      </div>
+    </div>
+
+    <!-- MP12B: Prompt Detail Panel (modal overlay) -->
+    <div id="promptDetailOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:none;align-items:center;justify-content:center">
+      <div id="promptDetailPanel" style="background:var(--bg);border:1px solid var(--line);border-radius:8px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;padding:16px;position:relative">
+        <button onclick="closePromptDetail()" style="position:absolute;top:8px;right:8px;background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">&times;</button>
+        <div id="promptDetailContent">Loading...</div>
+      </div>
     </div>
 
     <div class="card hierarchy" id="hierarchy"></div>
@@ -2356,13 +2384,13 @@
             const projName = proj ? proj.name : '';
             const hrs = p.estimated_hours ? `(~${p.estimated_hours}h)` : '';
             const created = formatTimestamp(p.created_at);
-            const reviewUrl = `https://metapm.rentyourcio.com/prompts/${p.pth || p.id}`;
             return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--line);flex-wrap:wrap">
-              <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">${p.pth || p.id}</span>
+              <span onclick="openPromptDetail('${p.pth}')" style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;cursor:pointer">${p.pth || p.id}</span>
               <span style="font-size:11px">${emoji} ${projName}</span>
               <span style="font-size:11px;color:var(--muted)">${(p.sprint_id||'').slice(0,35)} ${hrs}</span>
               <span style="font-size:10px;color:var(--muted);margin-left:auto">${created}</span>
-              <a href="${reviewUrl}" target="_blank" style="font-size:10px;padding:1px 8px;background:#3b82f6;color:#fff;border:none;border-radius:3px;text-decoration:none">Review ↗</a>
+              <button onclick="approveFromPanel(${p.id}, '${p.pth}')" style="font-size:10px;padding:1px 8px;background:#22c55e;color:#fff;border:none;border-radius:3px;cursor:pointer">Approve</button>
+              <button onclick="promptDetailAction('${p.pth}', 'reject')" style="font-size:10px;padding:1px 8px;background:#ef4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Reject</button>
             </div>`;
           }).join('');
           qs('needsApprovalSection').style.display = '';
@@ -3194,12 +3222,214 @@
       }
     }
 
+    // ── MP12B: Prompt Detail Panel ──
+    async function openPromptDetail(pth) {
+      const overlay = document.getElementById('promptDetailOverlay');
+      overlay.style.display = 'flex';
+      const content = document.getElementById('promptDetailContent');
+      content.innerHTML = 'Loading...';
+
+      try {
+        const [promptRes, historyRes] = await Promise.all([
+          api(`/api/prompts/${pth}`),
+          api(`/api/prompts/${pth}/history`).catch(() => ({history: []})),
+        ]);
+
+        const p = promptRes;
+        const history = historyRes.history || [];
+
+        const statusColors = {
+          draft: '#f59e0b', approved: '#3b82f6', executing: '#eab308',
+          completed: '#22c55e', stopped: '#ef4444', rejected: '#ef4444',
+          blocked: '#ef4444', cancelled: '#6b7280',
+        };
+        const sc = statusColors[p.status] || '#6b7280';
+
+        // Section A: Prompt info
+        let html = `
+          <div style="margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="background:#fef3c7;color:#92400e;font-size:12px;font-weight:700;padding:2px 8px;border-radius:4px">${p.pth}</span>
+              <span style="background:${sc};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">${p.status.toUpperCase()}</span>
+            </div>
+            <div style="font-size:11px;color:var(--muted);display:grid;grid-template-columns:auto 1fr;gap:2px 12px">
+              <span>Sprint:</span><span>${p.sprint_id || '-'}</span>
+              <span>Project:</span><span>${p.project_emoji || ''} ${p.project_name || '-'}</span>
+              <span>Created:</span><span>${formatTimestamp(p.created_at)}</span>
+              ${p.approved_at ? `<span>Approved:</span><span>${formatTimestamp(p.approved_at)}</span>` : ''}
+              ${p.session_started_at ? `<span>Session start:</span><span>${formatTimestamp(p.session_started_at)}</span>` : ''}
+              ${p.session_ended_at ? `<span>Session end:</span><span>${formatTimestamp(p.session_ended_at)}</span>` : ''}
+              ${p.estimated_hours ? `<span>Est hours:</span><span>${p.estimated_hours}h</span>` : ''}
+            </div>
+          </div>`;
+
+        // Section B: Workflow history timeline
+        html += `<div style="border-top:1px solid var(--line);padding-top:8px;margin-bottom:12px">
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Workflow History</div>`;
+        if (history.length) {
+          html += history.map(h => {
+            const icon = h.success ? '<span style="color:#22c55e">&#10003;</span>' : '<span style="color:#ef4444">&#10007;</span>';
+            const byBadge = `<span style="background:#334155;color:#e2e8f0;font-size:9px;padding:1px 4px;border-radius:2px">${h.changed_by}</span>`;
+            const reason = (!h.success && h.blocked_reason)
+              ? `<div style="color:#ef4444;font-size:10px;margin-left:20px">${h.blocked_reason}</div>` : '';
+            const fromTo = h.from_status
+              ? `${h.from_status} &rarr; ${h.to_status}`
+              : `&rarr; ${h.to_status}`;
+            return `<div style="padding:3px 0;border-bottom:1px solid var(--line)">
+              <div style="display:flex;align-items:center;gap:6px;font-size:11px">
+                ${icon}
+                <span style="${!h.success ? 'color:#ef4444;font-weight:600' : ''}">${fromTo}</span>
+                ${byBadge}
+                <span style="font-size:9px;color:var(--muted)">${h.trigger || ''}</span>
+                <span style="font-size:10px;color:var(--muted);margin-left:auto">${formatTimestamp(h.changed_at)}</span>
+              </div>
+              ${reason}
+            </div>`;
+          }).join('');
+        } else {
+          html += '<div style="color:var(--muted);font-size:11px">No history yet</div>';
+        }
+        html += '</div>';
+
+        // Section C: Action buttons
+        html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+        if (['draft', 'approved'].includes(p.status)) {
+          html += `<button onclick="promptDetailAction('${p.pth}', 'reject')" style="font-size:11px;padding:4px 12px;background:#ef4444;color:#fff;border:none;border-radius:4px;cursor:pointer">Reject</button>`;
+        }
+        if (p.status === 'approved') {
+          html += `<button onclick="copyPth('${p.pth}', this)" style="font-size:11px;padding:4px 12px;background:#6366f1;color:#fff;border:none;border-radius:4px;cursor:pointer">Copy PTH</button>`;
+        }
+        if (p.status === 'executing') {
+          html += `<button onclick="promptDetailAction('${p.pth}', 'cancel')" style="font-size:11px;padding:4px 12px;background:#ef4444;color:#fff;border:none;border-radius:4px;cursor:pointer">Cancel Job</button>`;
+        }
+        html += `<button onclick="closePromptDetail()" style="font-size:11px;padding:4px 12px;background:var(--panel-soft);color:var(--text);border:1px solid var(--line);border-radius:4px;cursor:pointer;margin-left:auto">Close</button>`;
+        html += '</div>';
+
+        content.innerHTML = html;
+      } catch(e) {
+        content.innerHTML = `<div style="color:#ef4444">Error loading prompt: ${e.message}</div>`;
+      }
+    }
+
+    function closePromptDetail() {
+      document.getElementById('promptDetailOverlay').style.display = 'none';
+    }
+
+    async function promptDetailAction(pth, action) {
+      try {
+        if (action === 'reject') {
+          if (!confirm(`Reject prompt ${pth}?`)) return;
+          await api(`/api/prompts/${pth}/status`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json', 'X-API-Key': 'metapm-key'},
+            body: JSON.stringify({status: 'rejected', reason: 'Rejected by PL from dashboard'})
+          });
+        } else if (action === 'cancel') {
+          if (!confirm(`Cancel job for ${pth}?`)) return;
+          await api(`/api/prompts/${pth}/cancel`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json', 'X-API-Key': 'metapm-key'},
+          });
+        }
+        // Refresh the detail panel and lists
+        openPromptDetail(pth);
+        loadActivePrompts();
+        loadJobsStatus();
+      } catch(e) {
+        alert('Action failed: ' + e.message);
+      }
+    }
+
+    async function approveFromPanel(promptId, pth) {
+      if (!confirm(`Approve prompt ${pth}?`)) return;
+      try {
+        await api(`/api/prompts/${promptId}`, {
+          method: 'PATCH',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({status: 'approved', approved_by: 'PL'})
+        });
+        loadActivePrompts();
+        loadJobsStatus();
+      } catch(e) {
+        alert('Approve failed: ' + e.message);
+      }
+    }
+
+    // Click handler: close modal on overlay click (not panel click)
+    document.getElementById('promptDetailOverlay').addEventListener('click', function(e) {
+      if (e.target === this) closePromptDetail();
+    });
+
+    // ── MP12B: Job History Grid ──
+    async function loadJobHistory() {
+      const el = document.getElementById('jobHistoryGrid');
+      const statusFilter = document.getElementById('jhStatusFilter').value;
+      const projectFilter = document.getElementById('jhProjectFilter').value;
+
+      let url = '/api/prompts/sessions/history?limit=25';
+      if (statusFilter) url += `&status=${statusFilter}`;
+      if (projectFilter) url += `&project=${projectFilter}`;
+
+      try {
+        const data = await api(url);
+        const sessions = data.sessions || [];
+
+        if (!sessions.length) {
+          el.innerHTML = '<div style="color:var(--muted);font-size:11px">No sessions in selected range</div>';
+          return;
+        }
+
+        el.innerHTML = sessions.map(s => {
+          const statusColors = {
+            executing: '#eab308', completed: '#22c55e', stopped: '#ef4444',
+            draft: '#6b7280', approved: '#3b82f6', blocked: '#ef4444',
+            cancelled: '#6b7280', rejected: '#ef4444',
+          };
+          const sc = statusColors[s.status] || '#6b7280';
+          const badge = s.is_stale
+            ? '<span style="background:#f59e0b;color:#000;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700">STALE</span>'
+            : `<span style="background:${sc};color:#fff;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700">${s.status.toUpperCase()}</span>`;
+          const duration = s.duration_min ? `${s.duration_min}m` : (s.is_stale ? 'running...' : '-');
+
+          return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--line);cursor:pointer" onclick="openPromptDetail('${s.pth}')">
+            ${badge}
+            <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">${s.pth || '-'}</span>
+            <span style="font-size:11px">${s.project_emoji || ''} ${(s.project_name || '').slice(0,15)}</span>
+            <span style="font-size:10px;color:var(--muted)">${(s.sprint_id || '').slice(0,25)}</span>
+            <span style="font-size:10px;color:var(--muted);margin-left:auto">${duration}</span>
+            <span style="font-size:10px;color:var(--muted)">${formatTimestamp(s.session_started_at || s.created_at)}</span>
+          </div>`;
+        }).join('');
+      } catch(e) {
+        el.innerHTML = `<span style="color:#ef4444;font-size:11px">Error: ${e.message}</span>`;
+      }
+    }
+
+    // Populate project filter for Job History
+    function populateJobHistoryFilters() {
+      const sel = document.getElementById('jhProjectFilter');
+      if (sel && state.projects) {
+        sel.innerHTML = '<option value="">All projects</option>' +
+          state.projects.map(p => `<option value="${p.code}">${p.emoji || ''} ${p.name}</option>`).join('');
+      }
+    }
+
     loadJobsStatus();
     setInterval(loadJobsStatus, 30000);
 
+    // Run TTL auto-archive on load
+    api('/api/prompts/ttl-auto-archive', {method: 'POST'}).catch(() => {});
+
+    // Run ghost archive once
+    api('/api/prompts/archive-ghosts', {method: 'POST'}).catch(() => {});
+
     bindControls();
     loadVersion();
-    loadData().then(() => loadActivePrompts()).catch((err) => {
+    loadData().then(() => {
+      loadActivePrompts();
+      populateJobHistoryFilters();
+      loadJobHistory();
+    }).catch((err) => {
       qs('hierarchy').innerHTML = `<div style="color:#ff9a9a">Failed to load data: ${err.message}</div>`;
     });
   </script>

@@ -21,6 +21,10 @@ import requests as _requests
 
 from app.core.config import settings
 from app.core.database import execute_query
+from app.core.state_machine import (
+    validate_prompt_transition, write_prompt_history, write_prompt_failure,
+    write_failure_event, InvalidTransitionError, PROMPT_VALID_TRANSITIONS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -362,6 +366,55 @@ async def get_active_sessions():
     }
 
 
+@router.post("/ttl-auto-archive")
+async def ttl_auto_archive():
+    """MP12B BUG-023: Auto-archive sessions with session_started_at set, no session_ended_at, older than 4h."""
+    stale = execute_query("""
+        SELECT id, pth, status, session_started_at
+        FROM cc_prompts
+        WHERE session_started_at IS NOT NULL AND session_ended_at IS NULL
+          AND session_started_at < DATEADD(hour, -4, GETUTCDATE())
+    """, fetch="all") or []
+
+    archived = []
+    for row in stale:
+        execute_query("""
+            UPDATE cc_prompts
+            SET status = 'stopped', session_ended_at = GETUTCDATE(),
+                session_outcome = 'stopped', session_stop_reason = 'TTL auto-archive (4h)',
+                updated_at = GETUTCDATE()
+            WHERE id = ?
+        """, (row['id'],), fetch="none")
+        write_prompt_history(row['id'], row.get('pth', ''), row.get('status', ''),
+                             'stopped', 'system', 'ttl_auto_archive')
+        write_failure_event('ttl_auto_archive', row.get('pth', ''), 'ttl_auto_archive',
+                            f"Session for PTH '{row.get('pth')}' auto-archived after 4h with no session_ended_at.")
+        archived.append(row.get('pth'))
+        logger.info(f"[TTL] Auto-archived stale session: PTH {row.get('pth')}")
+
+    return {"archived_count": len(archived), "archived_pths": archived}
+
+
+@router.post("/archive-ghosts")
+async def archive_ghost_entries():
+    """MP12B BUG-024: One-time archive of known ghost entries."""
+    ghost_pths = ['E2E1', 'E2F1', 'A9B3', 'C4E2', 'MP-UAT-001', 'AF01Q']
+    archived = []
+    for pth in ghost_pths:
+        row = execute_query(
+            "SELECT id, status FROM cc_prompts WHERE pth = ? AND status NOT IN ('completed', 'rejected', 'cancelled', 'stopped')",
+            (pth,), fetch="one"
+        )
+        if row:
+            execute_query(
+                "UPDATE cc_prompts SET status='cancelled', updated_at=GETUTCDATE() WHERE id=?",
+                (row['id'],), fetch="none"
+            )
+            write_prompt_history(row['id'], pth, row['status'], 'cancelled', 'system', 'archive_ghosts')
+            archived.append(pth)
+    return {"archived": archived}
+
+
 @router.get("/stale-drafts")
 async def get_stale_drafts():
     """MP10 REQ-028: Return prompts in draft/approved status older than 24h with no session started."""
@@ -390,6 +443,95 @@ async def get_stale_drafts():
             for r in rows
         ]
     }
+
+
+@router.get("/sessions/history")
+async def get_sessions_history(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    status: Optional[str] = None,
+    project: Optional[str] = None,
+    limit: int = 50,
+):
+    """MP12B REQ-037: Job history grid — all sessions with filtering."""
+    where_parts = []
+    params = []
+
+    if from_date:
+        where_parts.append("p.session_started_at >= ?")
+        params.append(from_date)
+    else:
+        where_parts.append("p.created_at >= DATEADD(day, -7, GETUTCDATE())")
+
+    if to_date:
+        where_parts.append("(p.session_ended_at <= ? OR p.session_ended_at IS NULL)")
+        params.append(to_date)
+
+    if status:
+        statuses = [s.strip() for s in status.split(',')]
+        placeholders = ','.join(['?' for _ in statuses])
+        where_parts.append(f"p.status IN ({placeholders})")
+        params.extend(statuses)
+
+    if project:
+        where_parts.append("proj.code = ?")
+        params.append(project)
+
+    where_clause = " AND ".join(where_parts) if where_parts else "1=1"
+    params.append(limit)
+
+    rows = execute_query(f"""
+        SELECT TOP (?) p.id, p.pth, p.sprint_id, p.status, p.session_started_at,
+               p.session_ended_at, p.session_outcome, p.session_stop_reason,
+               p.created_at, p.estimated_hours,
+               proj.name as project_name, proj.emoji as project_emoji, proj.code as project_code
+        FROM cc_prompts p
+        LEFT JOIN roadmap_projects proj ON p.project_id = proj.id
+        WHERE {where_clause}
+        ORDER BY COALESCE(p.session_started_at, p.created_at) DESC
+    """, (*params[-1:], *params[:-1]), fetch="all") or []
+
+    sessions = []
+    for r in rows:
+        started = r.get("session_started_at")
+        ended = r.get("session_ended_at")
+        duration_min = None
+        is_stale = False
+        if started and not ended:
+            from datetime import datetime, timezone
+            try:
+                started_dt = started if isinstance(started, datetime) else datetime.fromisoformat(str(started))
+                age_hours = (datetime.now(timezone.utc) - started_dt.replace(tzinfo=timezone.utc)).total_seconds() / 3600
+                is_stale = age_hours > 2
+            except Exception:
+                pass
+        if started and ended:
+            try:
+                s_dt = started if isinstance(started, datetime) else datetime.fromisoformat(str(started))
+                e_dt = ended if isinstance(ended, datetime) else datetime.fromisoformat(str(ended))
+                duration_min = round((e_dt - s_dt).total_seconds() / 60, 1)
+            except Exception:
+                pass
+
+        sessions.append({
+            "id": r["id"],
+            "pth": r.get("pth"),
+            "sprint_id": r.get("sprint_id"),
+            "status": r.get("status"),
+            "session_started_at": str(started) if started else None,
+            "session_ended_at": str(ended) if ended else None,
+            "session_outcome": r.get("session_outcome"),
+            "session_stop_reason": r.get("session_stop_reason"),
+            "created_at": str(r["created_at"]) if r.get("created_at") else None,
+            "estimated_hours": r.get("estimated_hours"),
+            "project_name": r.get("project_name"),
+            "project_emoji": r.get("project_emoji"),
+            "project_code": r.get("project_code"),
+            "duration_min": duration_min,
+            "is_stale": is_stale,
+        })
+
+    return {"count": len(sessions), "sessions": sessions}
 
 
 @router.get("/{pth}")
@@ -535,11 +677,32 @@ async def update_prompt(prompt_id: int, patch: PromptPatch):
     set_parts = []
     params = []
 
+    # Read current state for history tracking
+    current_row = execute_query(
+        "SELECT id, pth, status FROM cc_prompts WHERE id = ?", (prompt_id,), fetch="one"
+    )
+    if not current_row:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    current_status = current_row.get('status', '')
+    pth_val = current_row.get('pth', '')
+
     if patch.status:
         valid = ('draft', 'prompt_ready', 'approved', 'sent', 'completed',
-                 'executing', 'complete', 'closed', 'rejected', 'cancelled')
+                 'executing', 'complete', 'closed', 'rejected', 'cancelled', 'stopped', 'blocked')
         if patch.status not in valid:
             raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(valid)}")
+
+        # MP12B: Validate transition and record failure if blocked
+        if patch.status != current_status and current_status in PROMPT_VALID_TRANSITIONS:
+            try:
+                validate_prompt_transition(current_status, patch.status, pth_val)
+            except InvalidTransitionError as e:
+                write_prompt_failure(
+                    prompt_id, pth_val, current_status, patch.status,
+                    patch.approved_by or 'PL', f'PATCH /{prompt_id}', str(e)
+                )
+                raise HTTPException(status_code=400, detail=str(e))
+
         set_parts.append("status = ?")
         params.append(patch.status)
 
@@ -550,9 +713,6 @@ async def update_prompt(prompt_id: int, patch: PromptPatch):
                 params.append(patch.approved_by)
             # AP06: fire Cloud Run Job immediately on PL approval (targeted mode with PTH)
             if patch.approved_by == "PL":
-                pth_row = execute_query("SELECT pth FROM cc_prompts WHERE id = ?",
-                                        (prompt_id,), fetch="one")
-                pth_val = pth_row.get("pth") if pth_row else None
                 asyncio.create_task(
                     trigger_cloud_run_job_immediate("metapm-loop1-worker", pth=pth_val)
                 )
@@ -563,8 +723,7 @@ async def update_prompt(prompt_id: int, patch: PromptPatch):
 
     if patch.content_md is not None:
         # Only allow content edits on draft prompts
-        current = execute_query("SELECT status FROM cc_prompts WHERE id = ?", (prompt_id,), fetch="one")
-        if current and current['status'] not in ('draft', 'prompt_ready'):
+        if current_status not in ('draft', 'prompt_ready'):
             raise HTTPException(status_code=400, detail="Content can only be edited when prompt is in draft status")
         set_parts.append("content_md = ?")
         params.append(patch.content_md)
@@ -580,6 +739,13 @@ async def update_prompt(prompt_id: int, patch: PromptPatch):
     execute_query(f"""
         UPDATE cc_prompts SET {', '.join(set_parts)} WHERE id = ?
     """, tuple(params), fetch="none")
+
+    # MP12B: Write prompt history for status changes
+    if patch.status and patch.status != current_status:
+        write_prompt_history(
+            prompt_id, pth_val, current_status, patch.status,
+            patch.approved_by or 'PL', f'PATCH /{prompt_id}'
+        )
 
     row = execute_query("""
         SELECT p.*, proj.name as project_name, proj.emoji as project_emoji
@@ -602,10 +768,12 @@ async def cancel_prompt(pth: str, _: bool = Depends(verify_api_key)):
     row = execute_query("SELECT id, pth, status FROM cc_prompts WHERE pth = ?", (pth,), fetch="one")
     if not row:
         raise HTTPException(status_code=404, detail=f"Prompt with PTH '{pth}' not found")
+    from_status = row.get('status', '')
     execute_query(
         "UPDATE cc_prompts SET status='cancelled', updated_at=GETUTCDATE() WHERE pth=?",
         (pth,), fetch="none"
     )
+    write_prompt_history(row['id'], pth, from_status, 'cancelled', 'CAI', 'cancel_prompt')
     logger.info(f"[MM10B] Prompt {pth} cancelled")
     return {"pth": pth, "status": "cancelled"}
 
@@ -631,6 +799,10 @@ async def update_prompt_status_by_pth(pth: str, patch: PromptStatusPatch, _: boo
     current_status = row.get("status", "")
     rejectable = ('draft', 'prompt_ready')
     if patch.status == 'rejected' and current_status not in rejectable:
+        write_prompt_failure(
+            row['id'], pth, current_status, 'rejected', 'CAI', 'update_prompt_status_by_pth',
+            f"Can only reject prompts in draft/prompt_ready status. Current: {current_status}"
+        )
         raise HTTPException(
             status_code=400,
             detail=f"Can only reject prompts in draft/prompt_ready status. Current: {current_status}"
@@ -641,8 +813,49 @@ async def update_prompt_status_by_pth(pth: str, patch: PromptStatusPatch, _: boo
         "UPDATE cc_prompts SET status=?, rejection_reason=?, updated_at=GETUTCDATE() WHERE pth=?",
         (patch.status, reason[:500] if reason else None, pth), fetch="none"
     )
-    logger.info(f"[MP11] Prompt {pth} → {patch.status}. Reason: {reason}")
+    write_prompt_history(row['id'], pth, current_status, patch.status, 'CAI', 'update_prompt_status_by_pth')
+    logger.info(f"[MP11] Prompt {pth} -> {patch.status}. Reason: {reason}")
     return {"pth": pth, "status": patch.status, "reason": reason}
+
+
+# ── MP12B: Prompt History API ──
+
+@router.get("/{pth}/history")
+async def get_prompt_history(pth: str):
+    """MP12B REQ-035: Return full transition history for a prompt by PTH."""
+    # Verify PTH exists
+    prompt = execute_query(
+        "SELECT TOP 1 id FROM cc_prompts WHERE pth = ? ORDER BY id DESC",
+        (pth,), fetch="one"
+    )
+    if not prompt:
+        raise HTTPException(status_code=404, detail=f"Prompt with PTH '{pth}' not found")
+
+    rows = execute_query("""
+        SELECT id, prompt_id, pth, from_status, to_status, changed_at,
+               changed_by, [trigger], success, blocked_reason
+        FROM prompt_history
+        WHERE pth = ?
+        ORDER BY changed_at DESC
+    """, (pth,), fetch="all") or []
+
+    return {
+        "pth": pth,
+        "count": len(rows),
+        "history": [
+            {
+                "id": r["id"],
+                "from_status": r.get("from_status"),
+                "to_status": r.get("to_status"),
+                "changed_at": str(r["changed_at"]) if r.get("changed_at") else None,
+                "changed_by": r.get("changed_by"),
+                "trigger": r.get("trigger"),
+                "success": bool(r.get("success", 1)),
+                "blocked_reason": r.get("blocked_reason"),
+            }
+            for r in rows
+        ],
+    }
 
 
 # ── AP06: Jobs Status API ──
