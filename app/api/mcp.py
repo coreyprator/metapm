@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.database import execute_query
+from app.core.state_machine import write_prompt_history, write_failure_event
 from app.schemas.mcp import (
     HandoffCreate, HandoffUpdate, HandoffResponse, HandoffListResponse,
     TaskCreate, TaskUpdate, TaskResponse, TaskListResponse,
@@ -2091,6 +2092,8 @@ async def post_session_signal(req: SessionSignalRequest):
         raise HTTPException(404, f"Prompt '{req.pth}' not found")
 
     prompt_id = row["id"]
+    from_status = row["status"]
+    response = {"pth": req.pth, "signal": req.status, "timestamp": req.timestamp}
 
     if req.status == "started":
         execute_query("""
@@ -2101,6 +2104,27 @@ async def post_session_signal(req: SessionSignalRequest):
                 updated_at = GETUTCDATE()
             WHERE id = ?
         """, (req.timestamp, prompt_id), fetch="none")
+        write_prompt_history(prompt_id, req.pth, from_status, 'executing', 'CC', 'post_session_signal')
+
+        # MP12B ITEM 6: Auto-advance requirement cc_prompt_ready -> cc_executing
+        try:
+            req_row = execute_query(
+                "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ? AND status = 'cc_prompt_ready'",
+                (req.pth,), fetch="one"
+            )
+            if req_row:
+                execute_query(
+                    "UPDATE roadmap_requirements SET status = 'cc_executing', updated_at = GETUTCDATE() WHERE id = ?",
+                    (req_row["id"],), fetch="none"
+                )
+                response['requirement_advanced'] = {'code': req_row['code'], 'new_status': 'cc_executing'}
+                logger.info(f"post_session_signal: auto-advanced {req_row['code']} to cc_executing for PTH {req.pth}")
+            else:
+                write_failure_event('orphan_pth', req.pth, 'post_session_signal',
+                                    f"session-start for PTH '{req.pth}' found no requirement at cc_prompt_ready.")
+        except Exception as e:
+            logger.warning(f"post_session_signal: requirement auto-advance failed (non-fatal): {e}")
+
     elif req.status == "completed":
         execute_query("""
             UPDATE cc_prompts
@@ -2110,6 +2134,8 @@ async def post_session_signal(req: SessionSignalRequest):
                 updated_at = GETUTCDATE()
             WHERE id = ?
         """, (req.timestamp, prompt_id), fetch="none")
+        write_prompt_history(prompt_id, req.pth, from_status, 'completed', 'CC', 'post_session_signal')
+
     elif req.status in ("stopped", "blocked"):
         execute_query("""
             UPDATE cc_prompts
@@ -2120,10 +2146,7 @@ async def post_session_signal(req: SessionSignalRequest):
                 updated_at = GETUTCDATE()
             WHERE id = ?
         """, (req.timestamp, req.status, (req.reason or "")[:500], prompt_id), fetch="none")
+        write_prompt_history(prompt_id, req.pth, from_status, 'stopped', 'CC', 'post_session_signal')
 
-    return {
-        "pth": req.pth,
-        "signal": req.status,
-        "timestamp": req.timestamp,
-        "message": f"Session signal '{req.status}' recorded for {req.pth}.",
-    }
+    response["message"] = f"Session signal '{req.status}' recorded for {req.pth}."
+    return response
