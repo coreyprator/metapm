@@ -3,14 +3,16 @@ MetaPM Roadmap API Router
 Project, Requirement, and Sprint management endpoints.
 """
 
+import csv
 import hashlib
+import io
 import logging
 import uuid
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 
 from app.core.database import execute_query
 from app.core.state_machine import write_requirement_failure, write_failure_event
@@ -956,6 +958,92 @@ async def get_roadmap(
         return RoadmapResponse(projects=roadmap_items, stats=stats)
     except Exception as e:
         logger.error(f"Error getting roadmap: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/roadmap/export/csv")
+async def export_roadmap_csv(
+    project: Optional[str] = Query(None, description="Project code e.g. HL, MP"),
+    status: Optional[str] = Query(None, description="Single status filter"),
+    include_closed: bool = Query(False),
+    priority: Optional[str] = Query(None, description="P1, P2, or P3"),
+    type: Optional[str] = Query(None, description="feature, bug, enhancement, task, vision"),
+    search: Optional[str] = Query(None, description="Free text search"),
+):
+    """Export filtered requirements as CSV with full descriptions."""
+    try:
+        where_clauses = []
+        params = []
+
+        if project:
+            where_clauses.append("UPPER(p.code) = UPPER(?)")
+            params.append(project)
+        if status:
+            where_clauses.append("r.status = ?")
+            params.append(status)
+        if not include_closed:
+            where_clauses.append("r.status NOT IN ('closed', 'done')")
+        if priority:
+            where_clauses.append("r.priority = ?")
+            params.append(priority)
+        if type:
+            where_clauses.append("r.type = ?")
+            params.append(type)
+        if search:
+            where_clauses.append("(r.code LIKE ? OR r.title LIKE ? OR r.description LIKE ?)")
+            like_term = f"%{search}%"
+            params.extend([like_term, like_term, like_term])
+
+        where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+        rows = execute_query(f"""
+            SELECT r.code, r.title, r.type, r.priority, r.status, r.pth,
+                   r.description, s.name as sprint_name,
+                   r.created_at, r.updated_at
+            FROM roadmap_requirements r
+            JOIN roadmap_projects p ON r.project_id = p.id
+            LEFT JOIN roadmap_sprints s ON r.sprint_id = s.id
+            WHERE {where_sql}
+            ORDER BY
+                CASE r.priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 END,
+                r.code
+        """, tuple(params) if params else None, fetch="all") or []
+
+        output = io.StringIO()
+        writer = csv.writer(output, quoting=csv.QUOTE_ALL)
+        writer.writerow(["Code", "Title", "Type", "Priority", "Status", "PTH",
+                         "Description", "Sprint", "CreatedAt", "UpdatedAt"])
+
+        for row in rows:
+            created = row['created_at'].strftime("%Y-%m-%d %H:%M") if row.get('created_at') else ""
+            updated = row['updated_at'].strftime("%Y-%m-%d %H:%M") if row.get('updated_at') else ""
+            writer.writerow([
+                row.get('code') or "",
+                row.get('title') or "",
+                row.get('type') or "",
+                row.get('priority') or "",
+                row.get('status') or "",
+                row.get('pth') or "",
+                row.get('description') or "",
+                row.get('sprint_name') or "",
+                created,
+                updated,
+            ])
+
+        csv_content = output.getvalue()
+        output.close()
+
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        project_label = project.upper() if project else "all"
+        filename = f"metapm-export-{project_label}-{today}.csv"
+
+        return StreamingResponse(
+            iter([csv_content]),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as e:
+        logger.error(f"Error exporting CSV: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

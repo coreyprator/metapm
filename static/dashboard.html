@@ -478,6 +478,7 @@
         <button type="button" id="docsTabBtn" onclick="toggleDocsTab()">📚 Docs</button>
         <a href="/static/roadmap-drill.html" target="_blank" rel="noopener"><button type="button">📋 Roadmap Drill</button></a>
         <a href="/static/roadmap-report.html" target="_blank" rel="noopener"><button type="button">📊 Roadmap Report</button></a>
+        <button type="button" id="exportCsvBtn" onclick="exportCSV()" title="Export current view to CSV">⬇ Export CSV</button>
         <a href="/architecture" target="_blank" rel="noopener"><button type="button">🏗️ Architecture</button></a>
         <button type="button" id="filterToggleBtn" class="filter-toggle-btn" onclick="const p=document.getElementById('controlsPanel');p.classList.toggle('mobile-collapsed');this.textContent=p.classList.contains('mobile-collapsed')?'⊞ Filters':'✕ Filters'">⊞ Filters</button>
         <div class="add-wrap">
@@ -1183,6 +1184,25 @@
       state.expanded = new Set();
       updateResetButtonState();
       loadData().then(() => render());
+    }
+
+    function exportCSV() {
+      const params = new URLSearchParams();
+      const project = qs('projectFilter')?.value || '';
+      const status = qs('statusFilter')?.value || '';
+      const priority = qs('priorityFilter')?.value || '';
+      const type = qs('typeFilter')?.value || '';
+      const search = qs('searchInput')?.value || '';
+      const openOnly = qs('openItemsToggle')?.checked;
+
+      if (project) params.set('project', project);
+      if (status) params.set('status', status);
+      if (priority) params.set('priority', priority);
+      if (type) params.set('type', type);
+      if (search) params.set('search', search);
+      if (!openOnly) params.set('include_closed', 'true');
+
+      window.location.href = `/api/roadmap/export/csv?${params.toString()}`;
     }
 
     function activateWipView() {
