@@ -397,12 +397,12 @@ async def ttl_auto_archive():
 
 @router.post("/archive-ghosts")
 async def archive_ghost_entries():
-    """MP12B BUG-024: One-time archive of known ghost entries."""
+    """MP12B BUG-024 + MP13A BUG-027: Archive known ghost/test entries."""
     ghost_pths = ['E2E1', 'E2F1', 'A9B3', 'C4E2', 'MP-UAT-001', 'AF01Q']
     archived = []
     for pth in ghost_pths:
         row = execute_query(
-            "SELECT id, status FROM cc_prompts WHERE pth = ? AND status NOT IN ('completed', 'rejected', 'cancelled', 'stopped')",
+            "SELECT id, status FROM cc_prompts WHERE pth = ? AND status != 'cancelled'",
             (pth,), fetch="one"
         )
         if row:
@@ -410,7 +410,7 @@ async def archive_ghost_entries():
                 "UPDATE cc_prompts SET status='cancelled', updated_at=GETUTCDATE() WHERE id=?",
                 (row['id'],), fetch="none"
             )
-            write_prompt_history(row['id'], pth, row['status'], 'cancelled', 'system', 'archive_ghosts')
+            write_prompt_history(row['id'], pth, row['status'], 'cancelled', 'system', 'manual_ghost_archive')
             archived.append(pth)
     return {"archived": archived}
 
@@ -472,6 +472,9 @@ async def get_sessions_history(
         placeholders = ','.join(['?' for _ in statuses])
         where_parts.append(f"p.status IN ({placeholders})")
         params.extend(statuses)
+    else:
+        # MP13A BUG-027: exclude cancelled (archived ghost) entries from default view
+        where_parts.append("p.status != 'cancelled'")
 
     if project:
         where_parts.append("proj.code = ?")

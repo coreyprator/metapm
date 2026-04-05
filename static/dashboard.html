@@ -591,23 +591,23 @@
       </div>
       <div id="jobsList" style="font-size:12px;color:var(--muted)">Loading...</div>
       <div id="approvedPromptsList" style="margin-top:8px"></div>
-      <!-- MP12B: Job History Grid -->
+      <!-- MP12B+MP13A: Job History Grid -->
       <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:8px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em">Job History</span>
-          <div style="display:flex;gap:6px;align-items:center">
-            <select id="jhStatusFilter" onchange="loadJobHistory()" style="font-size:10px;padding:2px 4px;background:var(--panel-soft);color:var(--text);border:1px solid var(--line);border-radius:3px">
-              <option value="">All statuses</option>
-              <option value="executing">Executing</option>
-              <option value="completed">Completed</option>
-              <option value="stopped">Stopped</option>
-              <option value="draft">Draft</option>
-              <option value="approved">Approved</option>
-            </select>
-            <select id="jhProjectFilter" onchange="loadJobHistory()" style="font-size:10px;padding:2px 4px;background:var(--panel-soft);color:var(--text);border:1px solid var(--line);border-radius:3px">
-              <option value="">All projects</option>
-            </select>
-          </div>
+        <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Job History</span>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+          <select id="jhStatusFilter" onchange="loadJobHistory()" style="font-size:10px;padding:2px 4px;background:var(--panel-soft);color:var(--text);border:1px solid var(--line);border-radius:3px">
+            <option value="">All statuses</option>
+            <option value="running">Running</option>
+            <option value="stale">Stale</option>
+            <option value="completed">Completed</option>
+            <option value="stopped">Stopped</option>
+            <option value="blocked">Blocked</option>
+            <option value="draft">Draft</option>
+            <option value="approved">Approved</option>
+          </select>
+          <select id="jhProjectFilter" onchange="loadJobHistory()" style="font-size:10px;padding:2px 4px;background:var(--panel-soft);color:var(--text);border:1px solid var(--line);border-radius:3px">
+            <option value="">All projects</option>
+          </select>
         </div>
         <div id="jobHistoryGrid" style="font-size:12px;color:var(--muted)">Loading history...</div>
       </div>
@@ -2390,7 +2390,7 @@
               <span style="font-size:11px;color:var(--muted)">${(p.sprint_id||'').slice(0,35)} ${hrs}</span>
               <span style="font-size:10px;color:var(--muted);margin-left:auto">${created}</span>
               <button onclick="approveFromPanel(${p.id}, '${p.pth}')" style="font-size:10px;padding:1px 8px;background:#22c55e;color:#fff;border:none;border-radius:3px;cursor:pointer">Approve</button>
-              <button onclick="promptDetailAction('${p.pth}', 'reject')" style="font-size:10px;padding:1px 8px;background:#ef4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Reject</button>
+              <button onclick="promptDetailAction(${p.id}, '${p.pth}', 'reject')" style="font-size:10px;padding:1px 8px;background:#ef4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Reject</button>
             </div>`;
           }).join('');
           qs('needsApprovalSection').style.display = '';
@@ -3294,13 +3294,13 @@
         // Section C: Action buttons
         html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
         if (['draft', 'approved'].includes(p.status)) {
-          html += `<button onclick="promptDetailAction('${p.pth}', 'reject')" style="font-size:11px;padding:4px 12px;background:#ef4444;color:#fff;border:none;border-radius:4px;cursor:pointer">Reject</button>`;
+          html += `<button onclick="promptDetailAction(${p.id}, '${p.pth}', 'reject')" style="font-size:11px;padding:4px 12px;background:#ef4444;color:#fff;border:none;border-radius:4px;cursor:pointer">Reject</button>`;
         }
         if (p.status === 'approved') {
           html += `<button onclick="copyPth('${p.pth}', this)" style="font-size:11px;padding:4px 12px;background:#6366f1;color:#fff;border:none;border-radius:4px;cursor:pointer">Copy PTH</button>`;
         }
         if (p.status === 'executing') {
-          html += `<button onclick="promptDetailAction('${p.pth}', 'cancel')" style="font-size:11px;padding:4px 12px;background:#ef4444;color:#fff;border:none;border-radius:4px;cursor:pointer">Cancel Job</button>`;
+          html += `<button onclick="promptDetailAction(${p.id}, '${p.pth}', 'cancel')" style="font-size:11px;padding:4px 12px;background:#ef4444;color:#fff;border:none;border-radius:4px;cursor:pointer">Cancel Job</button>`;
         }
         html += `<button onclick="closePromptDetail()" style="font-size:11px;padding:4px 12px;background:var(--panel-soft);color:var(--text);border:1px solid var(--line);border-radius:4px;cursor:pointer;margin-left:auto">Close</button>`;
         html += '</div>';
@@ -3315,20 +3315,19 @@
       document.getElementById('promptDetailOverlay').style.display = 'none';
     }
 
-    async function promptDetailAction(pth, action) {
+    async function promptDetailAction(promptId, pth, action) {
       try {
         if (action === 'reject') {
           if (!confirm(`Reject prompt ${pth}?`)) return;
-          await api(`/api/prompts/${pth}/status`, {
+          await api(`/api/prompts/${promptId}`, {
             method: 'PATCH',
-            headers: {'Content-Type': 'application/json', 'X-API-Key': 'metapm-key'},
-            body: JSON.stringify({status: 'rejected', reason: 'Rejected by PL from dashboard'})
+            body: JSON.stringify({status: 'rejected'})
           });
         } else if (action === 'cancel') {
           if (!confirm(`Cancel job for ${pth}?`)) return;
-          await api(`/api/prompts/${pth}/cancel`, {
+          await api(`/api/prompts/${promptId}`, {
             method: 'PATCH',
-            headers: {'Content-Type': 'application/json', 'X-API-Key': 'metapm-key'},
+            body: JSON.stringify({status: 'cancelled'})
           });
         }
         // Refresh the detail panel and lists
@@ -3366,13 +3365,22 @@
       const statusFilter = document.getElementById('jhStatusFilter').value;
       const projectFilter = document.getElementById('jhProjectFilter').value;
 
-      let url = '/api/prompts/sessions/history?limit=25';
-      if (statusFilter) url += `&status=${statusFilter}`;
+      // MP13A: stale and running are client-side computed filters
+      const isClientFilter = statusFilter === 'stale' || statusFilter === 'running';
+      let url = '/api/prompts/sessions/history?limit=50';
+      if (statusFilter && !isClientFilter) url += `&status=${statusFilter}`;
       if (projectFilter) url += `&project=${projectFilter}`;
 
       try {
         const data = await api(url);
-        const sessions = data.sessions || [];
+        let sessions = data.sessions || [];
+
+        // MP13A BUG-025: client-side stale/running filter
+        if (statusFilter === 'stale') {
+          sessions = sessions.filter(s => s.is_stale);
+        } else if (statusFilter === 'running') {
+          sessions = sessions.filter(s => s.status === 'executing' && !s.is_stale && !s.session_ended_at);
+        }
 
         if (!sessions.length) {
           el.innerHTML = '<div style="color:var(--muted);font-size:11px">No sessions in selected range</div>';
@@ -3391,7 +3399,7 @@
             : `<span style="background:${sc};color:#fff;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700">${s.status.toUpperCase()}</span>`;
           const duration = s.duration_min ? `${s.duration_min}m` : (s.is_stale ? 'running...' : '-');
 
-          return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--line);cursor:pointer" onclick="openPromptDetail('${s.pth}')">
+          return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--line);cursor:pointer" data-pth="${s.pth || ''}" onclick="openPromptDetail('${s.pth}')">
             ${badge}
             <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">${s.pth || '-'}</span>
             <span style="font-size:11px">${s.project_emoji || ''} ${(s.project_name || '').slice(0,15)}</span>

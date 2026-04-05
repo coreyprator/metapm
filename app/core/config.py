@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.72.0"  # MP12B: State machine integrity with defense-in-depth audit trail
+    VERSION: str = "2.73.0"  # MP13A: Dashboard polish — 403 fix, filters, drill-through, UAT page redesign
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

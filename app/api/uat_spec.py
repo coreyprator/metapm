@@ -660,8 +660,28 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
     mark_passed_btn = ('<button class="btn btn-mark-passed" onclick="markAsPassed()">'
                        '✅ Mark as Passed</button>') if spec_status == "conditional_pass" else ""
 
-    cards_html = ""
-    for tc in real_test_cases:
+    # MP13A REQ-038: split test cases by type (cc_machine vs pl_visual)
+    cc_machine_tcs = [tc for tc in real_test_cases if tc.get("type") == "cc_machine"]
+    pl_visual_tcs = [tc for tc in real_test_cases if tc.get("type", "pl_visual") != "cc_machine"]
+
+    def _render_machine_card(tc):
+        tid = esc(tc["id"])
+        title = esc(tc["title"])
+        current = result_by_id.get(tc["id"], {})
+        cur_status = current.get("status", "pending")
+        cur_notes = esc(current.get("notes", ""))
+        status_icons = {"pass": "✓", "fail": "✗", "skip": "○", "pending": "?"}
+        icon = status_icons.get(cur_status, "?")
+        return f"""
+        <div class="test-card result-{cur_status} submitted" data-id="{tid}" data-type="cc_machine">
+          <div class="test-header">
+            <span class="test-id">{tid}</span>
+            <span class="test-name">{title}</span>
+          </div>
+          <div style="font-size:0.85rem;color:var(--muted);margin-top:4px">{cur_notes}</div>
+        </div>"""
+
+    def _render_pl_card(tc):
         tid = esc(tc["id"])
         title = esc(tc["title"])
         url = tc.get("url", "")
@@ -670,14 +690,11 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
         current = result_by_id.get(tc["id"], {})
         cur_status = current.get("status", "pending")
         cur_notes = esc(current.get("notes", ""))
-
         steps_html = "".join(f"<li>{esc(s)}</li>" for s in steps)
         url_html = f'<a href="{esc(url)}" target="_blank" class="bv-url">{esc(url)}</a>' if url else ""
-
         def checked(val):
             return " checked" if cur_status == val else ""
-
-        cards_html += f"""
+        return f"""
         <div class="test-card result-{cur_status} {submitted_cls}" data-id="{tid}">
           <div class="test-header">
             <span class="test-id">{tid}</span>
@@ -705,6 +722,34 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
           </div>
           <div class="attach-thumb" id="athumb-{tid}">{''.join(f'<img src="data:{a.get("mime","image/png")};base64,{a["data"]}" title="{esc(a.get("filename","attachment"))}">' for a in (current.get("attachments") or []) if a.get("data"))}</div>
         </div>"""
+
+    # Build section HTML
+    machine_section = ""
+    if cc_machine_tcs:
+        machine_cards = "".join(_render_machine_card(tc) for tc in cc_machine_tcs)
+        machine_section = f"""
+        <div class="uat-section-machine" style="margin-bottom:20px;opacity:0.85">
+          <h3 style="font-size:1rem;color:var(--pass);margin-bottom:8px">✓ Machine-verified by CC — {len(cc_machine_tcs)} items</h3>
+          <p style="font-size:0.85rem;color:var(--muted);margin-bottom:12px">These were verified programmatically by CC before handoff. No action required.</p>
+          {machine_cards}
+        </div>"""
+
+    pl_section = ""
+    if pl_visual_tcs:
+        pl_cards = "".join(_render_pl_card(tc) for tc in pl_visual_tcs)
+        pl_section = f"""
+        <div class="uat-section-pl">
+          <h3 style="font-size:1rem;color:var(--accent);margin-bottom:12px">Your input required — {len(pl_visual_tcs)} items</h3>
+          {pl_cards}
+        </div>"""
+    elif cc_machine_tcs:
+        pl_section = f"""
+        <div class="uat-section-pl" style="text-align:center;padding:20px">
+          <p style="color:var(--muted);margin-bottom:12px">All BVs were machine-verified. No action required.</p>
+          <button class="btn btn-submit" onclick="submitAcknowledge()">Acknowledge &amp; Close</button>
+        </div>"""
+
+    cards_html = machine_section + pl_section
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -862,7 +907,8 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
     const SPEC_ID = "{spec_id}";
 
     function updateCounts() {{
-      const cards = document.querySelectorAll('.test-card');
+      const cards = document.querySelectorAll('.test-card:not([data-type="cc_machine"])');
+      const machineCards = document.querySelectorAll('.test-card[data-type="cc_machine"]');
       let pass=0,fail=0,skip=0,pend=0;
       cards.forEach(card => {{
         const id = card.dataset.id;
@@ -873,7 +919,9 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
         card.className = card.className.replace(/\\bresult-\\w+/g,'') + ` result-${{val}}`;
         if (val==='pass') pass++; else if(val==='fail') fail++; else if(val==='skip') skip++; else pend++;
       }});
-      document.getElementById('cnt-total').textContent = cards.length;
+      // Count machine-verified as passes
+      machineCards.forEach(card => {{ pass++; }});
+      document.getElementById('cnt-total').textContent = cards.length + machineCards.length;
       document.getElementById('cnt-pass').textContent = pass;
       document.getElementById('cnt-fail').textContent = fail;
       document.getElementById('cnt-skip').textContent = skip;
@@ -1024,6 +1072,27 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       }}
     }}
 
+    async function submitAcknowledge() {{
+      // MP13A REQ-038: all BVs are cc_machine, PL just acknowledges
+      if (!confirm('All items were machine-verified. Acknowledge and close?')) return;
+      try {{
+        const resp = await fetch(`/api/uat/${{SPEC_ID}}/pl-results`, {{
+          method: 'PATCH',
+          headers: {{'Content-Type': 'application/json'}},
+          body: JSON.stringify({{ test_cases: [], general_notes: 'All BVs machine-verified. PL acknowledged.' }})
+        }});
+        if (resp.ok) {{
+          const div = document.getElementById('submit-result');
+          div.style.display = 'block';
+          div.className = 'ok';
+          div.innerHTML = 'Acknowledged. <a href="/uat/' + SPEC_ID + '">View UAT record &rarr;</a>';
+        }} else {{
+          const data = await resp.json();
+          alert('Acknowledge failed: ' + (data.detail || JSON.stringify(data)));
+        }}
+      }} catch(e) {{ alert('Error: ' + e.message); }}
+    }}
+
     async function submitResults() {{
       // MP-UAT-001: Confirmation dialog before submission
       const confirmed = confirm(
@@ -1032,7 +1101,8 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       );
       if (!confirmed) return;
 
-      const cards = document.querySelectorAll('.test-card');
+      // MP13A: only submit pl_visual cards (cc_machine are pre-filled)
+      const cards = document.querySelectorAll('.test-card:not([data-type="cc_machine"])');
       const test_cases = [];
       cards.forEach(card => {{
         const id = card.dataset.id;
