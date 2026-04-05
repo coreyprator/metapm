@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.74.0"  # MP14A: Dashboard CSV export with full descriptions
+    VERSION: str = "2.74.1"  # MP15B: CSV export — project filter fix, Project column, filename time
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

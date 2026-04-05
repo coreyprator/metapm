@@ -972,6 +972,10 @@ async def export_roadmap_csv(
 ):
     """Export filtered requirements as CSV with full descriptions."""
     try:
+        # FIX 1 (BUG-029): Normalize project param — proj-em → EM
+        if project:
+            project = project.replace('proj-', '').upper()
+
         where_clauses = []
         params = []
 
@@ -996,8 +1000,10 @@ async def export_roadmap_csv(
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
+        # FIX 2 (BUG-030): Add project name column via JOIN
         rows = execute_query(f"""
-            SELECT r.code, r.title, r.type, r.priority, r.status, r.pth,
+            SELECT r.code, p.name as project_name, p.code as project_code,
+                   r.title, r.type, r.priority, r.status, r.pth,
                    r.description, s.name as sprint_name,
                    r.created_at, r.updated_at
             FROM roadmap_requirements r
@@ -1011,7 +1017,7 @@ async def export_roadmap_csv(
 
         output = io.StringIO()
         writer = csv.writer(output, quoting=csv.QUOTE_ALL)
-        writer.writerow(["Code", "Title", "Type", "Priority", "Status", "PTH",
+        writer.writerow(["Code", "Project", "Title", "Type", "Priority", "Status", "PTH",
                          "Description", "Sprint", "CreatedAt", "UpdatedAt"])
 
         for row in rows:
@@ -1019,6 +1025,7 @@ async def export_roadmap_csv(
             updated = row['updated_at'].strftime("%Y-%m-%d %H:%M") if row.get('updated_at') else ""
             writer.writerow([
                 row.get('code') or "",
+                row.get('project_name') or row.get('project_code') or "",
                 row.get('title') or "",
                 row.get('type') or "",
                 row.get('priority') or "",
@@ -1033,9 +1040,10 @@ async def export_roadmap_csv(
         csv_content = output.getvalue()
         output.close()
 
-        today = datetime.utcnow().strftime("%Y-%m-%d")
-        project_label = project.upper() if project else "all"
-        filename = f"metapm-export-{project_label}-{today}.csv"
+        # FIX 3 (BUG-031): Add time component to filename
+        now = datetime.utcnow()
+        project_label = project if project else "all"
+        filename = f"metapm-export-{project_label}-{now.strftime('%Y-%m-%d-%H%M')}.csv"
 
         return StreamingResponse(
             iter([csv_content]),
