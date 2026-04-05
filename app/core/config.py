@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.70.0"  # MP-DASHBOARD-INTEGRITY-001: Session signals, RUNNING display, Copy PTH, stale drafts, Bootstrap BA26-BA28
+    VERSION: str = "2.71.0"  # MP-DESCRIPTION-FIX-001: Dashboard description truncation fix — full text in list view, auto-expand textarea, save sync
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

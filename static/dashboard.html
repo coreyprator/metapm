@@ -158,11 +158,15 @@
       gap: 8px;
       align-items: center;
       padding: 8px;
+      padding-bottom: 8px;
       border-radius: 6px;
       border: 1px solid var(--line);
       margin-bottom: 6px;
       background: #0f182b;
       cursor: pointer;
+      height: auto !important;
+      min-height: 65px;
+      grid-template-rows: min-content auto !important;
     }
     .req-row:hover { background: #13203a; }
     .sprint-row {
@@ -180,7 +184,7 @@
     .p1 { color: #ff9a9a; border-color: #803c3c; }
     .p2 { color: #ffd18a; border-color: #7a5a2f; }
     .req-row.has-prompt { border-left: 3px solid #f0b429; }
-    .item-description { grid-column: 1 / -1; font-size: 11px; color: var(--muted); margin-top: 2px; padding: 0 2px; white-space: pre-wrap; word-break: break-word; }
+    .item-description { grid-column: 1 / -1; font-size: 11px; color: var(--muted); margin-top: 4px; padding: 0 2px; display: block; white-space: pre-wrap !important; word-break: break-word; height: auto !important; overflow: visible !important; }
     /* Lifecycle status badges (PF5-MS1 v2) */
     .status-req_created     { color: #374151; background: #F3F4F6; border-color: #9CA3AF; }
     .status-req_approved    { color: #1D4ED8; background: #EFF6FF; border-color: #93C5FD; }
@@ -760,7 +764,7 @@
     </div>
     <div>
       <label>Description</label>
-      <textarea id="dDescription"></textarea>
+      <textarea id="dDescription" style="width:100%!important;min-height:100px;height:auto!important;line-height:1.5;resize:vertical"></textarea>
     </div>
     <div>
       <label>Linked Handoffs</label>
@@ -1112,7 +1116,7 @@
           <button class="icon-btn" data-open-req="${req.id}" title="Edit Requirement">✏️</button>
           <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete Requirement">🗑️</button>
         </div>
-        ${window._showDescriptions && req.description ? `<div class="item-description">${(req.description||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0,200)}${req.description.length > 200 ? '…' : ''}</div>` : ''}
+        ${window._showDescriptions && req.description ? `<div class="item-description">${(req.description||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
       </div>`;
     }
 
@@ -1961,6 +1965,8 @@
       qs('dCheckpoint').textContent = '';
       qs('dVersion').value = req.target_version || '';
       qs('dDescription').value = req.description || '';
+      const ta = document.getElementById('dDescription');
+      if (ta) { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }
 
       // State transition via PATCH /state — immediate, no Save needed
       // A2 fix: reset handler before re-assigning to prevent accumulation across drawer opens
@@ -2243,6 +2249,9 @@
       };
 
       await api(`/api/roadmap/requirements/${req.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      // Sync description to list view immediately
+      const listDesc = document.querySelector(`.req-row[data-req="${req.id}"] .item-description`);
+      if (listDesc) { listDesc.innerText = payload.description; listDesc.style.height = 'auto'; }
       qs('drawer').classList.remove('open');
       state.selectedReq = null;
       await loadData();
