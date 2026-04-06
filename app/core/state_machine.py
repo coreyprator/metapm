@@ -16,12 +16,14 @@ logger = logging.getLogger(__name__)
 
 PROMPT_VALID_TRANSITIONS = {
     'draft':     {'approved', 'rejected'},
-    'approved':  {'executing', 'rejected'},
+    'approved':  {'sent', 'executing', 'rejected'},
+    'sent':      {'executing', 'rejected'},
     'executing': {'completed', 'stopped', 'blocked'},
     'stopped':   {'approved'},
     'blocked':   {'approved'},
     'completed': set(),
     'rejected':  set(),
+    'cancelled': set(),
 }
 
 
