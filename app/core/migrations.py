@@ -2271,33 +2271,39 @@ def run_migrations():
 
     # Migration 63: MP18 REQ-044 — cc_prompts status normalization
     try:
-        # Step 1: Normalize 'complete' → 'completed'
-        execute_query(
-            "UPDATE cc_prompts SET status = 'completed' WHERE status = 'complete'",
-            fetch="none"
-        )
-        # Step 2: Add constraint (drop old one first if exists)
-        existing = execute_query("""
+        # Step 1: Normalize 'complete' → 'completed', 'prompt_ready' → 'draft', 'closed' → 'completed'
+        execute_query("UPDATE cc_prompts SET status = 'completed' WHERE status = 'complete'", fetch="none")
+        execute_query("UPDATE cc_prompts SET status = 'draft' WHERE status = 'prompt_ready'", fetch="none")
+        execute_query("UPDATE cc_prompts SET status = 'completed' WHERE status = 'closed'", fetch="none")
+        # Step 2: Drop old constraint v2 and add normalized constraint
+        existing_v3 = execute_query("""
             SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-            WHERE TABLE_NAME = 'cc_prompts' AND CONSTRAINT_NAME = 'chk_cc_prompts_status'
+            WHERE TABLE_NAME = 'cc_prompts' AND CONSTRAINT_NAME = 'chk_cc_prompts_status_v3'
         """, fetch="one")
-        if existing and existing['cnt'] == 0:
-            # Check for unexpected statuses first
+        if existing_v3 and existing_v3['cnt'] == 0:
+            # Drop old constraints
+            execute_query("""
+                DECLARE @ck NVARCHAR(200)
+                SELECT @ck = name FROM sys.check_constraints
+                WHERE parent_object_id = OBJECT_ID('cc_prompts') AND definition LIKE '%status%'
+                IF @ck IS NOT NULL EXEC('ALTER TABLE cc_prompts DROP CONSTRAINT [' + @ck + ']')
+            """, fetch="none")
+            # Check for unexpected statuses
             unexpected = execute_query("""
                 SELECT DISTINCT status FROM cc_prompts
-                WHERE status NOT IN ('draft','approved','executing','completed','stopped','blocked','rejected','cancelled')
+                WHERE status NOT IN ('draft','approved','sent','executing','completed','stopped','blocked','rejected','cancelled')
             """, fetch="all") or []
             if not unexpected:
                 execute_query("""
                     ALTER TABLE cc_prompts
-                    ADD CONSTRAINT chk_cc_prompts_status
-                    CHECK (status IN ('draft','approved','executing','completed','stopped','blocked','rejected','cancelled'))
+                    ADD CONSTRAINT chk_cc_prompts_status_v3
+                    CHECK (status IN ('draft','approved','sent','executing','completed','stopped','blocked','rejected','cancelled'))
                 """, fetch="none")
-                logger.info("  Migration 63: cc_prompts status normalized + constraint added.")
+                logger.info("  Migration 63: cc_prompts status normalized + v3 constraint added.")
             else:
                 logger.warning(f"  Migration 63: BLOCKER — unexpected statuses: {[r['status'] for r in unexpected]}")
         else:
-            logger.info("  Migration 63: chk_cc_prompts_status constraint already exists.")
+            logger.info("  Migration 63: chk_cc_prompts_status_v3 constraint already exists.")
     except Exception as e:
         logger.warning(f"  Migration 63 warning: {e}")
 

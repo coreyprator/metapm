@@ -84,7 +84,7 @@ async def verify_status_normalization():
         fetch="all"
     ) or []
     statuses = [r["status"] for r in rows]
-    expected = {'draft', 'approved', 'executing', 'completed', 'stopped', 'blocked', 'rejected', 'cancelled'}
+    expected = {'draft', 'approved', 'sent', 'executing', 'completed', 'stopped', 'blocked', 'rejected', 'cancelled'}
     unexpected = [s for s in statuses if s not in expected]
     return {
         "check": "status_normalization",
