@@ -54,7 +54,7 @@ try:
     """, fetch="all") or []
     for _g in _ghosts:
         _eq("UPDATE cc_prompts SET status='stopped', session_ended_at=GETUTCDATE(), session_outcome='ttl_fallback_archive', updated_at=GETUTCDATE() WHERE id=?", (_g['id'],), fetch="none")
-        _eq("INSERT INTO prompt_history (prompt_id, pth, from_status, to_status, changed_by, trigger, success, blocked_reason) VALUES (?,?,'executing','stopped','system','ttl_fallback_archive',1,'Auto-archived on startup: >24h ghost.')", (_g['id'], _g['pth']), fetch="none")
+        _eq("INSERT INTO prompt_history (prompt_id, pth, from_status, to_status, changed_by, [trigger], success, blocked_reason) VALUES (?,?,'executing','stopped','system','ttl_fallback_archive',1,'Auto-archived on startup: >24h ghost.')", (_g['id'], _g['pth']), fetch="none")
         logger.info(f"[SWEEP-STARTUP] Archived ghost: PTH {_g['pth']}")
     if _ghosts:
         logger.info(f"[SWEEP-STARTUP] Archived {len(_ghosts)} ghost executing sessions")

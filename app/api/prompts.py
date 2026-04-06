@@ -417,7 +417,7 @@ async def sweep_ghost_executing_sessions():
         """, (p['id'],), fetch="none")
         execute_query("""
             INSERT INTO prompt_history
-            (prompt_id, pth, from_status, to_status, changed_by, trigger, success, blocked_reason)
+            (prompt_id, pth, from_status, to_status, changed_by, [trigger], success, blocked_reason)
             VALUES (?,?,'executing','stopped','system','ttl_fallback_archive',1,
             'Auto-archived: stuck at executing >24h with no session-end signal.')
         """, (p['id'], p['pth']), fetch="none")
