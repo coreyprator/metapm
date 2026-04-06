@@ -43,6 +43,24 @@ try:
 except Exception as e:
     logger.warning(f"Migration warning (non-fatal): {e}")
 
+# MP16C BUG-032: Sweep ghost executing sessions on startup (>24h with no session-end signal)
+try:
+    from app.core.database import execute_query as _eq
+    from app.core.state_machine import write_prompt_history as _wph
+    _ghosts = _eq("""
+        SELECT id, pth FROM cc_prompts
+        WHERE status = 'executing' AND session_ended_at IS NULL
+        AND updated_at < DATEADD(hour, -24, GETUTCDATE())
+    """, fetch="all") or []
+    for _g in _ghosts:
+        _eq("UPDATE cc_prompts SET status='stopped', session_ended_at=GETUTCDATE(), session_outcome='ttl_fallback_archive', updated_at=GETUTCDATE() WHERE id=?", (_g['id'],), fetch="none")
+        _eq("INSERT INTO prompt_history (prompt_id, pth, from_status, to_status, changed_by, trigger, success, blocked_reason) VALUES (?,?,'executing','stopped','system','ttl_fallback_archive',1,'Auto-archived on startup: >24h ghost.')", (_g['id'], _g['pth']), fetch="none")
+        logger.info(f"[SWEEP-STARTUP] Archived ghost: PTH {_g['pth']}")
+    if _ghosts:
+        logger.info(f"[SWEEP-STARTUP] Archived {len(_ghosts)} ghost executing sessions")
+except Exception as e:
+    logger.warning(f"Startup sweep warning (non-fatal): {e}")
+
 # Redirect root to dashboard
 @app.get("/")
 async def root_redirect():

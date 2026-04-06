@@ -395,6 +395,38 @@ async def ttl_auto_archive():
     return {"archived_count": len(archived), "archived_pths": archived}
 
 
+@router.post("/sessions/sweep")
+async def sweep_ghost_executing_sessions():
+    """MP16C BUG-032: Archive cc_prompts stuck at 'executing' >24h with no session_ended_at.
+    These predate the session-signal system and are invisible to the existing TTL rule."""
+    ghosts = execute_query("""
+        SELECT id, pth FROM cc_prompts
+        WHERE status = 'executing'
+        AND session_ended_at IS NULL
+        AND updated_at < DATEADD(hour, -24, GETUTCDATE())
+    """, fetch="all") or []
+
+    archived_pths = []
+    for p in ghosts:
+        execute_query("""
+            UPDATE cc_prompts SET status='stopped',
+            session_ended_at=GETUTCDATE(),
+            session_outcome='ttl_fallback_archive',
+            updated_at=GETUTCDATE()
+            WHERE id=?
+        """, (p['id'],), fetch="none")
+        execute_query("""
+            INSERT INTO prompt_history
+            (prompt_id, pth, from_status, to_status, changed_by, trigger, success, blocked_reason)
+            VALUES (?,?,'executing','stopped','system','ttl_fallback_archive',1,
+            'Auto-archived: stuck at executing >24h with no session-end signal.')
+        """, (p['id'], p['pth']), fetch="none")
+        archived_pths.append(p['pth'])
+        logger.info(f"[SWEEP] Fallback-archived ghost session: PTH {p['pth']}")
+
+    return {"archived": len(ghosts), "pths": archived_pths}
+
+
 @router.post("/archive-ghosts")
 async def archive_ghost_entries():
     """MP12B BUG-024 + MP13A BUG-027: Archive known ghost/test entries."""
@@ -660,17 +692,15 @@ async def list_prompts(
         params.append(-days)
 
     where_clause = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
-    params.append(limit)
 
     rows = execute_query(f"""
-        SELECT TOP (?) p.*, proj.name as project_name, proj.emoji as project_emoji
+        SELECT TOP ({int(limit)}) p.*, proj.name as project_name, proj.emoji as project_emoji
         FROM cc_prompts p
         LEFT JOIN roadmap_projects proj ON p.project_id = proj.id
         {where_clause}
         ORDER BY p.created_at DESC
-    """, (*params[-1:], *params[:-1]), fetch="all") or []
+    """, tuple(params) if params else None, fetch="all") or []
 
-    # SQL Server TOP needs to be first param
     return [_row_to_response(r) for r in rows]
 
 

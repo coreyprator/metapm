@@ -3138,6 +3138,9 @@
       const lastUpdatedEl = qs('jobsLastUpdated');
       if (lastUpdatedEl) lastUpdatedEl.textContent = 'Last updated: ' + formatTimestamp(new Date().toISOString());
 
+      // MP16C BUG-032: Non-blocking sweep of ghost executing sessions on dashboard load
+      fetch('/api/prompts/sessions/sweep', {method:'POST'}).catch(()=>{});
+
       // MP10 BUG-016: RUNNING section — active CC sessions only
       let sessionsHtml = '';
       try {

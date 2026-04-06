@@ -931,6 +931,36 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
     document.querySelectorAll('.radio-group input[type=radio]').forEach(r => r.addEventListener('change', updateCounts));
     updateCounts();
 
+    // MP16C BUG-034: Replace collapsed textareas with auto-sized divs on submitted UAT pages
+    if (document.querySelector('.test-card.submitted')) {{
+      document.querySelectorAll('textarea.notes-input').forEach(ta => {{
+        if (!ta.value.trim()) {{
+          const wrap = ta.closest('.test-card');
+          const label = wrap?.querySelector('.notes-label');
+          if (label) label.remove();
+          ta.remove();
+          return;
+        }}
+        const div = document.createElement('div');
+        div.className = 'notes-display';
+        div.style.cssText = 'font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word;padding:6px 8px;margin:0;color:var(--text);';
+        div.textContent = ta.value.trim();
+        ta.parentNode.replaceChild(div, ta);
+      }});
+      const gn = document.getElementById('general-notes');
+      if (gn && gn.hasAttribute('readonly')) {{
+        if (!gn.value.trim()) {{
+          gn.closest('.general-notes')?.remove();
+        }} else {{
+          const div = document.createElement('div');
+          div.className = 'notes-display';
+          div.style.cssText = 'font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word;padding:6px 8px;margin:0;color:var(--text);';
+          div.textContent = gn.value.trim();
+          gn.parentNode.replaceChild(div, gn);
+        }}
+      }}
+    }}
+
     // ── Attachment support (MP07) ──
     const attachmentsMap = {{}};
     let generalNotesAttachments = [];
