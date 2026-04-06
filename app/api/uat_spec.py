@@ -91,6 +91,17 @@ class PLResultsSubmit(BaseModel):
     submitted_by: Optional[str] = None
 
 
+# MP19 REQ-049: CC machine BV results
+class CCMachineResult(BaseModel):
+    id: str
+    cc_result: str  # pass | fail
+    cc_evidence: str  # raw output / JSON response proving the result
+
+
+class CCResultsSubmit(BaseModel):
+    test_cases: List[CCMachineResult]
+
+
 # ── POST /api/uat/spec ───────────────────────────────────────────────────────
 
 @router.post("/api/uat/spec", response_model=UATSpecResponse, status_code=201)
@@ -473,6 +484,66 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
     return response
 
 
+# ── PATCH /api/uat/{spec_id}/cc-results — MP19 REQ-049 ─────────────────────
+
+@router.patch("/api/uat/{spec_id}/cc-results")
+async def submit_cc_results(spec_id: str, body: CCResultsSubmit):
+    """
+    CC-only endpoint to record machine BV results with evidence.
+    No PL auth required — CC submits after running machine tests.
+    """
+    _validate_uuid(spec_id)
+
+    row = execute_query(
+        "SELECT id, test_cases_json FROM uat_pages WHERE id = ?",
+        (spec_id,), fetch="one"
+    )
+    if not row:
+        raise HTTPException(404, f"UAT spec {spec_id} not found")
+
+    existing_cases = json.loads(row["test_cases_json"]) if row.get("test_cases_json") else []
+    updates_by_id = {tc.id: tc for tc in body.test_cases}
+    updated_count = 0
+
+    for case in existing_cases:
+        if case.get("id", "").startswith("_"):
+            continue
+        update = updates_by_id.get(case["id"])
+        if update and case.get("type") == "cc_machine":
+            case["cc_result"] = update.cc_result
+            case["cc_evidence"] = update.cc_evidence
+            case["status"] = update.cc_result  # sync status with cc_result
+            updated_count += 1
+
+    execute_query("""
+        UPDATE uat_pages SET test_cases_json = ?, updated_at = GETUTCDATE() WHERE id = ?
+    """, (json.dumps(existing_cases), spec_id), fetch="none")
+
+    # Also persist to uat_bv_items
+    for tc in body.test_cases:
+        try:
+            execute_query("""
+                IF EXISTS (SELECT 1 FROM uat_bv_items WHERE spec_id=? AND bv_id=?)
+                    UPDATE uat_bv_items
+                    SET status=?, cc_result=?, cc_evidence=?, updated_at=GETUTCDATE()
+                    WHERE spec_id=? AND bv_id=?
+                ELSE
+                    INSERT INTO uat_bv_items (spec_id, bv_id, title, status, cc_result, cc_evidence)
+                    VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                spec_id, tc.id,
+                tc.cc_result, tc.cc_result, tc.cc_evidence,
+                spec_id, tc.id,
+                spec_id, tc.id, tc.id,
+                tc.cc_result, tc.cc_result, tc.cc_evidence,
+            ), fetch="none")
+        except Exception as e:
+            logger.warning(f"CC BV item upsert failed for {tc.id}: {e}")
+
+    logger.info(f"CC submitted {updated_count} machine BV results for spec {spec_id}")
+    return {"updated": updated_count, "spec_id": spec_id}
+
+
 class UATOverride(BaseModel):
     status: str  # passed | conditional_pass | failed
     override_note: Optional[str] = None
@@ -744,17 +815,27 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
         tid = esc(tc["id"])
         title = esc(tc["title"])
         current = result_by_id.get(tc["id"], {})
-        cur_status = current.get("status", "pending")
+        cur_status = current.get("cc_result", current.get("status", "pending"))
+        cc_evidence = esc(current.get("cc_evidence", ""))
         cur_notes = esc(current.get("notes", ""))
-        status_icons = {"pass": "✓", "fail": "✗", "skip": "○", "pending": "?"}
-        icon = status_icons.get(cur_status, "?")
+        result_label = "PASS" if cur_status == "pass" else ("FAIL" if cur_status == "fail" else cur_status.upper())
+        result_color = "var(--pass)" if cur_status == "pass" else ("var(--fail)" if cur_status == "fail" else "var(--pending)")
+        evidence_html = ""
+        if cc_evidence:
+            evidence_html = f"""
+            <details style="margin-top:6px">
+              <summary style="font-size:0.8rem;color:var(--muted);cursor:pointer">Machine evidence</summary>
+              <pre style="font-size:0.75rem;color:var(--muted);background:#0d1117;padding:8px;border-radius:4px;margin-top:4px;overflow-x:auto;white-space:pre-wrap;word-break:break-word">{cc_evidence}</pre>
+            </details>"""
         return f"""
         <div class="test-card result-{cur_status} submitted" data-id="{tid}" data-type="cc_machine">
           <div class="test-header">
             <span class="test-id">{tid}</span>
             <span class="test-name">{title}</span>
+            <span style="margin-left:auto;font-weight:700;font-size:0.85rem;color:{result_color}">{result_label}</span>
           </div>
-          <div style="font-size:0.85rem;color:var(--muted);margin-top:4px">{cur_notes}</div>
+          {f'<div style="font-size:0.85rem;color:var(--muted);margin-top:4px">{cur_notes}</div>' if cur_notes else ''}
+          {evidence_html}
         </div>"""
 
     def _render_pl_card(tc):
@@ -810,16 +891,19 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
           <div class="attach-thumb" id="athumb-{tid}">{''.join(f'<img src="data:{a.get("mime","image/png")};base64,{a["data"]}" title="{esc(a.get("filename","attachment"))}">' for a in (current.get("attachments") or []) if a.get("data"))}</div>
         </div>"""
 
-    # Build section HTML
+    # MP19 REQ-050: Machine tests in collapsed details — PL sees only pl_visual
     machine_section = ""
     if cc_machine_tcs:
+        machine_pass = sum(1 for tc in cc_machine_tcs if result_by_id.get(tc["id"], {{}}).get("cc_result") == "pass" or result_by_id.get(tc["id"], {{}}).get("status") == "pass")
         machine_cards = "".join(_render_machine_card(tc) for tc in cc_machine_tcs)
         machine_section = f"""
-        <div class="uat-section-machine" style="margin-bottom:20px;opacity:0.85">
-          <h3 style="font-size:1rem;color:var(--pass);margin-bottom:8px">✓ Machine-verified by CC — {len(cc_machine_tcs)} items</h3>
-          <p style="font-size:0.85rem;color:var(--muted);margin-bottom:12px">These were verified programmatically by CC before handoff. No action required.</p>
+        <details style="margin-bottom:20px;opacity:0.75">
+          <summary style="font-size:0.95rem;color:var(--pass);cursor:pointer;padding:10px 0">
+            Machine tests — pre-verified by CC ({machine_pass}/{len(cc_machine_tcs)} passed)
+          </summary>
+          <p style="font-size:0.85rem;color:var(--muted);margin:8px 0 12px">These were verified programmatically by CC before handoff. No action required from PL.</p>
           {machine_cards}
-        </div>"""
+        </details>"""
 
     pl_section = ""
     if pl_visual_tcs:

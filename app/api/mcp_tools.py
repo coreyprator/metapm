@@ -294,6 +294,30 @@ TOOLS = [
             "required": ["code", "project_code"],
         },
     },
+    {
+        "name": "submit_cc_results",
+        "description": "Submit machine BV results with evidence to a UAT spec. CC calls this after running machine tests to record cc_result (pass/fail) and cc_evidence (raw output) for each cc_machine BV.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "spec_id": {"type": "string", "description": "UAT spec UUID"},
+                "test_cases": {
+                    "type": "array",
+                    "description": "Array of cc_machine BV results",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string", "description": "BV ID (e.g. MP19-M01)"},
+                            "cc_result": {"type": "string", "enum": ["pass", "fail"], "description": "Machine test result"},
+                            "cc_evidence": {"type": "string", "description": "Raw output/JSON proving the result"},
+                        },
+                        "required": ["id", "cc_result", "cc_evidence"],
+                    },
+                },
+            },
+            "required": ["spec_id", "test_cases"],
+        },
+    },
 ]
 
 
@@ -320,8 +344,10 @@ def _tool_post_prompt(args: dict) -> dict:
     )
     if not req_row:
         return {"error": f"requirement_code {requirement_code} not found in project {project_id}."}
-    if req_row["status"] != "cai_designing":
-        return {"error": f"requirement {requirement_code} is at status {req_row['status']}, expected cai_designing. Cannot link prompt."}
+    # MP19 BUG-037: Allow linking at cai_designing or cc_prompt_ready
+    linkable_statuses = ("cai_designing", "cc_prompt_ready")
+    if req_row["status"] not in linkable_statuses:
+        return {"error": f"requirement {requirement_code} is at status {req_row['status']}, expected one of {linkable_statuses}. Cannot link prompt."}
 
     # MP12B GATE 3: PTH uniqueness — reject if active prompt exists for this PTH
     active = execute_query(
@@ -353,21 +379,24 @@ def _tool_post_prompt(args: dict) -> dict:
     # MP12B: Write initial history row for draft creation
     write_prompt_history(result["id"], pth, None, 'draft', 'CAI', 'post_prompt')
 
-    # MP18 BUG-035: Write PTH to requirement and auto-advance cai_designing → cc_prompt_ready
+    # MP18 BUG-035 + MP19 BUG-037: Write PTH to requirement, auto-advance only if at cai_designing
     requirement_advanced = False
     try:
         execute_query(
             "UPDATE roadmap_requirements SET pth = ?, updated_at = GETDATE() WHERE id = ?",
             (pth, req_row["id"]), fetch="none"
         )
-        execute_query(
-            "UPDATE roadmap_requirements SET status = 'cc_prompt_ready', updated_at = GETDATE() WHERE id = ?",
-            (req_row["id"],), fetch="none"
-        )
-        requirement_advanced = True
-        logger.info(f"BUG-035: linked PTH {pth} to {requirement_code}, advanced to cc_prompt_ready")
+        if req_row["status"] == "cai_designing":
+            execute_query(
+                "UPDATE roadmap_requirements SET status = 'cc_prompt_ready', updated_at = GETDATE() WHERE id = ?",
+                (req_row["id"],), fetch="none"
+            )
+            requirement_advanced = True
+            logger.info(f"BUG-037: linked PTH {pth} to {requirement_code}, advanced to cc_prompt_ready")
+        else:
+            logger.info(f"BUG-037: linked PTH {pth} to {requirement_code} (already at {req_row['status']}, no advance needed)")
     except Exception as e:
-        logger.warning(f"BUG-035: requirement auto-advance failed (non-fatal): {e}")
+        logger.warning(f"BUG-037: requirement auto-advance failed (non-fatal): {e}")
 
     return {
         "id": result["id"],
@@ -1191,6 +1220,61 @@ def _tool_get_requirement_history(args: dict) -> dict:
     }
 
 
+def _tool_submit_cc_results(args: dict) -> dict:
+    """MP19 REQ-049: Submit machine BV results with evidence."""
+    spec_id = args["spec_id"]
+    test_cases = args["test_cases"]
+
+    row = execute_query(
+        "SELECT id, test_cases_json FROM uat_pages WHERE id = ?",
+        (spec_id,), fetch="one"
+    )
+    if not row:
+        return {"error": f"UAT spec {spec_id} not found"}
+
+    import json
+    existing_cases = json.loads(row["test_cases_json"]) if row.get("test_cases_json") else []
+    updates_by_id = {tc["id"]: tc for tc in test_cases}
+    updated_count = 0
+
+    for case in existing_cases:
+        if case.get("id", "").startswith("_"):
+            continue
+        update = updates_by_id.get(case["id"])
+        if update and case.get("type") == "cc_machine":
+            case["cc_result"] = update["cc_result"]
+            case["cc_evidence"] = update["cc_evidence"]
+            case["status"] = update["cc_result"]
+            updated_count += 1
+
+    execute_query("""
+        UPDATE uat_pages SET test_cases_json = ?, updated_at = GETUTCDATE() WHERE id = ?
+    """, (json.dumps(existing_cases), spec_id), fetch="none")
+
+    # Persist to uat_bv_items
+    for tc in test_cases:
+        try:
+            execute_query("""
+                IF EXISTS (SELECT 1 FROM uat_bv_items WHERE spec_id=? AND bv_id=?)
+                    UPDATE uat_bv_items
+                    SET status=?, cc_result=?, cc_evidence=?, updated_at=GETUTCDATE()
+                    WHERE spec_id=? AND bv_id=?
+                ELSE
+                    INSERT INTO uat_bv_items (spec_id, bv_id, title, status, cc_result, cc_evidence)
+                    VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                spec_id, tc["id"],
+                tc["cc_result"], tc["cc_result"], tc["cc_evidence"],
+                spec_id, tc["id"],
+                spec_id, tc["id"], tc["id"],
+                tc["cc_result"], tc["cc_result"], tc["cc_evidence"],
+            ), fetch="none")
+        except Exception as e:
+            logger.warning(f"CC BV item upsert failed for {tc['id']}: {e}")
+
+    return {"updated": updated_count, "spec_id": spec_id}
+
+
 # Tool dispatch map
 TOOL_HANDLERS = {
     "post_prompt": _tool_post_prompt,
@@ -1213,6 +1297,7 @@ TOOL_HANDLERS = {
     "verify_challenge": _tool_verify_challenge,
     "post_session_signal": _tool_post_session_signal,
     "get_requirement_history": _tool_get_requirement_history,
+    "submit_cc_results": _tool_submit_cc_results,
 }
 
 

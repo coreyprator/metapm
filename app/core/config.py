@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.75.0"  # MP18: Workflow hardening — state machine, PTH linkage, status normalization, UAT auto-chain, session enforcement, classification gates
+    VERSION: str = "2.76.0"  # MP19: Machine BV hardening — post_prompt requirement_code fix, cc_result/cc_evidence, PL form cleanup
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

@@ -2325,4 +2325,23 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 64 warning: {e}")
 
+    # Migration 65: MP19 REQ-049 — cc_result, cc_evidence columns on uat_bv_items
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'uat_bv_items' AND COLUMN_NAME = 'cc_result'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            execute_query("""
+                ALTER TABLE uat_bv_items
+                ADD cc_result NVARCHAR(20) NULL,
+                    cc_evidence NVARCHAR(MAX) NULL
+            """, fetch="none")
+            logger.info("  Migration 65: cc_result, cc_evidence columns added to uat_bv_items.")
+        else:
+            logger.info("  Migration 65: cc_result/cc_evidence columns already exist.")
+    except Exception as e:
+        logger.warning(f"  Migration 65 warning: {e}")
+
     logger.info("Migrations complete.")

@@ -309,9 +309,11 @@ async def create_prompt(prompt: PromptCreate, _: bool = Depends(verify_api_key))
     if not req_row:
         raise HTTPException(status_code=400,
                             detail=f"requirement_code {prompt.requirement_code} not found in project {project_id}.")
-    if req_row["status"] != "cai_designing":
+    # MP19 BUG-037: Allow linking at cai_designing or cc_prompt_ready (only auto-advance from cai_designing)
+    linkable_statuses = ("cai_designing", "cc_prompt_ready")
+    if req_row["status"] not in linkable_statuses:
         raise HTTPException(status_code=400,
-                            detail=f"requirement {prompt.requirement_code} is at status {req_row['status']}, expected cai_designing. Cannot link prompt.")
+                            detail=f"requirement {prompt.requirement_code} is at status {req_row['status']}, expected one of {linkable_statuses}. Cannot link prompt.")
 
     result = execute_query("""
         INSERT INTO cc_prompts
@@ -335,21 +337,24 @@ async def create_prompt(prompt: PromptCreate, _: bool = Depends(verify_api_key))
     if not result:
         raise HTTPException(status_code=500, detail="Failed to create prompt")
 
-    # MP18 BUG-035: Write PTH to requirement and auto-advance cai_designing → cc_prompt_ready
+    # MP18 BUG-035 + MP19 BUG-037: Write PTH to requirement, auto-advance only if at cai_designing
     requirement_advanced = False
     try:
         execute_query(
             "UPDATE roadmap_requirements SET pth = ?, updated_at = GETDATE() WHERE id = ?",
             (prompt.pth, req_row["id"]), fetch="none"
         )
-        execute_query(
-            "UPDATE roadmap_requirements SET status = 'cc_prompt_ready', updated_at = GETDATE() WHERE id = ?",
-            (req_row["id"],), fetch="none"
-        )
-        requirement_advanced = True
-        logger.info(f"BUG-035: linked PTH {prompt.pth} to {prompt.requirement_code}, advanced to cc_prompt_ready")
+        if req_row["status"] == "cai_designing":
+            execute_query(
+                "UPDATE roadmap_requirements SET status = 'cc_prompt_ready', updated_at = GETDATE() WHERE id = ?",
+                (req_row["id"],), fetch="none"
+            )
+            requirement_advanced = True
+            logger.info(f"BUG-037: linked PTH {prompt.pth} to {prompt.requirement_code}, advanced to cc_prompt_ready")
+        else:
+            logger.info(f"BUG-037: linked PTH {prompt.pth} to {prompt.requirement_code} (already at {req_row['status']}, no advance needed)")
     except Exception as e:
-        logger.error(f"BUG-035: auto-advance failed for {prompt.requirement_code}: {e}")
+        logger.error(f"BUG-037: auto-advance failed for {prompt.requirement_code}: {e}")
 
     # Fire-and-forget PA notification
     asyncio.create_task(notify_pa("Prompt created", {
