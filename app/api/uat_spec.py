@@ -516,7 +516,7 @@ async def submit_cc_results(spec_id: str, body: CCResultsSubmit):
             updated_count += 1
 
     execute_query("""
-        UPDATE uat_pages SET test_cases_json = ?, updated_at = GETUTCDATE() WHERE id = ?
+        UPDATE uat_pages SET test_cases_json = ? WHERE id = ?
     """, (json.dumps(existing_cases), spec_id), fetch="none")
 
     # Also persist to uat_bv_items
@@ -525,7 +525,7 @@ async def submit_cc_results(spec_id: str, body: CCResultsSubmit):
             execute_query("""
                 IF EXISTS (SELECT 1 FROM uat_bv_items WHERE spec_id=? AND bv_id=?)
                     UPDATE uat_bv_items
-                    SET status=?, cc_result=?, cc_evidence=?, updated_at=GETUTCDATE()
+                    SET status=?, cc_result=?, cc_evidence=?
                     WHERE spec_id=? AND bv_id=?
                 ELSE
                     INSERT INTO uat_bv_items (spec_id, bv_id, title, status, cc_result, cc_evidence)
