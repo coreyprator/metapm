@@ -261,7 +261,24 @@ async def create_handoff(
         # MP-HANDOFF-GATE-001: Enforce cc_complete state and valid UAT spec before registration
         bypass = (handoff.enforcement_bypass or "").strip().lower()
 
-        # Gate 1: linked prompt/requirement must be at cc_complete or higher
+        # MP18 REQ-046 Gate 1: prompt must be approved or executing (not draft/rejected)
+        if getattr(handoff, 'pth', None) or getattr(handoff, 'prompt_pth', None):
+            check_pth = getattr(handoff, 'pth', None) or handoff.prompt_pth
+            prompt_row = execute_query(
+                "SELECT TOP 1 id, status FROM cc_prompts WHERE pth = ? ORDER BY id DESC",
+                (check_pth,), fetch="one"
+            )
+            if prompt_row and prompt_row['status'] in ('draft', 'rejected'):
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": "prompt_not_approved",
+                        "prompt_status": prompt_row['status'],
+                        "pth": check_pth,
+                    }
+                )
+
+        # Gate 1b: linked prompt/requirement must be at cc_complete or higher
         # Skipped when enforcement_bypass="data_only_sprint"
         if bypass != "data_only_sprint" and getattr(handoff, 'prompt_pth', None):
             allowed_states = ('cc_complete', 'uat_ready', 'uat_pass', 'done', 'closed')

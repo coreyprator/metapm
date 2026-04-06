@@ -1718,24 +1718,23 @@ async def assign_pth(requirement_id: str, body: PthAssignRequest = None):
 # STATUS TRANSITION + HISTORY (MP-MS3 Phase 2)
 # ============================================
 
-# Valid status transitions — uses lifecycle transitions; legacy statuses allow any
-VALID_TRANSITIONS = {
-    "req_created":     ["req_approved", "backlog", "closed"],
-    "req_approved":    ["cai_designing", "req_created"],
-    "cai_designing":   ["cc_prompt_ready", "req_approved"],
-    "cc_prompt_ready": ["cc_executing", "cai_designing"],
-    "cc_executing":    ["cc_complete", "cc_prompt_ready"],
-    "cc_complete":     ["uat_ready", "cc_executing"],
-    "uat_ready":       ["uat_pass", "uat_fail"],
-    "uat_pass":        ["done"],
-    "uat_fail":        ["cc_prompt_ready", "rework"],
-    "done":            ["rework"],
-    "rework":          ["cc_prompt_ready"],
-    # Legacy: allow any transition
-    "backlog": None,
-    "executing": None,
-    "closed": None,
+# MP18 BUG-036: Allowed transitions — strict enforcement, no legacy bypass
+ALLOWED_TRANSITIONS = {
+    "req_created":     ["req_approved", "closed"],
+    "req_approved":    ["cai_designing", "closed"],
+    "cai_designing":   ["cc_prompt_ready", "closed"],
+    "cc_prompt_ready": ["cc_executing", "closed"],
+    "cc_executing":    ["cc_complete", "closed"],
+    "cc_complete":     ["uat_ready", "closed"],
+    "uat_ready":       ["uat_pass", "uat_fail", "closed"],
+    "uat_pass":        ["done", "closed"],
+    "uat_fail":        ["cai_designing", "closed"],
+    "done":            ["closed"],
+    "closed":          [],
+    "backlog":         ["req_created", "closed"],
+    "rework":          ["req_created", "closed"],
 }
+VALID_TRANSITIONS = ALLOWED_TRANSITIONS  # backward compat alias
 
 
 @router.patch("/roadmap/requirements/{requirement_id}/status", response_model=StatusTransitionResponse)
@@ -1758,13 +1757,22 @@ async def transition_requirement_status(requirement_id: str, body: StatusTransit
                 previous_status=current_status, transition_recorded=False
             )
 
-        # Validate transition (None = legacy, allow any)
-        allowed = VALID_TRANSITIONS.get(current_status)
-        if allowed is not None and new_status not in allowed:
-            reason = f"Invalid transition: {current_status} -> {new_status}. Allowed: {', '.join(allowed)}"
+        # MP18 BUG-036: "closed" requires a non-empty note
+        if new_status == "closed" and not (body.notes and body.notes.strip()):
+            raise HTTPException(status_code=400, detail="note required when closing from any status.")
+
+        # MP18 BUG-036: Strict state machine enforcement
+        allowed = ALLOWED_TRANSITIONS.get(current_status, [])
+        if new_status not in allowed:
             write_requirement_failure(requirement_id, current_status, new_status,
-                                      body.changed_by, 'transition_requirement_status', reason)
-            raise HTTPException(status_code=400, detail=reason)
+                                      body.changed_by, 'transition_requirement_status',
+                                      f"illegal_transition: {current_status} -> {new_status}")
+            raise HTTPException(status_code=400, detail={
+                "error": "illegal_transition",
+                "current_status": current_status,
+                "requested_status": new_status,
+                "allowed_next": allowed,
+            })
 
         # Update status
         execute_query("""
@@ -1818,9 +1826,10 @@ async def batch_transition_status(body: BatchStatusRequest):
             current_status = req['status']
             new_status = body.status.value
 
-            allowed = VALID_TRANSITIONS.get(current_status)
-            if allowed is not None and new_status not in allowed:
-                results.append({"id": req_id, "code": req['code'], "error": f"Invalid: {current_status} → {new_status}"})
+            allowed = ALLOWED_TRANSITIONS.get(current_status, [])
+            if new_status not in allowed:
+                results.append({"id": req_id, "code": req['code'], "error": "illegal_transition",
+                                "current_status": current_status, "requested_status": new_status, "allowed_next": allowed})
                 continue
 
             execute_query("""
@@ -1866,22 +1875,8 @@ LIFECYCLE_STATES = [
     {"id": "closed",          "label": "Closed",         "color": "#374151", "phase": "legacy"},
 ]
 
-LIFECYCLE_VALID_TRANSITIONS = {
-    "req_created":     ["req_approved", "backlog", "closed"],
-    "req_approved":    ["cai_designing", "req_created"],
-    "cai_designing":   ["cc_prompt_ready", "req_approved"],
-    "cc_prompt_ready": ["cc_executing", "cai_designing"],
-    "cc_executing":    ["cc_complete", "cc_prompt_ready"],
-    "cc_complete":     ["uat_ready", "cc_executing"],
-    "uat_ready":       ["uat_pass", "uat_fail"],
-    "uat_pass":        ["done"],
-    "uat_fail":        ["cc_prompt_ready", "rework"],
-    "done":            ["rework"],
-    "rework":          ["cc_prompt_ready"],
-    "backlog": None,   # legacy: allow any transition
-    "executing": None,
-    "closed": None,
-}
+# MP18 BUG-036: Lifecycle uses the same ALLOWED_TRANSITIONS
+LIFECYCLE_VALID_TRANSITIONS = ALLOWED_TRANSITIONS
 
 
 @router.get("/v1/lifecycle/states")
@@ -1919,13 +1914,22 @@ async def update_requirement_state(req_id: str, body: StateTransition):
                 detail="PTH required before advancing to cc_prompt_ready. Call POST /api/roadmap/requirements/{id}/assign-pth first."
             )
 
-        # Validate transition
+        # MP18 BUG-036: "closed" requires a non-empty note
+        if new_status == "closed" and not (body.note and body.note.strip()):
+            raise HTTPException(status_code=400, detail="note required when closing from any status.")
+
+        # MP18 BUG-036: Strict state machine enforcement
         if new_status != current_status:
-            allowed = LIFECYCLE_VALID_TRANSITIONS.get(current_status)
-            if allowed is not None and new_status not in allowed:
-                reason = f"Invalid transition: {current_status} -> {new_status}. Allowed: {allowed}"
+            allowed = ALLOWED_TRANSITIONS.get(current_status, [])
+            if new_status not in allowed:
+                reason = f"illegal_transition: {current_status} -> {new_status}"
                 write_requirement_failure(req_id, current_status, new_status, 'system', 'update_requirement_state', reason)
-                raise HTTPException(status_code=400, detail=reason)
+                raise HTTPException(status_code=400, detail={
+                    "error": "illegal_transition",
+                    "current_status": current_status,
+                    "requested_status": new_status,
+                    "allowed_next": allowed,
+                })
 
         execute_query(
             "UPDATE roadmap_requirements SET status = ?, updated_at = GETDATE() WHERE id = ?",

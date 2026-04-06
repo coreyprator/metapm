@@ -40,8 +40,9 @@ TOOLS = [
                 "project_id": {"type": "string", "description": "Project short code (e.g. 'proj-mp')"},
                 "content_md": {"type": "string", "description": "Full markdown prompt content"},
                 "estimated_hours": {"type": "number", "description": "Estimated hours (default 1.0)", "default": 1.0},
+                "requirement_code": {"type": "string", "description": "MP18 BUG-035: requirement code to link PTH to (REQUIRED)"},
             },
-            "required": ["pth", "sprint_id", "project_id", "content_md"],
+            "required": ["pth", "sprint_id", "project_id", "content_md", "requirement_code"],
         },
     },
     {
@@ -304,6 +305,23 @@ def _tool_post_prompt(args: dict) -> dict:
     project_id = args["project_id"]
     content_md = args["content_md"]
     estimated_hours = args.get("estimated_hours", 1.0)
+    requirement_code = args.get("requirement_code")
+
+    # MP18 BUG-035: requirement_code is REQUIRED
+    if not requirement_code:
+        return {"error": "requirement_code is required."}
+
+    # MP18 BUG-035: Look up requirement by code + project
+    req_row = execute_query(
+        "SELECT r.id, r.code, r.status FROM roadmap_requirements r "
+        "JOIN roadmap_projects p ON r.project_id = p.id "
+        "WHERE r.code = ? AND p.id = ?",
+        (requirement_code, project_id), fetch="one"
+    )
+    if not req_row:
+        return {"error": f"requirement_code {requirement_code} not found in project {project_id}."}
+    if req_row["status"] != "cai_designing":
+        return {"error": f"requirement {requirement_code} is at status {req_row['status']}, expected cai_designing. Cannot link prompt."}
 
     # MP12B GATE 3: PTH uniqueness — reject if active prompt exists for this PTH
     active = execute_query(
@@ -318,13 +336,13 @@ def _tool_post_prompt(args: dict) -> dict:
 
     result = execute_query("""
         INSERT INTO cc_prompts
-            (sprint_id, project_id, pth, content, content_md,
+            (sprint_id, project_id, pth, requirement_id, content, content_md,
              estimated_hours, created_by, status)
         OUTPUT INSERTED.id, INSERTED.pth, INSERTED.sprint_id, INSERTED.status,
                INSERTED.created_at
-        VALUES (?, ?, ?, ?, ?, ?, 'CAI', 'draft')
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'CAI', 'draft')
     """, (
-        sprint_id, project_id, pth,
+        sprint_id, project_id, pth, req_row["id"],
         content_md[:500] if content_md else '',
         content_md, estimated_hours,
     ), fetch="one")
@@ -335,26 +353,21 @@ def _tool_post_prompt(args: dict) -> dict:
     # MP12B: Write initial history row for draft creation
     write_prompt_history(result["id"], pth, None, 'draft', 'CAI', 'post_prompt')
 
-    # Auto-advance linked requirement from cai_designing -> cc_prompt_ready
-    requirement_advanced = None
+    # MP18 BUG-035: Write PTH to requirement and auto-advance cai_designing → cc_prompt_ready
+    requirement_advanced = False
     try:
-        req_row = execute_query(
-            "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ? AND status = 'cai_designing'",
-            (pth,), fetch="one"
+        execute_query(
+            "UPDATE roadmap_requirements SET pth = ?, updated_at = GETDATE() WHERE id = ?",
+            (pth, req_row["id"]), fetch="none"
         )
-        if req_row:
-            execute_query(
-                "UPDATE roadmap_requirements SET status = 'cc_prompt_ready', updated_at = GETUTCDATE() WHERE id = ?",
-                (req_row["id"],), fetch="none"
-            )
-            requirement_advanced = {"code": req_row["code"], "new_status": "cc_prompt_ready"}
-            logger.info(f"post_prompt: auto-advanced {req_row['code']} to cc_prompt_ready for PTH {pth}")
-        else:
-            # MP12B: orphan detection
-            write_failure_event('orphan_pth', pth, 'post_prompt',
-                                f"No requirement found at cai_designing for PTH '{pth}' during post_prompt.")
+        execute_query(
+            "UPDATE roadmap_requirements SET status = 'cc_prompt_ready', updated_at = GETDATE() WHERE id = ?",
+            (req_row["id"],), fetch="none"
+        )
+        requirement_advanced = True
+        logger.info(f"BUG-035: linked PTH {pth} to {requirement_code}, advanced to cc_prompt_ready")
     except Exception as e:
-        logger.warning(f"post_prompt: requirement auto-advance failed (non-fatal): {e}")
+        logger.warning(f"BUG-035: requirement auto-advance failed (non-fatal): {e}")
 
     return {
         "id": result["id"],
@@ -364,6 +377,7 @@ def _tool_post_prompt(args: dict) -> dict:
         "url": f"https://metapm.rentyourcio.com/prompts/{result['pth']}",
         "created_at": str(result["created_at"]) if result.get("created_at") else None,
         "requirement_advanced": requirement_advanced,
+        "requirement_code": requirement_code,
     }
 
 
@@ -607,6 +621,23 @@ def _tool_patch_requirement_status(args: dict) -> dict:
 
     req_id = req["id"]
     current = req["status"]
+
+    # MP18 BUG-036: State machine enforcement
+    from app.api.roadmap import ALLOWED_TRANSITIONS
+    allowed = ALLOWED_TRANSITIONS.get(current, [])
+    if status not in allowed:
+        write_requirement_failure(req_id, current, status, 'MCP', 'patch_requirement_status',
+                                  f"illegal_transition: {current} -> {status}")
+        return {
+            "error": "illegal_transition",
+            "current_status": current,
+            "requested_status": status,
+            "allowed_next": allowed,
+        }
+
+    # MP18 BUG-036: "closed" requires a non-empty note
+    if status == "closed" and not (note and note.strip()):
+        return {"error": "note required when closing from any status."}
 
     # BA17 Closeout gate: block cc_complete if handoff shell exists for this PTH and is incomplete
     if status == "cc_complete" and pth:

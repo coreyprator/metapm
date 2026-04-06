@@ -80,6 +80,7 @@ class PLResultsTestCase(BaseModel):
     status: str  # pass | fail | skip | pending
     notes: Optional[str] = None
     attachments: Optional[List[dict]] = None  # MP07: image/file evidence
+    classification: Optional[str] = None  # MP18 REQ-047: New requirement | Bug | Finding | No-action
 
 
 class PLResultsSubmit(BaseModel):
@@ -277,7 +278,40 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
         raise HTTPException(400, "This endpoint is only for cc_spec UATs")
 
     existing_cases = json.loads(row["test_cases_json"]) if row.get("test_cases_json") else []
+
+    # MP18 REQ-047: Identify pl_visual vs cc_machine BVs
+    pl_visual_ids = set()
+    for c in existing_cases:
+        if c.get("id", "").startswith("_"):
+            continue
+        if c.get("type") != "cc_machine":
+            pl_visual_ids.add(c["id"])
+
+    # MP18 REQ-047: Server-side validation — all pl_visual BVs must have status and classification
     updates_by_id = {tc.id: tc for tc in body.test_cases}
+    missing_classification = []
+    pending_bv_ids = []
+    for bv_id in pl_visual_ids:
+        tc = updates_by_id.get(bv_id)
+        if tc:
+            if not tc.classification:
+                missing_classification.append(bv_id)
+            if not tc.status or tc.status == "pending":
+                pending_bv_ids.append(bv_id)
+        else:
+            pending_bv_ids.append(bv_id)
+            missing_classification.append(bv_id)
+
+    if missing_classification:
+        raise HTTPException(status_code=400, detail={
+            "error": "classification_required",
+            "missing_bv_ids": missing_classification,
+        })
+    if pending_bv_ids:
+        raise HTTPException(status_code=400, detail={
+            "error": "all_bvs_required",
+            "pending_bv_ids": pending_bv_ids,
+        })
 
     for case in existing_cases:
         if case.get("id", "").startswith("_"):
@@ -285,6 +319,8 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
         update = updates_by_id.get(case["id"])
         if update:
             case["status"] = update.status
+            if update.classification:
+                case["classification"] = update.classification
             if update.notes is not None:
                 case["notes"] = update.notes
             if update.attachments:
@@ -326,26 +362,64 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
 
     logger.info(f"PL submitted results for spec {spec_id}: {passed}P/{failed}F/{skipped}S, status={new_status}")
 
-    # Auto-advance linked requirement based on UAT outcome
+    # MP18 REQ-045: Auto-advance linked requirement based on UAT outcome
     spec_pth_val = row.get("pth")
+    requirement_advance_result = {}
     if spec_pth_val and new_status in ("passed", "failed", "conditional_pass"):
-        # passed → uat_pass, failed/conditional_pass → uat_fail (conservative)
-        target_status = "uat_pass" if new_status == "passed" else "uat_fail"
         try:
             req_row = execute_query(
                 "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ?",
                 (spec_pth_val,), fetch="one"
             )
-            if req_row and req_row["status"] not in ("done", "closed", "uat_pass", "uat_fail"):
-                execute_query(
-                    "UPDATE roadmap_requirements SET status = ?, updated_at = GETUTCDATE() WHERE id = ?",
-                    (target_status, req_row["id"]), fetch="none"
-                )
-                logger.info(f"Auto-advanced {req_row['code']} to {target_status} on UAT submit ({new_status}) for {spec_id}")
+            if req_row and req_row["status"] == "uat_ready":
+                if new_status == "passed":
+                    # uat_ready → uat_pass (history row via trigger)
+                    execute_query(
+                        "UPDATE roadmap_requirements SET status = 'uat_pass', updated_at = GETUTCDATE() WHERE id = ?",
+                        (req_row["id"],), fetch="none"
+                    )
+                    logger.info(f"REQ-045: {req_row['code']} advanced to uat_pass")
+                    # uat_pass → done (second auto-chain)
+                    execute_query(
+                        "UPDATE roadmap_requirements SET status = 'done', updated_at = GETUTCDATE() WHERE id = ?",
+                        (req_row["id"],), fetch="none"
+                    )
+                    logger.info(f"REQ-045: {req_row['code']} auto-chained to done")
+                    requirement_advance_result = {
+                        "requirement_advanced": True,
+                        "new_status": "done",
+                        "requirement_code": req_row["code"],
+                    }
+                elif new_status == "conditional_pass":
+                    # Advance to uat_pass only — do NOT advance to done
+                    execute_query(
+                        "UPDATE roadmap_requirements SET status = 'uat_pass', updated_at = GETUTCDATE() WHERE id = ?",
+                        (req_row["id"],), fetch="none"
+                    )
+                    logger.info(f"REQ-045: {req_row['code']} advanced to uat_pass (conditional — requires CAI review)")
+                    requirement_advance_result = {
+                        "requirement_advanced": True,
+                        "new_status": "uat_pass",
+                        "requirement_code": req_row["code"],
+                        "requires_cai_review": True,
+                    }
+                elif new_status == "failed":
+                    # uat_ready → uat_fail
+                    execute_query(
+                        "UPDATE roadmap_requirements SET status = 'uat_fail', updated_at = GETUTCDATE() WHERE id = ?",
+                        (req_row["id"],), fetch="none"
+                    )
+                    logger.info(f"REQ-045: {req_row['code']} advanced to uat_fail")
+                    requirement_advance_result = {
+                        "requirement_advanced": True,
+                        "new_status": "uat_fail",
+                        "requirement_code": req_row["code"],
+                    }
             elif req_row:
-                logger.info(f"Requirement {req_row['code']} already at {req_row['status']}, skipping {target_status} advance")
+                logger.info(f"Requirement {req_row['code']} at {req_row['status']}, not uat_ready — skipping auto-advance")
         except Exception as e:
-            logger.warning(f"Auto-advance to {target_status} failed (non-fatal): {e}")
+            logger.warning(f"REQ-045 auto-advance failed: {e}")
+            requirement_advance_result = {"requirement_advance_error": str(e)}
     elif new_status == "in_progress":
         logger.info(f"UAT {spec_id} incomplete: {failed} fail, {total - passed - skipped} pending — no auto-advance")
 
@@ -357,17 +431,17 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
             execute_query("""
                 IF EXISTS (SELECT 1 FROM uat_bv_items WHERE spec_id=? AND bv_id=?)
                     UPDATE uat_bv_items
-                    SET status=?, notes=?, updated_at=GETUTCDATE()
+                    SET status=?, notes=?, classification=?, updated_at=GETUTCDATE()
                     WHERE spec_id=? AND bv_id=?
                 ELSE
-                    INSERT INTO uat_bv_items (spec_id, bv_id, title, status, notes)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO uat_bv_items (spec_id, bv_id, title, status, notes, classification)
+                    VALUES (?, ?, ?, ?, ?, ?)
             """, (
-                spec_id, tc.id,                          # EXISTS check
-                tc.status or 'pending', tc.notes or '',  # UPDATE SET
-                spec_id, tc.id,                          # UPDATE WHERE
-                spec_id, tc.id, bv_title,                # INSERT
-                tc.status or 'pending', tc.notes or '',  # INSERT values
+                spec_id, tc.id,                                              # EXISTS check
+                tc.status or 'pending', tc.notes or '', tc.classification,   # UPDATE SET
+                spec_id, tc.id,                                              # UPDATE WHERE
+                spec_id, tc.id, bv_title,                                    # INSERT
+                tc.status or 'pending', tc.notes or '', tc.classification,   # INSERT values
             ), fetch="none")
         except Exception as bv_err:
             logger.warning(f"BV item upsert failed for {tc.id}: {bv_err}")
@@ -388,13 +462,15 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
     ))
     logger.info(f"[AP07] Loop 3 triggered for spec {spec_id} PTH={spec_pth}")
 
-    return {
+    response = {
         "status": new_status,
         "passed": passed,
         "failed": failed,
         "skipped": skipped,
-        "uat_url": f"https://metapm.rentyourcio.com/uat/{spec_id}"
+        "uat_url": f"https://metapm.rentyourcio.com/uat/{spec_id}",
     }
+    response.update(requirement_advance_result)
+    return response
 
 
 class UATOverride(BaseModel):
@@ -690,10 +766,13 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
         current = result_by_id.get(tc["id"], {})
         cur_status = current.get("status", "pending")
         cur_notes = esc(current.get("notes", ""))
+        cur_class = current.get("classification", "")
         steps_html = "".join(f"<li>{esc(s)}</li>" for s in steps)
         url_html = f'<a href="{esc(url)}" target="_blank" class="bv-url">{esc(url)}</a>' if url else ""
         def checked(val):
             return " checked" if cur_status == val else ""
+        def cls_selected(val):
+            return " selected" if cur_class == val else ""
         return f"""
         <div class="test-card result-{cur_status} {submitted_cls}" data-id="{tid}">
           <div class="test-header">
@@ -713,6 +792,14 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
             <label class="radio-label{' checked-pending' if cur_status=='pending' else ''}">
               <input type="radio" name="{tid}" value="pending"{checked('pending')}> ? Pending</label>
           </div>
+          <div class="notes-label" style="margin-top:8px">Classification (required)</div>
+          <select class="classification-select" data-id="{tid}" style="width:100%;padding:7px 10px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem;margin-bottom:8px">
+            <option value="">— Select —</option>
+            <option value="New requirement"{cls_selected("New requirement")}>New requirement</option>
+            <option value="Bug"{cls_selected("Bug")}>Bug</option>
+            <option value="Finding"{cls_selected("Finding")}>Finding</option>
+            <option value="No-action"{cls_selected("No-action")}>No-action</option>
+          </select>
           <div class="notes-label">Notes</div>
           <textarea class="notes-input" placeholder="Observations...">{cur_notes}</textarea>
           {'' if is_submitted else f'<div class="paste-zone" id="paste-{tid}" data-id="{tid}" tabindex="0" contenteditable="false">📷 Paste screenshot here (Ctrl+V)</div>'}
@@ -1134,13 +1221,22 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       // MP13A: only submit pl_visual cards (cc_machine are pre-filled)
       const cards = document.querySelectorAll('.test-card:not([data-type="cc_machine"])');
       const test_cases = [];
+      let missingClassification = [];
       cards.forEach(card => {{
         const id = card.dataset.id;
         const checked = card.querySelector(`input[name="${{id}}"]:checked`);
         const notes = card.querySelector('.notes-input')?.value || '';
         const attachments = attachmentsMap[id] || [];
-        test_cases.push({{ id, status: checked ? checked.value : 'pending', notes, attachments }});
+        const classSelect = card.querySelector('.classification-select');
+        const classification = classSelect ? classSelect.value : '';
+        if (!classification) missingClassification.push(id);
+        test_cases.push({{ id, status: checked ? checked.value : 'pending', notes, attachments, classification }});
       }});
+      // MP18 REQ-047: block submit if classification missing
+      if (missingClassification.length > 0) {{
+        alert('Classification required for all BVs: ' + missingClassification.join(', '));
+        return;
+      }}
       const general_notes = document.getElementById('general-notes').value;
 
       const btn = document.getElementById('submit-btn');

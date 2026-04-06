@@ -191,6 +191,7 @@ def _all_bv_urls_are_root(content_md: str) -> bool:
 # Schemas
 class PromptCreate(BaseModel):
     requirement_id: Optional[str] = None
+    requirement_code: str = Field(..., description="MP18 BUG-035: required — links PTH to requirement")
     sprint_id: str
     pth: str = Field(..., max_length=20)
     content_md: str
@@ -298,6 +299,20 @@ async def create_prompt(prompt: PromptCreate, _: bool = Depends(verify_api_key))
     # Default project_id to MetaPM if not provided
     project_id = prompt.project_id or "proj-mp"
 
+    # MP18 BUG-035: Look up requirement by requirement_code + project
+    req_row = execute_query(
+        "SELECT r.id, r.code, r.status FROM roadmap_requirements r "
+        "JOIN roadmap_projects p ON r.project_id = p.id "
+        "WHERE r.code = ? AND p.id = ?",
+        (prompt.requirement_code, project_id), fetch="one"
+    )
+    if not req_row:
+        raise HTTPException(status_code=400,
+                            detail=f"requirement_code {prompt.requirement_code} not found in project {project_id}.")
+    if req_row["status"] != "cai_designing":
+        raise HTTPException(status_code=400,
+                            detail=f"requirement {prompt.requirement_code} is at status {req_row['status']}, expected cai_designing. Cannot link prompt.")
+
     result = execute_query("""
         INSERT INTO cc_prompts
             (sprint_id, project_id, pth, requirement_id, content, content_md,
@@ -310,7 +325,7 @@ async def create_prompt(prompt: PromptCreate, _: bool = Depends(verify_api_key))
         prompt.sprint_id,
         project_id,
         prompt.pth,
-        prompt.requirement_id,
+        req_row["id"],
         prompt.content_md[:500] if prompt.content_md else '',
         prompt.content_md,
         prompt.estimated_hours,
@@ -319,6 +334,22 @@ async def create_prompt(prompt: PromptCreate, _: bool = Depends(verify_api_key))
 
     if not result:
         raise HTTPException(status_code=500, detail="Failed to create prompt")
+
+    # MP18 BUG-035: Write PTH to requirement and auto-advance cai_designing → cc_prompt_ready
+    requirement_advanced = False
+    try:
+        execute_query(
+            "UPDATE roadmap_requirements SET pth = ?, updated_at = GETDATE() WHERE id = ?",
+            (prompt.pth, req_row["id"]), fetch="none"
+        )
+        execute_query(
+            "UPDATE roadmap_requirements SET status = 'cc_prompt_ready', updated_at = GETDATE() WHERE id = ?",
+            (req_row["id"],), fetch="none"
+        )
+        requirement_advanced = True
+        logger.info(f"BUG-035: linked PTH {prompt.pth} to {prompt.requirement_code}, advanced to cc_prompt_ready")
+    except Exception as e:
+        logger.error(f"BUG-035: auto-advance failed for {prompt.requirement_code}: {e}")
 
     # Fire-and-forget PA notification
     asyncio.create_task(notify_pa("Prompt created", {
@@ -336,6 +367,8 @@ async def create_prompt(prompt: PromptCreate, _: bool = Depends(verify_api_key))
         "status": result.get("status", "draft"),
         "created_at": str(result["created_at"]) if result.get("created_at") else None,
         "url": f"https://metapm.rentyourcio.com/prompts/{result['pth']}" if result.get("pth") else None,
+        "requirement_advanced": requirement_advanced,
+        "requirement_code": prompt.requirement_code,
     }
 
 

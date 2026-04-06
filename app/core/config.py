@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.74.2"  # MP16C: TTL fallback sweep, /prompts 422 fix, BA29, UAT notes fix
+    VERSION: str = "2.75.0"  # MP18: Workflow hardening — state machine, PTH linkage, status normalization, UAT auto-chain, session enforcement, classification gates
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

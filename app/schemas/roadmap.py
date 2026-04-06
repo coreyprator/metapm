@@ -372,6 +372,7 @@ class BatchStatusRequest(BaseModel):
 class StateTransition(BaseModel):
     status: str
     override_gate: Optional[bool] = False
+    note: Optional[str] = None
 
 
 class HistoryEntry(BaseModel):

@@ -69,4 +69,17 @@ async def verify_challenge(
         fetch="none",
     )
     logger.info(f"Challenge token verified for PTH {pth}")
-    return {"valid": True}
+
+    # MP18 REQ-046 Gate 2: check for session-start signal
+    session_start_missing = True
+    try:
+        session_row = execute_query(
+            "SELECT id FROM cc_sessions WHERE pth = ? AND signal = 'started'",
+            (pth,), fetch="one"
+        )
+        if session_row:
+            session_start_missing = False
+    except Exception:
+        pass  # table may not exist — default to warning
+
+    return {"valid": True, "session_start_missing": session_start_missing}

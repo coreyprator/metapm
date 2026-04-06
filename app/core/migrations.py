@@ -2269,4 +2269,54 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 62g warning: {e}")
 
+    # Migration 63: MP18 REQ-044 — cc_prompts status normalization
+    try:
+        # Step 1: Normalize 'complete' → 'completed'
+        execute_query(
+            "UPDATE cc_prompts SET status = 'completed' WHERE status = 'complete'",
+            fetch="none"
+        )
+        # Step 2: Add constraint (drop old one first if exists)
+        existing = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+            WHERE TABLE_NAME = 'cc_prompts' AND CONSTRAINT_NAME = 'chk_cc_prompts_status'
+        """, fetch="one")
+        if existing and existing['cnt'] == 0:
+            # Check for unexpected statuses first
+            unexpected = execute_query("""
+                SELECT DISTINCT status FROM cc_prompts
+                WHERE status NOT IN ('draft','approved','executing','completed','stopped','blocked','rejected','cancelled')
+            """, fetch="all") or []
+            if not unexpected:
+                execute_query("""
+                    ALTER TABLE cc_prompts
+                    ADD CONSTRAINT chk_cc_prompts_status
+                    CHECK (status IN ('draft','approved','executing','completed','stopped','blocked','rejected','cancelled'))
+                """, fetch="none")
+                logger.info("  Migration 63: cc_prompts status normalized + constraint added.")
+            else:
+                logger.warning(f"  Migration 63: BLOCKER — unexpected statuses: {[r['status'] for r in unexpected]}")
+        else:
+            logger.info("  Migration 63: chk_cc_prompts_status constraint already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 63 warning: {e}")
+
+    # Migration 64: MP18 REQ-047 — classification column on uat_bv_items
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = 'uat_bv_items' AND COLUMN_NAME = 'classification'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            execute_query("""
+                ALTER TABLE uat_bv_items
+                ADD classification NVARCHAR(50) NULL
+            """, fetch="none")
+            logger.info("  Migration 64: classification column added to uat_bv_items.")
+        else:
+            logger.info("  Migration 64: classification column already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 64 warning: {e}")
+
     logger.info("Migrations complete.")
