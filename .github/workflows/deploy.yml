@@ -44,6 +44,7 @@ jobs:
           python-version: '3.11'
 
       - name: Ingest source code into SQL
+        continue-on-error: true
         run: |
           pip install pyodbc
           python scripts/ingest_code.py --app metapm --repo-root . --sha $(git rev-parse --short HEAD)

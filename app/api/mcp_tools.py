@@ -1297,7 +1297,7 @@ import re as _re
 
 _ALLOWED_DATABASES = {"MetaPM", "LanguageLearning", "EtymologyGraph", "Etymython", "HarmonyLab", "ArtForge"}
 _WRITE_KEYWORDS = _re.compile(
-    r'\b(INSERT|UPDATE|DELETE|DROP|EXEC|TRUNCATE|ALTER|CREATE)\b', re.IGNORECASE
+    r'\b(INSERT|UPDATE|DELETE|DROP|EXEC|TRUNCATE|ALTER|CREATE)\b', _re.IGNORECASE
 )
 _ROW_CAP = 500
 
