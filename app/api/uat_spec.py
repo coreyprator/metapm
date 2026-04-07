@@ -809,6 +809,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
 
     # MP13A REQ-038: split test cases by type (cc_machine vs pl_visual)
     cc_machine_tcs = [tc for tc in real_test_cases if tc.get("type") == "cc_machine"]
+    # MP20 BUG-039: BVs without type default to pl_visual for rendering
     pl_visual_tcs = [tc for tc in real_test_cases if tc.get("type", "pl_visual") != "cc_machine"]
 
     def _render_machine_card(tc):

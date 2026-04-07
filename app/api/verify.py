@@ -201,7 +201,8 @@ async def verify_uat_classification_gate(body: UATClassificationGateRequest):
         return {"check": "uat_classification_gate", "status": "fail", "reason": "spec not found"}
 
     cases = json.loads(row["test_cases_json"]) if row.get("test_cases_json") else []
-    pl_visual = [c for c in cases if not c.get("id", "").startswith("_") and c.get("type") != "cc_machine"]
+    # MP20 BUG-039: match pl_visual explicitly (not just != cc_machine)
+    pl_visual = [c for c in cases if not c.get("id", "").startswith("_") and c.get("type") == "pl_visual"]
 
     if not pl_visual:
         return {"check": "uat_classification_gate", "status": "fail",
