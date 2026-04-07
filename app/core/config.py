@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.76.1"  # MP20: UAT validation pl_visual filter fix, deploy watch script
+    VERSION: str = "2.77.0"  # MP21: code_files table + execute_sql_query MCP tool
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

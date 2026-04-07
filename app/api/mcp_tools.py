@@ -318,6 +318,22 @@ TOOLS = [
             "required": ["spec_id", "test_cases"],
         },
     },
+    {
+        "name": "execute_sql_query",
+        "description": "Execute a read-only SQL SELECT query against any portfolio database. Use for source code search (code_files table in MetaPM), app content queries, or schema exploration. Max 500 rows returned.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sql": {"type": "string", "description": "SELECT statement to execute"},
+                "database": {
+                    "type": "string",
+                    "description": "Target database",
+                    "enum": ["MetaPM", "LanguageLearning", "EtymologyGraph", "Etymython", "HarmonyLab", "ArtForge"],
+                },
+            },
+            "required": ["sql", "database"],
+        },
+    },
 ]
 
 
@@ -1275,6 +1291,82 @@ def _tool_submit_cc_results(args: dict) -> dict:
     return {"updated": updated_count, "spec_id": spec_id}
 
 
+# ── Read-only SQL query tool ──
+
+import re as _re
+
+_ALLOWED_DATABASES = {"MetaPM", "LanguageLearning", "EtymologyGraph", "Etymython", "HarmonyLab", "ArtForge"}
+_WRITE_KEYWORDS = _re.compile(
+    r'\b(INSERT|UPDATE|DELETE|DROP|EXEC|TRUNCATE|ALTER|CREATE)\b', re.IGNORECASE
+)
+_ROW_CAP = 500
+
+
+def _tool_execute_sql_query(args: dict) -> dict:
+    sql = args.get("sql", "").strip()
+    database = args.get("database", "")
+
+    if database not in _ALLOWED_DATABASES:
+        return {"error": f"Database '{database}' not allowed. Must be one of: {', '.join(sorted(_ALLOWED_DATABASES))}"}
+
+    if _WRITE_KEYWORDS.search(sql):
+        return {"error": "Write operations are not permitted. Only SELECT queries are allowed."}
+
+    if not sql.upper().startswith("SELECT"):
+        return {"error": "Only SELECT statements are allowed."}
+
+    try:
+        import pyodbc
+        from app.core.config import settings
+
+        server = settings.DB_SERVER
+        if "," not in server and ":" not in server:
+            server = f"{server},1433"
+
+        conn_str = (
+            f"DRIVER={{{settings.DB_DRIVER}}};"
+            f"SERVER={server};"
+            f"DATABASE={database};"
+            f"UID={settings.DB_USER};"
+            f"PWD={settings.DB_PASSWORD};"
+            "TrustServerCertificate=yes;"
+        )
+        conn = pyodbc.connect(conn_str, timeout=30)
+        conn.setdecoding(pyodbc.SQL_WCHAR, encoding='utf-16-le')
+        conn.setencoding(encoding='utf-16-le')
+
+        cursor = conn.cursor()
+        cursor.execute(sql)
+
+        if not cursor.description:
+            conn.close()
+            return {"database": database, "row_count": 0, "truncated": False, "rows": []}
+
+        columns = [col[0] for col in cursor.description]
+        rows = cursor.fetchmany(_ROW_CAP + 1)
+        truncated = len(rows) > _ROW_CAP
+        if truncated:
+            rows = rows[:_ROW_CAP]
+
+        result_rows = []
+        for row in rows:
+            result_rows.append({
+                col: (str(val) if val is not None and not isinstance(val, (str, int, float, bool)) else val)
+                for col, val in zip(columns, row)
+            })
+
+        conn.close()
+        return {
+            "database": database,
+            "row_count": len(result_rows),
+            "truncated": truncated,
+            "rows": result_rows,
+        }
+    except Exception as e:
+        logger.error(f"execute_sql_query failed: {e}")
+        return {"error": str(e)}
+
+
 # Tool dispatch map
 TOOL_HANDLERS = {
     "post_prompt": _tool_post_prompt,
@@ -1298,6 +1390,7 @@ TOOL_HANDLERS = {
     "post_session_signal": _tool_post_session_signal,
     "get_requirement_history": _tool_get_requirement_history,
     "submit_cc_results": _tool_submit_cc_results,
+    "execute_sql_query": _tool_execute_sql_query,
 }
 
 

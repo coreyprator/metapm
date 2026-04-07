@@ -38,6 +38,19 @@ jobs:
             --allow-unauthenticated \
             --quiet
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Ingest source code into SQL
+        run: |
+          pip install pyodbc
+          python scripts/ingest_code.py --app metapm --repo-root . --sha $(git rev-parse --short HEAD)
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_HOST: 35.224.242.223
+
       - name: Get Service URL
         id: get-url
         run: |
