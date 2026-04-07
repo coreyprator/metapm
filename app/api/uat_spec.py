@@ -290,12 +290,12 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
 
     existing_cases = json.loads(row["test_cases_json"]) if row.get("test_cases_json") else []
 
-    # MP18 REQ-047: Identify pl_visual vs cc_machine BVs
+    # MP18 REQ-047 + MP20 BUG-039: Identify pl_visual BVs only (skip cc_machine)
     pl_visual_ids = set()
     for c in existing_cases:
         if c.get("id", "").startswith("_"):
             continue
-        if c.get("type") != "cc_machine":
+        if c.get("type") == "pl_visual":
             pl_visual_ids.add(c["id"])
 
     # MP18 REQ-047: Server-side validation — all pl_visual BVs must have status and classification
