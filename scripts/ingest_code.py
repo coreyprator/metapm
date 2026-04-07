@@ -18,7 +18,10 @@ except ImportError:
     sys.exit(1)
 
 # Exclusion rules
-EXCLUDED_DIRS = {"node_modules", "__pycache__", ".git", "dist", "build", ".next"}
+EXCLUDED_DIRS = {
+    "node_modules", "__pycache__", ".git", "dist", "build", ".next",
+    ".venv", "venv", "env", "site-packages",  # BUG-040
+}
 EXCLUDED_EXTENSIONS = {
     ".pyc", ".pyo", ".min.js", ".min.css",
     ".jpg", ".png", ".gif", ".ico", ".woff", ".ttf", ".pdf",

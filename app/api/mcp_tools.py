@@ -334,6 +334,25 @@ TOOLS = [
             "required": ["sql", "database"],
         },
     },
+    {
+        "name": "get_schema",
+        "description": "Get live table and column metadata for any portfolio database. Returns table names, column names, data types, nullability, and defaults from INFORMATION_SCHEMA. Use this before writing queries to avoid guessing column names.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "database": {
+                    "type": "string",
+                    "description": "Target database",
+                    "enum": ["MetaPM", "LanguageLearning", "EtymologyGraph", "Etymython", "HarmonyLab", "ArtForge"],
+                },
+                "table_name": {
+                    "type": "string",
+                    "description": "Optional — if provided, return only this table's columns. If omitted, return all tables.",
+                },
+            },
+            "required": ["database"],
+        },
+    },
 ]
 
 
@@ -1367,6 +1386,80 @@ def _tool_execute_sql_query(args: dict) -> dict:
         return {"error": str(e)}
 
 
+# ── get_schema tool ──
+
+def _tool_get_schema(args: dict) -> dict:
+    database = args.get("database", "")
+    table_name = args.get("table_name")
+
+    if database not in _ALLOWED_DATABASES:
+        return {"error": f"Database '{database}' not allowed. Must be one of: {', '.join(sorted(_ALLOWED_DATABASES))}"}
+
+    try:
+        import pyodbc
+        from app.core.config import settings
+
+        server = settings.DB_SERVER
+        if "," not in server and ":" not in server:
+            server = f"{server},1433"
+
+        conn_str = (
+            f"DRIVER={{{settings.DB_DRIVER}}};"
+            f"SERVER={server};"
+            f"DATABASE={database};"
+            f"UID={settings.DB_USER};"
+            f"PWD={settings.DB_PASSWORD};"
+            "TrustServerCertificate=yes;"
+        )
+        conn = pyodbc.connect(conn_str, timeout=30)
+        conn.setdecoding(pyodbc.SQL_WCHAR, encoding='utf-16-le')
+        conn.setencoding(encoding='utf-16-le')
+
+        cursor = conn.cursor()
+        sql = """
+            SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE,
+                   CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE, COLUMN_DEFAULT
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = 'dbo'
+        """
+        params = []
+        if table_name:
+            sql += " AND TABLE_NAME = ?"
+            params.append(table_name)
+        sql += " ORDER BY TABLE_NAME, ORDINAL_POSITION"
+
+        cursor.execute(sql, params)
+        rows = cursor.fetchall()
+        conn.close()
+
+        tables_dict: dict = {}
+        for row in rows:
+            tname = row[0]
+            if tname not in tables_dict:
+                tables_dict[tname] = []
+            tables_dict[tname].append({
+                "column_name": row[1],
+                "data_type": row[2],
+                "max_length": row[3],
+                "is_nullable": row[4],
+                "column_default": row[5],
+            })
+
+        tables = [
+            {"table_name": tname, "columns": cols}
+            for tname, cols in tables_dict.items()
+        ]
+
+        return {
+            "database": database,
+            "table_count": len(tables),
+            "tables": tables,
+        }
+    except Exception as e:
+        logger.error(f"get_schema failed for {database}: {e}")
+        return {"database": database, "error": "access_denied", "detail": str(e)}
+
+
 # Tool dispatch map
 TOOL_HANDLERS = {
     "post_prompt": _tool_post_prompt,
@@ -1391,6 +1484,7 @@ TOOL_HANDLERS = {
     "get_requirement_history": _tool_get_requirement_history,
     "submit_cc_results": _tool_submit_cc_results,
     "execute_sql_query": _tool_execute_sql_query,
+    "get_schema": _tool_get_schema,
 }
 
 
