@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.78.0"  # MP22: get_schema MCP tool + BUG-040 .venv exclusion fix
+    VERSION: str = "2.79.0"  # MP23: Sprint Quality Model (REQ-048)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

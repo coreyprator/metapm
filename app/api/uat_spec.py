@@ -75,18 +75,27 @@ class UATSpecResponse(BaseModel):
     status: str = "spec_created"
 
 
+VALID_FAILURE_TYPES = {
+    "wrong_spec", "regression", "environment", "unclear_bv",
+    "machine_test_sent_to_pl", "no_5q_applied", "incomplete_spec",
+    "missing_acceptance_criteria", "incomplete_handoff", "other",
+}
+
+
 class PLResultsTestCase(BaseModel):
     id: str
     status: str  # pass | fail | skip | pending
     notes: Optional[str] = None
     attachments: Optional[List[dict]] = None  # MP07: image/file evidence
     classification: Optional[str] = None  # MP18 REQ-047: New requirement | Bug | Finding | No-action
+    failure_type: Optional[str] = None  # MP23 REQ-048: reason for failure
 
 
 class PLResultsSubmit(BaseModel):
     test_cases: List[PLResultsTestCase]
     overall_notes: Optional[str] = None
     general_notes: Optional[str] = None  # Fix 2d: persisted to DB
+    failure_type: Optional[str] = None  # MP23: sprint-level failure_type for conditional_pass
     general_notes_attachments: Optional[List[dict]] = None  # MP07
     submitted_by: Optional[str] = None
 
@@ -324,6 +333,29 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
             "pending_bv_ids": pending_bv_ids,
         })
 
+    # MP23 REQ-048: Quality gate — failed BVs require failure_type, skipped/pending require notes
+    failed_no_type = []
+    skip_no_notes = []
+    for tc in body.test_cases:
+        if tc.id not in pl_visual_ids:
+            continue
+        if tc.status == "fail" and not tc.failure_type:
+            failed_no_type.append(tc.id)
+        if tc.status in ("skip", "pending") and not (tc.notes and tc.notes.strip()):
+            skip_no_notes.append(tc.id)
+    if failed_no_type:
+        raise HTTPException(status_code=400, detail={
+            "error": "failure_type_required",
+            "message": "Please select a failure type for each failed test \u2014 this helps track why sprints fail.",
+            "missing_bv_ids": failed_no_type,
+        })
+    if skip_no_notes:
+        raise HTTPException(status_code=400, detail={
+            "error": "notes_required_for_skip",
+            "message": "Please add a note explaining why this test was skipped or left pending.",
+            "missing_bv_ids": skip_no_notes,
+        })
+
     for case in existing_cases:
         if case.get("id", "").startswith("_"):
             continue
@@ -336,6 +368,8 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
                 case["notes"] = update.notes
             if update.attachments:
                 case["attachments"] = update.attachments
+            if update.failure_type:
+                case["failure_type"] = update.failure_type
 
     # Store general notes attachments as sentinel entry (id starts with _)
     if body.general_notes_attachments:
@@ -361,15 +395,59 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
     else:
         new_status = "in_progress"
 
-    # Fix 2d: persist general_notes
+    # MP23 REQ-048: conditional_pass gate — requires sprint-level failure_type
+    if new_status == "conditional_pass" and not body.failure_type:
+        raise HTTPException(status_code=400, detail={
+            "error": "failure_type_required_conditional",
+            "message": "Conditional pass requires a failure type. Please select one for this sprint.",
+        })
+
+    # MP23 REQ-048: Derive sprint-level failure_type from BV-level if not explicitly set
+    sprint_failure_type = body.failure_type
+    if not sprint_failure_type and failed > 0:
+        bv_failure_types = [tc.failure_type for tc in body.test_cases if tc.status == "fail" and tc.failure_type]
+        if bv_failure_types:
+            sprint_failure_type = bv_failure_types[0]
+
+    # MP23 REQ-048: Calculate attempt_number for this requirement
+    attempt_number = None
+    try:
+        spec_pth_for_attempt = row.get("pth")
+        if spec_pth_for_attempt:
+            prior_count_row = execute_query("""
+                SELECT COUNT(*) as cnt FROM uat_pages up
+                JOIN cc_prompts cp ON up.pth = cp.pth
+                WHERE cp.requirement_id = (
+                    SELECT TOP 1 requirement_id FROM cc_prompts WHERE pth = ?
+                )
+                AND up.pl_submitted_at IS NOT NULL
+                AND up.id != ?
+            """, (spec_pth_for_attempt, spec_id), fetch="one")
+            attempt_number = (prior_count_row["cnt"] if prior_count_row else 0) + 1
+    except Exception as e:
+        logger.warning(f"attempt_number calculation failed: {e}")
+
+    # Fix 2d: persist general_notes + attempt_number
     execute_query("""
         UPDATE uat_pages
         SET test_cases_json = ?,
             status = ?,
             pl_submitted_at = GETUTCDATE(),
-            general_notes = ?
+            general_notes = ?,
+            attempt_number = ?
         WHERE id = ?
-    """, (json.dumps(existing_cases), new_status, body.general_notes or body.overall_notes, spec_id), fetch="none")
+    """, (json.dumps(existing_cases), new_status, body.general_notes or body.overall_notes, attempt_number, spec_id), fetch="none")
+
+    # MP23 REQ-048: Write sprint-level failure_type to uat_results
+    if sprint_failure_type:
+        try:
+            handoff_id = row.get("handoff_id")
+            if handoff_id:
+                execute_query("""
+                    UPDATE uat_results SET failure_type = ? WHERE handoff_id = ?
+                """, (sprint_failure_type, str(handoff_id)), fetch="none")
+        except Exception as e:
+            logger.warning(f"uat_results failure_type update failed: {e}")
 
     logger.info(f"PL submitted results for spec {spec_id}: {passed}P/{failed}F/{skipped}S, status={new_status}")
 
@@ -434,7 +512,7 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
     elif new_status == "in_progress":
         logger.info(f"UAT {spec_id} incomplete: {failed} fail, {total - passed - skipped} pending — no auto-advance")
 
-    # MF01: persist individual BV items to uat_bv_items table
+    # MF01: persist individual BV items to uat_bv_items table (MP23: +failure_type)
     title_lookup = {c["id"]: c.get("title", "") for c in real_cases}
     for tc in body.test_cases:
         try:
@@ -442,17 +520,17 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
             execute_query("""
                 IF EXISTS (SELECT 1 FROM uat_bv_items WHERE spec_id=? AND bv_id=?)
                     UPDATE uat_bv_items
-                    SET status=?, notes=?, classification=?, updated_at=GETUTCDATE()
+                    SET status=?, notes=?, classification=?, failure_type=?, updated_at=GETUTCDATE()
                     WHERE spec_id=? AND bv_id=?
                 ELSE
-                    INSERT INTO uat_bv_items (spec_id, bv_id, title, status, notes, classification)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO uat_bv_items (spec_id, bv_id, title, status, notes, classification, failure_type)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (
-                spec_id, tc.id,                                              # EXISTS check
-                tc.status or 'pending', tc.notes or '', tc.classification,   # UPDATE SET
-                spec_id, tc.id,                                              # UPDATE WHERE
-                spec_id, tc.id, bv_title,                                    # INSERT
-                tc.status or 'pending', tc.notes or '', tc.classification,   # INSERT values
+                spec_id, tc.id,                                                          # EXISTS check
+                tc.status or 'pending', tc.notes or '', tc.classification, tc.failure_type,  # UPDATE SET
+                spec_id, tc.id,                                                          # UPDATE WHERE
+                spec_id, tc.id, bv_title,                                                # INSERT
+                tc.status or 'pending', tc.notes or '', tc.classification, tc.failure_type,  # INSERT values
             ), fetch="none")
         except Exception as bv_err:
             logger.warning(f"BV item upsert failed for {tc.id}: {bv_err}")
@@ -849,12 +927,16 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
         cur_status = current.get("status", "pending")
         cur_notes = esc(current.get("notes", ""))
         cur_class = current.get("classification", "")
+        cur_ft = current.get("failure_type", "")
         steps_html = "".join(f"<li>{esc(s)}</li>" for s in steps)
         url_html = f'<a href="{esc(url)}" target="_blank" class="bv-url">{esc(url)}</a>' if url else ""
         def checked(val):
             return " checked" if cur_status == val else ""
         def cls_selected(val):
             return " selected" if cur_class == val else ""
+        def ft_selected(val):
+            return " selected" if cur_ft == val else ""
+        ft_display = "block" if cur_status == "fail" else "none"
         return f"""
         <div class="test-card result-{cur_status} {submitted_cls}" data-id="{tid}">
           <div class="test-header">
@@ -873,6 +955,26 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
               <input type="radio" name="{tid}" value="skip"{checked('skip')}> ○ Skip</label>
             <label class="radio-label{' checked-pending' if cur_status=='pending' else ''}">
               <input type="radio" name="{tid}" value="pending"{checked('pending')}> ? Pending</label>
+          </div>
+          <div class="failure-type-row" data-id="{tid}" style="display:{ft_display};margin-bottom:8px">
+            <div class="notes-label" style="margin-top:8px">Failure Type (required for failed tests)</div>
+            <select class="failure-type-select" data-id="{tid}" style="width:100%;padding:7px 10px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem">
+              <option value="">— Select failure type —</option>
+              <optgroup label="Content failures">
+                <option value="wrong_spec"{ft_selected("wrong_spec")}>Wrong spec — CC built something different</option>
+                <option value="regression"{ft_selected("regression")}>Regression — previously working, now broken</option>
+                <option value="environment"{ft_selected("environment")}>Environment — deploy/infra problem</option>
+                <option value="unclear_bv"{ft_selected("unclear_bv")}>Unclear BV — test too vague to evaluate</option>
+              </optgroup>
+              <optgroup label="Process failures">
+                <option value="machine_test_sent_to_pl"{ft_selected("machine_test_sent_to_pl")}>Machine test sent to PL (BA32 violation)</option>
+                <option value="no_5q_applied"{ft_selected("no_5q_applied")}>No 5Q applied (BA31 violation)</option>
+                <option value="incomplete_spec"{ft_selected("incomplete_spec")}>Incomplete spec</option>
+                <option value="missing_acceptance_criteria"{ft_selected("missing_acceptance_criteria")}>Missing acceptance criteria</option>
+                <option value="incomplete_handoff"{ft_selected("incomplete_handoff")}>Incomplete handoff</option>
+              </optgroup>
+              <option value="other"{ft_selected("other")}>Other (explain in notes)</option>
+            </select>
           </div>
           <div class="notes-label" style="margin-top:8px">Classification (required)</div>
           <select class="classification-select" data-id="{tid}" style="width:100%;padding:7px 10px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem;margin-bottom:8px">
@@ -1100,8 +1202,22 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       document.getElementById('cnt-pend').textContent = pend;
     }}
 
-    document.querySelectorAll('.radio-group input[type=radio]').forEach(r => r.addEventListener('change', updateCounts));
+    // MP23: Show/hide failure_type dropdown based on status
+    function updateFailureTypeVisibility() {{
+      document.querySelectorAll('.test-card:not([data-type="cc_machine"])').forEach(card => {{
+        const id = card.dataset.id;
+        const checked = card.querySelector(`input[name="${{id}}"]:checked`);
+        const val = checked ? checked.value : 'pending';
+        const ftRow = card.querySelector('.failure-type-row');
+        if (ftRow) ftRow.style.display = (val === 'fail') ? 'block' : 'none';
+      }});
+    }}
+
+    document.querySelectorAll('.radio-group input[type=radio]').forEach(r => {{
+      r.addEventListener('change', () => {{ updateCounts(); updateFailureTypeVisibility(); }});
+    }});
     updateCounts();
+    updateFailureTypeVisibility();
 
     // MP16C BUG-034: Replace collapsed textareas with auto-sized divs on submitted UAT pages
     if (document.querySelector('.test-card.submitted')) {{
@@ -1307,15 +1423,21 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       const cards = document.querySelectorAll('.test-card:not([data-type="cc_machine"])');
       const test_cases = [];
       let missingClassification = [];
+      let hasFails = false;
       cards.forEach(card => {{
         const id = card.dataset.id;
         const checked = card.querySelector(`input[name="${{id}}"]:checked`);
+        const status = checked ? checked.value : 'pending';
         const notes = card.querySelector('.notes-input')?.value || '';
         const attachments = attachmentsMap[id] || [];
         const classSelect = card.querySelector('.classification-select');
         const classification = classSelect ? classSelect.value : '';
         if (!classification) missingClassification.push(id);
-        test_cases.push({{ id, status: checked ? checked.value : 'pending', notes, attachments, classification }});
+        // MP23: capture failure_type for failed BVs
+        const ftSelect = card.querySelector('.failure-type-select');
+        const failure_type = (ftSelect && status === 'fail') ? ftSelect.value : null;
+        if (status === 'fail') hasFails = true;
+        test_cases.push({{ id, status, notes, attachments, classification, failure_type }});
       }});
       // MP18 REQ-047: block submit if classification missing
       if (missingClassification.length > 0) {{
@@ -1324,29 +1446,47 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       }}
       const general_notes = document.getElementById('general-notes').value;
 
+      // MP23: determine if we need sprint-level failure_type (for conditional_pass)
+      let sprintFailureType = null;
+      const hasSkips = test_cases.some(tc => tc.status === 'skip');
+      const allPassOrSkip = test_cases.every(tc => tc.status === 'pass' || tc.status === 'skip');
+      if (!hasFails && hasSkips && allPassOrSkip) {{
+        // This will be conditional_pass — we need sprint-level failure_type
+        sprintFailureType = prompt('This UAT will be a conditional pass.\\nPlease select a failure type:\\n\\n' +
+          '1. wrong_spec\\n2. regression\\n3. environment\\n4. unclear_bv\\n' +
+          '5. incomplete_spec\\n6. other\\n\\nType the failure type:');
+        if (!sprintFailureType) {{
+          alert('Conditional pass requires a failure type.');
+          return;
+        }}
+      }}
+
       const btn = document.getElementById('submit-btn');
       btn.disabled = true;
       btn.textContent = '⏳ Submitting...';
+
+      const payload = {{ test_cases, general_notes, general_notes_attachments: generalNotesAttachments, submitted_by: '{pl_email}' }};
+      if (sprintFailureType) payload.failure_type = sprintFailureType;
 
       try {{
         const resp = await fetch(`/api/uat/${{SPEC_ID}}/pl-results`, {{
           method: 'PATCH',
           headers: {{'Content-Type': 'application/json'}},
-          body: JSON.stringify({{ test_cases, general_notes, general_notes_attachments: generalNotesAttachments, submitted_by: '{pl_email}' }})
+          body: JSON.stringify(payload)
         }});
         const data = await resp.json();
         const div = document.getElementById('submit-result');
         div.style.display = 'block';
         if (resp.ok) {{
-          // MP-UAT-001: POST-Redirect-GET — redirect to GET page
-          // This replaces the current history entry so F5 reloads the GET page, not the form
           window.location.replace('/uat/' + SPEC_ID);
           return;
         }} else {{
           btn.disabled = false;
           btn.textContent = '📤 Submit Results';
           div.className = 'err';
-          div.textContent = `Error: ${{data.detail || JSON.stringify(data)}}`;
+          const detail = data.detail;
+          const msg = (typeof detail === 'object' && detail.message) ? detail.message : (typeof detail === 'string' ? detail : JSON.stringify(detail));
+          div.textContent = `Error: ${{msg}}`;
         }}
       }} catch(e) {{
         btn.disabled = false;

@@ -158,15 +158,11 @@
       gap: 8px;
       align-items: center;
       padding: 8px;
-      padding-bottom: 8px;
       border-radius: 6px;
       border: 1px solid var(--line);
       margin-bottom: 6px;
       background: #0f182b;
       cursor: pointer;
-      height: auto !important;
-      min-height: 65px;
-      grid-template-rows: min-content auto !important;
     }
     .req-row:hover { background: #13203a; }
     .sprint-row {
@@ -184,7 +180,7 @@
     .p1 { color: #ff9a9a; border-color: #803c3c; }
     .p2 { color: #ffd18a; border-color: #7a5a2f; }
     .req-row.has-prompt { border-left: 3px solid #f0b429; }
-    .item-description { grid-column: 1 / -1; font-size: 11px; color: var(--muted); margin-top: 4px; padding: 0 2px; display: block; white-space: pre-wrap !important; word-break: break-word; height: auto !important; overflow: visible !important; }
+    .item-description { grid-column: 1 / -1; font-size: 11px; color: var(--muted); margin-top: 2px; padding: 0 2px; white-space: pre-wrap; word-break: break-word; }
     /* Lifecycle status badges (PF5-MS1 v2) */
     .status-req_created     { color: #374151; background: #F3F4F6; border-color: #9CA3AF; }
     .status-req_approved    { color: #1D4ED8; background: #EFF6FF; border-color: #93C5FD; }
@@ -251,6 +247,7 @@
     .btn-reject { background: #374151; color: #d1d5db; border-color: #374151 !important; }
     .btn-reject:hover { background: #4b5563; }
     #visionBoardBtn.active { background: #7c3aed; color: white; border-color: #7c3aed; }
+    #qualityTabBtn.active { background: #065f46; color: #86efac; border-color: #065f46; }
     .task-row {
       display: grid;
       grid-template-columns: 1fr auto auto;
@@ -474,11 +471,11 @@
         <button type="button" id="lessonsBtn" onclick="toggleLessonsView()">📚 Lessons <span id="lessonsDraftBadge" style="display:none;background:#854d0e;color:#fde68a;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:3px"></span></button>
         <button type="button" id="uatTabBtn" onclick="toggleUatTab()">🧪 UAT</button>
         <button type="button" id="promptsTabBtn" onclick="togglePromptsTab()">📝 Prompts</button>
+        <button type="button" id="qualityTabBtn" onclick="toggleQualityTab()">📊 Quality</button>
         <button type="button" id="ragSearchBtn" onclick="toggleRagSearch()">🔍 RAG</button>
         <button type="button" id="docsTabBtn" onclick="toggleDocsTab()">📚 Docs</button>
         <a href="/static/roadmap-drill.html" target="_blank" rel="noopener"><button type="button">📋 Roadmap Drill</button></a>
         <a href="/static/roadmap-report.html" target="_blank" rel="noopener"><button type="button">📊 Roadmap Report</button></a>
-        <button type="button" id="exportCsvBtn" onclick="exportCSV()" title="Export current view to CSV">⬇ Export CSV</button>
         <a href="/architecture" target="_blank" rel="noopener"><button type="button">🏗️ Architecture</button></a>
         <button type="button" id="filterToggleBtn" class="filter-toggle-btn" onclick="const p=document.getElementById('controlsPanel');p.classList.toggle('mobile-collapsed');this.textContent=p.classList.contains('mobile-collapsed')?'⊞ Filters':'✕ Filters'">⊞ Filters</button>
         <div class="add-wrap">
@@ -579,12 +576,10 @@
       <button type="button" onclick="bulkAssignSprint()" style="padding:4px 12px;background:var(--info);color:#fff;border:none;border-radius:4px;font-size:12px;cursor:pointer">Assign</button>
       <button type="button" onclick="clearBulkSelection()" style="padding:4px 10px;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:4px;font-size:12px;cursor:pointer">Clear</button>
     </div>
-    <!-- MP10: Stale Drafts Banner -->
-    <div id="staleDraftsBanner" style="display:none"></div>
-    <!-- MP12B: Active Jobs Panel + Job History Grid -->
+    <!-- MM10B: Active Jobs Panel -->
     <div class="card" id="jobsPanel" style="margin-bottom:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <span style="font-weight:600;font-size:13px">Active Jobs</span>
+        <span style="font-weight:600;font-size:13px">⚡ Active Jobs</span>
         <div style="display:flex;align-items:center;gap:8px">
           <span id="jobsLastUpdated" style="font-size:10px;color:var(--muted)"></span>
           <button onclick="loadJobsStatus()" style="font-size:11px;padding:2px 8px;background:var(--panel-soft);border:1px solid var(--line);border-radius:4px;color:var(--muted);cursor:pointer">Refresh</button>
@@ -592,34 +587,6 @@
       </div>
       <div id="jobsList" style="font-size:12px;color:var(--muted)">Loading...</div>
       <div id="approvedPromptsList" style="margin-top:8px"></div>
-      <!-- MP12B+MP13A: Job History Grid -->
-      <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:8px">
-        <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Job History</span>
-        <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
-          <select id="jhStatusFilter" onchange="loadJobHistory()" style="font-size:10px;padding:2px 4px;background:var(--panel-soft);color:var(--text);border:1px solid var(--line);border-radius:3px">
-            <option value="">All statuses</option>
-            <option value="running">Running</option>
-            <option value="stale">Stale</option>
-            <option value="completed">Completed</option>
-            <option value="stopped">Stopped</option>
-            <option value="blocked">Blocked</option>
-            <option value="draft">Draft</option>
-            <option value="approved">Approved</option>
-          </select>
-          <select id="jhProjectFilter" onchange="loadJobHistory()" style="font-size:10px;padding:2px 4px;background:var(--panel-soft);color:var(--text);border:1px solid var(--line);border-radius:3px">
-            <option value="">All projects</option>
-          </select>
-        </div>
-        <div id="jobHistoryGrid" style="font-size:12px;color:var(--muted)">Loading history...</div>
-      </div>
-    </div>
-
-    <!-- MP12B: Prompt Detail Panel (modal overlay) -->
-    <div id="promptDetailOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:none;align-items:center;justify-content:center">
-      <div id="promptDetailPanel" style="background:var(--bg);border:1px solid var(--line);border-radius:8px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;padding:16px;position:relative">
-        <button onclick="closePromptDetail()" style="position:absolute;top:8px;right:8px;background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">&times;</button>
-        <div id="promptDetailContent">Loading...</div>
-      </div>
     </div>
 
     <div class="card hierarchy" id="hierarchy"></div>
@@ -688,6 +655,44 @@
         </select>
       </div>
       <div id="promptsList" style="padding:8px"></div>
+    </div>
+
+    <!-- MP23: Quality dashboard tab -->
+    <div class="card" id="qualityPanel" style="display:none">
+      <div id="qualitySymptomBanner"></div>
+      <div class="ll-filter-bar" style="align-items:center;flex-wrap:wrap;gap:8px">
+        <select id="quality-filter-project" style="padding:6px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px">
+          <option value="">All Projects</option>
+        </select>
+        <select id="quality-filter-status" style="padding:6px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px">
+          <option value="">All Status</option>
+          <option value="passed">Pass</option>
+          <option value="failed">Fail</option>
+          <option value="conditional_pass">Conditional Pass</option>
+        </select>
+        <input type="date" id="quality-filter-from" style="padding:5px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px" placeholder="From">
+        <input type="date" id="quality-filter-to" style="padding:5px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px" placeholder="To">
+        <select id="quality-filter-5q" style="padding:6px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px">
+          <option value="">All 5Q</option>
+          <option value="yes">5Q Applied</option>
+          <option value="no">No 5Q</option>
+        </select>
+        <select id="quality-filter-failure" style="padding:6px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px">
+          <option value="">All Failure Types</option>
+          <option value="wrong_spec">Wrong spec</option>
+          <option value="regression">Regression</option>
+          <option value="environment">Environment</option>
+          <option value="unclear_bv">Unclear BV</option>
+          <option value="machine_test_sent_to_pl">Machine test sent to PL</option>
+          <option value="no_5q_applied">No 5Q applied</option>
+          <option value="incomplete_spec">Incomplete spec</option>
+          <option value="missing_acceptance_criteria">Missing acceptance criteria</option>
+          <option value="incomplete_handoff">Incomplete handoff</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div id="qualityTable" style="padding:8px;overflow-x:auto"></div>
+      <div id="qualityTotals" style="padding:8px 12px;font-size:13px;color:var(--muted);border-top:1px solid var(--line)"></div>
     </div>
 
     <div class="card" id="ragSearchPanel" style="display:none">
@@ -793,7 +798,7 @@
     </div>
     <div>
       <label>Description</label>
-      <textarea id="dDescription" style="width:100%!important;min-height:100px;height:auto!important;line-height:1.5;resize:vertical"></textarea>
+      <textarea id="dDescription"></textarea>
     </div>
     <div>
       <label>Linked Handoffs</label>
@@ -1145,7 +1150,7 @@
           <button class="icon-btn" data-open-req="${req.id}" title="Edit Requirement">✏️</button>
           <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete Requirement">🗑️</button>
         </div>
-        ${window._showDescriptions && req.description ? `<div class="item-description">${(req.description||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
+        ${window._showDescriptions && req.description ? `<div class="item-description">${(req.description||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0,200)}${req.description.length > 200 ? '…' : ''}</div>` : ''}
       </div>`;
     }
 
@@ -1184,25 +1189,6 @@
       state.expanded = new Set();
       updateResetButtonState();
       loadData().then(() => render());
-    }
-
-    function exportCSV() {
-      const params = new URLSearchParams();
-      const project = qs('projectFilter')?.value || '';
-      const status = qs('statusFilter')?.value || '';
-      const priority = qs('priorityFilter')?.value || '';
-      const type = qs('typeFilter')?.value || '';
-      const search = qs('searchInput')?.value || '';
-      const openOnly = qs('openItemsToggle')?.checked;
-
-      if (project) params.set('project', project);
-      if (status) params.set('status', status);
-      if (priority) params.set('priority', priority);
-      if (type) params.set('type', type);
-      if (search) params.set('search', search);
-      if (!openOnly) params.set('include_closed', 'true');
-
-      window.location.href = `/api/roadmap/export/csv?${params.toString()}`;
     }
 
     function activateWipView() {
@@ -1377,6 +1363,7 @@
         if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); vb.style.display = 'none'; }
         if (lessonsActive) { lessonsActive = false; qs('lessonsBtn').classList.remove('active'); lp.style.display = 'none'; }
         if (promptsTabActive) { promptsTabActive = false; qs('promptsTabBtn').classList.remove('active'); qs('promptsPanel').style.display = 'none'; }
+        if (qualityTabActive) { qualityTabActive = false; qs('qualityTabBtn').classList.remove('active'); qs('qualityPanel').style.display = 'none'; }
         btn.classList.add('active');
         hierarchy.style.display = 'none';
         panel.style.display = 'block';
@@ -1483,6 +1470,7 @@
         if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); vb.style.display = 'none'; }
         if (uatTabActive) { uatTabActive = false; qs('uatTabBtn').classList.remove('active'); up.style.display = 'none'; }
         if (lessonsActive) { lessonsActive = false; qs('lessonsBtn').classList.remove('active'); lp.style.display = 'none'; }
+        if (qualityTabActive) { qualityTabActive = false; qs('qualityTabBtn').classList.remove('active'); qs('qualityPanel').style.display = 'none'; }
         btn.classList.add('active');
         hierarchy.style.display = 'none';
         panel.style.display = 'block';
@@ -2013,8 +2001,6 @@
       qs('dCheckpoint').textContent = '';
       qs('dVersion').value = req.target_version || '';
       qs('dDescription').value = req.description || '';
-      const ta = document.getElementById('dDescription');
-      if (ta) { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }
 
       // State transition via PATCH /state — immediate, no Save needed
       // A2 fix: reset handler before re-assigning to prevent accumulation across drawer opens
@@ -2297,9 +2283,6 @@
       };
 
       await api(`/api/roadmap/requirements/${req.id}`, { method: 'PUT', body: JSON.stringify(payload) });
-      // Sync description to list view immediately
-      const listDesc = document.querySelector(`.req-row[data-req="${req.id}"] .item-description`);
-      if (listDesc) { listDesc.innerText = payload.description; listDesc.style.height = 'auto'; }
       qs('drawer').classList.remove('open');
       state.selectedReq = null;
       await loadData();
@@ -2404,13 +2387,13 @@
             const projName = proj ? proj.name : '';
             const hrs = p.estimated_hours ? `(~${p.estimated_hours}h)` : '';
             const created = formatTimestamp(p.created_at);
+            const reviewUrl = `https://metapm.rentyourcio.com/prompts/${p.pth || p.id}`;
             return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--line);flex-wrap:wrap">
-              <span onclick="openPromptDetail('${p.pth}')" style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;cursor:pointer">${p.pth || p.id}</span>
+              <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">${p.pth || p.id}</span>
               <span style="font-size:11px">${emoji} ${projName}</span>
               <span style="font-size:11px;color:var(--muted)">${(p.sprint_id||'').slice(0,35)} ${hrs}</span>
               <span style="font-size:10px;color:var(--muted);margin-left:auto">${created}</span>
-              <button onclick="approveFromPanel(${p.id}, '${p.pth}')" style="font-size:10px;padding:1px 8px;background:#22c55e;color:#fff;border:none;border-radius:3px;cursor:pointer">Approve</button>
-              <button onclick="promptDetailAction(${p.id}, '${p.pth}', 'reject')" style="font-size:10px;padding:1px 8px;background:#ef4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Reject</button>
+              <a href="${reviewUrl}" target="_blank" style="font-size:10px;padding:1px 8px;background:#3b82f6;color:#fff;border:none;border-radius:3px;text-decoration:none">Review ↗</a>
             </div>`;
           }).join('');
           qs('needsApprovalSection').style.display = '';
@@ -2824,6 +2807,139 @@
     }
 
     // ── Tab toggle wrappers for RAG + Docs ────────────────────────────────────
+    // ── MP23: Quality Tab ─────────────────────────────────────────────────────
+    let qualityTabActive = false;
+    let qualityData = [];
+
+    function toggleQualityTab() {
+      qualityTabActive = !qualityTabActive;
+      const btn = qs('qualityTabBtn');
+      const panel = qs('qualityPanel');
+      const hierarchy = qs('hierarchy');
+      if (qualityTabActive) {
+        if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); qs('visionBoard').style.display = 'none'; }
+        if (uatTabActive) { uatTabActive = false; qs('uatTabBtn').classList.remove('active'); qs('uatPanel').style.display = 'none'; }
+        if (promptsTabActive) { promptsTabActive = false; qs('promptsTabBtn').classList.remove('active'); qs('promptsPanel').style.display = 'none'; }
+        if (lessonsActive) { lessonsActive = false; qs('lessonsBtn').classList.remove('active'); qs('lessonsPanel').style.display = 'none'; }
+        btn.classList.add('active');
+        hierarchy.style.display = 'none';
+        panel.style.display = 'block';
+        refreshQuality();
+      } else {
+        btn.classList.remove('active');
+        hierarchy.style.display = '';
+        panel.style.display = 'none';
+      }
+    }
+
+    async function refreshQuality() {
+      try {
+        const [data, symptoms] = await Promise.all([
+          api('/api/quality/portfolio'),
+          api('/api/quality/symptom-detector')
+        ]);
+        qualityData = data || [];
+        // Populate project filter
+        const projSet = new Set(qualityData.map(d => d.project_code).filter(Boolean));
+        const projSelect = qs('quality-filter-project');
+        projSelect.innerHTML = '<option value="">All Projects</option>';
+        [...projSet].sort().forEach(p => { projSelect.insertAdjacentHTML('beforeend', `<option value="${p}">${p}</option>`); });
+        // Symptom banner
+        const bannerEl = qs('qualitySymptomBanner');
+        if (symptoms && symptoms.length > 0) {
+          bannerEl.innerHTML = '<div style="background:#92400e22;border:1px solid #92400e;border-radius:6px;padding:10px 14px;margin-bottom:10px;font-size:13px">' +
+            symptoms.map(s => `<div style="color:#fcd34d">\u26a0\ufe0f ${s.project_code} \u2014 "${s.feature_prefix}..." \u2014 ${s.bug_count} bug attempts in 30 days</div>`).join('') +
+            '</div>';
+        } else {
+          bannerEl.innerHTML = '';
+        }
+        renderQualityTable();
+      } catch (e) {
+        qs('qualityTable').innerHTML = `<div style="color:#f87171;padding:12px">Error: ${e.message}</div>`;
+      }
+    }
+
+    function getFilteredQuality() {
+      const proj = qs('quality-filter-project').value;
+      const status = qs('quality-filter-status').value;
+      const from = qs('quality-filter-from').value;
+      const to = qs('quality-filter-to').value;
+      const fq = qs('quality-filter-5q').value;
+      const ft = qs('quality-filter-failure').value;
+      return qualityData.filter(d => {
+        if (proj && d.project_code !== proj) return false;
+        if (status && d.overall_status !== status) return false;
+        if (from && d.submitted_at && d.submitted_at < from) return false;
+        if (to && d.submitted_at && d.submitted_at > to + 'T23:59:59') return false;
+        if (fq === 'yes' && !d.five_q_applied) return false;
+        if (fq === 'no' && d.five_q_applied) return false;
+        if (ft && d.failure_type !== ft) return false;
+        return true;
+      });
+    }
+
+    function renderQualityTable() {
+      const filtered = getFilteredQuality();
+      const statusBadge = (s) => {
+        const m = { passed: ['#3fb950','#0f2d1a'], failed: ['#f85149','#2d0f0f'], conditional_pass: ['#d29922','#2a1f06'] };
+        const [c, bg] = m[s] || ['#8b949e','#1e2229'];
+        return `<span style="color:${c};background:${bg};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">${s}</span>`;
+      };
+      let html = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="border-bottom:1px solid var(--line);text-align:left">' +
+        '<th style="padding:6px">Date</th><th style="padding:6px">Project</th><th style="padding:6px">PTH</th>' +
+        '<th style="padding:6px">Sprint Title</th><th style="padding:6px">Version</th><th style="padding:6px">Status</th>' +
+        '<th style="padding:6px">BV Pass %</th><th style="padding:6px">Attempt #</th><th style="padding:6px">5Q</th>' +
+        '<th style="padding:6px">Root Cause</th><th style="padding:6px">Failure Type</th>' +
+        '</tr></thead><tbody>';
+      if (!filtered.length) {
+        html += '<tr><td colspan="11" style="padding:12px;color:var(--muted);text-align:center">No quality data found</td></tr>';
+      }
+      for (const d of filtered) {
+        const date = d.submitted_at ? d.submitted_at.substring(0, 10) : '\u2014';
+        const ver = d.sprint_id ? d.sprint_id.split('-').slice(-1)[0] : '';
+        html += `<tr style="border-bottom:1px solid var(--line)">
+          <td style="padding:6px">${date}</td>
+          <td style="padding:6px">${d.project_code || ''}</td>
+          <td style="padding:6px"><a href="/prompts/${d.pth}" style="color:var(--info)">${d.pth || ''}</a></td>
+          <td style="padding:6px">${(d.sprint_title || '').substring(0, 40)}</td>
+          <td style="padding:6px">${ver}</td>
+          <td style="padding:6px">${statusBadge(d.overall_status)}</td>
+          <td style="padding:6px">${d.bv_pass_rate}%</td>
+          <td style="padding:6px">${d.attempt_number || '\u2014'}</td>
+          <td style="padding:6px">${d.five_q_applied ? 'Yes' : 'No'}</td>
+          <td style="padding:6px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.root_cause_method || ''}">${d.root_cause_method || '\u2014'}</td>
+          <td style="padding:6px">${d.failure_type || '\u2014'}</td>
+        </tr>`;
+      }
+      html += '</tbody></table>';
+      qs('qualityTable').innerHTML = html;
+
+      // Grand totals + process failure callout
+      const total = filtered.length;
+      const passed = filtered.filter(d => d.overall_status === 'passed').length;
+      const failed = filtered.filter(d => d.overall_status === 'failed').length;
+      const passRate = total > 0 ? ((passed / total) * 100).toFixed(1) : '0.0';
+      const machineToPlCount = filtered.filter(d => d.failure_type === 'machine_test_sent_to_pl').length;
+      const no5qCount = filtered.filter(d => d.failure_type === 'no_5q_applied').length;
+      const incSpecCount = filtered.filter(d => d.failure_type === 'incomplete_spec').length;
+      qs('qualityTotals').innerHTML =
+        `<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">` +
+        `<span><strong>Total sprints:</strong> ${total}</span>` +
+        `<span style="color:#3fb950"><strong>Passed:</strong> ${passed}</span>` +
+        `<span style="color:#f85149"><strong>Failed:</strong> ${failed}</span>` +
+        `<span><strong>Pass rate:</strong> ${passRate}%</span>` +
+        `</div>` +
+        `<div style="margin-top:6px;font-size:12px;color:var(--muted)">` +
+        `<strong>Process failures:</strong> Machine tests sent to PL: ${machineToPlCount} | No 5Q applied: ${no5qCount} | Incomplete spec: ${incSpecCount}` +
+        `</div>`;
+    }
+
+    // Wire up quality filter change events
+    ['quality-filter-project','quality-filter-status','quality-filter-from','quality-filter-to','quality-filter-5q','quality-filter-failure'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('change', renderQualityTable);
+    });
+
     function toggleRagSearch() {
       const p = qs('ragSearchPanel');
       const show = p.style.display === 'none';
@@ -3132,39 +3248,11 @@
       } catch(e) { return isoString; }
     }
 
-    // MP10: Active Jobs Panel with CC Session Signals + Copy PTH
+    // MM10B: Active Jobs Panel
     async function loadJobsStatus() {
       const el = qs('jobsList');
       const lastUpdatedEl = qs('jobsLastUpdated');
       if (lastUpdatedEl) lastUpdatedEl.textContent = 'Last updated: ' + formatTimestamp(new Date().toISOString());
-
-      // MP16C BUG-032: Non-blocking sweep of ghost executing sessions on dashboard load
-      fetch('/api/prompts/sessions/sweep', {method:'POST'}).catch(()=>{});
-
-      // MP10 BUG-016: RUNNING section — active CC sessions only
-      let sessionsHtml = '';
-      try {
-        const sessData = await api('/api/prompts/active-sessions');
-        const sessions = sessData.sessions || [];
-        if (sessions.length) {
-          sessionsHtml = '<div style="font-size:11px;font-weight:700;color:#eab308;text-transform:uppercase;letter-spacing:.05em;margin:0 0 4px">RUNNING</div>' +
-            sessions.map(s =>
-              `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)">
-                <span style="background:#eab308;color:#000;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700">RUNNING</span>
-                <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">PTH: ${s.pth}</span>
-                <span style="font-weight:600;font-size:11px">${(s.sprint_id || '').slice(0,35)}</span>
-                <span style="color:var(--muted);font-size:10px;margin-left:auto">${formatTimestamp(s.session_started_at)}</span>
-              </div>`
-            ).join('') + '<div style="margin-bottom:8px"></div>';
-        } else {
-          sessionsHtml = '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin:0 0 4px">RUNNING</div>' +
-            '<span style="color:var(--muted);font-size:12px">No active sessions</span>' +
-            '<div style="margin-bottom:8px"></div>';
-        }
-      } catch(e) { /* non-fatal */ }
-
-      // Jobs section
-      let jobsHtml = '';
       try {
         const data = await api('/api/prompts/jobs/status');
         const loop1 = data.loop1 || [];
@@ -3176,10 +3264,10 @@
           ...loop3.map(j => ({...j, label: 'Loop 3 (UAT)'}))
         ];
         if (!all.length) {
-          jobsHtml = '<span style="color:var(--muted)">No jobs in last 24h. Loops idle.</span>';
+          el.innerHTML = '<span style="color:var(--muted)">No jobs in last 24h. Loops idle.</span>';
         } else {
           const statusColor = s => s === 'running' ? '#eab308' : s === 'succeeded' ? '#22c55e' : '#ef4444';
-          jobsHtml = all.map(j => {
+          el.innerHTML = all.map(j => {
             const pthLabel = j.pth
               ? `<span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">PTH: ${j.pth}</span>`
               : `<span style="color:var(--muted);font-family:monospace;font-size:10px">${(j.name||'').split('/').pop().split('-').slice(-2).join('-')}</span>`;
@@ -3192,275 +3280,53 @@
           }).join('');
         }
       } catch(e) {
-        jobsHtml = `<span style="color:#ef4444">Jobs API error: ${e.message}</span>`;
+        el.innerHTML = `<span style="color:#ef4444">Jobs API error: ${e.message}</span>`;
       }
-      el.innerHTML = sessionsHtml + jobsHtml;
 
-      // MP10 BUG-014: Approved prompts — Copy PTH (replaces Launch button)
+      // Approved prompts launch list — only recent (filtered server-side by not-cancelled)
       try {
         const promptsData = await api('/api/prompts/?status=approved&limit=10');
         const approved = (Array.isArray(promptsData) ? promptsData : (promptsData.prompts || []))
           .filter(p => p.status === 'approved');
         const launchEl = qs('approvedPromptsList');
         if (approved.length) {
-          launchEl.innerHTML = '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin:8px 0 4px">Approved — Ready for CC</div>' +
+          launchEl.innerHTML = '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin:8px 0 4px">Approved — Ready to Launch</div>' +
+            `<div id="launchList">` +
             approved.map(p =>
-              `<div style="display:flex;align-items:center;gap:8px;padding:3px 0">
+              `<div id="launch-${p.pth}" style="display:flex;align-items:center;gap:8px;padding:3px 0">
                 <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">${p.pth || p.id}</span>
                 <span style="color:var(--muted);font-size:11px">${(p.sprint_id || '').slice(0,35)}</span>
                 <span style="color:var(--muted);font-size:10px">${formatTimestamp(p.created_at)}</span>
-                <button onclick="copyPth('${p.pth}', this)" style="font-size:10px;padding:1px 8px;background:#6366f1;color:#fff;border:none;border-radius:3px;cursor:pointer;margin-left:auto">Copy PTH</button>
+                <button onclick="launchJob('${p.pth}', this)" style="font-size:10px;padding:1px 8px;background:#3b82f6;color:#fff;border:none;border-radius:3px;cursor:pointer;margin-left:auto">Launch</button>
               </div>`
-            ).join('');
+            ).join('') + `</div>`;
         } else {
           launchEl.innerHTML = '';
         }
       } catch(e) { /* non-fatal */ }
-
-      // MP10 REQ-028: Stale drafts banner
-      try {
-        const staleData = await api('/api/prompts/stale-drafts');
-        const staleBanner = document.getElementById('staleDraftsBanner');
-        if (staleData.count > 0 && staleBanner) {
-          staleBanner.innerHTML = `<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:8px 12px;margin-bottom:8px;display:flex;align-items:center;gap:8px">
-            <span style="font-size:12px;color:#92400e;font-weight:600">${staleData.count} prompt${staleData.count > 1 ? 's have' : ' has'} been waiting &gt;24h — <a href="/prompts" style="color:#b45309;text-decoration:underline">review</a></span>
-            <button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;color:#92400e;cursor:pointer;font-size:14px">&times;</button>
-          </div>`;
-          staleBanner.style.display = '';
-        } else if (staleBanner) {
-          staleBanner.style.display = 'none';
-        }
-      } catch(e) { /* non-fatal */ }
     }
 
-    async function copyPth(pth, btn) {
+    async function launchJob(pth, btn) {
+      // MM10B: optimistic removal — hide row immediately
+      const row = document.getElementById('launch-' + pth);
+      if (row) row.style.display = 'none';
+      if (btn) btn.disabled = true;
       try {
-        await navigator.clipboard.writeText(pth);
-        const orig = btn.textContent;
-        btn.textContent = 'Copied!';
-        btn.style.background = '#22c55e';
-        setTimeout(() => { btn.textContent = orig; btn.style.background = '#6366f1'; }, 1500);
+        await api('/api/prompts/jobs/launch', {method:'POST', body: JSON.stringify({pth})});
       } catch(e) {
-        alert('Copy failed: ' + e.message);
-      }
-    }
-
-    // ── MP12B: Prompt Detail Panel ──
-    async function openPromptDetail(pth) {
-      const overlay = document.getElementById('promptDetailOverlay');
-      overlay.style.display = 'flex';
-      const content = document.getElementById('promptDetailContent');
-      content.innerHTML = 'Loading...';
-
-      try {
-        const [promptRes, historyRes] = await Promise.all([
-          api(`/api/prompts/${pth}`),
-          api(`/api/prompts/${pth}/history`).catch(() => ({history: []})),
-        ]);
-
-        const p = promptRes;
-        const history = historyRes.history || [];
-
-        const statusColors = {
-          draft: '#f59e0b', approved: '#3b82f6', executing: '#eab308',
-          completed: '#22c55e', stopped: '#ef4444', rejected: '#ef4444',
-          blocked: '#ef4444', cancelled: '#6b7280',
-        };
-        const sc = statusColors[p.status] || '#6b7280';
-
-        // Section A: Prompt info
-        let html = `
-          <div style="margin-bottom:12px">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-              <span style="background:#fef3c7;color:#92400e;font-size:12px;font-weight:700;padding:2px 8px;border-radius:4px">${p.pth}</span>
-              <span style="background:${sc};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">${p.status.toUpperCase()}</span>
-            </div>
-            <div style="font-size:11px;color:var(--muted);display:grid;grid-template-columns:auto 1fr;gap:2px 12px">
-              <span>Sprint:</span><span>${p.sprint_id || '-'}</span>
-              <span>Project:</span><span>${p.project_emoji || ''} ${p.project_name || '-'}</span>
-              <span>Created:</span><span>${formatTimestamp(p.created_at)}</span>
-              ${p.approved_at ? `<span>Approved:</span><span>${formatTimestamp(p.approved_at)}</span>` : ''}
-              ${p.session_started_at ? `<span>Session start:</span><span>${formatTimestamp(p.session_started_at)}</span>` : ''}
-              ${p.session_ended_at ? `<span>Session end:</span><span>${formatTimestamp(p.session_ended_at)}</span>` : ''}
-              ${p.estimated_hours ? `<span>Est hours:</span><span>${p.estimated_hours}h</span>` : ''}
-            </div>
-          </div>`;
-
-        // Section B: Workflow history timeline
-        html += `<div style="border-top:1px solid var(--line);padding-top:8px;margin-bottom:12px">
-          <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Workflow History</div>`;
-        if (history.length) {
-          html += history.map(h => {
-            const icon = h.success ? '<span style="color:#22c55e">&#10003;</span>' : '<span style="color:#ef4444">&#10007;</span>';
-            const byBadge = `<span style="background:#334155;color:#e2e8f0;font-size:9px;padding:1px 4px;border-radius:2px">${h.changed_by}</span>`;
-            const reason = (!h.success && h.blocked_reason)
-              ? `<div style="color:#ef4444;font-size:10px;margin-left:20px">${h.blocked_reason}</div>` : '';
-            const fromTo = h.from_status
-              ? `${h.from_status} &rarr; ${h.to_status}`
-              : `&rarr; ${h.to_status}`;
-            return `<div style="padding:3px 0;border-bottom:1px solid var(--line)">
-              <div style="display:flex;align-items:center;gap:6px;font-size:11px">
-                ${icon}
-                <span style="${!h.success ? 'color:#ef4444;font-weight:600' : ''}">${fromTo}</span>
-                ${byBadge}
-                <span style="font-size:9px;color:var(--muted)">${h.trigger || ''}</span>
-                <span style="font-size:10px;color:var(--muted);margin-left:auto">${formatTimestamp(h.changed_at)}</span>
-              </div>
-              ${reason}
-            </div>`;
-          }).join('');
-        } else {
-          html += '<div style="color:var(--muted);font-size:11px">No history yet</div>';
-        }
-        html += '</div>';
-
-        // Section C: Action buttons
-        html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
-        if (['draft', 'approved'].includes(p.status)) {
-          html += `<button onclick="promptDetailAction(${p.id}, '${p.pth}', 'reject')" style="font-size:11px;padding:4px 12px;background:#ef4444;color:#fff;border:none;border-radius:4px;cursor:pointer">Reject</button>`;
-        }
-        if (p.status === 'approved') {
-          html += `<button onclick="copyPth('${p.pth}', this)" style="font-size:11px;padding:4px 12px;background:#6366f1;color:#fff;border:none;border-radius:4px;cursor:pointer">Copy PTH</button>`;
-        }
-        if (p.status === 'executing') {
-          html += `<button onclick="promptDetailAction(${p.id}, '${p.pth}', 'cancel')" style="font-size:11px;padding:4px 12px;background:#ef4444;color:#fff;border:none;border-radius:4px;cursor:pointer">Cancel Job</button>`;
-        }
-        html += `<button onclick="closePromptDetail()" style="font-size:11px;padding:4px 12px;background:var(--panel-soft);color:var(--text);border:1px solid var(--line);border-radius:4px;cursor:pointer;margin-left:auto">Close</button>`;
-        html += '</div>';
-
-        content.innerHTML = html;
-      } catch(e) {
-        content.innerHTML = `<div style="color:#ef4444">Error loading prompt: ${e.message}</div>`;
-      }
-    }
-
-    function closePromptDetail() {
-      document.getElementById('promptDetailOverlay').style.display = 'none';
-    }
-
-    async function promptDetailAction(promptId, pth, action) {
-      try {
-        if (action === 'reject') {
-          if (!confirm(`Reject prompt ${pth}?`)) return;
-          await api(`/api/prompts/${promptId}`, {
-            method: 'PATCH',
-            body: JSON.stringify({status: 'rejected'})
-          });
-        } else if (action === 'cancel') {
-          if (!confirm(`Cancel job for ${pth}?`)) return;
-          await api(`/api/prompts/${promptId}`, {
-            method: 'PATCH',
-            body: JSON.stringify({status: 'cancelled'})
-          });
-        }
-        // Refresh the detail panel and lists
-        openPromptDetail(pth);
-        loadActivePrompts();
-        loadJobsStatus();
-      } catch(e) {
-        alert('Action failed: ' + e.message);
-      }
-    }
-
-    async function approveFromPanel(promptId, pth) {
-      if (!confirm(`Approve prompt ${pth}?`)) return;
-      try {
-        await api(`/api/prompts/${promptId}`, {
-          method: 'PATCH',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({status: 'approved', approved_by: 'PL'})
-        });
-        loadActivePrompts();
-        loadJobsStatus();
-      } catch(e) {
-        alert('Approve failed: ' + e.message);
-      }
-    }
-
-    // Click handler: close modal on overlay click (not panel click)
-    document.getElementById('promptDetailOverlay').addEventListener('click', function(e) {
-      if (e.target === this) closePromptDetail();
-    });
-
-    // ── MP12B: Job History Grid ──
-    async function loadJobHistory() {
-      const el = document.getElementById('jobHistoryGrid');
-      const statusFilter = document.getElementById('jhStatusFilter').value;
-      const projectFilter = document.getElementById('jhProjectFilter').value;
-
-      // MP13A: stale and running are client-side computed filters
-      const isClientFilter = statusFilter === 'stale' || statusFilter === 'running';
-      let url = '/api/prompts/sessions/history?limit=50';
-      if (statusFilter && !isClientFilter) url += `&status=${statusFilter}`;
-      if (projectFilter) url += `&project=${projectFilter}`;
-
-      try {
-        const data = await api(url);
-        let sessions = data.sessions || [];
-
-        // MP13A BUG-025: client-side stale/running filter
-        if (statusFilter === 'stale') {
-          sessions = sessions.filter(s => s.is_stale);
-        } else if (statusFilter === 'running') {
-          sessions = sessions.filter(s => s.status === 'executing' && !s.is_stale && !s.session_ended_at);
-        }
-
-        if (!sessions.length) {
-          el.innerHTML = '<div style="color:var(--muted);font-size:11px">No sessions in selected range</div>';
-          return;
-        }
-
-        el.innerHTML = sessions.map(s => {
-          const statusColors = {
-            executing: '#eab308', completed: '#22c55e', stopped: '#ef4444',
-            draft: '#6b7280', approved: '#3b82f6', blocked: '#ef4444',
-            cancelled: '#6b7280', rejected: '#ef4444',
-          };
-          const sc = statusColors[s.status] || '#6b7280';
-          const badge = s.is_stale
-            ? '<span style="background:#f59e0b;color:#000;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700">STALE</span>'
-            : `<span style="background:${sc};color:#fff;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700">${s.status.toUpperCase()}</span>`;
-          const duration = s.duration_min ? `${s.duration_min}m` : (s.is_stale ? 'running...' : '-');
-
-          return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--line);cursor:pointer" data-pth="${s.pth || ''}" onclick="openPromptDetail('${s.pth}')">
-            ${badge}
-            <span style="background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px">${s.pth || '-'}</span>
-            <span style="font-size:11px">${s.project_emoji || ''} ${(s.project_name || '').slice(0,15)}</span>
-            <span style="font-size:10px;color:var(--muted)">${(s.sprint_id || '').slice(0,25)}</span>
-            <span style="font-size:10px;color:var(--muted);margin-left:auto">${duration}</span>
-            <span style="font-size:10px;color:var(--muted)">${formatTimestamp(s.session_started_at || s.created_at)}</span>
-          </div>`;
-        }).join('');
-      } catch(e) {
-        el.innerHTML = `<span style="color:#ef4444;font-size:11px">Error: ${e.message}</span>`;
-      }
-    }
-
-    // Populate project filter for Job History
-    function populateJobHistoryFilters() {
-      const sel = document.getElementById('jhProjectFilter');
-      if (sel && state.projects) {
-        sel.innerHTML = '<option value="">All projects</option>' +
-          state.projects.map(p => `<option value="${p.code}">${p.emoji || ''} ${p.name}</option>`).join('');
+        // Restore on failure
+        if (row) row.style.display = '';
+        if (btn) btn.disabled = false;
+        alert(`Launch failed: ${e.message}`);
       }
     }
 
     loadJobsStatus();
     setInterval(loadJobsStatus, 30000);
 
-    // Run TTL auto-archive on load
-    api('/api/prompts/ttl-auto-archive', {method: 'POST'}).catch(() => {});
-
-    // Run ghost archive once
-    api('/api/prompts/archive-ghosts', {method: 'POST'}).catch(() => {});
-
     bindControls();
     loadVersion();
-    loadData().then(() => {
-      loadActivePrompts();
-      populateJobHistoryFilters();
-      loadJobHistory();
-    }).catch((err) => {
+    loadData().then(() => loadActivePrompts()).catch((err) => {
       qs('hierarchy').innerHTML = `<div style="color:#ff9a9a">Failed to load data: ${err.message}</div>`;
     });
   </script>

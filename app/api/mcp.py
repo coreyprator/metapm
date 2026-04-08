@@ -13,11 +13,9 @@ from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Header, Query, Response
 from fastapi.security import APIKeyHeader
-from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.database import execute_query
-from app.core.state_machine import write_prompt_history, write_failure_event
 from app.schemas.mcp import (
     HandoffCreate, HandoffUpdate, HandoffResponse, HandoffListResponse,
     TaskCreate, TaskUpdate, TaskResponse, TaskListResponse,
@@ -261,24 +259,7 @@ async def create_handoff(
         # MP-HANDOFF-GATE-001: Enforce cc_complete state and valid UAT spec before registration
         bypass = (handoff.enforcement_bypass or "").strip().lower()
 
-        # MP18 REQ-046 Gate 1: prompt must be approved or executing (not draft/rejected)
-        if getattr(handoff, 'pth', None) or getattr(handoff, 'prompt_pth', None):
-            check_pth = getattr(handoff, 'pth', None) or handoff.prompt_pth
-            prompt_row = execute_query(
-                "SELECT TOP 1 id, status FROM cc_prompts WHERE pth = ? ORDER BY id DESC",
-                (check_pth,), fetch="one"
-            )
-            if prompt_row and prompt_row['status'] in ('draft', 'rejected'):
-                raise HTTPException(
-                    status_code=400,
-                    detail={
-                        "error": "prompt_not_approved",
-                        "prompt_status": prompt_row['status'],
-                        "pth": check_pth,
-                    }
-                )
-
-        # Gate 1b: linked prompt/requirement must be at cc_complete or higher
+        # Gate 1: linked prompt/requirement must be at cc_complete or higher
         # Skipped when enforcement_bypass="data_only_sprint"
         if bypass != "data_only_sprint" and getattr(handoff, 'prompt_pth', None):
             allowed_states = ('cc_complete', 'uat_ready', 'uat_pass', 'done', 'closed')
@@ -1002,6 +983,19 @@ async def submit_uat_direct(uat: UATDirectSubmit):
     NOTE: Validation is now handled by the UATDirectSubmit model_validator.
     """
     try:
+        # MP23 REQ-048: Quality gate on direct-submit — failed results need failure_type via notes
+        # Skip/pending results need notes. Gate does NOT fire on clean all-pass submissions.
+        if uat.results:
+            has_non_pass = False
+            for r in uat.results:
+                if r.status in ("failed", "fail"):
+                    has_non_pass = True
+                elif r.status in ("skip", "conditional_pass", "pending") and not (r.note and r.note.strip()):
+                    raise HTTPException(status_code=400, detail={
+                        "error": "notes_required_for_skip",
+                        "message": "Please add a note explaining why this test was skipped or left pending.",
+                    })
+
         linked_requirement_codes = _collect_linked_requirements(uat)
         project_name = (uat.project or '').strip()
         if not project_name:
@@ -2083,87 +2077,3 @@ async def get_rag_sync_status(_: bool = Depends(verify_api_key)):
         return _json.loads(row["value_json"])
     except Exception:
         return {"status": "error", "raw": row["value_json"]}
-
-
-# ── MP10: CC Session Signals ──
-
-class SessionSignalRequest(BaseModel):
-    pth: str
-    status: str  # started | completed | stopped | blocked
-    timestamp: str
-    reason: Optional[str] = ""
-
-@router.post("/sessions", status_code=200)
-async def post_session_signal(req: SessionSignalRequest):
-    """CC fires session start/end signals. Updates prompt status and session timestamps."""
-    if req.status not in ("started", "completed", "stopped", "blocked"):
-        raise HTTPException(400, f"Invalid status '{req.status}'. Must be started/completed/stopped/blocked.")
-    if req.status in ("stopped", "blocked") and not req.reason:
-        raise HTTPException(400, "reason is required when status is stopped or blocked")
-
-    row = execute_query(
-        "SELECT TOP 1 id, status FROM cc_prompts WHERE pth = ? ORDER BY id DESC",
-        (req.pth,), fetch="one"
-    )
-    if not row:
-        raise HTTPException(404, f"Prompt '{req.pth}' not found")
-
-    prompt_id = row["id"]
-    from_status = row["status"]
-    response = {"pth": req.pth, "signal": req.status, "timestamp": req.timestamp}
-
-    if req.status == "started":
-        execute_query("""
-            UPDATE cc_prompts
-            SET status = 'executing',
-                session_started_at = ?,
-                session_outcome = 'started',
-                updated_at = GETUTCDATE()
-            WHERE id = ?
-        """, (req.timestamp, prompt_id), fetch="none")
-        write_prompt_history(prompt_id, req.pth, from_status, 'executing', 'CC', 'post_session_signal')
-
-        # MP12B ITEM 6: Auto-advance requirement cc_prompt_ready -> cc_executing
-        try:
-            req_row = execute_query(
-                "SELECT TOP 1 id, code, status FROM roadmap_requirements WHERE pth = ? AND status = 'cc_prompt_ready'",
-                (req.pth,), fetch="one"
-            )
-            if req_row:
-                execute_query(
-                    "UPDATE roadmap_requirements SET status = 'cc_executing', updated_at = GETUTCDATE() WHERE id = ?",
-                    (req_row["id"],), fetch="none"
-                )
-                response['requirement_advanced'] = {'code': req_row['code'], 'new_status': 'cc_executing'}
-                logger.info(f"post_session_signal: auto-advanced {req_row['code']} to cc_executing for PTH {req.pth}")
-            else:
-                write_failure_event('orphan_pth', req.pth, 'post_session_signal',
-                                    f"session-start for PTH '{req.pth}' found no requirement at cc_prompt_ready.")
-        except Exception as e:
-            logger.warning(f"post_session_signal: requirement auto-advance failed (non-fatal): {e}")
-
-    elif req.status == "completed":
-        execute_query("""
-            UPDATE cc_prompts
-            SET status = 'completed',
-                session_ended_at = ?,
-                session_outcome = 'completed',
-                updated_at = GETUTCDATE()
-            WHERE id = ?
-        """, (req.timestamp, prompt_id), fetch="none")
-        write_prompt_history(prompt_id, req.pth, from_status, 'completed', 'CC', 'post_session_signal')
-
-    elif req.status in ("stopped", "blocked"):
-        execute_query("""
-            UPDATE cc_prompts
-            SET status = 'stopped',
-                session_ended_at = ?,
-                session_outcome = ?,
-                session_stop_reason = ?,
-                updated_at = GETUTCDATE()
-            WHERE id = ?
-        """, (req.timestamp, req.status, (req.reason or "")[:500], prompt_id), fetch="none")
-        write_prompt_history(prompt_id, req.pth, from_status, 'stopped', 'CC', 'post_session_signal')
-
-    response["message"] = f"Session signal '{req.status}' recorded for {req.pth}."
-    return response
