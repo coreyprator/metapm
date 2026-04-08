@@ -983,13 +983,15 @@ async def submit_uat_direct(uat: UATDirectSubmit):
     NOTE: Validation is now handled by the UATDirectSubmit model_validator.
     """
     try:
-        # MP23 REQ-048: Quality gate on direct-submit — failed results need failure_type via notes
+        # MP23 REQ-048: Quality gate on direct-submit — failed results need notes explaining failure.
         # Skip/pending results need notes. Gate does NOT fire on clean all-pass submissions.
         if uat.results:
-            has_non_pass = False
             for r in uat.results:
-                if r.status in ("failed", "fail"):
-                    has_non_pass = True
+                if r.status in ("failed", "fail") and not (r.note and r.note.strip()):
+                    raise HTTPException(status_code=400, detail={
+                        "error": "failure_type_required",
+                        "message": "Please select a failure type for each failed test \u2014 this helps track why sprints fail.",
+                    })
                 elif r.status in ("skip", "conditional_pass", "pending") and not (r.note and r.note.strip()):
                     raise HTTPException(status_code=400, detail={
                         "error": "notes_required_for_skip",
