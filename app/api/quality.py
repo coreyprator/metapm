@@ -133,6 +133,16 @@ async def get_portfolio_quality():
     return results
 
 
+@router.get("/api/quality/projects")
+async def get_quality_projects():
+    """BUG-047: All projects for quality filter dropdown."""
+    rows = execute_query(
+        "SELECT DISTINCT code, name FROM roadmap_projects ORDER BY name",
+        fetch="all"
+    ) or []
+    return [{"code": r["code"], "name": r["name"]} for r in rows]
+
+
 @router.get("/api/quality/symptom-detector")
 async def get_symptom_chasing():
     """Detect repeat bug patterns — features with 3+ bugs in 30 days."""

@@ -2833,18 +2833,17 @@
 
     async function refreshQuality() {
       try {
-        const [data, symptoms] = await Promise.all([
+        const [data, symptoms, projects] = await Promise.all([
           api('/api/quality/portfolio'),
-          api('/api/quality/symptom-detector')
+          api('/api/quality/symptom-detector'),
+          api('/api/quality/projects')
         ]);
         qualityData = data || [];
-        // BUG-047: Populate project filter with project names
-        const projMap = new Map();
-        qualityData.forEach(d => { if (d.project_code) projMap.set(d.project_code, d.project_name || d.project_code); });
+        // BUG-047: Populate project filter from roadmap_projects
         const projSelect = qs('quality-filter-project');
         projSelect.innerHTML = '<option value="">All Projects</option>';
-        [...projMap.entries()].sort((a, b) => a[1].localeCompare(b[1])).forEach(([code, name]) => {
-          projSelect.insertAdjacentHTML('beforeend', `<option value="${code}">${name}</option>`);
+        (projects || []).forEach(p => {
+          projSelect.insertAdjacentHTML('beforeend', `<option value="${p.code}">${p.name}</option>`);
         });
         // Symptom banner
         const bannerEl = qs('qualitySymptomBanner');
