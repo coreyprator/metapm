@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.80.0"  # MP24: Quality Dashboard Mega (BUG-045 et al)
+    VERSION: str = "2.81.0"  # MP25: Add menu overflow fix (BUG-052), failure types coverage (BUG-053)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
