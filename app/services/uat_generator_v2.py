@@ -151,6 +151,27 @@ def render_structured_uat_html(
                     <button class="btn btn-fail" onclick="setResult(this,'fail')">Fail</button>
                     <button class="btn btn-skip" onclick="setResult(this,'skip')">Skip</button>
                 </div>
+                <select class="failure-type-select" style="display:none;margin-top:8px;padding:6px 8px;background:#1e1e32;color:#e2e8f0;border:1px solid #f8717180;border-radius:4px;font-size:0.85rem">
+                    <option value="">Select failure type...</option>
+                    <option value="wrong_spec">Wrong spec</option>
+                    <option value="regression">Regression</option>
+                    <option value="environment">Environment</option>
+                    <option value="unclear_bv">Unclear BV</option>
+                    <option value="machine_test_sent_to_pl">Machine test sent to PL</option>
+                    <option value="no_5q_applied">No 5Q applied</option>
+                    <option value="incomplete_spec">Incomplete spec</option>
+                    <option value="missing_acceptance_criteria">Missing acceptance criteria</option>
+                    <option value="incomplete_handoff">Incomplete handoff</option>
+                    <option value="ui_rendering_bug">UI rendering bug</option>
+                    <option value="data_mapping_bug">Data mapping bug</option>
+                    <option value="filter_query_bug">Filter/query bug</option>
+                    <option value="gate_validation_bug">Gate/validation bug</option>
+                    <option value="navigation_routing_bug">Navigation/routing bug</option>
+                    <option value="api_contract_bug">API contract bug</option>
+                    <option value="state_management_bug">State management bug</option>
+                    <option value="performance_bug">Performance bug</option>
+                    <option value="other">Other</option>
+                </select>
                 <div class="notes-container">
                     <textarea class="notes-input" placeholder="Notes..."></textarea>
                 </div>
@@ -314,7 +335,8 @@ def render_structured_uat_html(
 
     <div class="general-notes">
         <h3>General Notes</h3>
-        <textarea id="general-notes" class="general-notes-input" placeholder="Any observations, issues found, suggestions..."></textarea>
+        <div id="notes-list"></div>
+        <button type="button" onclick="addNote()" style="margin-top:8px;padding:8px 16px;background:#3b82f6;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem">+ Add Note</button>
     </div>
 
     <footer style="background:linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent), black 15%));padding:20px;border-radius:12px;margin-top:24px;">
@@ -367,6 +389,9 @@ def render_structured_uat_html(
             else if (result === 'fail') item.classList.add('failed');
             else item.classList.add('skipped');
             results[id] = result;
+            // MP24 REQ-056: Show/hide failure_type dropdown on fail
+            const ftSelect = item.querySelector('.failure-type-select');
+            if (ftSelect) ftSelect.style.display = result === 'fail' ? 'block' : 'none';
             updateCounts();
         }}
 
@@ -408,11 +433,14 @@ def render_structured_uat_html(
             document.querySelectorAll('.test-item').forEach(item => {{
                 const id = item.dataset.test;
                 const notes = item.querySelector('.notes-input')?.value || '';
+                const ftSelect = item.querySelector('.failure-type-select');
+                const failure_type = ftSelect ? ftSelect.value : '';
                 cases.push({{
                     id: id,
                     status: results[id] || 'pending',
                     result: results[id] ? (results[id] === 'pass' ? 'Confirmed' : results[id] === 'fail' ? 'Failed' : 'Skipped') : null,
-                    notes: notes
+                    notes: notes,
+                    failure_type: failure_type || null
                 }});
             }});
             return cases;
@@ -443,8 +471,11 @@ def render_structured_uat_html(
                 out += '\\n';
             }});
 
-            const gn = document.getElementById('general-notes').value.trim();
-            if (gn) out += 'General Notes\\n' + '-'.repeat(50) + '\\n' + gn + '\\n';
+            const notes = gatherNotes();
+            if (notes.length) {{
+                out += 'General Notes\\n' + '-'.repeat(50) + '\\n';
+                notes.forEach(n => {{ out += '[' + (n.classification || '') + '] ' + n.text + '\\n'; }});
+            }}
 
             out += '\\nOVERALL: ' + (f > 0 ? 'PENDING' : (Object.keys(results).length === total ? 'APPROVED' : 'PENDING')) + '\\n';
             return out;
@@ -566,6 +597,46 @@ def render_structured_uat_html(
                 btn.style.background = '#991b1b';
                 btn.disabled = false;
             }}
+        }}
+
+        // MP24 REQ-057: Multi-note management
+        let noteCounter = 0;
+        function addNote() {{
+            noteCounter++;
+            const ts = new Date().toISOString().replace('T', ' ').substring(0, 19) + 'Z';
+            const container = document.getElementById('notes-list');
+            const entry = document.createElement('div');
+            entry.className = 'note-entry';
+            entry.dataset.noteId = noteCounter;
+            entry.style.cssText = 'background:#1e1e32;border:1px solid #334155;border-radius:6px;padding:12px;margin-bottom:8px;position:relative';
+            entry.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">` +
+                `<span style="color:#8b949e;font-size:0.8rem">${{ts}}</span>` +
+                `<div style="display:flex;gap:8px;align-items:center">` +
+                `<select class="note-classification" style="padding:4px 6px;background:#0d1117;color:#e2e8f0;border:1px solid #334155;border-radius:4px;font-size:0.8rem">` +
+                `<option value="">No classification</option>` +
+                `<option value="bug">Bug</option>` +
+                `<option value="finding">Finding</option>` +
+                `<option value="new_requirement">New Requirement</option>` +
+                `<option value="no_action">No-action</option>` +
+                `</select>` +
+                `<button onclick="this.closest('.note-entry').remove()" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1.1rem;padding:0 4px">&times;</button>` +
+                `</div></div>` +
+                `<textarea class="note-text" placeholder="Enter note..." style="width:100%;min-height:60px;padding:8px;background:#0d1117;color:#e2e8f0;border:1px solid #334155;border-radius:4px;resize:vertical;font-size:0.85rem"></textarea>`;
+            container.appendChild(entry);
+        }}
+
+        function gatherNotes() {{
+            const entries = [];
+            document.querySelectorAll('.note-entry').forEach(entry => {{
+                const text = entry.querySelector('.note-text')?.value || '';
+                const classification = entry.querySelector('.note-classification')?.value || null;
+                const tsSpan = entry.querySelector('span');
+                const timestamp = tsSpan ? tsSpan.textContent.trim() : null;
+                if (text.trim()) {{
+                    entries.push({{ timestamp, text: text.trim(), classification: classification || null }});
+                }}
+            }});
+            return entries;
         }}
 
         // Screenshot paste handler

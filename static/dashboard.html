@@ -108,7 +108,7 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       display: none;
-      z-index: 5;
+      z-index: 200;
     }
     .add-menu.open { display: block; }
     .add-menu button {
@@ -466,16 +466,9 @@
         <span id="appVersion" class="version-badge">v-</span>
       </div>
       <div class="actions-row">
-        <button type="button" id="wipBtn" onclick="activateWipView()">📋 WIP</button>
-        <button type="button" id="visionBoardBtn" onclick="toggleVisionBoard()">👁 Vision Board</button>
-        <button type="button" id="lessonsBtn" onclick="toggleLessonsView()">📚 Lessons <span id="lessonsDraftBadge" style="display:none;background:#854d0e;color:#fde68a;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:3px"></span></button>
-        <button type="button" id="uatTabBtn" onclick="toggleUatTab()">🧪 UAT</button>
-        <button type="button" id="promptsTabBtn" onclick="togglePromptsTab()">📝 Prompts</button>
         <button type="button" id="qualityTabBtn" onclick="toggleQualityTab()">📊 Quality</button>
-        <button type="button" id="ragSearchBtn" onclick="toggleRagSearch()">🔍 RAG</button>
+        <a href="https://portfolio-rag.rentyourcio.com/search/etymology" target="_blank" rel="noopener"><button type="button" id="ragSearchBtn">🔍 RAG</button></a>
         <button type="button" id="docsTabBtn" onclick="toggleDocsTab()">📚 Docs</button>
-        <a href="/static/roadmap-drill.html" target="_blank" rel="noopener"><button type="button">📋 Roadmap Drill</button></a>
-        <a href="/static/roadmap-report.html" target="_blank" rel="noopener"><button type="button">📊 Roadmap Report</button></a>
         <a href="/architecture" target="_blank" rel="noopener"><button type="button">🏗️ Architecture</button></a>
         <button type="button" id="filterToggleBtn" class="filter-toggle-btn" onclick="const p=document.getElementById('controlsPanel');p.classList.toggle('mobile-collapsed');this.textContent=p.classList.contains('mobile-collapsed')?'⊞ Filters':'✕ Filters'">⊞ Filters</button>
         <div class="add-wrap">
@@ -669,6 +662,7 @@
           <option value="passed">Pass</option>
           <option value="failed">Fail</option>
           <option value="conditional_pass">Conditional Pass</option>
+          <option value="in_progress">In Progress</option>
         </select>
         <input type="date" id="quality-filter-from" style="padding:5px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px" placeholder="From">
         <input type="date" id="quality-filter-to" style="padding:5px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px" placeholder="To">
@@ -688,8 +682,17 @@
           <option value="incomplete_spec">Incomplete spec</option>
           <option value="missing_acceptance_criteria">Missing acceptance criteria</option>
           <option value="incomplete_handoff">Incomplete handoff</option>
+          <option value="ui_rendering_bug">UI rendering bug</option>
+          <option value="data_mapping_bug">Data mapping bug</option>
+          <option value="filter_query_bug">Filter/query bug</option>
+          <option value="gate_validation_bug">Gate/validation bug</option>
+          <option value="navigation_routing_bug">Navigation/routing bug</option>
+          <option value="api_contract_bug">API contract bug</option>
+          <option value="state_management_bug">State management bug</option>
+          <option value="performance_bug">Performance bug</option>
           <option value="other">Other</option>
         </select>
+        <button type="button" onclick="resetQualityFilters()" style="padding:6px 12px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px;cursor:pointer">Reset Filters</button>
       </div>
       <div id="qualityTable" style="padding:8px;overflow-x:auto"></div>
       <div id="qualityTotals" style="padding:8px 12px;font-size:13px;color:var(--muted);border-top:1px solid var(--line)"></div>
@@ -2817,10 +2820,6 @@
       const panel = qs('qualityPanel');
       const hierarchy = qs('hierarchy');
       if (qualityTabActive) {
-        if (visionBoardActive) { visionBoardActive = false; qs('visionBoardBtn').classList.remove('active'); qs('visionBoard').style.display = 'none'; }
-        if (uatTabActive) { uatTabActive = false; qs('uatTabBtn').classList.remove('active'); qs('uatPanel').style.display = 'none'; }
-        if (promptsTabActive) { promptsTabActive = false; qs('promptsTabBtn').classList.remove('active'); qs('promptsPanel').style.display = 'none'; }
-        if (lessonsActive) { lessonsActive = false; qs('lessonsBtn').classList.remove('active'); qs('lessonsPanel').style.display = 'none'; }
         btn.classList.add('active');
         hierarchy.style.display = 'none';
         panel.style.display = 'block';
@@ -2839,11 +2838,14 @@
           api('/api/quality/symptom-detector')
         ]);
         qualityData = data || [];
-        // Populate project filter
-        const projSet = new Set(qualityData.map(d => d.project_code).filter(Boolean));
+        // BUG-047: Populate project filter with project names
+        const projMap = new Map();
+        qualityData.forEach(d => { if (d.project_code) projMap.set(d.project_code, d.project_name || d.project_code); });
         const projSelect = qs('quality-filter-project');
         projSelect.innerHTML = '<option value="">All Projects</option>';
-        [...projSet].sort().forEach(p => { projSelect.insertAdjacentHTML('beforeend', `<option value="${p}">${p}</option>`); });
+        [...projMap.entries()].sort((a, b) => a[1].localeCompare(b[1])).forEach(([code, name]) => {
+          projSelect.insertAdjacentHTML('beforeend', `<option value="${code}">${name}</option>`);
+        });
         // Symptom banner
         const bannerEl = qs('qualitySymptomBanner');
         if (symptoms && symptoms.length > 0) {
@@ -2900,7 +2902,7 @@
         html += `<tr style="border-bottom:1px solid var(--line)">
           <td style="padding:6px">${date}</td>
           <td style="padding:6px">${d.project_code || ''}</td>
-          <td style="padding:6px"><a href="/prompts/${d.pth}" style="color:var(--info)">${d.pth || ''}</a></td>
+          <td style="padding:6px">${d.spec_id ? `<a href="/uat/${d.spec_id}" style="color:var(--info)">${d.pth || ''}</a>` : (d.pth || '')}</td>
           <td style="padding:6px">${(d.sprint_title || '').substring(0, 40)}</td>
           <td style="padding:6px">${ver}</td>
           <td style="padding:6px">${statusBadge(d.overall_status)}</td>
@@ -2939,6 +2941,17 @@
       const el = document.getElementById(id);
       if (el) el.addEventListener('change', renderQualityTable);
     });
+
+    // BUG-049: Reset all quality filters
+    function resetQualityFilters() {
+      qs('quality-filter-project').value = '';
+      qs('quality-filter-status').value = '';
+      qs('quality-filter-from').value = '';
+      qs('quality-filter-to').value = '';
+      qs('quality-filter-5q').value = '';
+      qs('quality-filter-failure').value = '';
+      renderQualityTable();
+    }
 
     function toggleRagSearch() {
       const p = qs('ragSearchPanel');

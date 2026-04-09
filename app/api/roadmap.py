@@ -3,19 +3,16 @@ MetaPM Roadmap API Router
 Project, Requirement, and Sprint management endpoints.
 """
 
-import csv
 import hashlib
-import io
 import logging
 import uuid
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import PlainTextResponse
 
 from app.core.database import execute_query
-from app.core.state_machine import write_requirement_failure, write_failure_event
 from app.schemas.roadmap import (
     ProjectCreate, ProjectUpdate, ProjectResponse, ProjectListResponse,
     SprintCreate, SprintUpdate, SprintResponse, SprintListResponse,
@@ -961,100 +958,6 @@ async def get_roadmap(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/roadmap/export/csv")
-async def export_roadmap_csv(
-    project: Optional[str] = Query(None, description="Project code e.g. HL, MP"),
-    status: Optional[str] = Query(None, description="Single status filter"),
-    include_closed: bool = Query(False),
-    priority: Optional[str] = Query(None, description="P1, P2, or P3"),
-    type: Optional[str] = Query(None, description="feature, bug, enhancement, task, vision"),
-    search: Optional[str] = Query(None, description="Free text search"),
-):
-    """Export filtered requirements as CSV with full descriptions."""
-    try:
-        # FIX 1 (BUG-029): Normalize project param — proj-em → EM
-        if project:
-            project = project.replace('proj-', '').upper()
-
-        where_clauses = []
-        params = []
-
-        if project:
-            where_clauses.append("UPPER(p.code) = UPPER(?)")
-            params.append(project)
-        if status:
-            where_clauses.append("r.status = ?")
-            params.append(status)
-        if not include_closed:
-            where_clauses.append("r.status NOT IN ('closed', 'done')")
-        if priority:
-            where_clauses.append("r.priority = ?")
-            params.append(priority)
-        if type:
-            where_clauses.append("r.type = ?")
-            params.append(type)
-        if search:
-            where_clauses.append("(r.code LIKE ? OR r.title LIKE ? OR r.description LIKE ?)")
-            like_term = f"%{search}%"
-            params.extend([like_term, like_term, like_term])
-
-        where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
-
-        # FIX 2 (BUG-030): Add project name column via JOIN
-        rows = execute_query(f"""
-            SELECT r.code, p.name as project_name, p.code as project_code,
-                   r.title, r.type, r.priority, r.status, r.pth,
-                   r.description, s.name as sprint_name,
-                   r.created_at, r.updated_at
-            FROM roadmap_requirements r
-            JOIN roadmap_projects p ON r.project_id = p.id
-            LEFT JOIN roadmap_sprints s ON r.sprint_id = s.id
-            WHERE {where_sql}
-            ORDER BY
-                CASE r.priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 END,
-                r.code
-        """, tuple(params) if params else None, fetch="all") or []
-
-        output = io.StringIO()
-        writer = csv.writer(output, quoting=csv.QUOTE_ALL)
-        writer.writerow(["Code", "Project", "Title", "Type", "Priority", "Status", "PTH",
-                         "Description", "Sprint", "CreatedAt", "UpdatedAt"])
-
-        for row in rows:
-            created = row['created_at'].strftime("%Y-%m-%d %H:%M") if row.get('created_at') else ""
-            updated = row['updated_at'].strftime("%Y-%m-%d %H:%M") if row.get('updated_at') else ""
-            writer.writerow([
-                row.get('code') or "",
-                row.get('project_name') or row.get('project_code') or "",
-                row.get('title') or "",
-                row.get('type') or "",
-                row.get('priority') or "",
-                row.get('status') or "",
-                row.get('pth') or "",
-                row.get('description') or "",
-                row.get('sprint_name') or "",
-                created,
-                updated,
-            ])
-
-        csv_content = output.getvalue()
-        output.close()
-
-        # FIX 3 (BUG-031): Add time component to filename
-        now = datetime.utcnow()
-        project_label = project if project else "all"
-        filename = f"metapm-export-{project_label}-{now.strftime('%Y-%m-%d-%H%M')}.csv"
-
-        return StreamingResponse(
-            iter([csv_content]),
-            media_type="text/csv; charset=utf-8",
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-        )
-    except Exception as e:
-        logger.error(f"Error exporting CSV: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.get("/roadmap/export")
 async def export_roadmap():
     """Export full roadmap with projects, requirements, sprints, and aggregate stats."""
@@ -1718,23 +1621,25 @@ async def assign_pth(requirement_id: str, body: PthAssignRequest = None):
 # STATUS TRANSITION + HISTORY (MP-MS3 Phase 2)
 # ============================================
 
-# MP18 BUG-036: Allowed transitions — strict enforcement, no legacy bypass
-ALLOWED_TRANSITIONS = {
-    "req_created":     ["req_approved", "closed"],
-    "req_approved":    ["cai_designing", "closed"],
-    "cai_designing":   ["cc_prompt_ready", "closed"],
-    "cc_prompt_ready": ["cc_executing", "closed"],
-    "cc_executing":    ["cc_complete", "closed"],
-    "cc_complete":     ["uat_ready", "closed"],
-    "uat_ready":       ["uat_pass", "uat_fail", "closed"],
-    "uat_pass":        ["done", "closed"],
-    "uat_fail":        ["cai_designing", "closed"],
-    "done":            ["closed"],
-    "closed":          [],
-    "backlog":         ["req_created", "closed"],
-    "rework":          ["req_created", "closed"],
+# Valid status transitions — uses lifecycle transitions; legacy statuses allow any
+VALID_TRANSITIONS = {
+    "req_created":     ["req_approved", "backlog", "closed"],
+    "req_approved":    ["cai_designing", "req_created"],
+    "cai_designing":   ["cc_prompt_ready", "req_approved"],
+    "cc_prompt_ready": ["cc_executing", "cai_designing"],
+    "cc_executing":    ["cc_complete", "cc_prompt_ready"],
+    "cc_complete":     ["uat_ready", "cc_executing"],
+    "uat_ready":       ["uat_pass", "uat_fail"],
+    "uat_pass":        ["done"],
+    "uat_fail":        ["cc_prompt_ready", "rework"],
+    "done":            ["rework"],
+    "rework":          ["cc_prompt_ready"],
+    # Legacy: allow any transition
+    "backlog": None,
+    "executing": None,
+    "closed": None,
 }
-VALID_TRANSITIONS = ALLOWED_TRANSITIONS  # backward compat alias
+ALLOWED_TRANSITIONS = VALID_TRANSITIONS  # Alias used by mcp_tools.py
 
 
 @router.patch("/roadmap/requirements/{requirement_id}/status", response_model=StatusTransitionResponse)
@@ -1757,22 +1662,13 @@ async def transition_requirement_status(requirement_id: str, body: StatusTransit
                 previous_status=current_status, transition_recorded=False
             )
 
-        # MP18 BUG-036: "closed" requires a non-empty note
-        if new_status == "closed" and not (body.notes and body.notes.strip()):
-            raise HTTPException(status_code=400, detail="note required when closing from any status.")
-
-        # MP18 BUG-036: Strict state machine enforcement
-        allowed = ALLOWED_TRANSITIONS.get(current_status, [])
-        if new_status not in allowed:
-            write_requirement_failure(requirement_id, current_status, new_status,
-                                      body.changed_by, 'transition_requirement_status',
-                                      f"illegal_transition: {current_status} -> {new_status}")
-            raise HTTPException(status_code=400, detail={
-                "error": "illegal_transition",
-                "current_status": current_status,
-                "requested_status": new_status,
-                "allowed_next": allowed,
-            })
+        # Validate transition (None = legacy, allow any)
+        allowed = VALID_TRANSITIONS.get(current_status)
+        if allowed is not None and new_status not in allowed:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid transition: {current_status} → {new_status}. Allowed: {', '.join(allowed)}"
+            )
 
         # Update status
         execute_query("""
@@ -1826,10 +1722,9 @@ async def batch_transition_status(body: BatchStatusRequest):
             current_status = req['status']
             new_status = body.status.value
 
-            allowed = ALLOWED_TRANSITIONS.get(current_status, [])
-            if new_status not in allowed:
-                results.append({"id": req_id, "code": req['code'], "error": "illegal_transition",
-                                "current_status": current_status, "requested_status": new_status, "allowed_next": allowed})
+            allowed = VALID_TRANSITIONS.get(current_status)
+            if allowed is not None and new_status not in allowed:
+                results.append({"id": req_id, "code": req['code'], "error": f"Invalid: {current_status} → {new_status}"})
                 continue
 
             execute_query("""
@@ -1875,8 +1770,22 @@ LIFECYCLE_STATES = [
     {"id": "closed",          "label": "Closed",         "color": "#374151", "phase": "legacy"},
 ]
 
-# MP18 BUG-036: Lifecycle uses the same ALLOWED_TRANSITIONS
-LIFECYCLE_VALID_TRANSITIONS = ALLOWED_TRANSITIONS
+LIFECYCLE_VALID_TRANSITIONS = {
+    "req_created":     ["req_approved", "backlog", "closed"],
+    "req_approved":    ["cai_designing", "req_created"],
+    "cai_designing":   ["cc_prompt_ready", "req_approved"],
+    "cc_prompt_ready": ["cc_executing", "cai_designing"],
+    "cc_executing":    ["cc_complete", "cc_prompt_ready"],
+    "cc_complete":     ["uat_ready", "cc_executing"],
+    "uat_ready":       ["uat_pass", "uat_fail"],
+    "uat_pass":        ["done"],
+    "uat_fail":        ["cc_prompt_ready", "rework"],
+    "done":            ["rework"],
+    "rework":          ["cc_prompt_ready"],
+    "backlog": None,   # legacy: allow any transition
+    "executing": None,
+    "closed": None,
+}
 
 
 @router.get("/v1/lifecycle/states")
@@ -1907,29 +1816,19 @@ async def update_requirement_state(req_id: str, body: StateTransition):
 
         # PTH gate: block cc_prompt_ready without PTH (MP-PTH-GATE-001)
         if new_status == 'cc_prompt_ready' and not req.get('pth') and not body.override_gate:
-            reason = "PTH required before advancing to cc_prompt_ready"
-            write_requirement_failure(req_id, current_status, new_status, 'system', 'update_requirement_state', reason)
             raise HTTPException(
                 status_code=400,
                 detail="PTH required before advancing to cc_prompt_ready. Call POST /api/roadmap/requirements/{id}/assign-pth first."
             )
 
-        # MP18 BUG-036: "closed" requires a non-empty note
-        if new_status == "closed" and not (body.note and body.note.strip()):
-            raise HTTPException(status_code=400, detail="note required when closing from any status.")
-
-        # MP18 BUG-036: Strict state machine enforcement
+        # Validate transition
         if new_status != current_status:
-            allowed = ALLOWED_TRANSITIONS.get(current_status, [])
-            if new_status not in allowed:
-                reason = f"illegal_transition: {current_status} -> {new_status}"
-                write_requirement_failure(req_id, current_status, new_status, 'system', 'update_requirement_state', reason)
-                raise HTTPException(status_code=400, detail={
-                    "error": "illegal_transition",
-                    "current_status": current_status,
-                    "requested_status": new_status,
-                    "allowed_next": allowed,
-                })
+            allowed = LIFECYCLE_VALID_TRANSITIONS.get(current_status)
+            if allowed is not None and new_status not in allowed:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid transition: {current_status} -> {new_status}. Allowed: {allowed}"
+                )
 
         execute_query(
             "UPDATE roadmap_requirements SET status = ?, updated_at = GETDATE() WHERE id = ?",

@@ -734,6 +734,28 @@ def _tool_patch_requirement_status(args: dict) -> dict:
             write_requirement_failure(req_id, current, 'uat_ready', 'CAI', 'patch_requirement_status', reason)
             return {"error": "Cannot advance to uat_ready: no UAT spec linked. Call post_uat_spec first."}
 
+    # MP24 TSK-016: Close gate — require review if UAT pages exist
+    if status in ('done', 'closed', 'uat_pass'):
+        req_full = execute_query("SELECT pth FROM roadmap_requirements WHERE id = ?", (req_id,), fetch="one")
+        req_pth = req_full.get("pth") if req_full else pth
+        if req_pth:
+            uat_exists = execute_query(
+                "SELECT TOP 1 id FROM uat_pages WHERE pth = ?",
+                (req_pth,), fetch="one"
+            )
+            if uat_exists:
+                review_exists = execute_query(
+                    "SELECT TOP 1 id FROM reviews WHERE prompt_pth = ?",
+                    (req_pth,), fetch="one"
+                )
+                if not review_exists:
+                    reason = f"review_required: cannot close {code} — UAT pages exist but no review record"
+                    write_requirement_failure(req_id, current, status, 'MCP', 'patch_requirement_status', reason)
+                    return {
+                        "error": "review_required",
+                        "message": "Cannot close this requirement — no CAI review record found. CAI must call post_review before closing.",
+                    }
+
     execute_query(
         "UPDATE roadmap_requirements SET status = ?, updated_at = GETDATE() WHERE id = ?",
         (status, req_id), fetch="none"
@@ -886,6 +908,14 @@ def _tool_post_uat_spec(args: dict) -> dict:
         ), fetch="none")
 
     uat_url = f"https://metapm.rentyourcio.com/uat/{spec_id}"
+
+    # MP24 BUG-043: Delete all existing BV items before inserting new ones (dedup on re-spec)
+    if existing:
+        try:
+            execute_query("DELETE FROM uat_bv_items WHERE spec_id = ?", (spec_id,), fetch="none")
+            logger.info(f"post_uat_spec: deleted old BV items for spec {spec_id} (dedup)")
+        except Exception as del_err:
+            logger.warning(f"post_uat_spec: BV item cleanup failed: {del_err}")
 
     # BA17 fix: persist individual BV items to uat_bv_items (so get_uat_results can read them)
     for tc in test_cases_raw:

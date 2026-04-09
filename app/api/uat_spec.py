@@ -8,7 +8,7 @@ import logging
 import os
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
@@ -79,6 +79,10 @@ VALID_FAILURE_TYPES = {
     "wrong_spec", "regression", "environment", "unclear_bv",
     "machine_test_sent_to_pl", "no_5q_applied", "incomplete_spec",
     "missing_acceptance_criteria", "incomplete_handoff", "other",
+    # MP24 REQ-056: Bug-type failure categories
+    "ui_rendering_bug", "data_mapping_bug", "filter_query_bug",
+    "gate_validation_bug", "navigation_routing_bug", "api_contract_bug",
+    "state_management_bug", "performance_bug",
 }
 
 
@@ -94,7 +98,7 @@ class PLResultsTestCase(BaseModel):
 class PLResultsSubmit(BaseModel):
     test_cases: List[PLResultsTestCase]
     overall_notes: Optional[str] = None
-    general_notes: Optional[str] = None  # Fix 2d: persisted to DB
+    general_notes: Optional[Any] = None  # MP24 REQ-057: List[dict] (timestamped entries) or legacy str
     failure_type: Optional[str] = None  # MP23: sprint-level failure_type for conditional_pass
     general_notes_attachments: Optional[List[dict]] = None  # MP07
     submitted_by: Optional[str] = None
@@ -428,6 +432,10 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
         logger.warning(f"attempt_number calculation failed: {e}")
 
     # Fix 2d: persist general_notes + attempt_number
+    # MP24 REQ-057: general_notes stored as JSON array of timestamped entries
+    gn_value = body.general_notes or body.overall_notes
+    if isinstance(gn_value, list):
+        gn_value = json.dumps(gn_value)
     execute_query("""
         UPDATE uat_pages
         SET test_cases_json = ?,
@@ -436,7 +444,7 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
             general_notes = ?,
             attempt_number = ?
         WHERE id = ?
-    """, (json.dumps(existing_cases), new_status, body.general_notes or body.overall_notes, attempt_number, spec_id), fetch="none")
+    """, (json.dumps(existing_cases), new_status, gn_value, attempt_number, spec_id), fetch="none")
 
     # MP23 REQ-048: Write sprint-level failure_type to uat_results
     if sprint_failure_type:
@@ -742,8 +750,24 @@ async def get_uat_results(spec_id: str):
             }
             for c in real_cases
         ],
-        "general_notes": row.get("general_notes") or "",
+        "general_notes": _parse_general_notes(row.get("general_notes")),
     }
+
+
+def _parse_general_notes(raw):
+    """MP24 REQ-057: Parse general_notes — JSON array or legacy plain string."""
+    if not raw:
+        return []
+    if isinstance(raw, list):
+        return raw
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, list):
+            return parsed
+    except (json.JSONDecodeError, TypeError):
+        pass
+    # Legacy plain string — wrap as single entry
+    return [{"timestamp": None, "text": raw, "classification": None}]
 
 
 # ── POST /api/uat/{spec_id}/admin-backfill ───────────────────────────────────
@@ -808,11 +832,15 @@ async def admin_backfill_uat_results(spec_id: str, body: AdminBackfillRequest, r
     else:
         new_status = "in_progress"
 
+    # MP24 REQ-057: serialize general_notes as JSON if list
+    admin_gn = body.general_notes
+    if isinstance(admin_gn, list):
+        admin_gn = json.dumps(admin_gn)
     execute_query("""
         UPDATE uat_pages
         SET test_cases_json = ?, status = ?, pl_submitted_at = GETUTCDATE(), general_notes = ?
         WHERE id = ?
-    """, (json.dumps(existing_cases), new_status, body.general_notes, spec_id), fetch="none")
+    """, (json.dumps(existing_cases), new_status, admin_gn, spec_id), fetch="none")
 
     # Persist individual BV items to uat_bv_items table
     title_lookup = {c["id"]: c.get("title", "") for c in real_cases}
@@ -1160,7 +1188,8 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
 
   <div class="general-notes">
     <div class="general-notes-title">General Notes</div>
-    <textarea id="general-notes" placeholder="Overall observations..." {'readonly' if is_submitted else ''}>{esc(general_notes)}</textarea>
+    <div id="notes-list"></div>
+    {'' if is_submitted else '<button type="button" onclick="addNote()" style="margin-top:8px;padding:6px 14px;background:#3b82f6;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.82rem">+ Add Note</button>'}
     {'' if is_submitted else '<div class="paste-zone" id="gn-paste-zone" tabindex="0" contenteditable="false">📷 Paste screenshot here (Ctrl+V)</div>'}
     <div class="attach-row">
       <label class="attach-btn">📎 Attach file<input type="file" id="gn-attach-input" accept="image/*,.pdf" {'disabled' if is_submitted else ''}></label>
@@ -1179,6 +1208,58 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
 
   <script>
     const SPEC_ID = "{spec_id}";
+
+    // MP24 REQ-057: Multi-note management
+    let noteCounter = 0;
+    function addNote() {{
+      noteCounter++;
+      const ts = new Date().toISOString().replace('T', ' ').substring(0, 19) + 'Z';
+      const container = document.getElementById('notes-list');
+      const entry = document.createElement('div');
+      entry.className = 'note-entry';
+      entry.style.cssText = 'background:#0d1117;border:1px solid #334155;border-radius:6px;padding:10px;margin-bottom:8px;position:relative';
+      entry.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">` +
+        `<span style="color:#8b949e;font-size:0.78rem">${{ts}}</span>` +
+        `<div style="display:flex;gap:6px;align-items:center">` +
+        `<select class="note-classification" style="padding:3px 6px;background:#161b22;color:#e2e8f0;border:1px solid #334155;border-radius:4px;font-size:0.78rem">` +
+        `<option value="">No classification</option>` +
+        `<option value="bug">Bug</option>` +
+        `<option value="finding">Finding</option>` +
+        `<option value="new_requirement">New Requirement</option>` +
+        `<option value="no_action">No-action</option>` +
+        `</select>` +
+        `<button onclick="this.closest('.note-entry').remove()" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:0 4px">&times;</button>` +
+        `</div></div>` +
+        `<textarea class="note-text" placeholder="Enter note..." style="width:100%;min-height:50px;padding:6px;background:#161b22;color:#e2e8f0;border:1px solid #334155;border-radius:4px;resize:vertical;font-size:0.82rem"></textarea>`;
+      container.appendChild(entry);
+    }}
+
+    function gatherNotes() {{
+      const entries = [];
+      document.querySelectorAll('.note-entry').forEach(entry => {{
+        const text = entry.querySelector('.note-text')?.value || '';
+        const classification = entry.querySelector('.note-classification')?.value || null;
+        const tsSpan = entry.querySelector('span');
+        const timestamp = tsSpan ? tsSpan.textContent.trim() : null;
+        if (text.trim()) {{
+          entries.push({{ timestamp, text: text.trim(), classification: classification || null }});
+        }}
+      }});
+      return entries;
+    }}
+
+    // Pre-populate existing notes on page load
+    (function loadExistingNotes() {{
+      const existingNotes = {json.dumps(_parse_general_notes(general_notes))};
+      existingNotes.forEach(n => {{
+        addNote();
+        const entries = document.querySelectorAll('.note-entry');
+        const last = entries[entries.length - 1];
+        if (n.text) last.querySelector('.note-text').value = n.text;
+        if (n.classification) last.querySelector('.note-classification').value = n.classification;
+        if (n.timestamp) last.querySelector('span').textContent = n.timestamp;
+      }});
+    }})();
 
     function updateCounts() {{
       const cards = document.querySelectorAll('.test-card:not([data-type="cc_machine"])');
@@ -1397,7 +1478,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
         const resp = await fetch(`/api/uat/${{SPEC_ID}}/pl-results`, {{
           method: 'PATCH',
           headers: {{'Content-Type': 'application/json'}},
-          body: JSON.stringify({{ test_cases: [], general_notes: 'All BVs machine-verified. PL acknowledged.' }})
+          body: JSON.stringify({{ test_cases: [], general_notes: [{{timestamp: new Date().toISOString(), text: 'All BVs machine-verified. PL acknowledged.', classification: null}}] }})
         }});
         if (resp.ok) {{
           const div = document.getElementById('submit-result');
@@ -1444,7 +1525,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
         alert('Classification required for all BVs: ' + missingClassification.join(', '));
         return;
       }}
-      const general_notes = document.getElementById('general-notes').value;
+      const general_notes = gatherNotes();
 
       // MP23: determine if we need sprint-level failure_type (for conditional_pass)
       let sprintFailureType = null;

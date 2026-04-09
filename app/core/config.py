@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.79.0"  # MP23: Sprint Quality Model (REQ-048)
+    VERSION: str = "2.80.0"  # MP24: Quality Dashboard Mega (BUG-045 et al)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
