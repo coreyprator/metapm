@@ -75,15 +75,26 @@ class UATSpecResponse(BaseModel):
     status: str = "spec_created"
 
 
-VALID_FAILURE_TYPES = {
-    "wrong_spec", "regression", "environment", "unclear_bv",
-    "machine_test_sent_to_pl", "no_5q_applied", "incomplete_spec",
-    "missing_acceptance_criteria", "incomplete_handoff", "other",
-    # MP24 REQ-056: Bug-type failure categories
-    "ui_rendering_bug", "data_mapping_bug", "filter_query_bug",
-    "gate_validation_bug", "navigation_routing_bug", "api_contract_bug",
-    "state_management_bug", "performance_bug",
-}
+def get_allowed_failure_types() -> set:
+    """MP27: Load allowed failure types from DB at validation time (not module load)."""
+    try:
+        rows = execute_query(
+            "SELECT type_code FROM failure_types WHERE is_active = 1",
+            fetch="all"
+        )
+        if rows:
+            return {r["type_code"] for r in rows}
+    except Exception:
+        pass
+    # Fallback to hardcoded set if DB tables don't exist yet
+    return {
+        "wrong_spec", "regression", "environment", "unclear_bv",
+        "machine_test_sent_to_pl", "no_5q_applied", "incomplete_spec",
+        "missing_acceptance_criteria", "incomplete_handoff", "other",
+        "ui_rendering_bug", "data_mapping_bug", "filter_query_bug",
+        "gate_validation_bug", "navigation_routing_bug", "api_contract_bug",
+        "state_management_bug", "performance_bug",
+    }
 
 
 class PLResultsTestCase(BaseModel):
@@ -337,14 +348,18 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
             "pending_bv_ids": pending_bv_ids,
         })
 
-    # MP23 REQ-048: Quality gate — failed BVs require failure_type, skipped/pending require notes
+    # MP23 REQ-048 + MP27: Quality gate — failed BVs require valid failure_type, skipped/pending require notes
+    allowed_types = get_allowed_failure_types()
     failed_no_type = []
+    invalid_type = []
     skip_no_notes = []
     for tc in body.test_cases:
         if tc.id not in pl_visual_ids:
             continue
         if tc.status == "fail" and not tc.failure_type:
             failed_no_type.append(tc.id)
+        elif tc.status == "fail" and tc.failure_type and tc.failure_type not in allowed_types:
+            invalid_type.append(tc.id)
         if tc.status in ("skip", "pending") and not (tc.notes and tc.notes.strip()):
             skip_no_notes.append(tc.id)
     if failed_no_type:
@@ -352,6 +367,12 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
             "error": "failure_type_required",
             "message": "Please select a failure type for each failed test \u2014 this helps track why sprints fail.",
             "missing_bv_ids": failed_no_type,
+        })
+    if invalid_type:
+        raise HTTPException(status_code=400, detail={
+            "error": "invalid_failure_type",
+            "message": "One or more failure types are not recognized. Please select from the dropdown.",
+            "invalid_bv_ids": invalid_type,
         })
     if skip_no_notes:
         raise HTTPException(status_code=400, detail={

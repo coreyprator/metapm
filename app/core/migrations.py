@@ -2064,4 +2064,145 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 61 warning: {e}")
 
+    # Migration 62: Create failure_categories + failure_types tables (MP27 — data-driven failure schema)
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'failure_categories'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            logger.info("  Migration 62: Creating failure_categories + failure_types tables...")
+
+            # Create failure_categories
+            execute_query("""
+                CREATE TABLE failure_categories (
+                    category_code  NVARCHAR(50)  NOT NULL PRIMARY KEY,
+                    display_label  NVARCHAR(100) NOT NULL,
+                    sort_order     INT           NOT NULL DEFAULT 0
+                )
+            """, fetch="none")
+
+            # Create failure_types
+            execute_query("""
+                CREATE TABLE failure_types (
+                    type_code      NVARCHAR(100) NOT NULL PRIMARY KEY,
+                    category_code  NVARCHAR(50)  NOT NULL
+                                     REFERENCES failure_categories(category_code),
+                    display_label  NVARCHAR(255) NOT NULL,
+                    help_text      NVARCHAR(500) NOT NULL,
+                    is_active      BIT           NOT NULL DEFAULT 1
+                )
+            """, fetch="none")
+
+            # Seed failure_categories
+            execute_query("INSERT INTO failure_categories VALUES ('bug',     'Bug Types',        1)", fetch="none")
+            execute_query("INSERT INTO failure_categories VALUES ('content', 'Content Failures',  2)", fetch="none")
+            execute_query("INSERT INTO failure_categories VALUES ('process', 'Process Failures',  3)", fetch="none")
+            execute_query("INSERT INTO failure_categories VALUES ('other',   'Other',             4)", fetch="none")
+
+            # Seed failure_types — Bug types
+            execute_query("""INSERT INTO failure_types VALUES (
+                'ui_rendering_bug', 'bug',
+                'UI Rendering — wrong position, missing element, wrong style',
+                'The element exists but renders incorrectly: wrong position, missing entirely, wrong style applied, or fails to render at all. Examples: button hidden behind header, tab at wrong position, modal clipped by overflow.',
+                1)""", fetch="none")
+            execute_query("""INSERT INTO failure_types VALUES (
+                'data_mapping_bug', 'bug',
+                'Data Mapping — wrong field shown, incorrect join',
+                'The right data exists in the database but the wrong value is displayed, or fields are mapped to the wrong columns. Examples: Sprint Title showing sprint_id instead of requirement title, empty dropdown that should be populated.',
+                1)""", fetch="none")
+            execute_query("""INSERT INTO failure_types VALUES (
+                'filter_query_bug', 'bug',
+                'Filter/Query — filter doesn''t work, empty dropdown',
+                'A filter control renders but has no effect on the data, or a dropdown is empty when it should contain options. Examples: Project filter showing no projects, Status filter not changing the rows.',
+                1)""", fetch="none")
+            execute_query("""INSERT INTO failure_types VALUES (
+                'gate_validation_bug', 'bug',
+                'Gate/Validation — blocks valid input or allows invalid',
+                'A validation rule fires incorrectly: either blocking a submission that should be allowed, or allowing a submission that should be blocked. Examples: clean passing UAT blocked by failure_type gate, cc_machine BVs requiring PL classification.',
+                1)""", fetch="none")
+            execute_query("""INSERT INTO failure_types VALUES (
+                'navigation_routing_bug', 'bug',
+                'Navigation/Routing — wrong page, wrong link destination',
+                'A link or button navigates to the wrong destination. Examples: PTH link opening prompt detail instead of UAT page, Quality tab at wrong position in nav.',
+                1)""", fetch="none")
+            execute_query("""INSERT INTO failure_types VALUES (
+                'api_contract_bug', 'bug',
+                'API Contract — wrong response shape, missing fields',
+                'An API endpoint returns data in an unexpected format: missing fields, wrong data types, wrong status codes, or a different structure than the frontend expects.',
+                1)""", fetch="none")
+            execute_query("""INSERT INTO failure_types VALUES (
+                'state_management_bug', 'bug',
+                'State Management — data doesn''t persist, stale data',
+                'Data that should be saved is lost, or the UI shows stale data that doesn''t reflect the current DB state. Examples: form values lost on navigation, cached data not refreshing after update.',
+                1)""", fetch="none")
+            execute_query("""INSERT INTO failure_types VALUES (
+                'performance_bug', 'bug',
+                'Performance — timeout, slow load, unresponsive UI',
+                'The feature works correctly but takes too long, times out, or makes the UI unresponsive. Includes Cloud Run cold starts causing visible delays.',
+                1)""", fetch="none")
+
+            # Seed failure_types — Content failures
+            execute_query("""INSERT INTO failure_types VALUES (
+                'wrong_spec', 'content',
+                'Wrong spec — CC built something different from intended',
+                'CC implemented the feature but misunderstood the requirement. The code is correct for what was built, but what was built is not what was needed. Root cause is usually spec ambiguity.',
+                1)""", fetch="none")
+            execute_query("""INSERT INTO failure_types VALUES (
+                'regression', 'content',
+                'Regression — previously working, now broken',
+                'Something that passed UAT in a prior sprint is now broken. The new sprint introduced a change that broke existing functionality.',
+                1)""", fetch="none")
+            execute_query("""INSERT INTO failure_types VALUES (
+                'environment', 'content',
+                'Environment — deploy or infrastructure issue',
+                'The code is correct but the deployment failed, a service is unavailable, or infrastructure configuration is wrong. Not a code bug.',
+                1)""", fetch="none")
+            execute_query("""INSERT INTO failure_types VALUES (
+                'unclear_bv', 'content',
+                'Unclear BV — test too vague to evaluate',
+                'The BV description didn''t give enough information to know what to look for or how to confirm pass/fail. The test itself needs to be rewritten.',
+                1)""", fetch="none")
+
+            # Seed failure_types — Process failures
+            execute_query("""INSERT INTO failure_types VALUES (
+                'machine_test_sent_to_pl', 'process',
+                'Machine test sent to PL (BA32 violation)',
+                'A cc_machine BV appeared in the PL UAT submission form. PL should never be asked to classify or evaluate machine tests. This is a BA32 violation.',
+                1)""", fetch="none")
+            execute_query("""INSERT INTO failure_types VALUES (
+                'no_5q_applied', 'process',
+                'No 5Q applied (BA31 violation)',
+                'The sprint was posted without the 5Q quality process having been run. five_q_applied was set to true without the ## 5Q block appearing in the CAI chat session.',
+                1)""", fetch="none")
+            execute_query("""INSERT INTO failure_types VALUES (
+                'incomplete_spec', 'process',
+                'Incomplete spec — spec too vague to build from',
+                'The spec was missing enough detail that CC had to guess at the implementation. Result was predictably wrong.',
+                1)""", fetch="none")
+            execute_query("""INSERT INTO failure_types VALUES (
+                'missing_acceptance_criteria', 'process',
+                'Missing acceptance criteria — BV didn''t explain how to test',
+                'The BV title described what to test but not how to test it or what constitutes a pass. PL had no basis to evaluate.',
+                1)""", fetch="none")
+            execute_query("""INSERT INTO failure_types VALUES (
+                'incomplete_handoff', 'process',
+                'Incomplete handoff — missing version, commit, deploy URL',
+                'The CC handoff was missing required fields. CAI could not complete the zccin review without the deployment details.',
+                1)""", fetch="none")
+
+            # Seed failure_types — Other
+            execute_query("""INSERT INTO failure_types VALUES (
+                'other', 'other',
+                'Other — explain in notes',
+                'The failure doesn''t fit any category above. Notes are required to explain what went wrong.',
+                1)""", fetch="none")
+
+            logger.info("  Migration 62: failure_categories + failure_types created and seeded.")
+        else:
+            logger.info("  Migration 62: failure_categories table already exists.")
+    except Exception as e:
+        logger.warning(f"  Migration 62 warning: {e}")
+
     logger.info("Migrations complete.")

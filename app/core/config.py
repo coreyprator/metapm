@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.82.0"  # MP26: Failure type optgroups (BUG-054), remove Quality failure filter (BUG-055), UAT cheat sheet popover (REQ-060)
+    VERSION: str = "2.83.0"  # MP27: Data-driven failure schema (BUG-056, BUG-057, REQ-060, REQ-062)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

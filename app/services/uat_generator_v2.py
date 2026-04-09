@@ -151,33 +151,18 @@ def render_structured_uat_html(
                     <button class="btn btn-fail" onclick="setResult(this,'fail')">Fail</button>
                     <button class="btn btn-skip" onclick="setResult(this,'skip')">Skip</button>
                 </div>
-                <select class="failure-type-select" style="display:none;margin-top:8px;padding:6px 8px;background:#1e1e32;color:#e2e8f0;border:1px solid #f8717180;border-radius:4px;font-size:0.85rem">
-                    <option value="">Select failure type...</option>
-                    <optgroup label="Content failures">
-                      <option value="wrong_spec">Wrong spec</option>
-                      <option value="regression">Regression</option>
-                      <option value="environment">Environment</option>
-                      <option value="unclear_bv">Unclear BV</option>
-                    </optgroup>
-                    <optgroup label="Bug types">
-                      <option value="ui_rendering_bug">UI rendering — wrong position, missing element, wrong style</option>
-                      <option value="data_mapping_bug">Data mapping — wrong field shown, incorrect join</option>
-                      <option value="filter_query_bug">Filter/query — filter doesn't work, empty dropdown</option>
-                      <option value="gate_validation_bug">Gate/validation — blocks valid input or allows invalid</option>
-                      <option value="navigation_routing_bug">Navigation/routing — wrong page, wrong link destination</option>
-                      <option value="api_contract_bug">API contract — wrong response shape, missing fields</option>
-                      <option value="state_management_bug">State management — data doesn't persist, stale data</option>
-                      <option value="performance_bug">Performance — timeout, slow load, unresponsive UI</option>
-                    </optgroup>
-                    <optgroup label="Process failures">
-                      <option value="machine_test_sent_to_pl">Machine test sent to PL</option>
-                      <option value="no_5q_applied">No 5Q applied</option>
-                      <option value="incomplete_spec">Incomplete spec</option>
-                      <option value="missing_acceptance_criteria">Missing acceptance criteria</option>
-                      <option value="incomplete_handoff">Incomplete handoff</option>
-                    </optgroup>
-                    <option value="other">Other</option>
-                </select>
+                <div class="classification-row" style="display:none; margin-top:8px;">
+                    <label style="font-size:12px; color:var(--text-muted);">Classification</label>
+                    <select class="classification-select" style="width:100%; margin-top:4px; padding:6px 8px; background:#1e1e32; color:#e2e8f0; border:1px solid #f8717180; border-radius:4px; font-size:0.85rem">
+                        <option value="">— Select classification —</option>
+                    </select>
+                </div>
+                <div class="failure-type-row" style="display:none; margin-top:8px;">
+                    <label style="font-size:12px; color:var(--text-muted);">Specific Failure Type</label>
+                    <select class="failure-type-select" style="width:100%; margin-top:4px; padding:6px 8px; background:#1e1e32; color:#e2e8f0; border:1px solid #f8717180; border-radius:4px; font-size:0.85rem">
+                        <option value="">— Select specific failure —</option>
+                    </select>
+                </div>
                 <div class="notes-container">
                     <textarea class="notes-input" placeholder="Notes..."></textarea>
                 </div>
@@ -470,9 +455,8 @@ def render_structured_uat_html(
             else if (result === 'fail') item.classList.add('failed');
             else item.classList.add('skipped');
             results[id] = result;
-            // MP24 REQ-056: Show/hide failure_type dropdown on fail
-            const ftSelect = item.querySelector('.failure-type-select');
-            if (ftSelect) ftSelect.style.display = result === 'fail' ? 'block' : 'none';
+            // MP27: Show/hide cascading classification + failure_type dropdowns on fail
+            updateFailureUI(item, result);
             updateCounts();
         }}
 
@@ -515,12 +499,15 @@ def render_structured_uat_html(
                 const id = item.dataset.test;
                 const notes = item.querySelector('.notes-input')?.value || '';
                 const ftSelect = item.querySelector('.failure-type-select');
-                const failure_type = ftSelect ? ftSelect.value : '';
+                const classSelect = item.querySelector('.classification-select');
+                const failure_type = (ftSelect && results[id] === 'fail') ? ftSelect.value : '';
+                const classification = (classSelect && results[id] === 'fail') ? classSelect.value : '';
                 cases.push({{
                     id: id,
                     status: results[id] || 'pending',
                     result: results[id] ? (results[id] === 'pass' ? 'Confirmed' : results[id] === 'fail' ? 'Failed' : 'Skipped') : null,
                     notes: notes,
+                    classification: classification || null,
                     failure_type: failure_type || null
                 }});
             }});
@@ -777,70 +764,107 @@ def render_structured_uat_html(
                 console.log('Could not load saved results:', e);
             }}
         }})();
+
+        // MP27: Data-driven failure schema — cascading dropdowns + cheat sheet
+        let FAILURE_SCHEMA = {{}};
+
+        async function loadFailureSchema() {{
+            try {{
+                const resp = await fetch('/api/config/failure-schema');
+                FAILURE_SCHEMA = await resp.json();
+
+                // Populate classification dropdowns
+                document.querySelectorAll('.classification-select').forEach(sel => {{
+                    Object.entries(FAILURE_SCHEMA).forEach(([code, cat]) => {{
+                        sel.add(new Option(cat.label, code));
+                    }});
+                }});
+
+                // Build cheat sheet content from DB help_text
+                const container = document.getElementById('cheat-sheet-types');
+                if (container) {{
+                    let html = '<h4>Failure Types</h4>';
+                    Object.entries(FAILURE_SCHEMA).forEach(([code, cat]) => {{
+                        html += '<div class="group">' +
+                          '<div class="group-title">' + cat.label + '</div>' +
+                          '<ul>';
+                        cat.types.forEach(t => {{
+                            const shortName = t.text.split(' \u2014 ')[0] || t.text;
+                            html += '<li><strong>' + shortName + ':</strong> ' + t.help + '</li>';
+                        }});
+                        html += '</ul></div>';
+                    }});
+                    container.innerHTML = html;
+                }}
+            }} catch(e) {{
+                console.error('Failed to load failure schema:', e);
+            }}
+        }}
+
+        function updateFailureUI(item, status) {{
+            const classRow    = item.querySelector('.classification-row');
+            const ftRow       = item.querySelector('.failure-type-row');
+            const classSelect = item.querySelector('.classification-select');
+
+            if (status === 'fail') {{
+                classRow.style.display = 'block';
+                ftRow.style.display = classSelect.value ? 'block' : 'none';
+            }} else {{
+                classRow.style.display = 'none';
+                ftRow.style.display = 'none';
+            }}
+        }}
+
+        function updateFailureTypes(item) {{
+            const classSelect = item.querySelector('.classification-select');
+            const ftSelect    = item.querySelector('.failure-type-select');
+            const ftRow       = item.querySelector('.failure-type-row');
+            const category    = classSelect.value;
+
+            ftSelect.innerHTML = '<option value="">\u2014 Select specific failure \u2014</option>';
+            if (category && FAILURE_SCHEMA[category]?.types) {{
+                FAILURE_SCHEMA[category].types.forEach(t => {{
+                    ftSelect.add(new Option(t.text, t.value));
+                }});
+                ftRow.style.display = 'block';
+            }} else {{
+                ftRow.style.display = 'none';
+            }}
+        }}
+
+        // Wire classification select change events
+        document.querySelectorAll('.test-item').forEach(item => {{
+            const classSelect = item.querySelector('.classification-select');
+            if (classSelect) {{
+                classSelect.addEventListener('change', () => updateFailureTypes(item));
+            }}
+        }});
+
+        // Load schema on page init
+        loadFailureSchema();
     </script>
 
-    <!-- Floating cheat sheet trigger -->
+    <!-- Floating cheat sheet trigger — MUST be direct child of body, outside all containers -->
     <button popovertarget="uat-cheat-sheet" class="uat-help-fab" title="UAT Rules &amp; Definitions">?</button>
 
     <!-- Cheat sheet popover — native Popover API, renders in browser top layer -->
     <div id="uat-cheat-sheet" popover>
       <div class="popover-header">
-        <h3>UAT Reference Guide <small>v2.82.0</small></h3>
+        <h3>UAT Reference Guide <small>v2.83.0</small></h3>
       </div>
 
       <div class="rules-summary">
         <strong>&#9888;&#65039; Submission Rules:</strong>
         <ul>
-          <li><strong>Fail / Conditional Pass:</strong> Requires Failure Type</li>
+          <li><strong>Fail / Conditional Pass:</strong> Requires Classification + Failure Type</li>
           <li><strong>Skip / Pending:</strong> Requires Notes explaining why</li>
           <li><strong>Pass:</strong> No additional fields required</li>
         </ul>
       </div>
 
-      <div class="type-definitions">
-        <h4>Failure Types</h4>
-
-        <div class="group">
-          <div class="group-title">Content Failures</div>
-          <ul>
-            <li><strong>Wrong spec:</strong> CC built something different from intended</li>
-            <li><strong>Regression:</strong> Previously working is now broken</li>
-            <li><strong>Environment:</strong> Deploy or infrastructure issue</li>
-            <li><strong>Unclear BV:</strong> Test too vague to evaluate fairly</li>
-          </ul>
-        </div>
-
-        <div class="group">
-          <div class="group-title">Bug Types</div>
-          <ul>
-            <li><strong>UI rendering:</strong> Wrong position, missing element, wrong style</li>
-            <li><strong>Data mapping:</strong> Wrong field shown, incorrect join</li>
-            <li><strong>Filter/query:</strong> Filter doesn't work, empty dropdown</li>
-            <li><strong>Gate/validation:</strong> Blocks valid input or allows invalid</li>
-            <li><strong>Navigation/routing:</strong> Wrong page, wrong link destination</li>
-            <li><strong>API contract:</strong> Wrong response shape, missing fields</li>
-            <li><strong>State management:</strong> Data doesn't persist, stale data</li>
-            <li><strong>Performance:</strong> Timeout, slow load, unresponsive UI</li>
-          </ul>
-        </div>
-
-        <div class="group">
-          <div class="group-title">Process Failures</div>
-          <ul>
-            <li><strong>Machine test sent to PL:</strong> cc_machine BV in PL form (BA32)</li>
-            <li><strong>No 5Q applied:</strong> Sprint posted without 5Q (BA31)</li>
-            <li><strong>Incomplete spec:</strong> Spec too vague to build from</li>
-            <li><strong>Missing acceptance criteria:</strong> BV didn't explain how to test</li>
-            <li><strong>Incomplete handoff:</strong> Missing version, commit, deploy URL</li>
-          </ul>
-        </div>
-
-        <div class="group">
-          <div class="group-title">Other</div>
-          <ul>
-            <li><strong>Other:</strong> Any failure not covered above — explain in notes</li>
-          </ul>
-        </div>
+      <div id="cheat-sheet-types" class="type-definitions">
+        <!-- Populated dynamically from /api/config/failure-schema -->
+        <p style="color:var(--text-muted); font-size:12px;">Loading...</p>
       </div>
     </div>
 </body>

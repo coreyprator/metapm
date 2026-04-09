@@ -10,6 +10,33 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/api/config/failure-schema")
+async def get_failure_schema():
+    """Return full failure type schema from DB, including help_text for cheat sheet."""
+    rows = execute_query(
+        """SELECT c.category_code, c.display_label AS cat_label, c.sort_order,
+                  t.type_code, t.display_label AS type_label, t.help_text
+           FROM failure_categories c
+           JOIN failure_types t ON t.category_code = c.category_code
+           WHERE t.is_active = 1
+           ORDER BY c.sort_order, t.type_code""",
+        fetch="all"
+    )
+    if not rows:
+        raise HTTPException(status_code=500, detail="No failure types found in database")
+    schema = {}
+    for row in rows:
+        cat = row["category_code"]
+        if cat not in schema:
+            schema[cat] = {"label": row["cat_label"], "types": []}
+        schema[cat]["types"].append({
+            "value": row["type_code"],
+            "text":  row["type_label"],
+            "help":  row["help_text"]
+        })
+    return schema
+
+
 @router.get("/api/quality/sprint/{pth}")
 async def get_sprint_quality(pth: str):
     """Quality data for one sprint, including per-BV results."""
