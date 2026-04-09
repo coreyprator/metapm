@@ -1005,24 +1005,14 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
             <label class="radio-label{' checked-pending' if cur_status=='pending' else ''}">
               <input type="radio" name="{tid}" value="pending"{checked('pending')}> ? Pending</label>
           </div>
-          <div class="failure-type-row" data-id="{tid}" style="display:{ft_display};margin-bottom:8px">
-            <div class="notes-label" style="margin-top:8px">Failure Type (required for failed tests)</div>
-            <select class="failure-type-select" data-id="{tid}" style="width:100%;padding:7px 10px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem">
-              <option value="">— Select failure type —</option>
-              <optgroup label="Content failures">
-                <option value="wrong_spec"{ft_selected("wrong_spec")}>Wrong spec — CC built something different</option>
-                <option value="regression"{ft_selected("regression")}>Regression — previously working, now broken</option>
-                <option value="environment"{ft_selected("environment")}>Environment — deploy/infra problem</option>
-                <option value="unclear_bv"{ft_selected("unclear_bv")}>Unclear BV — test too vague to evaluate</option>
-              </optgroup>
-              <optgroup label="Process failures">
-                <option value="machine_test_sent_to_pl"{ft_selected("machine_test_sent_to_pl")}>Machine test sent to PL (BA32 violation)</option>
-                <option value="no_5q_applied"{ft_selected("no_5q_applied")}>No 5Q applied (BA31 violation)</option>
-                <option value="incomplete_spec"{ft_selected("incomplete_spec")}>Incomplete spec</option>
-                <option value="missing_acceptance_criteria"{ft_selected("missing_acceptance_criteria")}>Missing acceptance criteria</option>
-                <option value="incomplete_handoff"{ft_selected("incomplete_handoff")}>Incomplete handoff</option>
-              </optgroup>
-              <option value="other"{ft_selected("other")}>Other (explain in notes)</option>
+          <div class="classification-row" data-id="{tid}" style="display:{ft_display};margin-bottom:8px">
+            <div class="notes-label" style="margin-top:8px">Classification (required for failed tests)</div>
+            <select class="classification-category-select" data-id="{tid}" style="width:100%;padding:7px 10px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem;margin-bottom:6px">
+              <option value="">— Select classification —</option>
+            </select>
+            <div class="notes-label">Specific Failure Type</div>
+            <select class="failure-type-select" data-id="{tid}" data-saved-value="{cur_ft}" style="width:100%;padding:7px 10px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem">
+              <option value="">— Select specific failure —</option>
             </select>
           </div>
           <div class="notes-label" style="margin-top:8px">Classification (required)</div>
@@ -1304,22 +1294,101 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       document.getElementById('cnt-pend').textContent = pend;
     }}
 
-    // MP23: Show/hide failure_type dropdown based on status
+    // MP27: Data-driven failure schema — cascading dropdowns + cheat sheet
+    let FAILURE_SCHEMA = {{}};
+
+    async function loadFailureSchema() {{
+      try {{
+        const resp = await fetch('/api/config/failure-schema');
+        FAILURE_SCHEMA = await resp.json();
+
+        // Populate classification category dropdowns
+        document.querySelectorAll('.classification-category-select').forEach(sel => {{
+          Object.entries(FAILURE_SCHEMA).forEach(([code, cat]) => {{
+            sel.add(new Option(cat.label, code));
+          }});
+          // Restore saved value if any
+          const card = sel.closest('.test-card');
+          const ftSelect = card?.querySelector('.failure-type-select');
+          const savedFt = ftSelect?.dataset?.savedValue;
+          if (savedFt) {{
+            // Find which category contains this type
+            for (const [code, cat] of Object.entries(FAILURE_SCHEMA)) {{
+              if (cat.types.some(t => t.value === savedFt)) {{
+                sel.value = code;
+                // Populate the failure type dropdown
+                ftSelect.innerHTML = '<option value="">\\u2014 Select specific failure \\u2014</option>';
+                cat.types.forEach(t => {{
+                  const opt = new Option(t.text, t.value);
+                  if (t.value === savedFt) opt.selected = true;
+                  ftSelect.add(opt);
+                }});
+                break;
+              }}
+            }}
+          }}
+        }});
+
+        // Build cheat sheet content
+        const container = document.getElementById('cheat-sheet-types');
+        if (container) {{
+          let html = '<h4>Failure Types</h4>';
+          Object.entries(FAILURE_SCHEMA).forEach(([code, cat]) => {{
+            html += '<div style="margin-bottom:10px">' +
+              '<div style="font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:600;margin:8px 0 4px">' + cat.label + '</div>' +
+              '<ul style="margin:0;padding-left:16px;font-size:12px;line-height:1.6">';
+            cat.types.forEach(t => {{
+              const shortName = t.text.split(' \\u2014 ')[0] || t.text;
+              html += '<li><strong>' + shortName + ':</strong> ' + t.help + '</li>';
+            }});
+            html += '</ul></div>';
+          }});
+          container.innerHTML = html;
+        }}
+      }} catch(e) {{
+        console.error('Failed to load failure schema:', e);
+      }}
+    }}
+
+    function updateClassificationTypes(card) {{
+      const catSelect = card.querySelector('.classification-category-select');
+      const ftSelect = card.querySelector('.failure-type-select');
+      const category = catSelect.value;
+      ftSelect.innerHTML = '<option value="">\\u2014 Select specific failure \\u2014</option>';
+      if (category && FAILURE_SCHEMA[category]?.types) {{
+        FAILURE_SCHEMA[category].types.forEach(t => {{
+          ftSelect.add(new Option(t.text, t.value));
+        }});
+      }}
+    }}
+
+    // MP23 + MP27: Show/hide failure classification row based on status
     function updateFailureTypeVisibility() {{
       document.querySelectorAll('.test-card:not([data-type="cc_machine"])').forEach(card => {{
         const id = card.dataset.id;
         const checked = card.querySelector(`input[name="${{id}}"]:checked`);
         const val = checked ? checked.value : 'pending';
-        const ftRow = card.querySelector('.failure-type-row');
-        if (ftRow) ftRow.style.display = (val === 'fail') ? 'block' : 'none';
+        const classRow = card.querySelector('.classification-row');
+        if (classRow) classRow.style.display = (val === 'fail') ? 'block' : 'none';
       }});
     }}
 
+    // Wire radio buttons
     document.querySelectorAll('.radio-group input[type=radio]').forEach(r => {{
       r.addEventListener('change', () => {{ updateCounts(); updateFailureTypeVisibility(); }});
     }});
+
+    // Wire classification category selects
+    document.querySelectorAll('.classification-category-select').forEach(sel => {{
+      sel.addEventListener('change', () => {{
+        const card = sel.closest('.test-card');
+        if (card) updateClassificationTypes(card);
+      }});
+    }});
+
     updateCounts();
     updateFailureTypeVisibility();
+    loadFailureSchema();
 
     // MP16C BUG-034: Replace collapsed textareas with auto-sized divs on submitted UAT pages
     if (document.querySelector('.test-card.submitted')) {{
@@ -1600,5 +1669,33 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       }}
     }}
   </script>
+
+  <style>
+    .uat-help-fab {{
+      position: fixed; bottom: 24px; right: 24px; width: 48px; height: 48px;
+      border-radius: 50%; background: var(--fail, #e74c3c); color: #fff; border: none;
+      font-size: 20px; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      cursor: pointer; z-index: 10000; display: flex; align-items: center; justify-content: center;
+    }}
+    #uat-cheat-sheet[popover] {{
+      width: min(420px, 90vw); max-height: 80vh; overflow-y: auto; padding: 20px;
+      border-radius: 12px; border: 1px solid var(--border); background: var(--card);
+      color: var(--text); box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin: auto;
+    }}
+  </style>
+
+  <button popovertarget="uat-cheat-sheet" class="uat-help-fab" title="UAT Rules &amp; Definitions">?</button>
+  <div id="uat-cheat-sheet" popover>
+    <div style="margin:0 0 12px;font-size:16px;font-weight:600">UAT Reference Guide <small style="font-size:11px;color:var(--muted);margin-left:6px">v2.83.0</small></div>
+    <div style="background:rgba(248,81,73,0.1);border-left:4px solid var(--fail);padding:10px 12px;margin:0 0 16px;font-size:13px">
+      <strong>Submission Rules:</strong>
+      <ul style="margin:6px 0 0;padding-left:16px">
+        <li><strong>Fail / Conditional Pass:</strong> Requires Classification + Failure Type</li>
+        <li><strong>Skip / Pending:</strong> Requires Notes explaining why</li>
+        <li><strong>Pass:</strong> No additional fields required</li>
+      </ul>
+    </div>
+    <div id="cheat-sheet-types"><p style="color:var(--muted);font-size:12px">Loading...</p></div>
+  </div>
 </body>
 </html>"""
