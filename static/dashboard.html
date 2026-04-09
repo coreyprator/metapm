@@ -672,27 +672,6 @@
           <option value="yes">5Q Applied</option>
           <option value="no">No 5Q</option>
         </select>
-        <select id="quality-filter-failure" style="padding:6px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px">
-          <option value="">All Failure Types</option>
-          <option value="wrong_spec">Wrong spec</option>
-          <option value="regression">Regression</option>
-          <option value="environment">Environment</option>
-          <option value="unclear_bv">Unclear BV</option>
-          <option value="machine_test_sent_to_pl">Machine test sent to PL</option>
-          <option value="no_5q_applied">No 5Q applied</option>
-          <option value="incomplete_spec">Incomplete spec</option>
-          <option value="missing_acceptance_criteria">Missing acceptance criteria</option>
-          <option value="incomplete_handoff">Incomplete handoff</option>
-          <option value="ui_rendering_bug">UI rendering bug</option>
-          <option value="data_mapping_bug">Data mapping bug</option>
-          <option value="filter_query_bug">Filter/query bug</option>
-          <option value="gate_validation_bug">Gate/validation bug</option>
-          <option value="navigation_routing_bug">Navigation/routing bug</option>
-          <option value="api_contract_bug">API contract bug</option>
-          <option value="state_management_bug">State management bug</option>
-          <option value="performance_bug">Performance bug</option>
-          <option value="other">Other</option>
-        </select>
         <button type="button" onclick="resetQualityFilters()" style="padding:6px 12px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px;cursor:pointer">Reset Filters</button>
       </div>
       <div id="qualityTable" style="padding:8px;overflow-x:auto"></div>
@@ -2867,7 +2846,6 @@
       const from = qs('quality-filter-from').value;
       const to = qs('quality-filter-to').value;
       const fq = qs('quality-filter-5q').value;
-      const ft = qs('quality-filter-failure').value;
       return qualityData.filter(d => {
         if (proj && d.project_code !== proj) return false;
         if (status && d.overall_status !== status) return false;
@@ -2875,7 +2853,6 @@
         if (to && d.submitted_at && d.submitted_at > to + 'T23:59:59') return false;
         if (fq === 'yes' && !d.five_q_applied) return false;
         if (fq === 'no' && d.five_q_applied) return false;
-        if (ft && d.failure_type !== ft) return false;
         return true;
       });
     }
@@ -2937,7 +2914,7 @@
     }
 
     // Wire up quality filter change events
-    ['quality-filter-project','quality-filter-status','quality-filter-from','quality-filter-to','quality-filter-5q','quality-filter-failure'].forEach(id => {
+    ['quality-filter-project','quality-filter-status','quality-filter-from','quality-filter-to','quality-filter-5q'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('change', renderQualityTable);
     });
@@ -2949,7 +2926,6 @@
       qs('quality-filter-from').value = '';
       qs('quality-filter-to').value = '';
       qs('quality-filter-5q').value = '';
-      qs('quality-filter-failure').value = '';
       renderQualityTable();
     }
 

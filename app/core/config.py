@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.81.0"  # MP25: Add menu overflow fix (BUG-052), failure types coverage (BUG-053)
+    VERSION: str = "2.82.0"  # MP26: Failure type optgroups (BUG-054), remove Quality failure filter (BUG-055), UAT cheat sheet popover (REQ-060)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

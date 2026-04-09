@@ -153,23 +153,29 @@ def render_structured_uat_html(
                 </div>
                 <select class="failure-type-select" style="display:none;margin-top:8px;padding:6px 8px;background:#1e1e32;color:#e2e8f0;border:1px solid #f8717180;border-radius:4px;font-size:0.85rem">
                     <option value="">Select failure type...</option>
-                    <option value="wrong_spec">Wrong spec</option>
-                    <option value="regression">Regression</option>
-                    <option value="environment">Environment</option>
-                    <option value="unclear_bv">Unclear BV</option>
-                    <option value="machine_test_sent_to_pl">Machine test sent to PL</option>
-                    <option value="no_5q_applied">No 5Q applied</option>
-                    <option value="incomplete_spec">Incomplete spec</option>
-                    <option value="missing_acceptance_criteria">Missing acceptance criteria</option>
-                    <option value="incomplete_handoff">Incomplete handoff</option>
-                    <option value="ui_rendering_bug">UI rendering bug</option>
-                    <option value="data_mapping_bug">Data mapping bug</option>
-                    <option value="filter_query_bug">Filter/query bug</option>
-                    <option value="gate_validation_bug">Gate/validation bug</option>
-                    <option value="navigation_routing_bug">Navigation/routing bug</option>
-                    <option value="api_contract_bug">API contract bug</option>
-                    <option value="state_management_bug">State management bug</option>
-                    <option value="performance_bug">Performance bug</option>
+                    <optgroup label="Content failures">
+                      <option value="wrong_spec">Wrong spec</option>
+                      <option value="regression">Regression</option>
+                      <option value="environment">Environment</option>
+                      <option value="unclear_bv">Unclear BV</option>
+                    </optgroup>
+                    <optgroup label="Bug types">
+                      <option value="ui_rendering_bug">UI rendering — wrong position, missing element, wrong style</option>
+                      <option value="data_mapping_bug">Data mapping — wrong field shown, incorrect join</option>
+                      <option value="filter_query_bug">Filter/query — filter doesn't work, empty dropdown</option>
+                      <option value="gate_validation_bug">Gate/validation — blocks valid input or allows invalid</option>
+                      <option value="navigation_routing_bug">Navigation/routing — wrong page, wrong link destination</option>
+                      <option value="api_contract_bug">API contract — wrong response shape, missing fields</option>
+                      <option value="state_management_bug">State management — data doesn't persist, stale data</option>
+                      <option value="performance_bug">Performance — timeout, slow load, unresponsive UI</option>
+                    </optgroup>
+                    <optgroup label="Process failures">
+                      <option value="machine_test_sent_to_pl">Machine test sent to PL</option>
+                      <option value="no_5q_applied">No 5Q applied</option>
+                      <option value="incomplete_spec">Incomplete spec</option>
+                      <option value="missing_acceptance_criteria">Missing acceptance criteria</option>
+                      <option value="incomplete_handoff">Incomplete handoff</option>
+                    </optgroup>
                     <option value="other">Other</option>
                 </select>
                 <div class="notes-container">
@@ -312,6 +318,81 @@ def render_structured_uat_html(
             width: 100%; min-height: 80px; padding: 12px;
             background: #1e1e32; border: 1px solid var(--border-color);
             border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; resize: vertical;
+        }}
+        /* Floating cheat sheet button */
+        .uat-help-fab {{
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--accent, #e74c3c);
+            color: #fff;
+            border: none;
+            font-size: 20px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            cursor: pointer;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }}
+        /* Native Popover API styling */
+        #uat-cheat-sheet[popover] {{
+            width: min(400px, 90vw);
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color, #26344f);
+            background: var(--bg-secondary, #111a2d);
+            color: var(--text-primary, #e6edf8);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            margin: auto;
+        }}
+        .popover-header h3 {{
+            margin: 0 0 12px;
+            font-size: 16px;
+            color: var(--text-primary, #e6edf8);
+        }}
+        .popover-header h3 small {{
+            font-size: 11px;
+            color: var(--text-muted, #9aa8c7);
+            margin-left: 6px;
+        }}
+        .rules-summary {{
+            background: rgba(231, 76, 60, 0.1);
+            border-left: 4px solid var(--accent, #e74c3c);
+            padding: 10px 12px;
+            margin: 0 0 16px;
+            font-size: 13px;
+        }}
+        .rules-summary ul {{
+            margin: 6px 0 0;
+            padding-left: 16px;
+        }}
+        .type-definitions h4 {{
+            color: #4a90d9;
+            border-bottom: 1px solid var(--border-color, #26344f);
+            padding-bottom: 4px;
+            margin: 0 0 8px;
+            font-size: 13px;
+        }}
+        .group-title {{
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-muted, #9aa8c7);
+            margin: 12px 0 4px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }}
+        .type-definitions ul {{
+            margin: 0;
+            padding-left: 16px;
+            font-size: 12px;
+            line-height: 1.6;
         }}
     </style>
 </head>
@@ -697,6 +778,71 @@ def render_structured_uat_html(
             }}
         }})();
     </script>
+
+    <!-- Floating cheat sheet trigger -->
+    <button popovertarget="uat-cheat-sheet" class="uat-help-fab" title="UAT Rules &amp; Definitions">?</button>
+
+    <!-- Cheat sheet popover — native Popover API, renders in browser top layer -->
+    <div id="uat-cheat-sheet" popover>
+      <div class="popover-header">
+        <h3>UAT Reference Guide <small>v2.82.0</small></h3>
+      </div>
+
+      <div class="rules-summary">
+        <strong>&#9888;&#65039; Submission Rules:</strong>
+        <ul>
+          <li><strong>Fail / Conditional Pass:</strong> Requires Failure Type</li>
+          <li><strong>Skip / Pending:</strong> Requires Notes explaining why</li>
+          <li><strong>Pass:</strong> No additional fields required</li>
+        </ul>
+      </div>
+
+      <div class="type-definitions">
+        <h4>Failure Types</h4>
+
+        <div class="group">
+          <div class="group-title">Content Failures</div>
+          <ul>
+            <li><strong>Wrong spec:</strong> CC built something different from intended</li>
+            <li><strong>Regression:</strong> Previously working is now broken</li>
+            <li><strong>Environment:</strong> Deploy or infrastructure issue</li>
+            <li><strong>Unclear BV:</strong> Test too vague to evaluate fairly</li>
+          </ul>
+        </div>
+
+        <div class="group">
+          <div class="group-title">Bug Types</div>
+          <ul>
+            <li><strong>UI rendering:</strong> Wrong position, missing element, wrong style</li>
+            <li><strong>Data mapping:</strong> Wrong field shown, incorrect join</li>
+            <li><strong>Filter/query:</strong> Filter doesn't work, empty dropdown</li>
+            <li><strong>Gate/validation:</strong> Blocks valid input or allows invalid</li>
+            <li><strong>Navigation/routing:</strong> Wrong page, wrong link destination</li>
+            <li><strong>API contract:</strong> Wrong response shape, missing fields</li>
+            <li><strong>State management:</strong> Data doesn't persist, stale data</li>
+            <li><strong>Performance:</strong> Timeout, slow load, unresponsive UI</li>
+          </ul>
+        </div>
+
+        <div class="group">
+          <div class="group-title">Process Failures</div>
+          <ul>
+            <li><strong>Machine test sent to PL:</strong> cc_machine BV in PL form (BA32)</li>
+            <li><strong>No 5Q applied:</strong> Sprint posted without 5Q (BA31)</li>
+            <li><strong>Incomplete spec:</strong> Spec too vague to build from</li>
+            <li><strong>Missing acceptance criteria:</strong> BV didn't explain how to test</li>
+            <li><strong>Incomplete handoff:</strong> Missing version, commit, deploy URL</li>
+          </ul>
+        </div>
+
+        <div class="group">
+          <div class="group-title">Other</div>
+          <ul>
+            <li><strong>Other:</strong> Any failure not covered above — explain in notes</li>
+          </ul>
+        </div>
+      </div>
+    </div>
 </body>
 </html>'''
 
