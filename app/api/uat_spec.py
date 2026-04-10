@@ -330,7 +330,10 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
         tc = updates_by_id.get(bv_id)
         if tc:
             if not tc.classification:
-                missing_classification.append(bv_id)
+                if tc.status == 'pass':
+                    tc.classification = 'No-action'   # BUG-061: Auto-assign, never block pass
+                else:
+                    missing_classification.append(bv_id)
             if not tc.status or tc.status == "pending":
                 pending_bv_ids.append(bv_id)
         else:
@@ -986,6 +989,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
         def ft_selected(val):
             return " selected" if cur_ft == val else ""
         ft_display = "block" if cur_status == "fail" else "none"
+        cls_row_display = 'none' if cur_status == 'pass' else 'block'
         return f"""
         <div class="test-card result-{cur_status} {submitted_cls}" data-id="{tid}">
           <div class="test-header">
@@ -1015,14 +1019,16 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
               <option value="">— Select specific failure —</option>
             </select>
           </div>
-          <div class="notes-label" style="margin-top:8px">Classification (required)</div>
-          <select class="classification-select" data-id="{tid}" style="width:100%;padding:7px 10px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem;margin-bottom:8px">
-            <option value="">— Select —</option>
-            <option value="New requirement"{cls_selected("New requirement")}>New requirement</option>
-            <option value="Bug"{cls_selected("Bug")}>Bug</option>
-            <option value="Finding"{cls_selected("Finding")}>Finding</option>
-            <option value="No-action"{cls_selected("No-action")}>No-action</option>
-          </select>
+          <div class="classification-row-outer" style="display:{cls_row_display};margin-top:8px">
+            <div class="notes-label">Classification (required)</div>
+            <select class="classification-select" data-id="{tid}" style="width:100%;padding:7px 10px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem;margin-bottom:8px">
+              <option value="">— Select —</option>
+              <option value="New requirement"{cls_selected("New requirement")}>New requirement</option>
+              <option value="Bug"{cls_selected("Bug")}>Bug</option>
+              <option value="Finding"{cls_selected("Finding")}>Finding</option>
+              <option value="No-action"{'selected' if cur_status == 'pass' else cls_selected("No-action")}>No-action</option>
+            </select>
+          </div>
           <div class="notes-label">Notes</div>
           <textarea class="notes-input" placeholder="Observations...">{cur_notes}</textarea>
           {'' if is_submitted else f'<div class="paste-zone" id="paste-{tid}" data-id="{tid}" tabindex="0" contenteditable="false">📷 Paste screenshot here (Ctrl+V)</div>'}
@@ -1373,9 +1379,24 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       }});
     }}
 
-    // Wire radio buttons
+    // Wire radio buttons — BUG-061: show/hide classification row + auto-set No-action on pass
     document.querySelectorAll('.radio-group input[type=radio]').forEach(r => {{
-      r.addEventListener('change', () => {{ updateCounts(); updateFailureTypeVisibility(); }});
+      r.addEventListener('change', function() {{
+        updateCounts();
+        updateFailureTypeVisibility();
+        const card = this.closest('.test-card');
+        if (card) {{
+          const classOuter = card.querySelector('.classification-row-outer');
+          const classSelect = card.querySelector('.classification-select');
+          if (this.value === 'pass') {{
+            if (classOuter) classOuter.style.display = 'none';
+            if (classSelect) classSelect.value = 'No-action';
+          }} else if (this.value === 'fail' || this.value === 'skip' || this.value === 'pending') {{
+            if (classOuter) classOuter.style.display = 'block';
+            if (classSelect && classSelect.value === 'No-action') classSelect.value = '';
+          }}
+        }}
+      }});
     }});
 
     // Wire classification category selects
@@ -1603,7 +1624,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
         const attachments = attachmentsMap[id] || [];
         const classSelect = card.querySelector('.classification-select');
         const classification = classSelect ? classSelect.value : '';
-        if (!classification) missingClassification.push(id);
+        if (!classification && status !== 'pass') missingClassification.push(id);
         // MP23: capture failure_type for failed BVs
         const ftSelect = card.querySelector('.failure-type-select');
         const failure_type = (ftSelect && status === 'fail') ? ftSelect.value : null;

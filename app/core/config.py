@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.84.0"  # MP28: Remove truncation, add .claude/settings.json, fix CI ingest (BUG-059, TSK-017, BUG-060)
+    VERSION: str = "2.85.0"  # MP29: Classification auto-assign for pass BVs (BUG-061), restore CSV export (BUG-062), Quality tab Prompt link (REQ-063)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

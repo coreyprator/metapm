@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 
 from app.core.database import execute_query
 from app.schemas.roadmap import (
@@ -59,6 +59,101 @@ def _project_done_counts() -> dict:
         }
         for row in rows
     }
+
+
+# ============================================
+# CSV EXPORT — BUG-062: Restore REQ-039 / BUG-029 / BUG-030 / BUG-031
+# ============================================
+
+@router.get("/roadmap/export/csv")
+async def export_requirements_csv(
+    project: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    priority: Optional[str] = Query(None),
+    type: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    include_closed: bool = Query(False),
+):
+    """Export filtered requirements as CSV."""
+    import io
+    import csv as csv_mod
+
+    # Normalize project filter — proj-mp → MP, mp → MP
+    project_code = None
+    if project:
+        project_code = project.upper().replace('PROJ-', '')
+
+    where_clauses = []
+    params = []
+
+    if project_code:
+        where_clauses.append("p.code = ?")
+        params.append(project_code)
+
+    if status:
+        where_clauses.append("r.status = ?")
+        params.append(status)
+    elif not include_closed:
+        where_clauses.append("r.status NOT IN ('done', 'closed')")
+
+    if priority:
+        where_clauses.append("r.priority = ?")
+        params.append(priority)
+
+    if type:
+        where_clauses.append("r.type = ?")
+        params.append(type)
+
+    if search:
+        where_clauses.append("(r.title LIKE ? OR r.description LIKE ? OR r.code LIKE ?)")
+        like = f"%{search}%"
+        params.extend([like, like, like])
+
+    where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+    results = execute_query(f"""
+        SELECT r.code, p.name AS project_name, r.title, r.type, r.priority,
+               r.status, r.pth, r.description, r.sprint_id, r.created_at, r.updated_at
+        FROM roadmap_requirements r
+        JOIN roadmap_projects p ON r.project_id = p.id
+        WHERE {where_sql}
+        ORDER BY
+            CASE r.priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 END,
+            r.created_at DESC
+    """, tuple(params) if params else None, fetch="all") or []
+
+    output = io.StringIO()
+    writer = csv_mod.writer(output, quoting=csv_mod.QUOTE_ALL)
+    writer.writerow(["Code", "Project", "Title", "Type", "Priority",
+                     "Status", "PTH", "Description", "Sprint", "CreatedAt", "UpdatedAt"])
+
+    for row in results:
+        created = row['created_at'].strftime('%Y-%m-%d %H:%M') if row.get('created_at') else ''
+        updated = row['updated_at'].strftime('%Y-%m-%d %H:%M') if row.get('updated_at') else ''
+        writer.writerow([
+            row.get('code', ''),
+            row.get('project_name', ''),
+            row.get('title', ''),
+            row.get('type', ''),
+            row.get('priority', ''),
+            row.get('status', ''),
+            row.get('pth', '') or '',
+            row.get('description', '') or '',
+            row.get('sprint_id', '') or '',
+            created,
+            updated,
+        ])
+
+    now = datetime.utcnow()
+    label = project_code if project_code else 'all'
+    filename = f"metapm-export-{label}-{now.strftime('%Y-%m-%d-%H%M')}.csv"
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 # ============================================

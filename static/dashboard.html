@@ -530,6 +530,7 @@
         <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="showArchivedToggle" style="min-height:auto" /> Show Archived</label>
         <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="showDescToggle" style="min-height:auto" /> Show Descriptions</label>
         <button id="resetFiltersBtn" type="button" class="danger-btn">Reset Filters</button>
+        <button id="exportCsvBtn" onclick="exportCSV()" style="padding:8px 14px;background:var(--panel-soft);border:1px solid var(--line);border-radius:8px;color:var(--text);cursor:pointer;font-size:13px" title="Export current filtered view to CSV">⬇ Export CSV</button>
       </div>
       <div class="control-row">
         <label>Sort/Group</label>
@@ -2869,9 +2870,10 @@
         '<th style="padding:6px">Sprint Title</th><th style="padding:6px">Version</th><th style="padding:6px">Status</th>' +
         '<th style="padding:6px">BV Pass %</th><th style="padding:6px">Attempt #</th><th style="padding:6px">5Q</th>' +
         '<th style="padding:6px">Root Cause</th><th style="padding:6px">Failure Type</th>' +
+        '<th style="padding:6px">UAT</th><th style="padding:6px">Prompt</th>' +
         '</tr></thead><tbody>';
       if (!filtered.length) {
-        html += '<tr><td colspan="11" style="padding:12px;color:var(--muted);text-align:center">No quality data found</td></tr>';
+        html += '<tr><td colspan="13" style="padding:12px;color:var(--muted);text-align:center">No quality data found</td></tr>';
       }
       for (const d of filtered) {
         const date = d.submitted_at ? d.submitted_at.substring(0, 10) : '\u2014';
@@ -2888,6 +2890,8 @@
           <td style="padding:6px">${d.five_q_applied ? 'Yes' : 'No'}</td>
           <td style="padding:6px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.root_cause_method || ''}">${d.root_cause_method || '\u2014'}</td>
           <td style="padding:6px">${d.failure_type || '\u2014'}</td>
+          <td style="padding:6px">${d.spec_id ? `<a href="/uat/${d.spec_id}" target="_blank" style="color:var(--info);font-size:12px;text-decoration:none">🔍 UAT</a>` : '<span style="color:var(--muted)">\u2014</span>'}</td>
+          <td style="padding:6px">${d.pth ? `<a href="/prompts/${d.pth}" target="_blank" style="color:var(--info);font-size:12px;text-decoration:none">📝 Prompt</a>` : '<span style="color:var(--muted)">\u2014</span>'}</td>
         </tr>`;
       }
       html += '</tbody></table>';
@@ -3180,6 +3184,22 @@
         updateResetButtonState();
         render();
       };
+
+      // BUG-062: Export CSV function
+      function exportCSV() {
+        const params = new URLSearchParams();
+        const project = qs('projectFilter')?.value || '';
+        const status  = qs('statusFilter')?.value || '';
+        const priority = qs('priorityFilter')?.value || '';
+        const type    = qs('typeFilter')?.value || '';
+        const search  = qs('searchInput')?.value || '';
+        if (project) params.set('project', project);
+        if (status && status !== 'all') params.set('status', status);
+        if (priority) params.set('priority', priority);
+        if (type) params.set('type', type);
+        if (search) params.set('search', search);
+        window.location.href = '/api/roadmap/export/csv?' + params.toString();
+      }
 
       qs('addBtn').onclick = () => qs('addMenu').classList.toggle('open');
       qs('addMenu').onclick = (e) => {
