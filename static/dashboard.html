@@ -1133,7 +1133,7 @@
           <button class="icon-btn" data-open-req="${req.id}" title="Edit Requirement">✏️</button>
           <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete Requirement">🗑️</button>
         </div>
-        ${window._showDescriptions && req.description ? `<div class="item-description">${(req.description||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0,200)}${req.description.length > 200 ? '…' : ''}</div>` : ''}
+        ${window._showDescriptions && req.description ? `<div class="item-description">${(req.description||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
       </div>`;
     }
 
@@ -1395,7 +1395,7 @@
           : p.status === 'ready' ? '<span style="background:#374151;color:#d1d5db;padding:1px 6px;border-radius:3px">Pending</span>'
           : `<span style="background:#374151;color:#d1d5db;padding:1px 6px;border-radius:3px">${p.status || 'Pending'}</span>`;
         const dateStr = (p.created_at || '').substring(0, 10);
-        const titleShort = (p.title || '').length > 50 ? (p.title || '').substring(0, 47) + '...' : (p.title || '');
+        const titleShort = p.title || '';
         html += `<tr style="border-bottom:1px solid var(--line);cursor:pointer" onclick="window.open('${p.uat_url}','_blank')">`;
         html += `<td style="padding:6px;font-weight:700;color:#60a5fa">${p.pth || '-'}</td>`;
         html += `<td style="padding:6px">${emoji} ${p.project}</td>`;
@@ -2880,7 +2880,7 @@
           <td style="padding:6px">${date}</td>
           <td style="padding:6px">${d.project_code || ''}</td>
           <td style="padding:6px">${d.spec_id ? `<a href="/uat/${d.spec_id}" style="color:var(--info)">${d.pth || ''}</a>` : (d.pth || '')}</td>
-          <td style="padding:6px">${(d.sprint_title || '').substring(0, 40)}</td>
+          <td style="padding:6px">${(d.sprint_title || '')}</td>
           <td style="padding:6px">${ver}</td>
           <td style="padding:6px">${statusBadge(d.overall_status)}</td>
           <td style="padding:6px">${d.bv_pass_rate}%</td>

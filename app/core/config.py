@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.83.0"  # MP27: Data-driven failure schema (BUG-056, BUG-057, REQ-060, REQ-062)
+    VERSION: str = "2.84.0"  # MP28: Remove truncation, add .claude/settings.json, fix CI ingest (BUG-059, TSK-017, BUG-060)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

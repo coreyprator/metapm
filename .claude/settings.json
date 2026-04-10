@@ -20,5 +20,33 @@
       "Bash(sudo *)",
       "Read(.env*)"
     ]
-  }
+  },
+  "allowedTools": [
+    "mcp__claude_ai_MetaPM__create_handoff_shell",
+    "mcp__claude_ai_MetaPM__execute_sql_query",
+    "mcp__claude_ai_MetaPM__get_challenge",
+    "mcp__claude_ai_MetaPM__get_checkpoint",
+    "mcp__claude_ai_MetaPM__get_compliance_doc",
+    "mcp__claude_ai_MetaPM__get_prompt",
+    "mcp__claude_ai_MetaPM__get_requirement_history",
+    "mcp__claude_ai_MetaPM__get_schema",
+    "mcp__claude_ai_MetaPM__get_uat_results",
+    "mcp__claude_ai_MetaPM__get_uat_results_by_pth",
+    "mcp__claude_ai_MetaPM__list_projects",
+    "mcp__claude_ai_MetaPM__list_requirements",
+    "mcp__claude_ai_MetaPM__patch_requirement_status",
+    "mcp__claude_ai_MetaPM__post_prompt",
+    "mcp__claude_ai_MetaPM__post_requirement",
+    "mcp__claude_ai_MetaPM__post_review",
+    "mcp__claude_ai_MetaPM__post_session_signal",
+    "mcp__claude_ai_MetaPM__post_uat_spec",
+    "mcp__claude_ai_MetaPM__reject_prompt",
+    "mcp__claude_ai_MetaPM__submit_cc_results",
+    "mcp__claude_ai_MetaPM__trigger_rag_sync",
+    "mcp__claude_ai_MetaPM__update_compliance_doc",
+    "mcp__claude_ai_MetaPM__verify_challenge",
+    "mcp__claude_ai_Portfolio_RAG__rag_query",
+    "mcp__claude_ai_Portfolio_RAG__rag_get_document",
+    "mcp__claude_ai_Portfolio_RAG__query_portfolio"
+  ]
 }
