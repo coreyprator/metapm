@@ -43,16 +43,9 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install ODBC Driver 18
-        run: |
-          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
-          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/mssql-release.list
-          sudo apt-get update
-          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
-          pip install pyodbc
-
       - name: Ingest source code into SQL
         run: |
+          pip install pyodbc
           python scripts/ingest_code.py --app metapm --repo-root . --sha $(git rev-parse --short HEAD) || exit 1
         env:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
