@@ -2344,19 +2344,25 @@ def run_migrations():
             """, (c[0], c[0], c[1], c[2], c[3], c[4], c[5]), fetch="none")
         logger.info("  Migration 64 Step 7: uat_classifications seeded.")
 
-        # Step 8: Create trigger for auto-populating attempt_number on INSERT
+        # Step 8: Create/replace trigger for auto-populating attempt_number on INSERT
+        # MP32 BUG-066: DROP+CREATE to ensure SET NOCOUNT ON is present (prevents error 334)
         execute_query("""
-            IF NOT EXISTS (SELECT 1 FROM sys.triggers WHERE name = 'trg_cc_prompts_attempt_number')
+            IF EXISTS (SELECT 1 FROM sys.triggers WHERE name = 'trg_cc_prompts_attempt_number')
+                DROP TRIGGER trg_cc_prompts_attempt_number
+        """, fetch="none")
+        execute_query("""
             EXEC('
                 CREATE TRIGGER trg_cc_prompts_attempt_number
                 ON cc_prompts
                 AFTER INSERT
                 AS BEGIN
+                    SET NOCOUNT ON;
                     UPDATE cc_prompts
                     SET attempt_number = (
-                        SELECT COUNT(*) FROM cc_prompts
-                        WHERE requirement_id = i.requirement_id
-                        AND created_at <= i.created_at
+                        SELECT COUNT(*) FROM cc_prompts cp2
+                        WHERE cp2.requirement_id = i.requirement_id
+                          AND cp2.requirement_id IS NOT NULL
+                          AND cp2.created_at <= i.created_at
                     )
                     FROM cc_prompts cp
                     JOIN inserted i ON cp.id = i.id
@@ -2364,7 +2370,7 @@ def run_migrations():
                 END
             ')
         """, fetch="none")
-        logger.info("  Migration 64 Step 8: attempt_number trigger created.")
+        logger.info("  Migration 64 Step 8: attempt_number trigger created (with SET NOCOUNT ON).")
 
         logger.info("  Migration 64: MP31 data model quality pass complete.")
     except Exception as e:

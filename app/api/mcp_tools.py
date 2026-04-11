@@ -396,12 +396,13 @@ def _tool_post_prompt(args: dict) -> dict:
         return {"error": f"PTH '{pth}' already has an active prompt in status '{active['status']}'. Reject or complete it first."}
 
     result = execute_query("""
+        SET NOCOUNT ON;
         INSERT INTO cc_prompts
             (sprint_id, project_id, pth, requirement_id, content, content_md,
              estimated_hours, created_by, status)
-        OUTPUT INSERTED.id, INSERTED.pth, INSERTED.sprint_id, INSERTED.status,
-               INSERTED.created_at
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'CAI', 'draft')
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'CAI', 'draft');
+        SELECT id, pth, sprint_id, status, created_at
+        FROM cc_prompts WHERE id = SCOPE_IDENTITY();
     """, (
         sprint_id, project_id, pth, req_row["id"],
         content_md[:500] if content_md else '',

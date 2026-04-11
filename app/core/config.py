@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.87.0"  # MP31: BUG-064 lifecycle gate fix, REQ-066 quality history, REQ-067 unique PTH, REQ-068 attempt_number trigger, REQ-069 global_seq, REQ-070 uat_classifications
+    VERSION: str = "2.87.1"  # MP32: BUG-066 fix OUTPUT INSERTED error 334 on cc_prompts (use SCOPE_IDENTITY), re-add trigger with SET NOCOUNT ON
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

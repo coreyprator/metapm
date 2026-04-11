@@ -316,13 +316,14 @@ async def create_prompt(prompt: PromptCreate, _: bool = Depends(verify_api_key))
                             detail=f"requirement {prompt.requirement_code} is at status {req_row['status']}, expected one of {linkable_statuses}. Cannot link prompt.")
 
     result = execute_query("""
+        SET NOCOUNT ON;
         INSERT INTO cc_prompts
             (sprint_id, project_id, pth, requirement_id, content, content_md,
              estimated_hours, created_by, status)
-        OUTPUT INSERTED.id, INSERTED.sprint_id, INSERTED.project_id, INSERTED.pth,
-               INSERTED.requirement_id, INSERTED.content_md, INSERTED.status,
-               INSERTED.estimated_hours, INSERTED.created_by, INSERTED.created_at
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft')
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft');
+        SELECT id, sprint_id, project_id, pth, requirement_id, content_md,
+               status, estimated_hours, created_by, created_at
+        FROM cc_prompts WHERE id = SCOPE_IDENTITY();
     """, (
         prompt.sprint_id,
         project_id,
