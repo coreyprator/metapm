@@ -1345,6 +1345,43 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       }}
     }}
 
+    // MP31 REQ-070: Load classifications from DB + add to cheat sheet
+    async function loadClassifications() {{
+      try {{
+        const resp = await fetch('/api/config/uat-classifications');
+        const classifications = await resp.json();
+
+        // Populate all classification-select dropdowns from DB
+        document.querySelectorAll('.classification-select').forEach(sel => {{
+          const savedVal = sel.value || sel.dataset.savedValue || '';
+          sel.innerHTML = '<option value="">\\u2014 Select classification \\u2014</option>';
+          classifications.forEach(c => {{
+            const opt = new Option(c.display_label, c.display_label);
+            if (c.display_label === savedVal) opt.selected = true;
+            sel.appendChild(opt);
+          }});
+        }});
+
+        // Add classification section to cheat sheet
+        const cheatContainer = document.getElementById('cheat-sheet-types');
+        if (cheatContainer) {{
+          const classHtml = `
+            <h4 style="color:var(--info);border-bottom:1px solid var(--line);
+                       padding-bottom:4px;margin:16px 0 8px;font-size:13px">
+              Classifications
+            </h4>
+            <ul style="margin:0;padding-left:16px;font-size:12px;line-height:1.7">
+            ${{classifications.map(c =>
+              `<li><strong>${{c.display_label}}:</strong> ${{c.help_text}}</li>`
+            ).join('')}}
+            </ul>`;
+          cheatContainer.insertAdjacentHTML('beforeend', classHtml);
+        }}
+      }} catch(e) {{
+        console.error('Failed to load classifications:', e);
+      }}
+    }}
+
     function updateCascade(card) {{
       const id = card.dataset.id;
       const status = card.querySelector(`input[name="${{id}}"]:checked`)?.value || 'pending';
@@ -1383,6 +1420,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
 
     updateCounts();
     loadFailureSchema();
+    loadClassifications();
 
     // MP16C BUG-034: Replace collapsed textareas with auto-sized divs on submitted UAT pages
     if (document.querySelector('.test-card.submitted')) {{

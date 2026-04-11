@@ -1975,6 +1975,128 @@ async def get_requirement_history(requirement_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/api/roadmap/requirements/{req_identifier}/quality-history")
+@router.get("/roadmap/requirements/{req_identifier}/quality-history")
+async def get_requirement_quality_history(req_identifier: str):
+    """Get quality history for a requirement — all sprint attempts with UAT outcomes."""
+    import json as _json
+    from collections import Counter
+
+    req = execute_query(
+        "SELECT id, code, pth FROM roadmap_requirements WHERE id = ? OR code = ?",
+        (req_identifier, req_identifier.upper()), fetch="one"
+    )
+    if not req:
+        raise HTTPException(status_code=404, detail=f"Requirement not found: {req_identifier}")
+
+    prompts = execute_query("""
+        SELECT cp.pth, cp.sprint_id, cp.five_q_applied,
+               cp.created_at, cp.status, cp.parent_pth,
+               cp.attempt_number, cp.version_before, cp.version_after
+        FROM cc_prompts cp
+        INNER JOIN (
+            SELECT pth, MAX(created_at) AS max_created
+            FROM cc_prompts
+            WHERE requirement_id = ?
+            GROUP BY pth
+        ) latest ON cp.pth = latest.pth AND cp.created_at = latest.max_created
+        WHERE cp.requirement_id = ?
+        ORDER BY cp.created_at ASC
+    """, (req['id'], req['id']), fetch="all") or []
+
+    history = []
+    for p in prompts:
+        pth = p['pth']
+
+        uat = execute_query(
+            """SELECT id, status, attempt_number, pl_submitted_at, general_notes
+               FROM uat_pages WHERE pth = ?
+               ORDER BY created_at DESC""",
+            (pth,), fetch="one"
+        )
+
+        bv_stats = {'pl_pass': 0, 'pl_fail': 0, 'pl_skip': 0,
+                    'machine_pass': 0, 'machine_fail': 0, 'failure_types': []}
+        if uat:
+            bv_rows = execute_query(
+                "SELECT bv_id, status, failure_type FROM uat_bv_items WHERE spec_id = ?",
+                (str(uat['id']),), fetch="all"
+            ) or []
+            for bv in bv_rows:
+                is_machine = (bv.get('bv_id', '') or '').startswith('M') or bv.get('bv_id') == 'CANARY'
+                s = bv.get('status', '')
+                if is_machine:
+                    if s == 'pass': bv_stats['machine_pass'] += 1
+                    else: bv_stats['machine_fail'] += 1
+                else:
+                    if s == 'pass': bv_stats['pl_pass'] += 1
+                    elif s == 'fail': bv_stats['pl_fail'] += 1
+                    elif s == 'skip': bv_stats['pl_skip'] += 1
+                if bv.get('failure_type') and s == 'fail':
+                    bv_stats['failure_types'].append(bv['failure_type'])
+            bv_stats['failure_types'] = list(set(bv_stats['failure_types']))
+
+        review = execute_query(
+            "SELECT assessment, notes FROM reviews WHERE prompt_pth = ?",
+            (pth,), fetch="one"
+        )
+
+        gn = []
+        if uat and uat.get('general_notes'):
+            try:
+                parsed = _json.loads(uat['general_notes'])
+                if isinstance(parsed, list):
+                    gn = [e for e in parsed if e.get('text', '').strip()]
+            except Exception:
+                pass
+
+        history.append({
+            'pth': pth,
+            'sprint_id': p.get('sprint_id'),
+            'attempt_number': p.get('attempt_number'),
+            'parent_pth': p.get('parent_pth'),
+            'five_q_applied': bool(p.get('five_q_applied')),
+            'created_at': p['created_at'].isoformat() if p.get('created_at') else None,
+            'uat_status': uat['status'] if uat else None,
+            'pl_submitted_at': uat['pl_submitted_at'].isoformat() if uat and uat.get('pl_submitted_at') else None,
+            'pl_pass': bv_stats['pl_pass'],
+            'pl_fail': bv_stats['pl_fail'],
+            'pl_skip': bv_stats['pl_skip'],
+            'machine_pass': bv_stats['machine_pass'],
+            'machine_fail': bv_stats['machine_fail'],
+            'failure_types': bv_stats['failure_types'],
+            'general_notes': gn,
+            'cai_assessment': review['assessment'] if review else None,
+            'cai_notes': review['notes'] if review else None,
+        })
+
+    all_ft = [ft for h in history for ft in h['failure_types']]
+    top_ft = Counter(all_ft).most_common(1)
+
+    return {
+        'requirement_code': req['code'],
+        'requirement_id': req['id'],
+        'total_attempts': len(history),
+        'pl_pass_attempts': sum(1 for h in history if h['uat_status'] == 'passed'),
+        'top_failure_type': top_ft[0][0] if top_ft else None,
+        'attempts': history
+    }
+
+
+@router.get("/api/config/uat-classifications")
+@router.get("/config/uat-classifications")
+async def get_uat_classifications():
+    """Return active UAT classifications from DB."""
+    rows = execute_query(
+        """SELECT classification_code, display_label, help_text,
+                  applies_to_pass, requires_failure_type, sort_order
+           FROM uat_classifications WHERE is_active = 1
+           ORDER BY sort_order""",
+        fetch="all"
+    ) or []
+    return [dict(r) for r in rows]
+
+
 @router.get("/roadmap/wip")
 async def get_wip_summary():
     """Get WIP pipeline summary — counts by status and active sprints."""

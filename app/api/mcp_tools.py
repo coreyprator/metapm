@@ -726,13 +726,34 @@ def _tool_patch_requirement_status(args: dict) -> dict:
                     "missing_fields": missing,
                 }
 
-    # MP12B GATE 2: manual patch to uat_ready requires uat_url
+    # MP31 BUG-064: uat_ready gate — check UAT page + review exist for requirement's PTH
     if status == 'uat_ready':
-        req_full = execute_query("SELECT uat_url FROM roadmap_requirements WHERE id = ?", (req_id,), fetch="one")
-        if req_full and not req_full.get('uat_url'):
-            reason = 'missing_uat_url: cannot advance to uat_ready without a linked UAT spec'
+        has_uat = False
+        has_review = False
+        req_full = execute_query("SELECT uat_url, pth FROM roadmap_requirements WHERE id = ?", (req_id,), fetch="one")
+        req_pth_val = req_full.get('pth') if req_full else pth
+        if req_pth_val:
+            uat_row = execute_query(
+                "SELECT COUNT(*) AS cnt FROM uat_pages WHERE pth = ?",
+                (req_pth_val,), fetch="one"
+            )
+            has_uat = uat_row and uat_row['cnt'] > 0
+
+            review_row = execute_query(
+                "SELECT COUNT(*) AS cnt FROM reviews WHERE prompt_pth = ?",
+                (req_pth_val,), fetch="one"
+            )
+            has_review = review_row and review_row['cnt'] > 0
+
+        if not has_uat:
+            reason = 'missing_uat: cannot advance to uat_ready without a UAT page for PTH'
             write_requirement_failure(req_id, current, 'uat_ready', 'CAI', 'patch_requirement_status', reason)
-            return {"error": "Cannot advance to uat_ready: no UAT spec linked. Call post_uat_spec first."}
+            return {"error": "Cannot advance to uat_ready: no UAT found for PTH."}
+        if not has_review:
+            reason = 'review_required: cannot advance to uat_ready without a CAI review for PTH'
+            write_requirement_failure(req_id, current, 'uat_ready', 'MCP', 'patch_requirement_status', reason)
+            return {"error": "review_required",
+                "message": "Cannot close: no CAI review record for this PTH."}
 
     # MP24 TSK-016: Close gate — require review if UAT pages exist
     if status in ('done', 'closed', 'uat_pass'):

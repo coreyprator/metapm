@@ -2233,4 +2233,141 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 63 warning: {e}")
 
+    # --- Migration 64: MP31 — Dedup PTH, add parent_pth/attempt_number/global_seq, UNIQUE PTH, uat_classifications ---
+    try:
+        logger.info("  Migration 64: MP31 data model quality pass...")
+
+        # Step 1: Resolve duplicate PTHs before adding UNIQUE constraint
+        execute_query("""
+            UPDATE cc_prompts
+            SET pth = pth + '_DUP_' + CAST(id AS NVARCHAR(10))
+            WHERE id NOT IN (
+                SELECT MAX(id) FROM cc_prompts GROUP BY pth
+            )
+            AND pth IN (SELECT pth FROM cc_prompts GROUP BY pth HAVING COUNT(*) > 1)
+        """, fetch="none")
+        logger.info("  Migration 64 Step 1: Deduplicated PTHs.")
+
+        # Step 2: Add parent_pth column to cc_prompts
+        execute_query("""
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                           WHERE TABLE_NAME='cc_prompts' AND COLUMN_NAME='parent_pth')
+            ALTER TABLE cc_prompts ADD parent_pth NVARCHAR(20) NULL
+        """, fetch="none")
+        logger.info("  Migration 64 Step 2a: parent_pth column added.")
+
+        # Step 2b: Add attempt_number column to cc_prompts
+        execute_query("""
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                           WHERE TABLE_NAME='cc_prompts' AND COLUMN_NAME='attempt_number')
+            ALTER TABLE cc_prompts ADD attempt_number INT NULL
+        """, fetch="none")
+        logger.info("  Migration 64 Step 2b: attempt_number column added.")
+
+        # Step 3: Add UNIQUE constraint on cc_prompts.pth
+        execute_query("""
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes
+                           WHERE name='UQ_cc_prompts_pth' AND object_id=OBJECT_ID('cc_prompts'))
+            ALTER TABLE cc_prompts ADD CONSTRAINT UQ_cc_prompts_pth UNIQUE (pth)
+        """, fetch="none")
+        logger.info("  Migration 64 Step 3: UNIQUE constraint on pth added.")
+
+        # Step 4: Add global_seq IDENTITY column to roadmap_requirements
+        result = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME='roadmap_requirements' AND COLUMN_NAME='global_seq'
+        """, fetch="one")
+        if result and result['cnt'] == 0:
+            execute_query("""
+                ALTER TABLE roadmap_requirements ADD global_seq INT IDENTITY(1,1) NOT NULL
+            """, fetch="none")
+            logger.info("  Migration 64 Step 4: global_seq IDENTITY column added.")
+        else:
+            logger.info("  Migration 64 Step 4: global_seq already exists.")
+
+        # Step 5: Backfill attempt_number using ROW_NUMBER
+        execute_query("""
+            UPDATE cc_prompts
+            SET attempt_number = rn.rn
+            FROM cc_prompts cp
+            JOIN (
+                SELECT id,
+                       ROW_NUMBER() OVER (PARTITION BY requirement_id ORDER BY created_at) AS rn
+                FROM cc_prompts
+                WHERE requirement_id IS NOT NULL
+            ) rn ON cp.id = rn.id
+            WHERE cp.requirement_id IS NOT NULL
+        """, fetch="none")
+        logger.info("  Migration 64 Step 5: attempt_number backfilled.")
+
+        # Step 6: Create uat_classifications table
+        execute_query("""
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+                           WHERE TABLE_NAME='uat_classifications')
+            CREATE TABLE uat_classifications (
+                classification_code  NVARCHAR(50)  NOT NULL PRIMARY KEY,
+                display_label        NVARCHAR(100) NOT NULL,
+                help_text            NVARCHAR(500) NOT NULL,
+                applies_to_pass      BIT           NOT NULL DEFAULT 0,
+                requires_failure_type BIT          NOT NULL DEFAULT 0,
+                sort_order           INT           NOT NULL DEFAULT 0,
+                is_active            BIT           NOT NULL DEFAULT 1
+            )
+        """, fetch="none")
+        logger.info("  Migration 64 Step 6: uat_classifications table created.")
+
+        # Step 7: Seed uat_classifications
+        classifications = [
+            ('new_requirement', 'New requirement',
+             'This UAT result reveals a gap or improvement that should be built. Not a bug — the sprint delivered what was specced, but something new is needed. Seeds a new backlog item.',
+             0, 0, 1),
+            ('bug', 'Bug',
+             'Something that was built does not work correctly. The feature exists but is broken, missing, or behaves unexpectedly. Requires a fix sprint.',
+             0, 1, 2),
+            ('finding', 'Finding',
+             'An observation worth recording but not immediately actionable. Nothing is broken and no new requirement is being committed to. Examples: a feature works but is slow, a UI pattern is inconsistent, something could be better in a future sprint. Documents a signal without creating work.',
+             0, 0, 3),
+            ('no_action', 'No-action',
+             'This result requires no follow-up. The test passed as expected, or a skip was intentional with no unresolved issues.',
+             1, 0, 4),
+            ('out_of_scope', 'Out of scope',
+             'The BV tests something that was never included in this sprint spec. The sprint delivered what was specced correctly. Use when a test was written for a future feature or a different sprint. Seed a new requirement for the next sprint.',
+             0, 0, 5),
+        ]
+        for c in classifications:
+            execute_query("""
+                IF NOT EXISTS (SELECT 1 FROM uat_classifications WHERE classification_code = ?)
+                INSERT INTO uat_classifications
+                    (classification_code, display_label, help_text, applies_to_pass,
+                     requires_failure_type, sort_order)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (c[0], c[0], c[1], c[2], c[3], c[4], c[5]), fetch="none")
+        logger.info("  Migration 64 Step 7: uat_classifications seeded.")
+
+        # Step 8: Create trigger for auto-populating attempt_number on INSERT
+        execute_query("""
+            IF NOT EXISTS (SELECT 1 FROM sys.triggers WHERE name = 'trg_cc_prompts_attempt_number')
+            EXEC('
+                CREATE TRIGGER trg_cc_prompts_attempt_number
+                ON cc_prompts
+                AFTER INSERT
+                AS BEGIN
+                    UPDATE cc_prompts
+                    SET attempt_number = (
+                        SELECT COUNT(*) FROM cc_prompts
+                        WHERE requirement_id = i.requirement_id
+                        AND created_at <= i.created_at
+                    )
+                    FROM cc_prompts cp
+                    JOIN inserted i ON cp.id = i.id
+                    WHERE i.requirement_id IS NOT NULL
+                END
+            ')
+        """, fetch="none")
+        logger.info("  Migration 64 Step 8: attempt_number trigger created.")
+
+        logger.info("  Migration 64: MP31 data model quality pass complete.")
+    except Exception as e:
+        logger.warning(f"  Migration 64 warning: {e}")
+
     logger.info("Migrations complete.")
