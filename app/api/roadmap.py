@@ -1727,7 +1727,7 @@ VALID_TRANSITIONS = {
     "uat_ready":       ["uat_pass", "uat_fail"],
     "uat_pass":        ["done"],
     "uat_fail":        ["cc_prompt_ready", "rework"],
-    "done":            ["rework"],
+    "done":            ["closed", "rework"],
     "rework":          ["cc_prompt_ready"],
     # Legacy: allow any transition
     "backlog": None,
@@ -1875,7 +1875,7 @@ LIFECYCLE_VALID_TRANSITIONS = {
     "uat_ready":       ["uat_pass", "uat_fail"],
     "uat_pass":        ["done"],
     "uat_fail":        ["cc_prompt_ready", "rework"],
-    "done":            ["rework"],
+    "done":            ["closed", "rework"],
     "rework":          ["cc_prompt_ready"],
     "backlog": None,   # legacy: allow any transition
     "executing": None,
