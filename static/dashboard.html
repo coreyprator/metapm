@@ -530,7 +530,7 @@
         <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="showArchivedToggle" style="min-height:auto" /> Show Archived</label>
         <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="showDescToggle" style="min-height:auto" /> Show Descriptions</label>
         <button id="resetFiltersBtn" type="button" class="danger-btn">Reset Filters</button>
-        <button id="exportCsvBtn" onclick="exportCSV()" style="padding:8px 14px;background:var(--panel-soft);border:1px solid var(--line);border-radius:8px;color:var(--text);cursor:pointer;font-size:13px" title="Export current filtered view to CSV">⬇ Export CSV</button>
+        <button id="exportCsvBtn" type="button" style="padding:8px 14px;background:var(--panel-soft);border:1px solid var(--line);border-radius:8px;color:var(--text);cursor:pointer;font-size:13px" title="Export current filtered view to CSV">⬇ Export CSV</button>
       </div>
       <div class="control-row">
         <label>Sort/Group</label>
@@ -3185,7 +3185,7 @@
         render();
       };
 
-      // BUG-062: Export CSV function
+      // BUG-062 + BUG-063: Export CSV function — wired via addEventListener
       function exportCSV() {
         const params = new URLSearchParams();
         const project = qs('projectFilter')?.value || '';
@@ -3200,6 +3200,8 @@
         if (search) params.set('search', search);
         window.location.href = '/api/roadmap/export/csv?' + params.toString();
       }
+      const exportBtn = document.getElementById('exportCsvBtn');
+      if (exportBtn) exportBtn.addEventListener('click', exportCSV);
 
       qs('addBtn').onclick = () => qs('addMenu').classList.toggle('open');
       qs('addMenu').onclick = (e) => {

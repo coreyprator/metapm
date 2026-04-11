@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.85.0"  # MP29: Classification auto-assign for pass BVs (BUG-061), restore CSV export (BUG-062), Quality tab Prompt link (REQ-063)
+    VERSION: str = "2.86.0"  # MP30: 2-level cascade classification (REQ-065), Out of scope + broken_interaction_bug failure types, CSV export fix (BUG-063)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

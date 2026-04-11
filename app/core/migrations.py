@@ -2205,4 +2205,32 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 62 warning: {e}")
 
+    # --- Migration 63: MP30 — Add out_of_scope and broken_interaction_bug failure types ---
+    try:
+        execute_query("""
+            IF NOT EXISTS (SELECT 1 FROM failure_types WHERE type_code = 'out_of_scope')
+            INSERT INTO failure_types (type_code, category_code, display_label, help_text, is_active)
+            VALUES (
+                'out_of_scope',
+                'process',
+                'Out of scope — not part of this sprint',
+                'The BV tests something that was never included in this sprint spec. The sprint delivered what was specced correctly. Use this when a test was written for a future requirement or a feature from a different sprint. Seed a new requirement for the next sprint.',
+                1
+            )
+        """, fetch="none")
+        execute_query("""
+            IF NOT EXISTS (SELECT 1 FROM failure_types WHERE type_code = 'broken_interaction_bug')
+            INSERT INTO failure_types (type_code, category_code, display_label, help_text, is_active)
+            VALUES (
+                'broken_interaction_bug',
+                'bug',
+                'Broken interaction — element present but non-functional',
+                'The UI element is visible and appears built, but user interaction produces no result. The feature looks complete but does not fulfil its promise. No file, no event, no navigation — nothing happens. Common causes: missing event handler, function not in global scope, missing API wiring, silent JS error. Examples: Export CSV button that does not download, Submit that does not submit, link that navigates nowhere.',
+                1
+            )
+        """, fetch="none")
+        logger.info("  Migration 63: out_of_scope + broken_interaction_bug failure types added.")
+    except Exception as e:
+        logger.warning(f"  Migration 63 warning: {e}")
+
     logger.info("Migrations complete.")

@@ -989,7 +989,6 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
         def ft_selected(val):
             return " selected" if cur_ft == val else ""
         ft_display = "block" if cur_status == "fail" else "none"
-        cls_row_display = 'none' if cur_status == 'pass' else 'block'
         return f"""
         <div class="test-card result-{cur_status} {submitted_cls}" data-id="{tid}">
           <div class="test-header">
@@ -1009,25 +1008,25 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
             <label class="radio-label{' checked-pending' if cur_status=='pending' else ''}">
               <input type="radio" name="{tid}" value="pending"{checked('pending')}> ? Pending</label>
           </div>
-          <div class="classification-row" data-id="{tid}" style="display:{ft_display};margin-bottom:8px">
-            <div class="notes-label" style="margin-top:8px">Classification (required for failed tests)</div>
-            <select class="classification-category-select" data-id="{tid}" style="width:100%;padding:7px 10px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem;margin-bottom:6px">
+          <div class="cascade-classification" data-id="{tid}"
+            style="display:{'none' if cur_status == 'pass' else 'block'};margin-top:10px">
+            <div class="notes-label">Classification</div>
+            <select class="classification-select" data-id="{tid}"
+              style="width:100%;padding:7px 10px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem;margin-bottom:8px">
               <option value="">— Select classification —</option>
-            </select>
-            <div class="notes-label">Specific Failure Type</div>
-            <select class="failure-type-select" data-id="{tid}" data-saved-value="{cur_ft}" style="width:100%;padding:7px 10px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem">
-              <option value="">— Select specific failure —</option>
-            </select>
-          </div>
-          <div class="classification-row-outer" style="display:{cls_row_display};margin-top:8px">
-            <div class="notes-label">Classification (required)</div>
-            <select class="classification-select" data-id="{tid}" style="width:100%;padding:7px 10px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem;margin-bottom:8px">
-              <option value="">— Select —</option>
               <option value="New requirement"{cls_selected("New requirement")}>New requirement</option>
               <option value="Bug"{cls_selected("Bug")}>Bug</option>
               <option value="Finding"{cls_selected("Finding")}>Finding</option>
               <option value="No-action"{'selected' if cur_status == 'pass' else cls_selected("No-action")}>No-action</option>
+              <option value="Out of scope"{cls_selected("Out of scope")}>Out of scope</option>
             </select>
+            <div class="failure-type-row" data-id="{tid}" style="display:{'block' if (cur_class == 'Bug' and cur_ft) else 'none'}">
+              <div class="notes-label">Failure type</div>
+              <select class="failure-type-select" data-id="{tid}" data-saved-value="{cur_ft}"
+                style="width:100%;padding:7px 10px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem">
+                <option value="">— Select failure type —</option>
+              </select>
+            </div>
           </div>
           <div class="notes-label">Notes</div>
           <textarea class="notes-input" placeholder="Observations...">{cur_notes}</textarea>
@@ -1240,10 +1239,11 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
         `<div style="display:flex;gap:6px;align-items:center">` +
         `<select class="note-classification" style="padding:3px 6px;background:#161b22;color:#e2e8f0;border:1px solid #334155;border-radius:4px;font-size:0.78rem">` +
         `<option value="">No classification</option>` +
+        `<option value="new_requirement">New requirement</option>` +
         `<option value="bug">Bug</option>` +
         `<option value="finding">Finding</option>` +
-        `<option value="new_requirement">New Requirement</option>` +
         `<option value="no_action">No-action</option>` +
+        `<option value="out_of_scope">Out of scope</option>` +
         `</select>` +
         `<button onclick="this.closest('.note-entry').remove()" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:0 4px">&times;</button>` +
         `</div></div>` +
@@ -1300,7 +1300,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       document.getElementById('cnt-pend').textContent = pend;
     }}
 
-    // MP27: Data-driven failure schema — cascading dropdowns + cheat sheet
+    // MP30: Data-driven failure schema — 2-level cascade (Classification → Failure type)
     let FAILURE_SCHEMA = {{}};
 
     async function loadFailureSchema() {{
@@ -1308,31 +1308,20 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
         const resp = await fetch('/api/config/failure-schema');
         FAILURE_SCHEMA = await resp.json();
 
-        // Populate classification category dropdowns
-        document.querySelectorAll('.classification-category-select').forEach(sel => {{
-          Object.entries(FAILURE_SCHEMA).forEach(([code, cat]) => {{
-            sel.add(new Option(cat.label, code));
+        // Populate all failure-type-select dropdowns using optgroups
+        document.querySelectorAll('.failure-type-select').forEach(sel => {{
+          const savedVal = sel.dataset.savedValue || '';
+          sel.innerHTML = '<option value="">\\u2014 Select failure type \\u2014</option>';
+          Object.entries(FAILURE_SCHEMA).forEach(([catCode, cat]) => {{
+            const group = document.createElement('optgroup');
+            group.label = cat.label;
+            cat.types.forEach(t => {{
+              const opt = new Option(t.text, t.value);
+              if (t.value === savedVal) opt.selected = true;
+              group.appendChild(opt);
+            }});
+            sel.appendChild(group);
           }});
-          // Restore saved value if any
-          const card = sel.closest('.test-card');
-          const ftSelect = card?.querySelector('.failure-type-select');
-          const savedFt = ftSelect?.dataset?.savedValue;
-          if (savedFt) {{
-            // Find which category contains this type
-            for (const [code, cat] of Object.entries(FAILURE_SCHEMA)) {{
-              if (cat.types.some(t => t.value === savedFt)) {{
-                sel.value = code;
-                // Populate the failure type dropdown
-                ftSelect.innerHTML = '<option value="">\\u2014 Select specific failure \\u2014</option>';
-                cat.types.forEach(t => {{
-                  const opt = new Option(t.text, t.value);
-                  if (t.value === savedFt) opt.selected = true;
-                  ftSelect.add(opt);
-                }});
-                break;
-              }}
-            }}
-          }}
         }});
 
         // Build cheat sheet content
@@ -1356,59 +1345,43 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       }}
     }}
 
-    function updateClassificationTypes(card) {{
-      const catSelect = card.querySelector('.classification-category-select');
-      const ftSelect = card.querySelector('.failure-type-select');
-      const category = catSelect.value;
-      ftSelect.innerHTML = '<option value="">\\u2014 Select specific failure \\u2014</option>';
-      if (category && FAILURE_SCHEMA[category]?.types) {{
-        FAILURE_SCHEMA[category].types.forEach(t => {{
-          ftSelect.add(new Option(t.text, t.value));
-        }});
+    function updateCascade(card) {{
+      const id = card.dataset.id;
+      const status = card.querySelector(`input[name="${{id}}"]:checked`)?.value || 'pending';
+      const cascade = card.querySelector('.cascade-classification');
+      const classSelect = card.querySelector('.classification-select');
+      const ftRow = card.querySelector('.failure-type-row');
+
+      if (!cascade) return;
+
+      if (status === 'pass') {{
+        cascade.style.display = 'none';
+        if (classSelect) classSelect.value = 'No-action';
+      }} else {{
+        cascade.style.display = 'block';
+      }}
+
+      const classification = classSelect?.value || '';
+      if (ftRow) {{
+        ftRow.style.display = (classification === 'Bug') ? 'block' : 'none';
       }}
     }}
 
-    // MP23 + MP27: Show/hide failure classification row based on status
-    function updateFailureTypeVisibility() {{
-      document.querySelectorAll('.test-card:not([data-type="cc_machine"])').forEach(card => {{
-        const id = card.dataset.id;
-        const checked = card.querySelector(`input[name="${{id}}"]:checked`);
-        const val = checked ? checked.value : 'pending';
-        const classRow = card.querySelector('.classification-row');
-        if (classRow) classRow.style.display = (val === 'fail') ? 'block' : 'none';
+    // Wire radio buttons + classification selects for cascade
+    document.querySelectorAll('.test-card:not([data-type="cc_machine"])').forEach(card => {{
+      card.querySelectorAll('input[type="radio"]').forEach(r => {{
+        r.addEventListener('change', () => {{
+          updateCounts();
+          updateCascade(card);
+        }});
       }});
-    }}
-
-    // Wire radio buttons — BUG-061: show/hide classification row + auto-set No-action on pass
-    document.querySelectorAll('.radio-group input[type=radio]').forEach(r => {{
-      r.addEventListener('change', function() {{
-        updateCounts();
-        updateFailureTypeVisibility();
-        const card = this.closest('.test-card');
-        if (card) {{
-          const classOuter = card.querySelector('.classification-row-outer');
-          const classSelect = card.querySelector('.classification-select');
-          if (this.value === 'pass') {{
-            if (classOuter) classOuter.style.display = 'none';
-            if (classSelect) classSelect.value = 'No-action';
-          }} else if (this.value === 'fail' || this.value === 'skip' || this.value === 'pending') {{
-            if (classOuter) classOuter.style.display = 'block';
-            if (classSelect && classSelect.value === 'No-action') classSelect.value = '';
-          }}
-        }}
-      }});
-    }});
-
-    // Wire classification category selects
-    document.querySelectorAll('.classification-category-select').forEach(sel => {{
-      sel.addEventListener('change', () => {{
-        const card = sel.closest('.test-card');
-        if (card) updateClassificationTypes(card);
-      }});
+      const classSelect = card.querySelector('.classification-select');
+      if (classSelect) {{
+        classSelect.addEventListener('change', () => updateCascade(card));
+      }}
     }});
 
     updateCounts();
-    updateFailureTypeVisibility();
     loadFailureSchema();
 
     // MP16C BUG-034: Replace collapsed textareas with auto-sized divs on submitted UAT pages
@@ -1625,9 +1598,9 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
         const classSelect = card.querySelector('.classification-select');
         const classification = classSelect ? classSelect.value : '';
         if (!classification && status !== 'pass') missingClassification.push(id);
-        // MP23: capture failure_type for failed BVs
+        // MP30: capture failure_type only when classification is Bug
         const ftSelect = card.querySelector('.failure-type-select');
-        const failure_type = (ftSelect && status === 'fail') ? ftSelect.value : null;
+        const failure_type = (ftSelect && classification === 'Bug') ? ftSelect.value : null;
         if (status === 'fail') hasFails = true;
         test_cases.push({{ id, status, notes, attachments, classification, failure_type }});
       }});

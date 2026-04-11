@@ -151,17 +151,22 @@ def render_structured_uat_html(
                     <button class="btn btn-fail" onclick="setResult(this,'fail')">Fail</button>
                     <button class="btn btn-skip" onclick="setResult(this,'skip')">Skip</button>
                 </div>
-                <div class="classification-row" style="display:none; margin-top:8px;">
+                <div class="cascade-classification" style="display:none; margin-top:8px;">
                     <label style="font-size:12px; color:var(--text-muted);">Classification</label>
                     <select class="classification-select" style="width:100%; margin-top:4px; padding:6px 8px; background:#1e1e32; color:#e2e8f0; border:1px solid #f8717180; border-radius:4px; font-size:0.85rem">
                         <option value="">— Select classification —</option>
+                        <option value="New requirement">New requirement</option>
+                        <option value="Bug">Bug</option>
+                        <option value="Finding">Finding</option>
+                        <option value="No-action">No-action</option>
+                        <option value="Out of scope">Out of scope</option>
                     </select>
-                </div>
-                <div class="failure-type-row" style="display:none; margin-top:8px;">
-                    <label style="font-size:12px; color:var(--text-muted);">Specific Failure Type</label>
-                    <select class="failure-type-select" style="width:100%; margin-top:4px; padding:6px 8px; background:#1e1e32; color:#e2e8f0; border:1px solid #f8717180; border-radius:4px; font-size:0.85rem">
-                        <option value="">— Select specific failure —</option>
-                    </select>
+                    <div class="failure-type-row" style="display:none; margin-top:8px;">
+                        <label style="font-size:12px; color:var(--text-muted);">Failure type</label>
+                        <select class="failure-type-select" style="width:100%; margin-top:4px; padding:6px 8px; background:#1e1e32; color:#e2e8f0; border:1px solid #f8717180; border-radius:4px; font-size:0.85rem">
+                            <option value="">— Select failure type —</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="notes-container">
                     <textarea class="notes-input" placeholder="Notes..."></textarea>
@@ -455,8 +460,8 @@ def render_structured_uat_html(
             else if (result === 'fail') item.classList.add('failed');
             else item.classList.add('skipped');
             results[id] = result;
-            // MP27: Show/hide cascading classification + failure_type dropdowns on fail
-            updateFailureUI(item, result);
+            // MP30: Show/hide 2-level cascade (Classification → Failure type)
+            updateCascade(item, result);
             updateCounts();
         }}
 
@@ -500,8 +505,8 @@ def render_structured_uat_html(
                 const notes = item.querySelector('.notes-input')?.value || '';
                 const ftSelect = item.querySelector('.failure-type-select');
                 const classSelect = item.querySelector('.classification-select');
-                const failure_type = (ftSelect && results[id] === 'fail') ? ftSelect.value : '';
-                const classification = (classSelect && results[id] === 'fail') ? classSelect.value : '';
+                const classification = classSelect ? classSelect.value : '';
+                const failure_type = (ftSelect && classification === 'Bug') ? ftSelect.value : '';
                 cases.push({{
                     id: id,
                     status: results[id] || 'pending',
@@ -682,10 +687,11 @@ def render_structured_uat_html(
                 `<div style="display:flex;gap:8px;align-items:center">` +
                 `<select class="note-classification" style="padding:4px 6px;background:#0d1117;color:#e2e8f0;border:1px solid #334155;border-radius:4px;font-size:0.8rem">` +
                 `<option value="">No classification</option>` +
+                `<option value="new_requirement">New requirement</option>` +
                 `<option value="bug">Bug</option>` +
                 `<option value="finding">Finding</option>` +
-                `<option value="new_requirement">New Requirement</option>` +
                 `<option value="no_action">No-action</option>` +
+                `<option value="out_of_scope">Out of scope</option>` +
                 `</select>` +
                 `<button onclick="this.closest('.note-entry').remove()" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1.1rem;padding:0 4px">&times;</button>` +
                 `</div></div>` +
@@ -773,10 +779,16 @@ def render_structured_uat_html(
                 const resp = await fetch('/api/config/failure-schema');
                 FAILURE_SCHEMA = await resp.json();
 
-                // Populate classification dropdowns
-                document.querySelectorAll('.classification-select').forEach(sel => {{
-                    Object.entries(FAILURE_SCHEMA).forEach(([code, cat]) => {{
-                        sel.add(new Option(cat.label, code));
+                // Populate all failure-type-select dropdowns using optgroups
+                document.querySelectorAll('.failure-type-select').forEach(sel => {{
+                    sel.innerHTML = '<option value="">\\u2014 Select failure type \\u2014</option>';
+                    Object.entries(FAILURE_SCHEMA).forEach(([catCode, cat]) => {{
+                        const group = document.createElement('optgroup');
+                        group.label = cat.label;
+                        cat.types.forEach(t => {{
+                            group.appendChild(new Option(t.text, t.value));
+                        }});
+                        sel.appendChild(group);
                     }});
                 }});
 
@@ -789,7 +801,7 @@ def render_structured_uat_html(
                           '<div class="group-title">' + cat.label + '</div>' +
                           '<ul>';
                         cat.types.forEach(t => {{
-                            const shortName = t.text.split(' \u2014 ')[0] || t.text;
+                            const shortName = t.text.split(' \\u2014 ')[0] || t.text;
                             html += '<li><strong>' + shortName + ':</strong> ' + t.help + '</li>';
                         }});
                         html += '</ul></div>';
@@ -801,42 +813,31 @@ def render_structured_uat_html(
             }}
         }}
 
-        function updateFailureUI(item, status) {{
-            const classRow    = item.querySelector('.classification-row');
-            const ftRow       = item.querySelector('.failure-type-row');
+        function updateCascade(item, status) {{
+            const cascade     = item.querySelector('.cascade-classification');
             const classSelect = item.querySelector('.classification-select');
+            const ftRow       = item.querySelector('.failure-type-row');
 
-            if (status === 'fail') {{
-                classRow.style.display = 'block';
-                ftRow.style.display = classSelect.value ? 'block' : 'none';
+            if (!cascade) return;
+
+            if (status === 'pass') {{
+                cascade.style.display = 'none';
+                if (classSelect) classSelect.value = 'No-action';
             }} else {{
-                classRow.style.display = 'none';
-                ftRow.style.display = 'none';
+                cascade.style.display = 'block';
+            }}
+
+            const classification = classSelect?.value || '';
+            if (ftRow) {{
+                ftRow.style.display = (classification === 'Bug') ? 'block' : 'none';
             }}
         }}
 
-        function updateFailureTypes(item) {{
-            const classSelect = item.querySelector('.classification-select');
-            const ftSelect    = item.querySelector('.failure-type-select');
-            const ftRow       = item.querySelector('.failure-type-row');
-            const category    = classSelect.value;
-
-            ftSelect.innerHTML = '<option value="">\u2014 Select specific failure \u2014</option>';
-            if (category && FAILURE_SCHEMA[category]?.types) {{
-                FAILURE_SCHEMA[category].types.forEach(t => {{
-                    ftSelect.add(new Option(t.text, t.value));
-                }});
-                ftRow.style.display = 'block';
-            }} else {{
-                ftRow.style.display = 'none';
-            }}
-        }}
-
-        // Wire classification select change events
+        // Wire classification select change events for cascade
         document.querySelectorAll('.test-item').forEach(item => {{
             const classSelect = item.querySelector('.classification-select');
             if (classSelect) {{
-                classSelect.addEventListener('change', () => updateFailureTypes(item));
+                classSelect.addEventListener('change', () => updateCascade(item, results[item.dataset.test] || 'pending'));
             }}
         }});
 
