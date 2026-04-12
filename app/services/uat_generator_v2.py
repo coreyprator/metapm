@@ -501,6 +501,7 @@ def render_structured_uat_html(
         function gatherTestCases() {{
             const cases = [];
             document.querySelectorAll('.test-item').forEach(item => {{
+                if (item.dataset.type === 'cc_machine') return;
                 const id = item.dataset.test;
                 const notes = item.querySelector('.notes-input')?.value || '';
                 const ftSelect = item.querySelector('.failure-type-select');

@@ -113,6 +113,7 @@ TOOLS = [
                 "note": {"type": "string", "description": "Optional note", "default": ""},
                 "pth": {"type": "string", "description": "Optional PTH discriminator (e.g. '91C1'). When provided, filters to the specific requirement matching both code and pth.", "default": ""},
                 "project_code": {"type": "string", "description": "Optional project code discriminator (e.g. 'AF', 'MP', 'SF'). When provided, filters to the specific requirement in that project.", "default": ""},
+                "covered_by_pth": {"type": "string", "description": "PTH of the sprint that delivered this requirement, for requirements with null PTH (also-closes). Allows uat_ready advancement without a direct requirement→spec link.", "default": ""},
             },
             "required": ["code", "status"],
         },
@@ -661,6 +662,7 @@ def _tool_patch_requirement_status(args: dict) -> dict:
     note = args.get("note", "")
     pth = args.get("pth", "")
     project_code = args.get("project_code", "")
+    covered_by_pth = args.get("covered_by_pth", "")
 
     if pth:
         req = execute_query(
@@ -668,6 +670,21 @@ def _tool_patch_requirement_status(args: dict) -> dict:
             (code, pth), fetch="one"
         )
         if not req:
+            # Retry: check if requirement exists but has no PTH assigned yet
+            exists = execute_query(
+                """SELECT r.id, r.status, p.code AS project
+                   FROM roadmap_requirements r
+                   JOIN roadmap_projects p ON r.project_id = p.id
+                   WHERE r.code = ? AND (r.pth IS NULL OR r.pth = '')""",
+                (code,), fetch="one"
+            )
+            if exists:
+                return {
+                    "error": "no_pth_assigned",
+                    "message": f"Requirement '{code}' exists in project '{exists['project']}' but has no PTH yet. "
+                               f"Use project_code='{exists['project']}' as discriminator instead, or call post_prompt first to assign a PTH.",
+                    "hint": f"patch_requirement_status(code='{code}', project_code='{exists['project']}', status=...)"
+                }
             return {"error": f"Requirement '{code}' with pth '{pth}' not found"}
     elif project_code:
         req = execute_query(
@@ -677,12 +694,24 @@ def _tool_patch_requirement_status(args: dict) -> dict:
         if not req:
             return {"error": f"Requirement '{code}' in project '{project_code}' not found"}
     else:
-        req = execute_query(
-            "SELECT id, status FROM roadmap_requirements WHERE code = ?",
-            (code,), fetch="one"
-        )
-        if not req:
+        rows = execute_query(
+            """SELECT r.id, r.status, r.pth, p.code AS project_code
+               FROM roadmap_requirements r
+               JOIN roadmap_projects p ON r.project_id = p.id
+               WHERE r.code = ?""",
+            (code,), fetch="all"
+        ) or []
+        if not rows:
             return {"error": f"Requirement '{code}' not found"}
+        if len(rows) > 1:
+            projects = [r['project_code'] for r in rows]
+            return {
+                "error": "ambiguous_code",
+                "message": f"Requirement code '{code}' exists in multiple projects: {projects}. "
+                           f"Provide project_code to disambiguate.",
+                "hint": f"patch_requirement_status(code='{code}', project_code='<one of {projects}>', status=...)"
+            }
+        req = rows[0]
 
     req_id = req["id"]
     current = req["status"]
@@ -732,7 +761,10 @@ def _tool_patch_requirement_status(args: dict) -> dict:
         has_uat = False
         has_review = False
         req_full = execute_query("SELECT uat_url, pth FROM roadmap_requirements WHERE id = ?", (req_id,), fetch="one")
-        req_pth_val = req_full.get('pth') if req_full else pth
+        # BUG-069: Use covered_by_pth if requirement has no PTH of its own
+        req_pth_val = (req_full.get('pth') if req_full else None) or covered_by_pth or pth
+        if not req_pth_val:
+            return {"error": "Cannot advance to uat_ready: requirement has no PTH and no covered_by_pth provided."}
         if req_pth_val:
             uat_row = execute_query(
                 "SELECT COUNT(*) AS cnt FROM uat_pages WHERE pth = ?",
@@ -759,7 +791,8 @@ def _tool_patch_requirement_status(args: dict) -> dict:
     # MP24 TSK-016: Close gate — require review if UAT pages exist
     if status in ('done', 'closed', 'uat_pass'):
         req_full = execute_query("SELECT pth FROM roadmap_requirements WHERE id = ?", (req_id,), fetch="one")
-        req_pth = req_full.get("pth") if req_full else pth
+        # BUG-069: Use covered_by_pth if requirement has no PTH of its own
+        req_pth = (req_full.get("pth") if req_full else None) or covered_by_pth or pth
         if req_pth:
             uat_exists = execute_query(
                 "SELECT TOP 1 id FROM uat_pages WHERE pth = ?",

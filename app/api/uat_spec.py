@@ -1628,6 +1628,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       let missingClassification = [];
       let hasFails = false;
       cards.forEach(card => {{
+        if (card.dataset.type === 'cc_machine') return;
         const id = card.dataset.id;
         const checked = card.querySelector(`input[name="${{id}}"]:checked`);
         const status = checked ? checked.value : 'pending';

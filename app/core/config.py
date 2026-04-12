@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.87.1"  # MP32: BUG-066 fix OUTPUT INSERTED error 334 on cc_prompts (use SCOPE_IDENTITY), re-add trigger with SET NOCOUNT ON
+    VERSION: str = "2.88.0"  # MP33: BUG-067 cc_machine classification guard, BUG-068 null-PTH/ambiguity fixes, BUG-069 covered_by_pth parameter
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
