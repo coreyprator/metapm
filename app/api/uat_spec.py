@@ -1178,11 +1178,22 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
     .attach-thumb {{ margin-top: 6px; }}
     .attach-thumb img {{ max-width: 160px; max-height: 120px; border-radius: 4px;
       border: 1px solid var(--border); }}
+    :root {{ --transition-speed: 0.25s; }}
+    body {{ transition: background-color var(--transition-speed), color var(--transition-speed); }}
+    [data-theme="light"] {{ --bg: #caced2; --card: #eef2f6; --border: #cbd5e1; --text: #1e293b; --muted: #64748b; }}
+    #theme-toggle {{ background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 4px 10px; border-radius: 4px; cursor: pointer; margin-left: auto; transition: transform 0.1s ease, border-color 0.2s; font-size: 16px; }}
+    #theme-toggle:hover {{ border-color: var(--accent); }}
+    #theme-toggle:active {{ transform: scale(0.92); }}
+    .item-description {{ font-size: 13px !important; line-height: 1.5; color: #b0c4de !important; }}
+    [data-theme="light"] .item-description {{ color: var(--muted) !important; }}
   </style>
 </head>
 <body>
   <header>
-    <h1>{project} v{version} — UAT {submitted_badge}</h1>
+    <div style="display:flex;align-items:center;gap:8px">
+      <h1 style="flex:1">{project} v{version} — UAT {submitted_badge}</h1>
+      <button id="theme-toggle" title="Toggle Light/Dark Mode"></button>
+    </div>
     <div class="meta">
       <span class="chip">v{version}</span>
       <span class="chip">PTH: {pth}</span>
@@ -1222,6 +1233,24 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
   {'<div style="font-size:11px;color:#94a3b8;margin-top:6px;text-align:center">⚡ Submitting fires Loop 3 automatically — requirements will be advanced within 2 minutes.</div>' if not is_submitted else ''}
   <div id="submit-result" {'class="ok" style="display:block"' if is_submitted else ''}>{f'Results submitted. <a href="/uat/{spec_id}">View UAT record →</a>' if is_submitted else ''}</div>
 
+  <script>
+    // REQ-071: Light/dark theme toggle
+    (function() {{
+      var saved = localStorage.getItem('metapm-theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', saved);
+      var btn = document.getElementById('theme-toggle');
+      if (btn) {{
+        btn.textContent = saved === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+        btn.addEventListener('click', function() {{
+          var current = document.documentElement.getAttribute('data-theme') || 'dark';
+          var next = current === 'dark' ? 'light' : 'dark';
+          document.documentElement.setAttribute('data-theme', next);
+          btn.textContent = next === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+          localStorage.setItem('metapm-theme', next);
+        }});
+      }}
+    }})();
+  </script>
   <script>
     const SPEC_ID = "{spec_id}";
 

@@ -716,10 +716,27 @@ def _tool_patch_requirement_status(args: dict) -> dict:
     req_id = req["id"]
     current = req["status"]
 
+    # BUG-070: Fetch requirement type for task bypass check
+    req_detail = execute_query("SELECT r.type, r.pth FROM roadmap_requirements r WHERE r.id = ?", (req_id,), fetch="one")
+    req_type = req_detail.get('type') if req_detail else None
+    req_pth_stored = req_detail.get('pth') if req_detail else None
+
     # MP18 BUG-036: State machine enforcement
     from app.api.roadmap import ALLOWED_TRANSITIONS
+
+    # BUG-070: Allow task-type requirements to bypass cc_complete → done when no UAT spec exists
+    is_task_bypass = False
+    if current == 'cc_complete' and status == 'done' and req_type == 'task':
+        pth_to_check = req_pth_stored or pth
+        uat_exists = False
+        if pth_to_check:
+            uat_row = execute_query("SELECT COUNT(*) AS cnt FROM uat_pages WHERE pth = ?", (pth_to_check,), fetch="one")
+            uat_exists = uat_row and uat_row['cnt'] > 0
+        if not uat_exists:
+            is_task_bypass = True
+
     allowed = ALLOWED_TRANSITIONS.get(current, [])
-    if status not in allowed:
+    if not is_task_bypass and status not in allowed:
         write_requirement_failure(req_id, current, status, 'MCP', 'patch_requirement_status',
                                   f"illegal_transition: {current} -> {status}")
         return {

@@ -17,6 +17,7 @@
       --warn: #f5a623;
       --info: #4a90d9;
     }
+    :root { --transition-speed: 0.25s; }
     * { box-sizing: border-box; }
     body {
       margin: 0;
@@ -24,7 +25,16 @@
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
+      transition: background-color var(--transition-speed), color var(--transition-speed);
     }
+    [data-theme="light"] { --bg: #caced2; --panel: #eef2f6; --panel-soft: #f8fafc; --text: #1e293b; --muted: #64748b; --line: #cbd5e1; }
+    #theme-toggle { background: var(--panel); border: 1px solid var(--line); color: var(--text); padding: 4px 10px; border-radius: 4px; cursor: pointer; margin-left: auto; transition: transform 0.1s ease, border-color 0.2s; font-size: 16px; }
+    #theme-toggle:hover { border-color: var(--accent); }
+    #theme-toggle:active { transform: scale(0.92); }
+    .item-description { font-size: 13px !important; line-height: 1.5; color: #b0c4de !important; }
+    [data-theme="light"] .item-description { color: var(--muted) !important; }
+    [data-theme="light"] .req-row { background: var(--panel) !important; }
+    [data-theme="light"] #resetFiltersBtn { background-color: #fee2e2 !important; color: #991b1b !important; border: 1px solid #fecaca !important; }
     .app {
       max-width: 1320px;
       margin: 0 auto;
@@ -465,6 +475,7 @@
       <div class="title-wrap">
         <div class="title" onclick="resetToHome()" style="cursor:pointer" title="Return to default dashboard">🔴 MetaPM</div>
         <span id="appVersion" class="version-badge">v-</span>
+        <button id="theme-toggle" title="Toggle Light/Dark Mode"></button>
       </div>
       <div class="actions-row">
         <button type="button" id="qualityTabBtn" onclick="toggleQualityTab()">📊 Quality</button>
@@ -854,6 +865,24 @@
     </div>
   </div>
 
+  <script>
+    // REQ-071: Light/dark theme toggle
+    (function() {
+      const saved = localStorage.getItem('metapm-theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', saved);
+      const btn = document.getElementById('theme-toggle');
+      if (btn) {
+        btn.textContent = saved === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+        btn.addEventListener('click', function() {
+          const current = document.documentElement.getAttribute('data-theme') || 'dark';
+          const next = current === 'dark' ? 'light' : 'dark';
+          document.documentElement.setAttribute('data-theme', next);
+          btn.textContent = next === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+          localStorage.setItem('metapm-theme', next);
+        });
+      }
+    })();
+  </script>
   <script>
     const PROJECT_COLORS = {
       HL: '#4A90D9', SF: '#F5A623', AF: '#E8751A', EM: '#9B59B6', MP: '#E74C3C', PM: '#27AE60'

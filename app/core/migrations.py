@@ -2376,4 +2376,21 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 64 warning: {e}")
 
+    # Migration 65: BUG-071 — Replace plain UNIQUE on cc_prompts.pth with filtered index excluding rejected rows
+    try:
+        execute_query("""
+            IF EXISTS (SELECT 1 FROM sys.indexes
+                       WHERE name='UQ_cc_prompts_pth' AND object_id=OBJECT_ID('cc_prompts'))
+            ALTER TABLE cc_prompts DROP CONSTRAINT UQ_cc_prompts_pth
+        """, fetch="none")
+        execute_query("""
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes
+                           WHERE name='IX_cc_prompts_pth_active' AND object_id=OBJECT_ID('cc_prompts'))
+            CREATE UNIQUE INDEX IX_cc_prompts_pth_active ON cc_prompts(pth)
+            WHERE status != 'rejected' AND pth IS NOT NULL
+        """, fetch="none")
+        logger.info("  Migration 65: Filtered unique index IX_cc_prompts_pth_active created (BUG-071).")
+    except Exception as e:
+        logger.warning(f"  Migration 65 warning: {e}")
+
     logger.info("Migrations complete.")
