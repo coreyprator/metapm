@@ -761,8 +761,8 @@ def _tool_patch_requirement_status(args: dict) -> dict:
         has_uat = False
         has_review = False
         req_full = execute_query("SELECT uat_url, pth FROM roadmap_requirements WHERE id = ?", (req_id,), fetch="one")
-        # BUG-069: Use covered_by_pth if requirement has no PTH of its own
-        req_pth_val = (req_full.get('pth') if req_full else None) or covered_by_pth or pth
+        # BUG-069: covered_by_pth overrides stored PTH when explicitly provided
+        req_pth_val = covered_by_pth or (req_full.get('pth') if req_full else None) or pth
         if not req_pth_val:
             return {"error": "Cannot advance to uat_ready: requirement has no PTH and no covered_by_pth provided."}
         if req_pth_val:
@@ -791,8 +791,8 @@ def _tool_patch_requirement_status(args: dict) -> dict:
     # MP24 TSK-016: Close gate — require review if UAT pages exist
     if status in ('done', 'closed', 'uat_pass'):
         req_full = execute_query("SELECT pth FROM roadmap_requirements WHERE id = ?", (req_id,), fetch="one")
-        # BUG-069: Use covered_by_pth if requirement has no PTH of its own
-        req_pth = (req_full.get("pth") if req_full else None) or covered_by_pth or pth
+        # BUG-069: covered_by_pth overrides stored PTH when explicitly provided
+        req_pth = covered_by_pth or (req_full.get("pth") if req_full else None) or pth
         if req_pth:
             uat_exists = execute_query(
                 "SELECT TOP 1 id FROM uat_pages WHERE pth = ?",
