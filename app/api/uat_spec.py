@@ -23,6 +23,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def strip_surrogates(text: str) -> str:
+    """BUG-072: Remove surrogate pairs that break UTF-8 encoding."""
+    if not text:
+        return text
+    return text.encode('utf-16', 'surrogatepass').decode('utf-16', 'ignore')
+
+
 def _validate_uuid(value: str) -> str:
     """Validate UUID format. Returns value or raises 400."""
     try:
@@ -621,7 +628,7 @@ async def submit_cc_results(spec_id: str, body: CCResultsSubmit):
         update = updates_by_id.get(case["id"])
         if update and case.get("type") == "cc_machine":
             case["cc_result"] = update.cc_result
-            case["cc_evidence"] = update.cc_evidence
+            case["cc_evidence"] = strip_surrogates(update.cc_evidence)
             case["status"] = update.cc_result  # sync status with cc_result
             updated_count += 1
 
@@ -642,10 +649,10 @@ async def submit_cc_results(spec_id: str, body: CCResultsSubmit):
                     VALUES (?, ?, ?, ?, ?, ?)
             """, (
                 spec_id, tc.id,
-                tc.cc_result, tc.cc_result, tc.cc_evidence,
+                tc.cc_result, tc.cc_result, strip_surrogates(tc.cc_evidence),
                 spec_id, tc.id,
                 spec_id, tc.id, tc.id,
-                tc.cc_result, tc.cc_result, tc.cc_evidence,
+                tc.cc_result, tc.cc_result, strip_surrogates(tc.cc_evidence),
             ), fetch="none")
         except Exception as e:
             logger.warning(f"CC BV item upsert failed for {tc.id}: {e}")
@@ -1240,12 +1247,12 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       document.documentElement.setAttribute('data-theme', saved);
       var btn = document.getElementById('theme-toggle');
       if (btn) {{
-        btn.textContent = saved === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+        btn.textContent = saved === 'dark' ? '\u2600\uFE0F' : '\U0001F319';
         btn.addEventListener('click', function() {{
           var current = document.documentElement.getAttribute('data-theme') || 'dark';
           var next = current === 'dark' ? 'light' : 'dark';
           document.documentElement.setAttribute('data-theme', next);
-          btn.textContent = next === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+          btn.textContent = next === 'dark' ? '\u2600\uFE0F' : '\U0001F319';
           localStorage.setItem('metapm-theme', next);
         }});
       }}

@@ -24,6 +24,13 @@ from app.core.state_machine import (
 
 logger = logging.getLogger(__name__)
 
+
+def strip_surrogates(text: str) -> str:
+    """BUG-072: Remove surrogate pairs that break UTF-8 encoding."""
+    if not text:
+        return text
+    return text.encode('utf-16', 'surrogatepass').decode('utf-16', 'ignore')
+
 router = APIRouter()
 
 # ── Tool definitions (MCP tools/list schema) ──
@@ -395,6 +402,9 @@ def _tool_post_prompt(args: dict) -> dict:
         write_failure_event('duplicate_pth', pth, 'post_prompt',
                             f"PTH '{pth}' already has active prompt (id={active['id']}) in status '{active['status']}'")
         return {"error": f"PTH '{pth}' already has an active prompt in status '{active['status']}'. Reject or complete it first."}
+
+    # BUG-072: Strip surrogates before INSERT
+    content_md = strip_surrogates(content_md)
 
     result = execute_query("""
         SET NOCOUNT ON;
@@ -1380,7 +1390,7 @@ def _tool_submit_cc_results(args: dict) -> dict:
         update = updates_by_id.get(case["id"])
         if update and case.get("type") == "cc_machine":
             case["cc_result"] = update["cc_result"]
-            case["cc_evidence"] = update["cc_evidence"]
+            case["cc_evidence"] = strip_surrogates(update["cc_evidence"])
             case["status"] = update["cc_result"]
             updated_count += 1
 
@@ -1401,10 +1411,10 @@ def _tool_submit_cc_results(args: dict) -> dict:
                     VALUES (?, ?, ?, ?, ?, ?)
             """, (
                 spec_id, tc["id"],
-                tc["cc_result"], tc["cc_result"], tc["cc_evidence"],
+                tc["cc_result"], tc["cc_result"], strip_surrogates(tc["cc_evidence"]),
                 spec_id, tc["id"],
                 spec_id, tc["id"], tc["id"],
-                tc["cc_result"], tc["cc_result"], tc["cc_evidence"],
+                tc["cc_result"], tc["cc_result"], strip_surrogates(tc["cc_evidence"]),
             ), fetch="none")
         except Exception as e:
             logger.warning(f"CC BV item upsert failed for {tc['id']}: {e}")
