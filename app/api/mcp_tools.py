@@ -816,7 +816,7 @@ def _tool_patch_requirement_status(args: dict) -> dict:
                 "message": "Cannot close: no CAI review record for this PTH."}
 
     # MP24 TSK-016: Close gate — require review if UAT pages exist
-    if status in ('done', 'closed', 'uat_pass'):
+    if status in ('done', 'closed', 'uat_pass') and not is_task_bypass:
         req_full = execute_query("SELECT pth FROM roadmap_requirements WHERE id = ?", (req_id,), fetch="one")
         # BUG-069: covered_by_pth overrides stored PTH when explicitly provided
         req_pth = covered_by_pth or (req_full.get("pth") if req_full else None) or pth

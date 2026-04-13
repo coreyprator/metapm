@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.90.0"  # MP35: BUG-072 UTF-8 surrogate sanitization
+    VERSION: str = "2.91.0"  # MP36: BUG-070 task bypass gate + BUG-074 theme CSS
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

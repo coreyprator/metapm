@@ -1139,15 +1139,22 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
     .radio-label.checked-skip {{ background: rgba(139,148,158,0.2); border-color: var(--skip); color: var(--skip); font-weight: 600; }}
     .radio-label.checked-pending {{ background: rgba(210,153,34,0.2); border-color: var(--pending); color: var(--pending); font-weight: 600; }}
     .notes-label {{ font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }}
-    .notes-input {{ width: 100%; padding: 7px 10px; background: #0d1117;
-      border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+    .notes-input {{ width: 100%; padding: 7px 10px; background: var(--card) !important;
+      border: 1px solid var(--border) !important; border-radius: 6px; color: var(--text) !important;
       font-family: inherit; font-size: 0.85rem; resize: vertical; min-height: 36px; }}
+    .notes-input::placeholder {{ color: var(--muted); }}
     .notes-input:focus {{ outline: none; border-color: var(--accent); }}
     .general-notes {{ background: var(--card); border: 1px solid var(--border);
       border-radius: 8px; padding: 16px; margin-bottom: 20px; }}
     .general-notes textarea {{ width: 100%; min-height: 80px; padding: 10px 12px;
-      background: #0d1117; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--card); border: 1px solid var(--border); border-radius: 6px;
       color: var(--text); font-family: inherit; font-size: 0.9rem; resize: vertical; }}
+    .classification-select,
+    .failure-type-select {{
+      background: var(--card) !important;
+      color: var(--text) !important;
+      border: 1px solid var(--border) !important;
+    }}
     .general-notes textarea:focus {{ outline: none; border-color: #bc8cff; }}
     .general-notes-title {{ font-size: 1rem; font-weight: 600; color: #bc8cff;
       border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; }}
@@ -1169,7 +1176,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       border: 1px solid var(--pass); color: var(--pass); padding: 4px 12px;
       border-radius: 6px; font-size: 0.8rem; font-weight: 600; margin-left: 12px; }}
     .test-card.submitted .radio-label {{ pointer-events: none; opacity: 0.85; }}
-    .test-card.submitted .notes-input {{ background: #0a0e17; pointer-events: none; }}
+    .test-card.submitted .notes-input {{ background: var(--bg) !important; pointer-events: none; }}
     .paste-zone {{ border: 2px dashed var(--border); border-radius: 6px; padding: 8px 12px;
       margin-top: 8px; font-size: 0.82rem; color: var(--muted); cursor: text;
       transition: border-color 0.2s; user-select: none; }}
@@ -1177,9 +1184,9 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
     .paste-zone.has-image {{ border-color: var(--pass); color: var(--pass); }}
     .attach-row {{ display: flex; align-items: center; gap: 8px; margin-top: 6px; }}
     .attach-btn {{ display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px;
-      background: #21262d; border: 1px solid var(--border); border-radius: 6px;
-      font-size: 0.82rem; cursor: pointer; color: var(--text); }}
-    .attach-btn:hover {{ border-color: var(--accent); }}
+      background: var(--card) !important; border: 1px solid var(--border) !important; border-radius: 6px;
+      font-size: 0.82rem; cursor: pointer; color: var(--text) !important; }}
+    .attach-btn:hover {{ border-color: var(--accent) !important; }}
     .attach-btn input[type=file] {{ display: none; }}
     .attach-name {{ font-size: 0.78rem; color: var(--muted); }}
     .attach-thumb {{ margin-top: 6px; }}
