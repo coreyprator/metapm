@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Requirement | MetaPM</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 20px; }
+  .container { max-width: 900px; margin: 0 auto; }
+  .back-link { display: inline-block; margin-bottom: 16px; color: var(--accent); text-decoration: none; font-size: 14px; }
+  .back-link:hover { text-decoration: underline; }
+  .req-header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+  .badge { padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; display: inline-block; }
+  .code-badge { background: #7c3aed; color: #fff; }
+  .project-badge { background: #374151; color: #d1d5db; }
+  .priority-badge { padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 700; text-transform: uppercase; }
+  .priority-P1 { background: #991b1b; color: #fca5a5; }
+  .priority-P2 { background: #92400e; color: #fde68a; }
+  .priority-P3 { background: #374151; color: #9ca3af; }
+  .type-badge { background: #1e3a5f; color: #93c5fd; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+  .status-badge { padding: 4px 14px; border-radius: 12px; font-size: 13px; font-weight: 700; text-transform: uppercase; }
+  .req-title { font-size: 24px; font-weight: 700; color: #f0f6fc; margin-bottom: 8px; line-height: 1.3; }
+  .req-meta { color: var(--muted); font-size: 14px; margin-bottom: 20px; line-height: 1.8; }
+  .req-meta a { color: var(--accent); text-decoration: none; }
+  .req-meta a:hover { text-decoration: underline; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+  .card-title { font-weight: 700; font-size: 14px; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .description { line-height: 1.7; font-size: 14px; white-space: pre-wrap; }
+  .timeline { list-style: none; padding: 0; }
+  .timeline li { padding: 8px 0 8px 16px; border-left: 2px solid var(--border); margin-left: 4px; font-size: 13px; }
+  .timeline li:last-child { border-left-color: var(--accent); }
+  .timeline .from-status { color: var(--muted); }
+  .timeline .arrow { color: #6e7681; margin: 0 6px; }
+  .timeline .to-status { font-weight: 600; }
+  .timeline .change-meta { color: #6e7681; font-size: 12px; margin-left: 8px; }
+  .loading { text-align: center; padding: 60px; color: #6e7681; font-size: 16px; }
+  .error { text-align: center; padding: 60px; color: #f87171; font-size: 16px; }
+  .not-found { text-align: center; padding: 60px; }
+  .not-found h2 { color: #f87171; margin-bottom: 12px; }
+  .not-found a { color: var(--accent); text-decoration: none; }
+  .not-found a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="/" class="back-link">&larr; Dashboard</a>
+  <div id="content">
+    <div class="loading">Loading requirement...</div>
+  </div>
+</div>
+<script>
+const STATUS_COLORS = {
+  req_created: '#6B7280', req_approved: '#2563EB', cai_designing: '#7C3AED',
+  cc_prompt_ready: '#D97706', cc_executing: '#EA580C', cc_complete: '#0891B2',
+  uat_ready: '#0284C7', uat_pass: '#16A34A', uat_fail: '#DC2626',
+  done: '#15803D', rework: '#9F1239',
+  backlog: '#6B7280', executing: '#EA580C', closed: '#374151'
+};
+
+const PROJECT_EMOJIS = {
+  MP: '\ud83d\udd34', SF: '\ud83d\udfe1', AF: '\ud83d\udfe0', HL: '\ud83d\udfe2',
+  EM: '\ud83d\udfe3', PM: '\ud83d\udfe2', EFG: '\ud83d\udd37', PR: '\u2b1c'
+};
+
+function statusBadge(status) {
+  const bg = STATUS_COLORS[status] || '#374151';
+  return `<span class="status-badge" style="background:${bg};color:#fff">${status}</span>`;
+}
+
+function priorityBadge(p) {
+  if (!p) return '';
+  return `<span class="priority-badge priority-${p}">${p}</span>`;
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+async function load() {
+  const parts = window.location.pathname.split('/');
+  // /r/{project_code}/{req_code}
+  const projectCode = decodeURIComponent(parts[2] || '').toUpperCase();
+  const reqCode = decodeURIComponent(parts[3] || '').toUpperCase();
+  const el = document.getElementById('content');
+
+  try {
+    const resp = await fetch(`/api/roadmap/requirements?project_code=${projectCode}&search=${encodeURIComponent(reqCode)}&limit=10`);
+    if (!resp.ok) throw new Error(`API returned ${resp.status}`);
+    const data = await resp.json();
+
+    const match = (data.requirements || []).find(r => r.code.toUpperCase() === reqCode);
+    if (!match) {
+      el.innerHTML = `<div class="not-found">
+        <h2>Requirement ${projectCode}/${reqCode} not found</h2>
+        <p style="color:var(--muted);margin-bottom:16px">This requirement may not exist or may belong to a different project.</p>
+        <a href="/">&larr; Back to Dashboard</a>
+      </div>`;
+      document.title = `Not Found | MetaPM`;
+      return;
+    }
+
+    document.title = `${match.code} \u2014 ${projectCode} | MetaPM`;
+
+    const emoji = match.project_emoji || PROJECT_EMOJIS[projectCode] || '';
+    const projName = match.project_name || projectCode;
+
+    let html = `
+      <h1 class="req-title">${escHtml(match.title)}</h1>
+      <div class="req-header">
+        <span class="badge code-badge">${escHtml(match.code)}</span>
+        ${statusBadge(match.status)}
+        ${priorityBadge(match.priority)}
+        ${match.type ? `<span class="badge type-badge">${escHtml(match.type)}</span>` : ''}
+        <span class="badge project-badge">${emoji} ${escHtml(projName)}</span>
+      </div>
+      <div class="req-meta">`;
+
+    if (match.pth) html += `PTH: <a href="/prompts/${escHtml(match.pth)}">${escHtml(match.pth)}</a><br>`;
+    if (match.sprint_id) html += `Sprint: ${escHtml(match.sprint_id)}<br>`;
+    if (match.target_version) html += `Target: ${escHtml(match.target_version)}<br>`;
+    if (match.created_at) html += `Created: ${formatDate(match.created_at)}<br>`;
+    if (match.updated_at) html += `Updated: ${formatDate(match.updated_at)}<br>`;
+    if (match.uat_url) html += `UAT: <a href="${escHtml(match.uat_url)}" target="_blank">View UAT</a><br>`;
+
+    html += `<a href="/?project=${projectCode}">View all ${escHtml(projName)} requirements</a>`;
+    html += `</div>`;
+
+    if (match.description) {
+      html += `<div class="card">
+        <div class="card-title">Description</div>
+        <div class="description">${escHtml(match.description)}</div>
+      </div>`;
+    }
+
+    // Fetch history
+    html += `<div class="card" id="history-card">
+      <div class="card-title">Lifecycle History</div>
+      <div class="loading" style="padding:16px">Loading history...</div>
+    </div>`;
+
+    el.innerHTML = html;
+
+    // Load history async
+    try {
+      const hResp = await fetch(`/api/roadmap/requirements/${match.id}/history`);
+      const hCard = document.getElementById('history-card');
+      if (hResp.ok) {
+        const hData = await hResp.json();
+        const entries = (hData.history || []).filter(h => h.field_name === 'status');
+        if (entries.length === 0) {
+          hCard.innerHTML = `<div class="card-title">Lifecycle History</div><p style="color:var(--muted);font-size:13px">No status transitions recorded yet.</p>`;
+        } else {
+          let tl = '<div class="card-title">Lifecycle History</div><ul class="timeline">';
+          entries.forEach(h => {
+            const fromBg = STATUS_COLORS[h.old_value] || '#374151';
+            const toBg = STATUS_COLORS[h.new_value] || '#374151';
+            tl += `<li>
+              <span class="from-status" style="color:${fromBg}">${escHtml(h.old_value || '(none)')}</span>
+              <span class="arrow">\u2192</span>
+              <span class="to-status" style="color:${toBg}">${escHtml(h.new_value)}</span>
+              <span class="change-meta">${formatDate(h.changed_at)}${h.changed_by ? ' by ' + escHtml(h.changed_by) : ''}</span>
+            </li>`;
+          });
+          tl += '</ul>';
+          hCard.innerHTML = tl;
+        }
+      } else {
+        hCard.innerHTML = `<div class="card-title">Lifecycle History</div><p style="color:var(--muted);font-size:13px">History unavailable.</p>`;
+      }
+    } catch (e) {
+      const hCard = document.getElementById('history-card');
+      if (hCard) hCard.innerHTML = `<div class="card-title">Lifecycle History</div><p style="color:var(--muted);font-size:13px">History unavailable.</p>`;
+    }
+
+  } catch (err) {
+    el.innerHTML = `<div class="error">Error loading requirement: ${escHtml(err.message)}</div>`;
+  }
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+load();
+</script>
+</body>
+</html>

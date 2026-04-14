@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.91.0"  # MP36: BUG-070 task bypass gate + BUG-074 theme CSS
+    VERSION: str = "2.92.0"  # MP37: REQ-075 requirement deep links /r/{project}/{code}
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

@@ -410,6 +410,16 @@ async def prompt_viewer_page(pth: str):
     raise HTTPException(status_code=404, detail="Prompt viewer page not found")
 
 
+@app.get("/r/{project_code}/{req_code}")
+async def requirement_deep_link(project_code: str, req_code: str):
+    """Human-readable deep link for requirements. /r/MP/REQ-075 renders the requirement."""
+    req_link_file = static_dir / "requirement-link.html"
+    if req_link_file.exists():
+        return FileResponse(str(req_link_file), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Requirement link page not found")
+
+
 @app.get("/self-uat")
 async def self_uat_page():
     """Serve the self-service ad-hoc UAT form (MP12)."""
