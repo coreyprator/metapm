@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CAI Prompt Builder — MetaPM</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #111a2d;
+      --panel-soft: #0f1729;
+      --text: #e6edf8;
+      --muted: #9aa8c7;
+      --line: #26344f;
+      --accent: #e74c3c;
+      --ok: #23a55a;
+      --warn: #f5a623;
+      --info: #4a90d9;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--line);
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .header h1 { font-size: 20px; font-weight: 700; }
+    .header .nav-link {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+    }
+    .header .nav-link:hover { color: var(--text); }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    /* Step 1: Input */
+    .step { margin-bottom: 24px; }
+    .step-label {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 8px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 140px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      padding: 12px;
+      resize: vertical;
+    }
+    textarea:focus { outline: none; border-color: var(--info); }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 18px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary { background: var(--info); color: #fff; }
+    .btn-primary:hover:not(:disabled) { opacity: .85; }
+    .btn-ok { background: var(--ok); color: #fff; }
+    .btn-ok:hover:not(:disabled) { opacity: .85; }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--text);
+    }
+    .btn-outline:hover:not(:disabled) { border-color: var(--muted); }
+    .btn-row { display: flex; gap: 10px; margin-top: 12px; }
+
+    /* Questions */
+    .questions-section { display: none; }
+    .questions-section.active { display: block; }
+    .q-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+    .q-card .q-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .q-card .q-category {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .q-card textarea {
+      min-height: 60px;
+    }
+    .q-required {
+      display: inline-block;
+      font-size: 10px;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 3px;
+      padding: 1px 5px;
+      margin-left: 6px;
+    }
+
+    /* Template badge */
+    .template-badge {
+      display: inline-block;
+      background: var(--panel);
+      border: 1px solid var(--info);
+      color: var(--info);
+      border-radius: 4px;
+      padding: 3px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+
+    /* Status */
+    .status-bar {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+    .status-bar.loading {
+      display: flex;
+      background: rgba(74, 144, 217, .12);
+      border: 1px solid rgba(74, 144, 217, .3);
+      color: var(--info);
+    }
+    .status-bar.error {
+      display: flex;
+      background: rgba(231, 76, 60, .12);
+      border: 1px solid rgba(231, 76, 60, .3);
+      color: var(--accent);
+    }
+    .status-bar.success {
+      display: flex;
+      background: rgba(35, 165, 90, .12);
+      border: 1px solid rgba(35, 165, 90, .3);
+      color: var(--ok);
+    }
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid transparent;
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Approved banner */
+    .approved-banner {
+      display: none;
+      background: rgba(35, 165, 90, .15);
+      border: 1px solid var(--ok);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .approved-banner .pth-label {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--ok);
+    }
+    .approved-banner .copy-btn {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <h1>CAI Prompt Builder</h1>
+    </div>
+    <div>
+      <a href="/static/dashboard.html" class="nav-link">Dashboard</a>
+      &nbsp;&nbsp;
+      <a href="/templates" class="nav-link">Templates</a>
+      &nbsp;&nbsp;
+      <a href="/prompts" class="nav-link">Prompts</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Status bar -->
+    <div id="status-bar" class="status-bar"></div>
+
+    <!-- Approved banner -->
+    <div id="approved-banner" class="approved-banner">
+      <div class="pth-label" id="approved-pth"></div>
+      <div style="color:var(--muted);font-size:13px;margin-top:4px">Prompt finalized — open the draft tab to copy</div>
+      <button class="btn btn-ok copy-btn" id="copy-final-btn" onclick="copyFinalPrompt()">Copy Final Prompt</button>
+    </div>
+
+    <!-- Step 1: Input -->
+    <div class="step" id="step-input">
+      <div class="step-label">Step 1 — Describe your task</div>
+      <textarea id="raw-input" placeholder="Type your rough thoughts here... e.g. 'fix the theme toggle on the UAT form textarea' or 'add a new endpoint that returns project stats'"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="submit-btn" onclick="submitInput()">Submit</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Questions -->
+    <div class="questions-section" id="questions-section">
+      <div class="step-label">Step 2 — Answer follow-up questions</div>
+      <div id="template-badge"></div>
+      <div id="questions-list"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="refine-btn" onclick="refinePrompt()">Refine</button>
+        <button class="btn btn-ok" id="approve-btn" onclick="finalizePrompt()" disabled>Approve</button>
+        <button class="btn btn-outline" id="view-draft-btn" onclick="openDraftTab()">View Draft</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Debug layer (BA41) ---
+    window.PortfolioDebug = window.PortfolioDebug || {
+      enabled: new URLSearchParams(window.location.search).get('debug') === '1' ||
+               localStorage.getItem('portfolio-debug') === '1',
+      log: function(c, e, p) { if (this.enabled) console.log('[DEBUG] ' + c + ' | ' + e, p || ''); },
+      enable: function() { this.enabled = true; }
+    };
+
+    // --- State ---
+    let state = {
+      sessionId: null,
+      originalInput: '',
+      templateType: '',
+      questions: [],
+      promptDraft: '',
+      promptFinal: '',
+      pth: null,
+      draftWindow: null,
+    };
+
+    // --- Status helpers ---
+    function showStatus(type, msg) {
+      const bar = document.getElementById('status-bar');
+      bar.className = 'status-bar ' + type;
+      if (type === 'loading') {
+        bar.innerHTML = '<div class="spinner"></div>' + msg;
+      } else {
+        bar.innerHTML = msg;
+      }
+    }
+    function hideStatus() {
+      document.getElementById('status-bar').className = 'status-bar';
+      document.getElementById('status-bar').style.display = 'none';
+    }
+
+    function setButtonsDisabled(disabled) {
+      ['submit-btn', 'refine-btn', 'approve-btn'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = disabled;
+      });
+    }
+
+    // --- Check approve eligibility ---
+    function checkApproveEligibility() {
+      const allAnswered = state.questions.every(q => {
+        if (!q.required) return true;
+        return q.answer && q.answer.trim().length > 0;
+      });
+      document.getElementById('approve-btn').disabled = !allAnswered;
+    }
+
+    // --- Render questions ---
+    function renderQuestions() {
+      const container = document.getElementById('questions-list');
+      container.innerHTML = '';
+      state.questions.forEach((q, i) => {
+        const card = document.createElement('div');
+        card.className = 'q-card';
+        const reqBadge = q.required ? '<span class="q-required">REQUIRED</span>' : '';
+        card.innerHTML =
+          '<div class="q-label">' + q.question + reqBadge + '</div>' +
+          (q.id ? '<div class="q-category">' + q.id + '</div>' : '') +
+          '<textarea id="answer-' + i + '" placeholder="Your answer...">' + (q.answer || '') + '</textarea>';
+        container.appendChild(card);
+        const ta = card.querySelector('textarea');
+        ta.addEventListener('input', function() {
+          state.questions[i].answer = this.value;
+          checkApproveEligibility();
+        });
+      });
+      checkApproveEligibility();
+    }
+
+    // --- Draft tab ---
+    function writeDraftToTab(content, title) {
+      if (!state.draftWindow || state.draftWindow.closed) {
+        state.draftWindow = window.open('', 'prompt-draft-tab');
+      }
+      const w = state.draftWindow;
+      const html = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+        '<title>' + (title || 'CC Prompt Draft') + '</title>' +
+        '<style>' +
+        'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b1220;color:#e6edf8;padding:24px;max-width:900px;margin:0 auto}' +
+        'pre{background:#111a2d;border:1px solid #26344f;border-radius:6px;padding:16px;white-space:pre-wrap;font-size:13px;line-height:1.6;overflow-x:auto}' +
+        'h1{font-size:18px;margin-bottom:4px}' +
+        '.meta{color:#9aa8c7;font-size:12px;margin-bottom:16px}' +
+        'button{background:#4a90d9;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer}' +
+        'button:hover{opacity:.85}' +
+        '</style></head><body>' +
+        '<h1>' + (title || 'CC Prompt Draft') + '</h1>' +
+        '<div class="meta">Session: ' + (state.sessionId || '—') + ' | Template: ' + (state.templateType || '—') + '</div>' +
+        '<button onclick="navigator.clipboard.writeText(document.getElementById(\'draft-content\').textContent).then(()=>this.textContent=\'Copied!\')">Copy to Clipboard</button>' +
+        '<pre id="draft-content">' + escapeHtml(content) + '</pre>' +
+        '</body></html>';
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+    }
+
+    function openDraftTab() {
+      writeDraftToTab(state.promptFinal || state.promptDraft, state.pth ? ('Final Prompt — PTH: ' + state.pth) : 'CC Prompt Draft');
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // --- Submit ---
+    async function submitInput() {
+      const input = document.getElementById('raw-input').value.trim();
+      if (!input) return;
+
+      state.originalInput = input;
+      PortfolioDebug.log('PromptBuilder', 'submit fired', input.length);
+
+      showStatus('loading', 'AI is analyzing your input...');
+      setButtonsDisabled(true);
+
+      try {
+        const resp = await fetch('/api/ai/prompt-builder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ input: input }),
+        });
+
+        PortfolioDebug.log('PromptBuilder', 'POST /api/ai/prompt-builder', resp.status);
+
+        if (!resp.ok) {
+          const err = await resp.text();
+          throw new Error('API error ' + resp.status + ': ' + err);
+        }
+
+        const data = await resp.json();
+        state.sessionId = data.session_id;
+        state.templateType = data.template_type;
+        state.questions = data.questions || [];
+        state.promptDraft = data.prompt_draft || '';
+
+        PortfolioDebug.log('PromptBuilder', 'questions received', state.questions.length);
+
+        // Show template badge
+        document.getElementById('template-badge').innerHTML =
+          '<span class="template-badge">' + state.templateType + '</span>';
+
+        // Show questions section
+        document.getElementById('questions-section').classList.add('active');
+        renderQuestions();
+
+        // Open draft tab
+        writeDraftToTab(state.promptDraft, 'CC Prompt Draft');
+        PortfolioDebug.log('PromptBuilder', 'draft tab opened');
+
+        hideStatus();
+      } catch (e) {
+        showStatus('error', 'Error: ' + e.message);
+      } finally {
+        setButtonsDisabled(false);
+      }
+    }
+
+    // --- Refine ---
+    async function refinePrompt() {
+      // Sync answers from textareas
+      state.questions.forEach((q, i) => {
+        const ta = document.getElementById('answer-' + i);
+        if (ta) q.answer = ta.value;
+      });
+
+      const answeredCount = state.questions.filter(q => q.answer && q.answer.trim()).length;
+      PortfolioDebug.log('PromptBuilder', 'refine fired', answeredCount);
+
+      showStatus('loading', 'AI is refining the prompt...');
+      setButtonsDisabled(true);
+
+      try {
+        const resp = await fetch('/api/ai/prompt-builder/refine', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: state.sessionId,
+            original_input: state.originalInput,
+            template_type: state.templateType,
+            questions: state.questions,
+            prompt_draft: state.promptDraft,
+          }),
+        });
+
+        PortfolioDebug.log('PromptBuilder', 'POST /api/ai/prompt-builder/refine', resp.status);
+
+        if (!resp.ok) {
+          const err = await resp.text();
+          throw new Error('Refine error ' + resp.status + ': ' + err);
+        }
+
+        const data = await resp.json();
+        state.questions = data.questions || state.questions;
+        state.promptDraft = data.prompt_draft || state.promptDraft;
+
+        renderQuestions();
+        writeDraftToTab(state.promptDraft, 'CC Prompt Draft (Refined)');
+
+        hideStatus();
+      } catch (e) {
+        showStatus('error', 'Error: ' + e.message);
+      } finally {
+        setButtonsDisabled(false);
+      }
+    }
+
+    // --- Finalize ---
+    async function finalizePrompt() {
+      // Sync answers
+      state.questions.forEach((q, i) => {
+        const ta = document.getElementById('answer-' + i);
+        if (ta) q.answer = ta.value;
+      });
+
+      PortfolioDebug.log('PromptBuilder', 'finalize fired');
+
+      showStatus('loading', 'Finalizing prompt...');
+      setButtonsDisabled(true);
+
+      try {
+        const resp = await fetch('/api/ai/prompt-builder/finalize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: state.sessionId,
+            original_input: state.originalInput,
+            template_type: state.templateType,
+            questions: state.questions,
+            prompt_draft: state.promptDraft,
+          }),
+        });
+
+        PortfolioDebug.log('PromptBuilder', 'POST /api/ai/prompt-builder/finalize', resp.status);
+
+        if (!resp.ok) {
+          const err = await resp.text();
+          throw new Error('Finalize error ' + resp.status + ': ' + err);
+        }
+
+        const data = await resp.json();
+        state.promptFinal = data.prompt_final;
+        state.pth = data.pth;
+
+        PortfolioDebug.log('PromptBuilder', 'PTH assigned', state.pth);
+
+        // Show approved banner
+        const banner = document.getElementById('approved-banner');
+        banner.style.display = 'block';
+        document.getElementById('approved-pth').textContent = 'Approved — PTH: ' + state.pth;
+
+        // Update draft tab with final
+        writeDraftToTab(state.promptFinal, 'Final Prompt — PTH: ' + state.pth);
+
+        showStatus('success', 'Prompt finalized with PTH: ' + state.pth);
+      } catch (e) {
+        showStatus('error', 'Error: ' + e.message);
+      } finally {
+        setButtonsDisabled(false);
+      }
+    }
+
+    // --- Copy final prompt ---
+    function copyFinalPrompt() {
+      const text = state.promptFinal || state.promptDraft;
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copy-final-btn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy Final Prompt'; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>

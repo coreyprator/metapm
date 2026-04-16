@@ -14,7 +14,7 @@ from fastapi.responses import RedirectResponse, JSONResponse, FileResponse, HTML
 from fastapi.exceptions import RequestValidationError
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor, rag, lessons, uat_gen, governance, seed, auth, uat_spec, prompts, reviews, radar, challenge, intelligence, verify, quality
+from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor, rag, lessons, uat_gen, governance, seed, auth, uat_spec, prompts, reviews, radar, challenge, intelligence, verify, quality, prompt_builder
 from app.core.config import settings
 from app.core.migrations import run_migrations
 from app.schemas.mcp import UATDirectSubmit, UATDirectSubmitResponse
@@ -143,6 +143,7 @@ app.include_router(challenge.router, prefix="/api/challenge", tags=["Challenge T
 app.include_router(intelligence.router, tags=["Intelligence"])
 app.include_router(verify.router, tags=["Verification"])
 app.include_router(quality.router, tags=["Quality"])
+app.include_router(prompt_builder.router, prefix="/api/ai", tags=["Prompt Builder"])
 
 
 # Define static_dir early for use in routes
@@ -428,6 +429,16 @@ async def templates_page():
         return FileResponse(str(templates_file), media_type="text/html")
     from fastapi import HTTPException
     raise HTTPException(status_code=404, detail="Templates page not found")
+
+
+@app.get("/prompt-builder")
+async def prompt_builder_page():
+    """Serve the AI-Assisted CC Prompt Builder (MP40 / REQ-078)."""
+    pb_file = static_dir / "prompt-builder.html"
+    if pb_file.exists():
+        return FileResponse(str(pb_file), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Prompt builder page not found")
 
 
 @app.get("/self-uat")

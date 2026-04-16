@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.94.0"  # MP39: REQ-077 Templates nav item in dashboard
+    VERSION: str = "2.95.0"  # MP40: REQ-078 AI-Assisted CC Prompt Builder
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
