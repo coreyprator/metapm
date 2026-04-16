@@ -17,7 +17,6 @@
       --warn: #f5a623;
       --info: #4a90d9;
     }
-    :root { --transition-speed: 0.25s; }
     * { box-sizing: border-box; }
     body {
       margin: 0;
@@ -25,16 +24,7 @@
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
-      transition: background-color var(--transition-speed), color var(--transition-speed);
     }
-    [data-theme="light"] { --bg: #caced2; --panel: #eef2f6; --panel-soft: #f8fafc; --text: #1e293b; --muted: #64748b; --line: #cbd5e1; }
-    #theme-toggle { background: var(--panel); border: 1px solid var(--line); color: var(--text); padding: 4px 10px; border-radius: 4px; cursor: pointer; margin-left: auto; transition: transform 0.1s ease, border-color 0.2s; font-size: 16px; }
-    #theme-toggle:hover { border-color: var(--accent); }
-    #theme-toggle:active { transform: scale(0.92); }
-    .item-description { font-size: 13px !important; line-height: 1.5; color: #b0c4de !important; }
-    [data-theme="light"] .item-description { color: var(--muted) !important; }
-    [data-theme="light"] .req-row { background: var(--panel) !important; }
-    [data-theme="light"] #resetFiltersBtn { background-color: #fee2e2 !important; color: #991b1b !important; border: 1px solid #fecaca !important; }
     .app {
       max-width: 1320px;
       margin: 0 auto;
@@ -108,7 +98,7 @@
     }
     textarea { width: 100%; min-height: 90px; resize: vertical; }
     button { cursor: pointer; }
-    .add-wrap { position: relative; z-index: 100; }
+    .add-wrap { position: relative; }
     .add-menu {
       position: absolute;
       top: 36px;
@@ -377,7 +367,7 @@
     }
     .card.header .header-content {
       max-height: 500px;
-      overflow: visible;
+      overflow: hidden;
       transition: max-height 0.3s ease-out;
       display: flex;
       justify-content: space-between;
@@ -386,11 +376,10 @@
     }
     .card.header.is-collapsed .header-content {
       max-height: 0;
-      overflow: hidden;
     }
     @media (max-width: 768px) {
-      .card.header .header-content { max-height: 0; overflow: hidden; }
-      .card.header:not(.is-collapsed) .header-content { max-height: 500px; overflow: visible; }
+      .card.header .header-content { max-height: 0; }
+      .card.header:not(.is-collapsed) .header-content { max-height: 500px; }
       .header-toggle { display: block; }
     }
     /* Responsive: Mobile (<768px) */
@@ -475,9 +464,9 @@
       <div class="title-wrap">
         <div class="title" onclick="resetToHome()" style="cursor:pointer" title="Return to default dashboard">🔴 MetaPM</div>
         <span id="appVersion" class="version-badge">v-</span>
-        <button id="theme-toggle" title="Toggle Light/Dark Mode"></button>
       </div>
       <div class="actions-row">
+        <a href="/templates" target="_blank" rel="noopener"><button type="button" id="templatesBtn">📋 Templates</button></a>
         <button type="button" id="qualityTabBtn" onclick="toggleQualityTab()">📊 Quality</button>
         <a href="https://portfolio-rag.rentyourcio.com/search/etymology" target="_blank" rel="noopener"><button type="button" id="ragSearchBtn">🔍 RAG</button></a>
         <button type="button" id="docsTabBtn" onclick="toggleDocsTab()">📚 Docs</button>
@@ -541,7 +530,6 @@
         <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="showArchivedToggle" style="min-height:auto" /> Show Archived</label>
         <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="showDescToggle" style="min-height:auto" /> Show Descriptions</label>
         <button id="resetFiltersBtn" type="button" class="danger-btn">Reset Filters</button>
-        <button id="exportCsvBtn" type="button" style="padding:8px 14px;background:var(--panel-soft);border:1px solid var(--line);border-radius:8px;color:var(--text);cursor:pointer;font-size:13px" title="Export current filtered view to CSV">⬇ Export CSV</button>
       </div>
       <div class="control-row">
         <label>Sort/Group</label>
@@ -683,6 +671,27 @@
           <option value="">All 5Q</option>
           <option value="yes">5Q Applied</option>
           <option value="no">No 5Q</option>
+        </select>
+        <select id="quality-filter-failure" style="padding:6px 8px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px">
+          <option value="">All Failure Types</option>
+          <option value="wrong_spec">Wrong spec</option>
+          <option value="regression">Regression</option>
+          <option value="environment">Environment</option>
+          <option value="unclear_bv">Unclear BV</option>
+          <option value="machine_test_sent_to_pl">Machine test sent to PL</option>
+          <option value="no_5q_applied">No 5Q applied</option>
+          <option value="incomplete_spec">Incomplete spec</option>
+          <option value="missing_acceptance_criteria">Missing acceptance criteria</option>
+          <option value="incomplete_handoff">Incomplete handoff</option>
+          <option value="ui_rendering_bug">UI rendering bug</option>
+          <option value="data_mapping_bug">Data mapping bug</option>
+          <option value="filter_query_bug">Filter/query bug</option>
+          <option value="gate_validation_bug">Gate/validation bug</option>
+          <option value="navigation_routing_bug">Navigation/routing bug</option>
+          <option value="api_contract_bug">API contract bug</option>
+          <option value="state_management_bug">State management bug</option>
+          <option value="performance_bug">Performance bug</option>
+          <option value="other">Other</option>
         </select>
         <button type="button" onclick="resetQualityFilters()" style="padding:6px 12px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px;cursor:pointer">Reset Filters</button>
       </div>
@@ -830,10 +839,6 @@
       <div id="dPromptContent" style="font-size:12px;color:var(--muted)">None</div>
     </div>
     <div>
-      <label>Quality History</label>
-      <div id="dQualityHistory" style="font-size:12px;color:var(--muted)">Loading...</div>
-    </div>
-    <div>
       <label>History</label>
       <div id="dHistory" style="font-size:12px;color:var(--muted)">Loading...</div>
     </div>
@@ -865,24 +870,6 @@
     </div>
   </div>
 
-  <script>
-    // REQ-071: Light/dark theme toggle
-    (function() {
-      const saved = localStorage.getItem('metapm-theme') || 'dark';
-      document.documentElement.setAttribute('data-theme', saved);
-      const btn = document.getElementById('theme-toggle');
-      if (btn) {
-        btn.textContent = saved === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
-        btn.addEventListener('click', function() {
-          const current = document.documentElement.getAttribute('data-theme') || 'dark';
-          const next = current === 'dark' ? 'light' : 'dark';
-          document.documentElement.setAttribute('data-theme', next);
-          btn.textContent = next === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
-          localStorage.setItem('metapm-theme', next);
-        });
-      }
-    })();
-  </script>
   <script>
     const PROJECT_COLORS = {
       HL: '#4A90D9', SF: '#F5A623', AF: '#E8751A', EM: '#9B59B6', MP: '#E74C3C', PM: '#27AE60'
@@ -1167,7 +1154,7 @@
           <button class="icon-btn" data-open-req="${req.id}" title="Edit Requirement">✏️</button>
           <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete Requirement">🗑️</button>
         </div>
-        ${window._showDescriptions && req.description ? `<div class="item-description">${(req.description||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
+        ${window._showDescriptions && req.description ? `<div class="item-description">${(req.description||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0,200)}${req.description.length > 200 ? '…' : ''}</div>` : ''}
       </div>`;
     }
 
@@ -1429,7 +1416,7 @@
           : p.status === 'ready' ? '<span style="background:#374151;color:#d1d5db;padding:1px 6px;border-radius:3px">Pending</span>'
           : `<span style="background:#374151;color:#d1d5db;padding:1px 6px;border-radius:3px">${p.status || 'Pending'}</span>`;
         const dateStr = (p.created_at || '').substring(0, 10);
-        const titleShort = p.title || '';
+        const titleShort = (p.title || '').length > 50 ? (p.title || '').substring(0, 47) + '...' : (p.title || '');
         html += `<tr style="border-bottom:1px solid var(--line);cursor:pointer" onclick="window.open('${p.uat_url}','_blank')">`;
         html += `<td style="padding:6px;font-weight:700;color:#60a5fa">${p.pth || '-'}</td>`;
         html += `<td style="padding:6px">${emoji} ${p.project}</td>`;
@@ -1997,50 +1984,6 @@
       }
     }
 
-    async function loadQualityHistory(reqId, container) {
-      container.innerHTML = '<p style="color:var(--muted);font-size:12px">Loading history...</p>';
-      try {
-        const resp = await fetch(`/api/roadmap/requirements/${reqId}/quality-history`);
-        const data = await resp.json();
-        if (!data.attempts?.length) {
-          container.innerHTML = '<p style="color:var(--muted);font-size:12px">No sprint history.</p>';
-          return;
-        }
-        const stats = `<div style="display:flex;gap:16px;font-size:12px;margin-bottom:10px">
-          <span><strong>${data.total_attempts}</strong> attempts</span>
-          <span><strong>${data.pl_pass_attempts}</strong> passed</span>
-          ${data.top_failure_type ? `<span>Top: <strong>${data.top_failure_type}</strong></span>` : ''}
-        </div>`;
-        const cards = data.attempts.map(a => {
-          const sc = a.uat_status==='passed'?'var(--ok)':a.uat_status==='failed'?'var(--accent)':'var(--muted)';
-          const fts = (a.failure_types||[]).map(ft =>
-            `<span style="font-size:10px;padding:1px 6px;border-radius:999px;background:var(--panel-soft);border:1px solid var(--line);color:var(--muted);margin-right:4px">${ft}</span>`).join('');
-          const gns = (a.general_notes||[]).map(n =>
-            `<div style="font-size:11px;color:var(--muted);border-left:2px solid var(--line);padding-left:8px;margin-top:4px">${n.text}</div>`).join('');
-          return `<div style="border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin-bottom:6px;background:var(--panel-soft)">
-            <div style="display:flex;align-items:center;gap:10px">
-              <span style="font-family:monospace;font-size:12px;color:var(--info)">${a.pth}</span>
-              <span style="font-size:11px;color:var(--muted);flex:1">${a.sprint_id||''}</span>
-              <span style="font-weight:700;font-size:12px;color:${sc}">${(a.uat_status||'no UAT').toUpperCase()}</span>
-              ${a.cai_assessment?`<span style="font-size:11px;color:var(--muted)">${a.cai_assessment}</span>`:''}
-            </div>
-            <div style="font-size:11px;color:var(--muted);margin-top:3px">
-              pl: ${a.pl_pass}\u2713 ${a.pl_fail}\u2717 ${a.pl_skip}skip
-              ${a.pl_submitted_at?' \u00b7 '+a.pl_submitted_at.substring(0,10):''}
-            </div>
-            ${fts?`<div style="margin-top:4px">${fts}</div>`:''}
-            ${gns}
-          </div>`;
-        }).join('');
-        container.innerHTML = `<div>
-          <div style="font-size:13px;font-weight:600;margin-bottom:8px">Sprint Attempts</div>
-          ${stats}${cards}
-        </div>`;
-      } catch(e) {
-        container.innerHTML = `<p style="color:var(--accent);font-size:12px">Failed to load.</p>`;
-      }
-    }
-
     async function openRequirement(reqId) {
       const req = state.requirements.find(r => r.id === reqId);
       if (!req) return;
@@ -2296,9 +2239,6 @@
       } else {
         qs('dPromptSection').style.display = 'none';
       }
-
-      // MP31 REQ-066: Load quality history panel
-      loadQualityHistory(req.id, qs('dQualityHistory'));
 
       // Load history timeline (MP-MS3)
       try {
@@ -2927,6 +2867,7 @@
       const from = qs('quality-filter-from').value;
       const to = qs('quality-filter-to').value;
       const fq = qs('quality-filter-5q').value;
+      const ft = qs('quality-filter-failure').value;
       return qualityData.filter(d => {
         if (proj && d.project_code !== proj) return false;
         if (status && d.overall_status !== status) return false;
@@ -2934,6 +2875,7 @@
         if (to && d.submitted_at && d.submitted_at > to + 'T23:59:59') return false;
         if (fq === 'yes' && !d.five_q_applied) return false;
         if (fq === 'no' && d.five_q_applied) return false;
+        if (ft && d.failure_type !== ft) return false;
         return true;
       });
     }
@@ -2950,10 +2892,9 @@
         '<th style="padding:6px">Sprint Title</th><th style="padding:6px">Version</th><th style="padding:6px">Status</th>' +
         '<th style="padding:6px">BV Pass %</th><th style="padding:6px">Attempt #</th><th style="padding:6px">5Q</th>' +
         '<th style="padding:6px">Root Cause</th><th style="padding:6px">Failure Type</th>' +
-        '<th style="padding:6px">UAT</th><th style="padding:6px">Prompt</th>' +
         '</tr></thead><tbody>';
       if (!filtered.length) {
-        html += '<tr><td colspan="13" style="padding:12px;color:var(--muted);text-align:center">No quality data found</td></tr>';
+        html += '<tr><td colspan="11" style="padding:12px;color:var(--muted);text-align:center">No quality data found</td></tr>';
       }
       for (const d of filtered) {
         const date = d.submitted_at ? d.submitted_at.substring(0, 10) : '\u2014';
@@ -2962,7 +2903,7 @@
           <td style="padding:6px">${date}</td>
           <td style="padding:6px">${d.project_code || ''}</td>
           <td style="padding:6px">${d.spec_id ? `<a href="/uat/${d.spec_id}" style="color:var(--info)">${d.pth || ''}</a>` : (d.pth || '')}</td>
-          <td style="padding:6px">${(d.sprint_title || '')}</td>
+          <td style="padding:6px">${(d.sprint_title || '').substring(0, 40)}</td>
           <td style="padding:6px">${ver}</td>
           <td style="padding:6px">${statusBadge(d.overall_status)}</td>
           <td style="padding:6px">${d.bv_pass_rate}%</td>
@@ -2970,8 +2911,6 @@
           <td style="padding:6px">${d.five_q_applied ? 'Yes' : 'No'}</td>
           <td style="padding:6px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.root_cause_method || ''}">${d.root_cause_method || '\u2014'}</td>
           <td style="padding:6px">${d.failure_type || '\u2014'}</td>
-          <td style="padding:6px">${d.spec_id ? `<a href="/uat/${d.spec_id}" target="_blank" style="color:var(--info);font-size:12px;text-decoration:none">🔍 UAT</a>` : '<span style="color:var(--muted)">\u2014</span>'}</td>
-          <td style="padding:6px">${d.pth ? `<a href="/prompts/${d.pth}" target="_blank" style="color:var(--info);font-size:12px;text-decoration:none">📝 Prompt</a>` : '<span style="color:var(--muted)">\u2014</span>'}</td>
         </tr>`;
       }
       html += '</tbody></table>';
@@ -2998,7 +2937,7 @@
     }
 
     // Wire up quality filter change events
-    ['quality-filter-project','quality-filter-status','quality-filter-from','quality-filter-to','quality-filter-5q'].forEach(id => {
+    ['quality-filter-project','quality-filter-status','quality-filter-from','quality-filter-to','quality-filter-5q','quality-filter-failure'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('change', renderQualityTable);
     });
@@ -3010,6 +2949,7 @@
       qs('quality-filter-from').value = '';
       qs('quality-filter-to').value = '';
       qs('quality-filter-5q').value = '';
+      qs('quality-filter-failure').value = '';
       renderQualityTable();
     }
 
@@ -3264,24 +3204,6 @@
         updateResetButtonState();
         render();
       };
-
-      // BUG-062 + BUG-063: Export CSV function — wired via addEventListener
-      function exportCSV() {
-        const params = new URLSearchParams();
-        const project = qs('projectFilter')?.value || '';
-        const status  = qs('statusFilter')?.value || '';
-        const priority = qs('priorityFilter')?.value || '';
-        const type    = qs('typeFilter')?.value || '';
-        const search  = qs('searchInput')?.value || '';
-        if (project) params.set('project', project);
-        if (status && status !== 'all') params.set('status', status);
-        if (priority) params.set('priority', priority);
-        if (type) params.set('type', type);
-        if (search) params.set('search', search);
-        window.location.href = '/api/roadmap/export/csv?' + params.toString();
-      }
-      const exportBtn = document.getElementById('exportCsvBtn');
-      if (exportBtn) exportBtn.addEventListener('click', exportCSV);
 
       qs('addBtn').onclick = () => qs('addMenu').classList.toggle('open');
       qs('addMenu').onclick = (e) => {
