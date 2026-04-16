@@ -5,7 +5,12 @@ Provides session management for PL-authenticated UAT pages (MP-UAT-SERVER-001).
 import hashlib
 import hmac
 import logging
+import os
 import time
+
+# Allow Google OAuth to return broader scopes than requested (e.g. when the
+# same client ID is shared with Gmail/Calendar MCP integrations).
+os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
 from typing import Optional
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse, HTMLResponse
@@ -98,7 +103,6 @@ async def oauth_login(request: Request, next: str = "/"):
         flow.redirect_uri = redirect_uri
         auth_url, state = flow.authorization_url(
             access_type="online",
-            include_granted_scopes="true",
             state=next,
             prompt="select_account",
         )
