@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.92.0"  # MP37: REQ-075 requirement deep links /r/{project}/{code}
+    VERSION: str = "2.93.0"  # MP38: REQ-076 CAI prompt templates page /templates
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

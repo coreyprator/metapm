@@ -420,6 +420,16 @@ async def requirement_deep_link(project_code: str, req_code: str):
     raise HTTPException(status_code=404, detail="Requirement link page not found")
 
 
+@app.get("/templates")
+async def templates_page():
+    """CAI Prompt Templates — interactive selector for PL sprint prompting."""
+    templates_file = static_dir / "templates.html"
+    if templates_file.exists():
+        return FileResponse(str(templates_file), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Templates page not found")
+
+
 @app.get("/self-uat")
 async def self_uat_page():
     """Serve the self-service ad-hoc UAT form (MP12)."""
