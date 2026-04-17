@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.96.0"  # MP41: BUG-079 description truncation + BUG-078 cc_machine BVs in PL form
+    VERSION: str = "2.96.1"  # MP42: BUG-081 fix unhashable type dict in UAT page render
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

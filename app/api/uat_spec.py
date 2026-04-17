@@ -1048,7 +1048,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
     # MP19 REQ-050: Machine tests in collapsed details — PL sees only pl_visual
     machine_section = ""
     if cc_machine_tcs:
-        machine_pass = sum(1 for tc in cc_machine_tcs if result_by_id.get(tc["id"], {{}}).get("cc_result") == "pass" or result_by_id.get(tc["id"], {{}}).get("status") == "pass")
+        machine_pass = sum(1 for tc in cc_machine_tcs if result_by_id.get(tc["id"], {}).get("cc_result") == "pass" or result_by_id.get(tc["id"], {}).get("status") == "pass")
         machine_cards = "".join(_render_machine_card(tc) for tc in cc_machine_tcs)
         machine_section = f"""
         <details style="margin-bottom:20px;opacity:0.75">
