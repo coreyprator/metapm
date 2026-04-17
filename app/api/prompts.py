@@ -205,6 +205,7 @@ class PromptPatch(BaseModel):
     status: Optional[str] = None
     approved_by: Optional[str] = None
     content_md: Optional[str] = None
+    also_closes: Optional[str] = None  # MP44 REQ-081: JSON array of requirement codes
 
 
 class PromptResponse(BaseModel):
@@ -802,6 +803,10 @@ async def update_prompt(prompt_id: int, patch: PromptPatch):
         params.append(patch.content_md)
         set_parts.append("content = ?")
         params.append(patch.content_md[:500] if patch.content_md else '')
+
+    if patch.also_closes is not None:
+        set_parts.append("also_closes = ?")
+        params.append(patch.also_closes)
 
     if not set_parts:
         raise HTTPException(status_code=400, detail="No fields to update")
