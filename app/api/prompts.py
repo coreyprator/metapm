@@ -249,6 +249,7 @@ def _row_to_response(row: dict) -> dict:
         "url": f"https://metapm.rentyourcio.com/prompts/{row['pth']}" if row.get("pth") else None,
         "project_name": row.get("project_name"),
         "project_emoji": row.get("project_emoji"),
+        "also_closes": row.get("also_closes"),
     }
 
 

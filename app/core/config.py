@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.97.1"  # MP43B: BUG-084 failure-type cascade scoping fix — notes textarea no longer destroyed
+    VERSION: str = "2.98.0"  # MP44: REQ-080 UAT renderer refactor + REQ-081 also_closes auto-advance
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

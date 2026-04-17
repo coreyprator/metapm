@@ -48,6 +48,7 @@ TOOLS = [
                 "content_md": {"type": "string", "description": "Full markdown prompt content"},
                 "estimated_hours": {"type": "number", "description": "Estimated hours (default 1.0)", "default": 1.0},
                 "requirement_code": {"type": "string", "description": "MP18 BUG-035: requirement code to link PTH to (REQUIRED)"},
+                "also_closes": {"type": "array", "items": {"type": "string"}, "description": "Additional requirement codes closed by this sprint", "default": []},
             },
             "required": ["pth", "sprint_id", "project_id", "content_md", "requirement_code"],
         },
@@ -373,6 +374,7 @@ def _tool_post_prompt(args: dict) -> dict:
     content_md = args["content_md"]
     estimated_hours = args.get("estimated_hours", 1.0)
     requirement_code = args.get("requirement_code")
+    also_closes = args.get("also_closes", [])
 
     # MP18 BUG-035: requirement_code is REQUIRED
     if not requirement_code:
@@ -406,18 +408,20 @@ def _tool_post_prompt(args: dict) -> dict:
     # BUG-072: Strip surrogates before INSERT
     content_md = strip_surrogates(content_md)
 
+    also_closes_json = json.dumps(also_closes) if also_closes else None
+
     result = execute_query("""
         SET NOCOUNT ON;
         INSERT INTO cc_prompts
             (sprint_id, project_id, pth, requirement_id, content, content_md,
-             estimated_hours, created_by, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'CAI', 'draft');
+             estimated_hours, created_by, status, also_closes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'CAI', 'draft', ?);
         SELECT id, pth, sprint_id, status, created_at
         FROM cc_prompts WHERE id = SCOPE_IDENTITY();
     """, (
         sprint_id, project_id, pth, req_row["id"],
         content_md[:500] if content_md else '',
-        content_md, estimated_hours,
+        content_md, estimated_hours, also_closes_json,
     ), fetch="one")
 
     if not result:
@@ -454,6 +458,7 @@ def _tool_post_prompt(args: dict) -> dict:
         "created_at": str(result["created_at"]) if result.get("created_at") else None,
         "requirement_advanced": requirement_advanced,
         "requirement_code": requirement_code,
+        "also_closes": also_closes,
     }
 
 
@@ -1255,7 +1260,7 @@ def _tool_post_session_signal(args: dict) -> dict:
 
     # Find the newest prompt for this PTH
     row = execute_query(
-        "SELECT TOP 1 id, status FROM cc_prompts WHERE pth = ? ORDER BY id DESC",
+        "SELECT TOP 1 id, status, also_closes, project_id FROM cc_prompts WHERE pth = ? ORDER BY id DESC",
         (pth,), fetch="one"
     )
     if not row:
@@ -1263,6 +1268,10 @@ def _tool_post_session_signal(args: dict) -> dict:
 
     prompt_id = row["id"]
     from_status = row["status"]
+    project_id = row.get("project_id")
+    # Parse also_closes JSON array
+    also_closes_raw = row.get("also_closes")
+    also_closes = json.loads(also_closes_raw) if also_closes_raw else []
     response = {"pth": pth, "signal": status, "timestamp": timestamp}
 
     if status == "started":
@@ -1296,6 +1305,31 @@ def _tool_post_session_signal(args: dict) -> dict:
         except Exception as e:
             logger.warning(f"post_session_signal: requirement auto-advance failed (non-fatal): {e}")
 
+        # MP44 REQ-081: Auto-advance also_closes requirements to cc_executing
+        if also_closes and project_id:
+            advanced_codes = []
+            for code in also_closes:
+                try:
+                    ac_row = execute_query(
+                        "SELECT TOP 1 r.id, r.code, r.status FROM roadmap_requirements r "
+                        "JOIN roadmap_projects p ON r.project_id = p.id "
+                        "WHERE r.code = ? AND p.id = ?",
+                        (code, project_id), fetch="one"
+                    )
+                    if ac_row and ac_row["status"] in ("cc_prompt_ready", "cai_designing", "req_approved"):
+                        execute_query(
+                            "UPDATE roadmap_requirements SET status = 'cc_executing', updated_at = GETUTCDATE() WHERE id = ?",
+                            (ac_row["id"],), fetch="none"
+                        )
+                        advanced_codes.append(code)
+                        logger.info(f"post_session_signal: also_closes auto-advanced {code} to cc_executing")
+                    else:
+                        logger.warning(f"post_session_signal: also_closes {code} not at advanceable status (status={ac_row['status'] if ac_row else 'NOT FOUND'})")
+                except Exception as e:
+                    logger.warning(f"post_session_signal: also_closes auto-advance for {code} failed (non-fatal): {e}")
+            if advanced_codes:
+                response['also_closes_advanced'] = advanced_codes
+
     elif status == "completed":
         new_status = 'completed'
         execute_query("""
@@ -1307,6 +1341,31 @@ def _tool_post_session_signal(args: dict) -> dict:
             WHERE id = ?
         """, (timestamp, prompt_id), fetch="none")
         write_prompt_history(prompt_id, pth, from_status, new_status, 'CC', 'post_session_signal')
+
+        # MP44 REQ-081: Auto-advance also_closes requirements to cc_complete
+        if also_closes and project_id:
+            advanced_codes = []
+            for code in also_closes:
+                try:
+                    ac_row = execute_query(
+                        "SELECT TOP 1 r.id, r.code, r.status FROM roadmap_requirements r "
+                        "JOIN roadmap_projects p ON r.project_id = p.id "
+                        "WHERE r.code = ? AND p.id = ?",
+                        (code, project_id), fetch="one"
+                    )
+                    if ac_row and ac_row["status"] == "cc_executing":
+                        execute_query(
+                            "UPDATE roadmap_requirements SET status = 'cc_complete', updated_at = GETUTCDATE() WHERE id = ?",
+                            (ac_row["id"],), fetch="none"
+                        )
+                        advanced_codes.append(code)
+                        logger.info(f"post_session_signal: also_closes auto-advanced {code} to cc_complete")
+                    else:
+                        logger.warning(f"post_session_signal: also_closes {code} not at cc_executing (status={ac_row['status'] if ac_row else 'NOT FOUND'})")
+                except Exception as e:
+                    logger.warning(f"post_session_signal: also_closes auto-advance for {code} failed (non-fatal): {e}")
+            if advanced_codes:
+                response['also_closes_advanced'] = advanced_codes
 
     elif status in ("stopped", "blocked"):
         new_status = 'stopped'
