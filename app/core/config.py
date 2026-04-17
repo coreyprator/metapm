@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.97.0"  # MP43: BUG-083 notes textarea restored + BUG-075 general notes failure type cascade
+    VERSION: str = "2.97.1"  # MP43B: BUG-084 failure-type cascade scoping fix — notes textarea no longer destroyed
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

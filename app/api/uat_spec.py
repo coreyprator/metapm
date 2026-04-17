@@ -1027,7 +1027,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
               <option value="No-action"{'selected' if cur_status == 'pass' else cls_selected("No-action")}>No-action</option>
               <option value="Out of scope"{cls_selected("Out of scope")}>Out of scope</option>
             </select>
-            <div class="failure-type-row" data-id="{tid}" style="display:{'block' if (cur_class == 'Bug' and cur_ft) else 'none'}">
+            <div class="failure-type-section" data-id="{tid}" style="display:{'block' if (cur_class == 'Bug' and cur_ft) else 'none'}">
               <div class="notes-label">Failure type</div>
               <select class="failure-type-select" data-id="{tid}" data-saved-value="{cur_ft}"
                 style="width:100%;padding:7px 10px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem">
@@ -1488,7 +1488,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       const status = card.querySelector(`input[name="${{id}}"]:checked`)?.value || 'pending';
       const cascade = card.querySelector('.cascade-classification');
       const classSelect = card.querySelector('.classification-select');
-      const ftRow = card.querySelector('.failure-type-row');
+      const ftRow = card.querySelector('.failure-type-section');
 
       if (!cascade) return;
 
@@ -1536,8 +1536,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
     if (document.querySelector('.test-card.submitted')) {{
       document.querySelectorAll('textarea.notes-input').forEach(ta => {{
         if (!ta.value.trim()) {{
-          const wrap = ta.closest('.test-card');
-          const label = wrap?.querySelector('.notes-label');
+          const label = ta.previousElementSibling?.classList.contains('notes-label') ? ta.previousElementSibling : null;
           if (label) label.remove();
           ta.remove();
           return;
