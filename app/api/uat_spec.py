@@ -1036,7 +1036,7 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
             </div>
           </div>
           <div class="notes-label">Notes</div>
-          <textarea class="notes-input" placeholder="Observations...">{cur_notes}</textarea>
+          <textarea id="notes-{tid}" class="notes-input" placeholder="Add notes here..." rows="3">{cur_notes}</textarea>
           {'' if is_submitted else f'<div class="paste-zone" id="paste-{tid}" data-id="{tid}" tabindex="0" contenteditable="false">📷 Paste screenshot here (Ctrl+V)</div>'}
           <div class="attach-row">
             <label class="attach-btn">📎 Attach file<input type="file" class="attach-input" accept="image/*,.pdf" data-id="{tid}" {'disabled' if is_submitted else ''}></label>
@@ -1290,8 +1290,50 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
         `</select>` +
         `<button onclick="this.closest('.note-entry').remove()" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:0 4px">&times;</button>` +
         `</div></div>` +
+        `<div class="note-failure-type-row" style="display:none;margin-bottom:6px">` +
+        `<label style="font-size:0.75rem;color:#8b949e;margin-bottom:4px;display:block">Failure Type</label>` +
+        `<select class="note-failure-type" style="width:100%;padding:7px 10px;background:#0d1117;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:0.85rem">` +
+        `<option value="">-- Select --</option>` +
+        `<option value="wrong_spec">Wrong spec</option>` +
+        `<option value="regression">Regression</option>` +
+        `<option value="environment">Environment</option>` +
+        `<option value="unclear_bv">Unclear BV</option>` +
+        `<option value="machine_test_sent_to_pl">Machine test sent to PL</option>` +
+        `<option value="no_5q_applied">No 5Q applied</option>` +
+        `<option value="incomplete_spec">Incomplete spec</option>` +
+        `<option value="missing_acceptance_criteria">Missing acceptance criteria</option>` +
+        `<option value="incomplete_handoff">Incomplete handoff</option>` +
+        `<option value="ui_rendering_bug">UI rendering bug</option>` +
+        `<option value="data_mapping_bug">Data mapping bug</option>` +
+        `<option value="filter_query_bug">Filter/query bug</option>` +
+        `<option value="gate_validation_bug">Gate/validation bug</option>` +
+        `<option value="navigation_routing_bug">Navigation/routing bug</option>` +
+        `<option value="api_contract_bug">API contract bug</option>` +
+        `<option value="state_management_bug">State management bug</option>` +
+        `<option value="performance_bug">Performance bug</option>` +
+        `<option value="other">Other</option>` +
+        `</select>` +
+        `</div>` +
         `<textarea class="note-text" placeholder="Enter note..." style="width:100%;min-height:50px;padding:6px;background:#161b22;color:#e2e8f0;border:1px solid #334155;border-radius:4px;resize:vertical;font-size:0.82rem"></textarea>`;
       container.appendChild(entry);
+
+      // BUG-075: Wire classification → failure type cascade for General Notes
+      const classSelect = entry.querySelector('.note-classification');
+      const ftRow = entry.querySelector('.note-failure-type-row');
+      classSelect.addEventListener('change', function() {{
+        if (this.value === 'bug') {{
+          ftRow.style.display = 'block';
+        }} else {{
+          ftRow.style.display = 'none';
+          ftRow.querySelector('select').value = '';
+        }}
+        if (window.PortfolioDebug) {{
+          window.PortfolioDebug.log('GeneralNotes', 'classification changed', {{
+            value: classSelect.value,
+            failureTypeVisible: classSelect.value === 'bug'
+          }});
+        }}
+      }});
     }}
 
     function gatherNotes() {{
@@ -1299,10 +1341,15 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       document.querySelectorAll('.note-entry').forEach(entry => {{
         const text = entry.querySelector('.note-text')?.value || '';
         const classification = entry.querySelector('.note-classification')?.value || null;
+        const failureType = entry.querySelector('.note-failure-type')?.value || null;
         const tsSpan = entry.querySelector('span');
         const timestamp = tsSpan ? tsSpan.textContent.trim() : null;
         if (text.trim()) {{
-          entries.push({{ timestamp, text: text.trim(), classification: classification || null }});
+          const note = {{ timestamp, text: text.trim(), classification: classification || null }};
+          if (classification === 'bug' && failureType) {{
+            note.failure_type = failureType;
+          }}
+          entries.push(note);
         }}
       }});
       return entries;
@@ -1316,7 +1363,18 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
         const entries = document.querySelectorAll('.note-entry');
         const last = entries[entries.length - 1];
         if (n.text) last.querySelector('.note-text').value = n.text;
-        if (n.classification) last.querySelector('.note-classification').value = n.classification;
+        if (n.classification) {{
+          last.querySelector('.note-classification').value = n.classification;
+          // Restore failure type cascade visibility
+          if (n.classification === 'bug') {{
+            const ftRow = last.querySelector('.note-failure-type-row');
+            if (ftRow) ftRow.style.display = 'block';
+          }}
+        }}
+        if (n.failure_type) {{
+          const ftSelect = last.querySelector('.note-failure-type');
+          if (ftSelect) ftSelect.value = n.failure_type;
+        }}
         if (n.timestamp) last.querySelector('span').textContent = n.timestamp;
       }});
     }})();
@@ -1458,6 +1516,15 @@ def render_spec_uat_page(spec_id: str, spec_data: dict, test_cases: list,
       const classSelect = card.querySelector('.classification-select');
       if (classSelect) {{
         classSelect.addEventListener('change', () => updateCascade(card));
+      }}
+      // BA41: notes textarea focus instrumentation
+      const notesInput = card.querySelector('.notes-input');
+      if (notesInput) {{
+        notesInput.addEventListener('focus', () => {{
+          if (window.PortfolioDebug) {{
+            window.PortfolioDebug.log('BVCard', 'notes focused', {{bvId: card.dataset.id}});
+          }}
+        }});
       }}
     }});
 

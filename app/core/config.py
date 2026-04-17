@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.96.1"  # MP42: BUG-081 fix unhashable type dict in UAT page render
+    VERSION: str = "2.97.0"  # MP43: BUG-083 notes textarea restored + BUG-075 general notes failure type cascade
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
