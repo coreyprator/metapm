@@ -282,7 +282,8 @@ async def serve_uat_page(request: Request, uat_id: str):
         # Strip to spec fields only (no result leakage for spec definition)
         spec_tests = [
             {"id": tc["id"], "title": tc["title"], "url": tc.get("url"),
-             "steps": tc.get("steps", []), "expected": tc.get("expected")}
+             "steps": tc.get("steps", []), "expected": tc.get("expected"),
+             "type": tc.get("type")}
             for tc in tc_json
             if not tc.get("id", "").startswith("_")
         ]

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.95.0"  # MP40: REQ-078 AI-Assisted CC Prompt Builder
+    VERSION: str = "2.96.0"  # MP41: BUG-079 description truncation + BUG-078 cc_machine BVs in PL form
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

@@ -1154,7 +1154,7 @@
           <button class="icon-btn" data-open-req="${req.id}" title="Edit Requirement">✏️</button>
           <button class="icon-btn danger-btn" data-delete-req="${req.id}" title="Delete Requirement">🗑️</button>
         </div>
-        ${window._showDescriptions && req.description ? `<div class="item-description">${(req.description||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0,200)}${req.description.length > 200 ? '…' : ''}</div>` : ''}
+        ${window._showDescriptions && req.description ? `<div class="item-description">${(req.description||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
       </div>`;
     }
 
