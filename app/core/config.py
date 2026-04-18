@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.98.0"  # MP44: REQ-080 UAT renderer refactor + REQ-081 also_closes auto-advance
+    VERSION: str = "2.98.2"  # MP46: BUG-086 delete BUG-034 JS textarea removal block
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
