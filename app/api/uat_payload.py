@@ -348,6 +348,10 @@ def get_page_js(spec_id: str, pl_email: str, general_notes_json: str) -> str:
       try {{
         const resp = await fetch('/api/config/uat-classifications');
         const classifications = await resp.json();
+        if (!Array.isArray(classifications)) {{
+          console.error('uat-classifications: expected array, got', classifications);
+          return;
+        }}
         document.querySelectorAll('.classification-select').forEach(sel => {{
           const savedVal = sel.value || sel.dataset.savedValue || '';
           sel.innerHTML = '<option value="">\\u2014 Select classification \\u2014</option>';

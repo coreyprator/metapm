@@ -13,6 +13,21 @@ scripts/
 venv/
 incoming_zip/
 project-methodology/
+tmpclaude-*/
+fix-diagnostic/
+handoffs/
+docs/
+*.csv
+*.xlsx
+*.zip
+*.pdf
+*.mp3
+*.wav
+*.html
+*.gsheet
+*.json
+!requirements.txt
+!app/**/*.json
 # MM18: Explicitly include static HTML files (override any implicit gcloud HTML filter)
 !static/
 !static/*.html

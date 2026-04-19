@@ -10,6 +10,30 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/api/config/uat-classifications")
+async def get_uat_classifications():
+    """BUG-091 (MP49): UAT classification options for pl_visual BV cards.
+
+    loadClassifications() in uat_payload.py depends on this endpoint. A prior
+    404 caused `resp.json()` to return {"detail":"Not Found"}, which is not
+    iterable — so .forEach threw after innerHTML had already been reset to the
+    placeholder on the first select, leaving B1 empty while the outer loop
+    halted before touching B2..Bn.
+    """
+    return [
+        {"display_label": "New requirement",
+         "help_text": "Missing feature that should be added as a new requirement."},
+        {"display_label": "Bug",
+         "help_text": "Existing feature broken or behaving incorrectly."},
+        {"display_label": "Finding",
+         "help_text": "Observation worth noting but not an immediate bug or requirement."},
+        {"display_label": "No-action",
+         "help_text": "Accepted as-is — no follow-up work needed."},
+        {"display_label": "Out of scope",
+         "help_text": "Belongs to a different sprint or project; defer."},
+    ]
+
+
 @router.get("/api/config/failure-schema")
 async def get_failure_schema():
     """Return full failure type schema from DB, including help_text for cheat sheet."""

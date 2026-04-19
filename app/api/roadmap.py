@@ -1701,7 +1701,7 @@ async def transition_requirement_status(requirement_id: str, body: StatusTransit
     """Transition a requirement to a new pipeline status with validation and history tracking."""
     try:
         req = execute_query(
-            "SELECT id, code, status FROM roadmap_requirements WHERE id = ?",
+            "SELECT id, code, status, type FROM roadmap_requirements WHERE id = ?",
             (requirement_id,), fetch="one"
         )
         if not req:
@@ -1718,7 +1718,13 @@ async def transition_requirement_status(requirement_id: str, body: StatusTransit
 
         # Validate transition (None = legacy, allow any)
         allowed = VALID_TRANSITIONS.get(current_status)
-        if allowed is not None and new_status not in allowed:
+        # BUG-073 (MP49): task-type requirements bypass UAT — allow cc_complete → done directly
+        task_shortcut = (
+            req.get('type') == 'task'
+            and current_status == 'cc_complete'
+            and new_status == 'done'
+        )
+        if allowed is not None and new_status not in allowed and not task_shortcut:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid transition: {current_status} → {new_status}. Allowed: {', '.join(allowed)}"
@@ -1859,7 +1865,7 @@ async def update_requirement_state(req_id: str, body: StateTransition):
             raise HTTPException(status_code=400, detail=f"Invalid status: '{body.status}'. Valid: {sorted(_VALID_STATUSES)}")
 
         req = execute_query(
-            "SELECT id, status, pth FROM roadmap_requirements WHERE id = ?",
+            "SELECT id, status, pth, type FROM roadmap_requirements WHERE id = ?",
             (req_id,), fetch="one"
         )
         if not req:
@@ -1878,7 +1884,13 @@ async def update_requirement_state(req_id: str, body: StateTransition):
         # Validate transition
         if new_status != current_status:
             allowed = LIFECYCLE_VALID_TRANSITIONS.get(current_status)
-            if allowed is not None and new_status not in allowed:
+            # BUG-073 (MP49): task-type requirements bypass UAT — allow cc_complete → done directly
+            task_shortcut = (
+                req.get('type') == 'task'
+                and current_status == 'cc_complete'
+                and new_status == 'done'
+            )
+            if allowed is not None and new_status not in allowed and not task_shortcut:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Invalid transition: {current_status} -> {new_status}. Allowed: {allowed}"

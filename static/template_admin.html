@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MetaPM — Template Admin</title>
+<style>
+  :root {
+    --bg:#0f1117; --bg2:#161b22; --bg3:#1f2937;
+    --text:#e5e7eb; --muted:#9ca3af; --border:#30363d;
+    --accent:#f59e0b; --pass:#22c55e; --fail:#ef4444;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,Segoe UI,sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:16px 24px; border-bottom:1px solid var(--border); background:linear-gradient(180deg,#1a1f2e 0%,var(--bg2) 100%); display:flex; align-items:center; gap:12px; }
+  h1 { font-size:1.1rem; margin:0; }
+  .sub { color:var(--muted); font-size:0.85rem; margin-left:auto; }
+  main { max-width:1100px; margin:0 auto; padding:24px 16px; }
+  table { width:100%; border-collapse:collapse; background:var(--bg2); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+  th, td { text-align:left; padding:10px 14px; border-bottom:1px solid var(--border); font-size:0.9rem; }
+  th { background:var(--bg3); color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.04em; font-size:0.75rem; }
+  tr:last-child td { border-bottom:none; }
+  button { background:var(--accent); color:#0f1117; border:none; padding:6px 14px; border-radius:6px; font-weight:600; cursor:pointer; font-size:0.85rem; }
+  button.secondary { background:transparent; color:var(--muted); border:1px solid var(--border); }
+  button:hover { filter:brightness(1.1); }
+  .version { font-family:ui-monospace,monospace; color:var(--accent); font-weight:600; }
+  .auth-row { display:flex; gap:8px; margin-bottom:16px; }
+  .auth-row input { flex:1; background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius:6px; font-family:ui-monospace,monospace; }
+  .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:none; align-items:center; justify-content:center; z-index:1000; }
+  .modal-backdrop.open { display:flex; }
+  .modal { background:var(--bg2); border:1px solid var(--border); border-radius:12px; width:min(960px,95vw); max-height:90vh; overflow:auto; padding:20px; }
+  .modal h2 { margin:0 0 8px; font-size:1rem; }
+  .modal .meta { color:var(--muted); font-size:0.8rem; margin-bottom:16px; }
+  .field { margin-bottom:14px; }
+  .field label { display:block; font-size:0.8rem; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.04em; }
+  .field textarea { width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:10px; font-family:ui-monospace,monospace; font-size:0.82rem; resize:vertical; }
+  .field textarea.content { min-height:320px; }
+  .field textarea.questions { min-height:140px; }
+  .actions { display:flex; gap:10px; justify-content:flex-end; margin-top:16px; }
+  .status { padding:10px 14px; border-radius:6px; margin-bottom:12px; font-size:0.85rem; display:none; }
+  .status.ok { background:#064e3b; color:#bbf7d0; display:block; }
+  .status.err { background:#7f1d1d; color:#fecaca; display:block; }
+</style>
+</head>
+<body>
+<header>
+  <h1>MetaPM &mdash; Template Admin</h1>
+  <span class="sub">REQ-086 &middot; PUT /api/templates/&#123;id&#125;</span>
+</header>
+<main>
+  <div class="auth-row">
+    <input id="apiKey" placeholder="MCP_API_KEY (paste to enable editing)" autocomplete="off">
+    <button class="secondary" onclick="saveKey()">Save key</button>
+  </div>
+  <div id="status" class="status"></div>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Name</th><th>Version</th><th style="width:100px"></th></tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+</main>
+
+<div id="modal" class="modal-backdrop" onclick="if(event.target===this) closeModal()">
+  <div class="modal">
+    <h2 id="mTitle">Edit template</h2>
+    <div class="meta" id="mMeta"></div>
+    <div class="field">
+      <label>content_md</label>
+      <textarea id="mContent" class="content"></textarea>
+    </div>
+    <div class="field">
+      <label>questions_json (JSON array)</label>
+      <textarea id="mQuestions" class="questions"></textarea>
+    </div>
+    <div class="actions">
+      <button class="secondary" onclick="closeModal()">Cancel</button>
+      <button onclick="saveTemplate()">Save &amp; bump version</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const KEY_STORAGE = "metapm_admin_key";
+let currentTemplate = null;
+
+function apiKey() { return document.getElementById("apiKey").value.trim(); }
+
+function saveKey() {
+  localStorage.setItem(KEY_STORAGE, apiKey());
+  setStatus("Key stored in localStorage", "ok");
+}
+
+function setStatus(msg, cls) {
+  const el = document.getElementById("status");
+  el.textContent = msg;
+  el.className = "status " + cls;
+  if (cls === "ok") setTimeout(() => { el.className = "status"; }, 3000);
+}
+
+async function load() {
+  const stored = localStorage.getItem(KEY_STORAGE);
+  if (stored) document.getElementById("apiKey").value = stored;
+
+  const resp = await fetch("/api/templates");
+  if (!resp.ok) { setStatus("Failed to load templates: " + resp.status, "err"); return; }
+  const templates = await resp.json();
+  templates.sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+  const rows = document.getElementById("rows");
+  rows.innerHTML = templates.map(t => `
+    <tr>
+      <td><code>${t.id}</code></td>
+      <td>${escapeHtml(t.name)}</td>
+      <td class="version">${t.version}</td>
+      <td><button onclick="openModal('${t.id}')">Edit</button></td>
+    </tr>`).join("");
+}
+
+function escapeHtml(s) {
+  return (s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+
+async function openModal(id) {
+  const resp = await fetch("/api/templates/" + encodeURIComponent(id));
+  if (!resp.ok) { setStatus("Failed to load template " + id, "err"); return; }
+  const t = await resp.json();
+  currentTemplate = t;
+  document.getElementById("mTitle").textContent = "Edit — " + t.name;
+  document.getElementById("mMeta").textContent =
+    "id=" + t.id + "  ·  version=" + t.version + "  ·  saving will bump version";
+  document.getElementById("mContent").value = t.content_md || "";
+  document.getElementById("mQuestions").value = JSON.stringify(t.questions || [], null, 2);
+  document.getElementById("modal").classList.add("open");
+}
+
+function closeModal() {
+  document.getElementById("modal").classList.remove("open");
+  currentTemplate = null;
+}
+
+async function saveTemplate() {
+  if (!currentTemplate) return;
+  const key = apiKey();
+  if (!key) { setStatus("Paste your MCP_API_KEY above first.", "err"); return; }
+
+  let parsedQuestions;
+  const raw = document.getElementById("mQuestions").value.trim();
+  try {
+    parsedQuestions = raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    setStatus("questions_json is not valid JSON: " + e.message, "err");
+    return;
+  }
+
+  const payload = {
+    content_md: document.getElementById("mContent").value,
+    questions_json: parsedQuestions,
+  };
+
+  const resp = await fetch("/api/templates/" + encodeURIComponent(currentTemplate.id), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "X-API-Key": key },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) {
+    const detail = await resp.text();
+    setStatus("Save failed (" + resp.status + "): " + detail, "err");
+    return;
+  }
+  const updated = await resp.json();
+  setStatus("Saved — now version " + updated.version, "ok");
+  closeModal();
+  load();
+}
+
+load();
+</script>
+</body>
+</html>

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "3.0.0"  # MP48: upsert guard for BUG-087, /dashboard redirect, /api/code-files/status
+    VERSION: str = "3.1.0"  # MP49: UAT classification endpoint (BUG-091), task lifecycle (BUG-073), templates admin (REQ-086)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
