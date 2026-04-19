@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.99.1"  # MP47: MCP tool_inventory sync fix (event-loop bug)
+    VERSION: str = "3.0.0"  # MP48: upsert guard for BUG-087, /dashboard redirect, /api/code-files/status
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

@@ -166,13 +166,35 @@ async def create_uat_spec(body: UATSpecCreate):
 
     # AP04 Fix 4: Check if spec already exists for this PTH (upsert by PTH)
     existing = execute_query(
-        "SELECT TOP 1 id FROM uat_pages WHERE pth = ? AND spec_source = 'cc_spec' ORDER BY created_at DESC",
+        "SELECT TOP 1 id, pl_submitted_at FROM uat_pages WHERE pth = ? AND spec_source = 'cc_spec' ORDER BY created_at DESC",
         (body.pth,), fetch="one"
     )
 
     if existing:
-        # UPDATE existing spec — preserve ID, reset test cases
         spec_id = str(existing["id"])
+        # MP48 BUG-087 Phase C guard: refuse to clobber a spec that has a prior
+        # PL submission. Re-posting after submit would wipe test_cases_json +
+        # uat_bv_items and destroy PL's recorded pass/fail/notes — this is the
+        # root cause of "Reopen & Edit shows blank" that MP47's reopen fix could
+        # not address on its own. Caller must archive the spec before re-posting.
+        if existing.get("pl_submitted_at") is not None:
+            logger.warning(
+                f"post_uat_spec blocked: PTH={body.pth} spec={spec_id} has prior PL submission "
+                f"(pl_submitted_at={existing['pl_submitted_at']}). Refusing to clobber."
+            )
+            raise HTTPException(status_code=409, detail={
+                "error": "spec_has_prior_submission",
+                "message": (
+                    "This UAT spec already has a PL submission recorded. Re-posting would "
+                    "erase pass/fail results and notes. Archive the existing spec before "
+                    "creating a replacement, or update via the override/reopen endpoints."
+                ),
+                "pth": body.pth,
+                "spec_id": spec_id,
+                "pl_submitted_at": str(existing["pl_submitted_at"]),
+                "existing_uat_url": f"https://metapm.rentyourcio.com/uat/{spec_id}",
+            })
+        # UPDATE existing unsubmitted spec — preserve ID, reset test cases
         try:
             execute_query("""
                 UPDATE uat_pages SET

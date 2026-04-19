@@ -974,12 +974,29 @@ def _tool_post_uat_spec(args: dict) -> dict:
 
     # Upsert by PTH (same as POST /api/uat/spec)
     existing = execute_query(
-        "SELECT TOP 1 id FROM uat_pages WHERE pth = ? AND spec_source = 'cc_spec' ORDER BY created_at DESC",
+        "SELECT TOP 1 id, pl_submitted_at FROM uat_pages WHERE pth = ? AND spec_source = 'cc_spec' ORDER BY created_at DESC",
         (pth,), fetch="one"
     )
 
     if existing:
         spec_id = str(existing["id"])
+        # MP48 BUG-087 Phase C guard: refuse to clobber a spec with prior PL results.
+        # See uat_spec.create_uat_spec for the root-cause explanation.
+        if existing.get("pl_submitted_at") is not None:
+            logger.warning(
+                f"post_uat_spec blocked: PTH={pth} spec={spec_id} has prior PL submission. Refusing to clobber."
+            )
+            return {
+                "error": "spec_has_prior_submission",
+                "message": (
+                    "UAT spec already has a PL submission recorded. Re-posting would erase "
+                    "pass/fail results and notes. Archive the existing spec before creating a replacement."
+                ),
+                "pth": pth,
+                "spec_id": spec_id,
+                "pl_submitted_at": str(existing["pl_submitted_at"]),
+                "existing_uat_url": f"https://metapm.rentyourcio.com/uat/{spec_id}",
+            }
         execute_query("""
             UPDATE uat_pages SET
                 project = ?, sprint_code = ?, version = ?,

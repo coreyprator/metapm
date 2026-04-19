@@ -14,7 +14,7 @@ from fastapi.responses import RedirectResponse, JSONResponse, FileResponse, HTML
 from fastapi.exceptions import RequestValidationError
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor, rag, lessons, uat_gen, governance, seed, auth, uat_spec, prompts, reviews, radar, challenge, intelligence, verify, quality, prompt_builder, templates_api, tool_inventory
+from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor, rag, lessons, uat_gen, governance, seed, auth, uat_spec, prompts, reviews, radar, challenge, intelligence, verify, quality, prompt_builder, templates_api, tool_inventory, code_status
 from app.core.config import settings
 from app.core.migrations import run_migrations
 from app.schemas.mcp import UATDirectSubmit, UATDirectSubmitResponse
@@ -64,6 +64,14 @@ except Exception as e:
 # Redirect root to dashboard
 @app.get("/")
 async def root_redirect():
+    return RedirectResponse(url="/static/dashboard.html")
+
+
+@app.get("/dashboard")
+async def dashboard_redirect():
+    # MP48 BUG-089: /dashboard#fragment navigation from REQ-084 deep links
+    # must land on the dashboard. Browsers preserve the URL fragment across
+    # redirects so /dashboard#active-jobs ends up at /static/dashboard.html#active-jobs.
     return RedirectResponse(url="/static/dashboard.html")
 
 # Trust X-Forwarded-Proto from Cloud Run load balancer so request.base_url returns https://
@@ -146,6 +154,7 @@ app.include_router(quality.router, tags=["Quality"])
 app.include_router(prompt_builder.router, prefix="/api/ai", tags=["Prompt Builder"])
 app.include_router(templates_api.router, tags=["Templates"])
 app.include_router(tool_inventory.router, tags=["Tool Inventory"])
+app.include_router(code_status.router, tags=["Code Files"])
 
 
 # Define static_dir early for use in routes
