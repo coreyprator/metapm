@@ -2081,4 +2081,111 @@ def run_migrations():
     except Exception as e:
         logger.warning(f"  Migration 62 warning: {e}")
 
+    # Migration 63: templates table (MP47 REQ-082)
+    try:
+        tbl = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'templates'
+        """, fetch="one")
+        if not tbl or tbl["cnt"] == 0:
+            logger.info("  Migration 63: Creating templates table...")
+            execute_query("""
+                CREATE TABLE templates (
+                    id VARCHAR(20) NOT NULL PRIMARY KEY,
+                    name NVARCHAR(200) NOT NULL,
+                    content_md NVARCHAR(MAX) NOT NULL,
+                    version VARCHAR(20) NOT NULL DEFAULT '1.0',
+                    questions_json NVARCHAR(MAX) NULL,
+                    display_order INT DEFAULT 0,
+                    updated_at DATETIME2 DEFAULT GETUTCDATE()
+                )
+            """, fetch="none")
+            logger.info("  Migration 63: templates table created.")
+        else:
+            for col, col_def in [
+                ("version", "VARCHAR(20) NOT NULL DEFAULT '1.0'"),
+                ("questions_json", "NVARCHAR(MAX) NULL"),
+                ("display_order", "INT DEFAULT 0"),
+            ]:
+                col_check = execute_query(f"""
+                    SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME = 'templates' AND COLUMN_NAME = '{col}'
+                """, fetch="one")
+                if not col_check or col_check["cnt"] == 0:
+                    execute_query(f"ALTER TABLE templates ADD [{col}] {col_def}", fetch="none")
+                    logger.info(f"  Migration 63: Added templates.{col}")
+
+        # Seed / upsert rows (idempotent — only inserts missing IDs)
+        from app.core.template_seed import TEMPLATE_SEED
+        import json as _json
+        for t in TEMPLATE_SEED:
+            exists = execute_query(
+                "SELECT COUNT(*) as cnt FROM templates WHERE id = ?",
+                (t["id"],), fetch="one"
+            )
+            if not exists or exists["cnt"] == 0:
+                execute_query("""
+                    INSERT INTO templates (id, name, content_md, version, questions_json, display_order)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    t["id"], t["name"], t["content_md"], t["version"],
+                    _json.dumps(t["questions"]), t["display_order"]
+                ), fetch="none")
+                logger.info(f"  Migration 63: Seeded template {t['id']} — {t['name']}")
+            else:
+                # Ensure version and questions_json are populated even on existing rows
+                execute_query("""
+                    UPDATE templates
+                    SET version = COALESCE(NULLIF(version, ''), ?),
+                        questions_json = COALESCE(questions_json, ?)
+                    WHERE id = ?
+                """, (t["version"], _json.dumps(t["questions"]), t["id"]), fetch="none")
+    except Exception as e:
+        logger.warning(f"  Migration 63 warning: {e}")
+
+    # Migration 64: mcp_tool_metadata table (MP47 REQ-085)
+    try:
+        tbl = execute_query("""
+            SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_NAME = 'mcp_tool_metadata'
+        """, fetch="one")
+        if not tbl or tbl["cnt"] == 0:
+            logger.info("  Migration 64: Creating mcp_tool_metadata table...")
+            execute_query("""
+                CREATE TABLE mcp_tool_metadata (
+                    tool_name VARCHAR(200) NOT NULL,
+                    server VARCHAR(100) NOT NULL,
+                    category VARCHAR(50) NOT NULL,
+                    when_to_use NVARCHAR(MAX) NULL,
+                    forbidden_uses NVARCHAR(MAX) NULL,
+                    gotchas NVARCHAR(MAX) NULL,
+                    updated_at DATETIME2 DEFAULT GETUTCDATE(),
+                    updated_by VARCHAR(50) NULL,
+                    CONSTRAINT PK_mcp_tool_metadata PRIMARY KEY (tool_name, server)
+                )
+            """, fetch="none")
+            execute_query("CREATE INDEX IX_mcp_tool_metadata_server ON mcp_tool_metadata(server)", fetch="none")
+            execute_query("CREATE INDEX IX_mcp_tool_metadata_category ON mcp_tool_metadata(category)", fetch="none")
+            logger.info("  Migration 64: mcp_tool_metadata table created.")
+
+        # Seed from static inventory (idempotent)
+        from app.core.tool_metadata_seed import TOOL_METADATA_SEED
+        for tm in TOOL_METADATA_SEED:
+            exists = execute_query(
+                "SELECT COUNT(*) as cnt FROM mcp_tool_metadata WHERE tool_name = ? AND server = ?",
+                (tm["tool_name"], tm["server"]), fetch="one"
+            )
+            if not exists or exists["cnt"] == 0:
+                execute_query("""
+                    INSERT INTO mcp_tool_metadata
+                        (tool_name, server, category, when_to_use, forbidden_uses, gotchas, updated_by)
+                    VALUES (?, ?, ?, ?, ?, ?, 'CC-MP47')
+                """, (
+                    tm["tool_name"], tm["server"], tm["category"],
+                    tm.get("when_to_use"), tm.get("forbidden_uses"), tm.get("gotchas"),
+                ), fetch="none")
+        logger.info(f"  Migration 64: Seeded {len(TOOL_METADATA_SEED)} tool metadata rows.")
+    except Exception as e:
+        logger.warning(f"  Migration 64 warning: {e}")
+
     logger.info("Migrations complete.")

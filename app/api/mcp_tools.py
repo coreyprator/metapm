@@ -362,6 +362,14 @@ TOOLS = [
             "required": ["database"],
         },
     },
+    {
+        "name": "get_tool_inventory",
+        "description": "MP47 REQ-085: Return the merged live+curated inventory of all MCP tools across every known server (metapm, portfolio-rag, gmail, calendar, drive). Call at session boot to learn which tools exist, when to use each, what is forbidden, and known gotchas.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
 ]
 
 
@@ -1656,7 +1664,18 @@ TOOL_HANDLERS = {
     "submit_cc_results": _tool_submit_cc_results,
     "execute_sql_query": _tool_execute_sql_query,
     "get_schema": _tool_get_schema,
+    "get_tool_inventory": lambda args: _tool_get_tool_inventory(args),
 }
+
+
+def _tool_get_tool_inventory(args: dict) -> dict:
+    """MP47 REQ-085 — merged live+curated inventory."""
+    from app.api.tool_inventory import get_tool_inventory_impl
+    try:
+        return get_tool_inventory_impl()
+    except Exception as e:
+        logger.error(f"get_tool_inventory failed: {e}")
+        return {"error": str(e)}
 
 
 # ── JSON-RPC 2.0 endpoint (MCP protocol) ──

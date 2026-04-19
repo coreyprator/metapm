@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "2.98.2"  # MP46: BUG-086 delete BUG-034 JS textarea removal block
+    VERSION: str = "2.99.1"  # MP47: MCP tool_inventory sync fix (event-loop bug)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

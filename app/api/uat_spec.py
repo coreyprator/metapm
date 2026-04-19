@@ -699,11 +699,14 @@ async def override_uat_status(spec_id: str, body: UATOverride, request: Request)
 async def reopen_uat(spec_id: str, request: Request):
     """
     MP-UAT-001: Reopen a submitted UAT for editing.
-    Resets status to 'ready' and all test case statuses to pending.
+    MP47 BUG-087: Preserves prior pl-results so the form pre-populates on reload.
+    Flips status back to 'ready' and clears pl_submitted_at (so the form is editable
+    again) but KEEPS test_cases_json and general_notes intact. The existing renderer
+    reads those fields to restore pass/fail radios, notes, classifications, and
+    failure types for each BV.
     Accepts PL Google OAuth session OR X-API-Key header.
     """
     _validate_uuid(spec_id)
-    # Accept either PL session or API key
     api_key = request.headers.get("x-api-key") or request.headers.get("X-API-Key")
     expected_key = settings.MCP_API_KEY or ""
     has_api_key = api_key and api_key == expected_key
@@ -711,32 +714,65 @@ async def reopen_uat(spec_id: str, request: Request):
         raise HTTPException(status_code=403, detail="PL authentication or API key required")
 
     row = execute_query(
-        "SELECT id, test_cases_json, status FROM uat_pages WHERE id = ?",
+        "SELECT id, status FROM uat_pages WHERE id = ?",
         (spec_id,), fetch="one"
     )
     if not row:
         raise HTTPException(404, f"UAT spec {spec_id} not found")
 
-    # Reset test case statuses to pending and clear notes
-    existing_cases = json.loads(row["test_cases_json"]) if row.get("test_cases_json") else []
-    for case in existing_cases:
-        if case.get("id", "").startswith("_"):
-            continue
-        case["status"] = "pending"
-        case["notes"] = ""
-        case.pop("attachments", None)
-
     execute_query("""
         UPDATE uat_pages
         SET status = 'ready',
-            test_cases_json = ?,
-            pl_submitted_at = NULL,
-            general_notes = NULL
+            pl_submitted_at = NULL
         WHERE id = ?
-    """, (json.dumps(existing_cases), spec_id), fetch="none")
+    """, (spec_id,), fetch="none")
 
-    logger.info(f"UAT spec {spec_id} reopened — status reset to ready, test cases reset to pending")
-    return {"status": "reopened", "spec_id": spec_id}
+    logger.info(f"UAT spec {spec_id} reopened (BUG-087) — prior results preserved for pre-fill")
+    return {"status": "reopened", "spec_id": spec_id, "results_preserved": True}
+
+
+@router.get("/api/uat/{spec_id}/pl-results")
+async def get_pl_results(spec_id: str):
+    """
+    MP47 BUG-087 M1: Return the current pl_visual test_cases with their prior
+    status/notes/classification/failure_type and the general_notes array. Used by
+    the reopen flow to pre-populate the form. Returns {} when the spec has no
+    prior submission (caller renders a blank form).
+    """
+    _validate_uuid(spec_id)
+    row = execute_query(
+        "SELECT id, test_cases_json, general_notes, status, pl_submitted_at "
+        "FROM uat_pages WHERE id = ?",
+        (spec_id,), fetch="one"
+    )
+    if not row:
+        raise HTTPException(404, f"UAT spec {spec_id} not found")
+
+    cases = json.loads(row["test_cases_json"]) if row.get("test_cases_json") else []
+    pl_cases = [
+        {
+            "id": c.get("id"),
+            "status": c.get("status", "pending"),
+            "notes": c.get("notes", "") or "",
+            "classification": c.get("classification", "") or "",
+            "failure_type": c.get("failure_type", "") or "",
+        }
+        for c in cases
+        if not c.get("id", "").startswith("_")
+        and c.get("type", "pl_visual") != "cc_machine"
+    ]
+    has_prior = any(
+        c["status"] not in ("pending", "") or c["notes"] or c["classification"]
+        for c in pl_cases
+    )
+    return {
+        "spec_id": str(row["id"]),
+        "status": row.get("status", "pending"),
+        "pl_submitted_at": str(row["pl_submitted_at"]) if row.get("pl_submitted_at") else None,
+        "has_prior_submission": has_prior,
+        "test_cases": pl_cases,
+        "general_notes": _parse_general_notes(row.get("general_notes")),
+    }
 
 
 @router.get("/api/uat/{spec_id}/results")

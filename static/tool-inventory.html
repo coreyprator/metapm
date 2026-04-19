@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MCP Tool Inventory | MetaPM</title>
+<style>
+  :root { --bg:#0f1117; --card:#161b22; --border:#30363d; --text:#c9d1d9; --muted:#8b949e; --accent:#58a6ff; --accent2:#bc8cff; --ok:#3fb950; --warn:#d29922; --fail:#f85149; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); padding:20px; }
+  .container { max-width:1280px; margin:0 auto; }
+  .back-link { display:inline-block; margin-bottom:12px; color:var(--accent); text-decoration:none; font-size:13px; }
+  h1 { font-size:24px; font-weight:700; color:#f0f6fc; margin-bottom:4px; }
+  .subtitle { color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .summary { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:14px 18px; margin-bottom:18px; font-size:13px; }
+  .server { background:var(--card); border:1px solid var(--border); border-radius:10px; margin-bottom:18px; overflow:hidden; }
+  .server-head { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; }
+  .server-name { font-size:15px; font-weight:700; color:#f0f6fc; }
+  .tag { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; }
+  .tag.live { background:#133620; color:var(--ok); }
+  .tag.curated-only { background:#3d2e0a; color:var(--warn); }
+  .tool { padding:12px 18px; border-bottom:1px solid var(--border); display:grid; grid-template-columns: 260px 120px 1fr; gap:16px; align-items:start; }
+  .tool:last-child { border-bottom:none; }
+  .tool-name { font-family:'SFMono-Regular',Consolas,monospace; color:var(--accent); font-size:13px; font-weight:600; word-break:break-word; }
+  .category { display:inline-block; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; background:#21262d; color:var(--muted); height:fit-content; }
+  .category.state_write { background:#2d1a1a; color:#ff9a9a; }
+  .category.state_read { background:#18293d; color:var(--accent); }
+  .category.semantic_search { background:#2a1f3d; color:var(--accent2); }
+  .category.workflow { background:#1a2d22; color:var(--ok); }
+  .category.discovery { background:#3d2e0a; color:var(--warn); }
+  .category.content_retrieval { background:#2d2a12; color:#e5c07b; }
+  .details { font-size:12.5px; line-height:1.55; }
+  .details .label { color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.04em; font-size:10px; margin-top:6px; }
+  .details .body { color:var(--text); margin-top:2px; }
+  .needs-curation { color:var(--warn); font-style:italic; font-size:11px; }
+  .live-only { color:var(--muted); font-style:italic; font-size:11px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a class="back-link" href="/">&larr; Dashboard</a>
+  <h1>MCP Tool Inventory</h1>
+  <p class="subtitle">Merged live + curated view of every MCP tool CC may call. Admin CRUD at <a href="/tool-metadata" style="color:var(--accent2)">/tool-metadata</a>.</p>
+  <div class="summary" id="summary">Loading…</div>
+  <div id="servers"></div>
+</div>
+
+<script>
+function esc(s) { return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function load() {
+  const r = await fetch('/api/mcp-tool-inventory');
+  if (!r.ok) { document.getElementById('summary').textContent = 'Failed to load inventory.'; return; }
+  const data = await r.json();
+  document.getElementById('summary').innerHTML = `<strong>${data.total_tools}</strong> tools across <strong>${data.servers.length}</strong> servers.`;
+  const out = document.getElementById('servers');
+  out.innerHTML = '';
+  data.servers.forEach(s => {
+    const srv = document.createElement('div');
+    srv.className = 'server';
+    srv.innerHTML = `
+      <div class="server-head">
+        <span class="server-name">${esc(s.name)}</span>
+        <span class="tag ${s.source === 'live' ? 'live' : 'curated-only'}">${esc(s.source)}</span>
+        <span style="color:var(--muted);font-size:12px;margin-left:auto">${s.count} tools</span>
+      </div>
+      ${s.tools.map(t => `
+        <div class="tool">
+          <div>
+            <div class="tool-name">${esc(t.tool_name)}</div>
+            ${t.live && !t.curated ? '<div class="needs-curation">Needs curation — call POST /api/mcp-tool-metadata</div>' : ''}
+            ${!t.live && t.curated && (s.source === 'live') ? '<div class="live-only">Not currently live on server</div>' : ''}
+          </div>
+          <div>${t.category ? `<span class="category ${esc(t.category)}">${esc(t.category)}</span>` : ''}</div>
+          <div class="details">
+            ${t.when_to_use ? `<div class="label">When to use</div><div class="body">${esc(t.when_to_use)}</div>` : ''}
+            ${t.forbidden_uses ? `<div class="label">Forbidden</div><div class="body">${esc(t.forbidden_uses)}</div>` : ''}
+            ${t.gotchas ? `<div class="label">Gotchas</div><div class="body">${esc(t.gotchas)}</div>` : ''}
+            ${!t.when_to_use && !t.forbidden_uses && !t.gotchas ? '<div class="needs-curation">No curation yet</div>' : ''}
+          </div>
+        </div>
+      `).join('')}
+    `;
+    out.appendChild(srv);
+  });
+}
+
+load();
+</script>
+</body>
+</html>

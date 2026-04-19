@@ -467,6 +467,7 @@
       </div>
       <div class="actions-row">
         <a href="/templates" target="_blank" rel="noopener"><button type="button" id="templatesBtn">📋 Templates</button></a>
+        <a href="/tool-inventory" target="_blank" rel="noopener"><button type="button" id="toolInventoryBtn">🧰 Tools</button></a>
         <button type="button" id="qualityTabBtn" onclick="toggleQualityTab()">📊 Quality</button>
         <a href="https://portfolio-rag.rentyourcio.com/search/etymology" target="_blank" rel="noopener"><button type="button" id="ragSearchBtn">🔍 RAG</button></a>
         <button type="button" id="docsTabBtn" onclick="toggleDocsTab()">📚 Docs</button>
@@ -3339,9 +3340,59 @@
 
     bindControls();
     loadVersion();
-    loadData().then(() => loadActivePrompts()).catch((err) => {
+    loadData().then(() => loadActivePrompts()).then(() => handleHashNavigation()).catch((err) => {
       qs('hierarchy').innerHTML = `<div style="color:#ff9a9a">Failed to load data: ${err.message}</div>`;
     });
+
+    // MP47 REQ-084 + BA41: lightweight instrumentation helper
+    window.PortfolioDebug = window.PortfolioDebug || {
+      log(area, event, payload) {
+        try { console.log(`[${area}] ${event}`, payload || ''); } catch (e) {}
+      }
+    };
+
+    // MP47 REQ-084 — open Edit Drawer via /dashboard#REQ-084
+    async function handleHashNavigation() {
+      const hash = (window.location.hash || '').replace(/^#/, '');
+      if (!hash) return;
+      const codePattern = /^[A-Z]+-\d+$/i;
+      if (!codePattern.test(hash)) return;
+
+      window.PortfolioDebug.log('dashboard', 'hash_nav_start', { hash });
+
+      const cached = (state.requirements || []).find(r =>
+        (r.code || '').toUpperCase() === hash.toUpperCase()
+      );
+      if (cached) {
+        window.PortfolioDebug.log('dashboard', 'hash_nav_cached', { uuid: cached.id });
+        openRequirement(cached.id);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/roadmap/requirements/by-code/${encodeURIComponent(hash)}`);
+        if (res.status === 404) {
+          window.PortfolioDebug.log('dashboard', 'hash_nav_not_found', { hash });
+          showToast(`Item ${hash} not found on dashboard`);
+          return;
+        }
+        if (!res.ok) {
+          const txt = await res.text();
+          window.PortfolioDebug.log('dashboard', 'hash_nav_error', { status: res.status, body: txt });
+          return;
+        }
+        const data = await res.json();
+        window.PortfolioDebug.log('dashboard', 'hash_nav_fetched', { uuid: data.id, ambiguous: data.ambiguous });
+        if (data.ambiguous) {
+          showToast(`Multiple ${hash} matches — opened first (${data.project_code})`, 'info');
+        }
+        openRequirement(data.id);
+      } catch (err) {
+        window.PortfolioDebug.log('dashboard', 'hash_nav_error', { err: err && err.message });
+      }
+    }
+
+    window.addEventListener('hashchange', handleHashNavigation);
   </script>
 </body>
 </html>

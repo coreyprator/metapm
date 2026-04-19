@@ -14,7 +14,7 @@ from fastapi.responses import RedirectResponse, JSONResponse, FileResponse, HTML
 from fastapi.exceptions import RequestValidationError
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor, rag, lessons, uat_gen, governance, seed, auth, uat_spec, prompts, reviews, radar, challenge, intelligence, verify, quality, prompt_builder
+from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor, rag, lessons, uat_gen, governance, seed, auth, uat_spec, prompts, reviews, radar, challenge, intelligence, verify, quality, prompt_builder, templates_api, tool_inventory
 from app.core.config import settings
 from app.core.migrations import run_migrations
 from app.schemas.mcp import UATDirectSubmit, UATDirectSubmitResponse
@@ -144,6 +144,8 @@ app.include_router(intelligence.router, tags=["Intelligence"])
 app.include_router(verify.router, tags=["Verification"])
 app.include_router(quality.router, tags=["Quality"])
 app.include_router(prompt_builder.router, prefix="/api/ai", tags=["Prompt Builder"])
+app.include_router(templates_api.router, tags=["Templates"])
+app.include_router(tool_inventory.router, tags=["Tool Inventory"])
 
 
 # Define static_dir early for use in routes
@@ -429,6 +431,36 @@ async def templates_page():
         return FileResponse(str(templates_file), media_type="text/html")
     from fastapi import HTTPException
     raise HTTPException(status_code=404, detail="Templates page not found")
+
+
+@app.get("/templates/{template_id}")
+async def templates_deep_link(template_id: str):
+    """MP47 REQ-082: Deep-link to a specific template (?v= honored by the page JS)."""
+    templates_file = static_dir / "templates.html"
+    if templates_file.exists():
+        return FileResponse(str(templates_file), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Templates page not found")
+
+
+@app.get("/tool-inventory")
+async def tool_inventory_page():
+    """MP47 REQ-085: Read-only merged MCP tool inventory."""
+    f = static_dir / "tool-inventory.html"
+    if f.exists():
+        return FileResponse(str(f), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Tool inventory page not found")
+
+
+@app.get("/tool-metadata")
+async def tool_metadata_admin_page():
+    """MP47 REQ-085: Admin CRUD for mcp_tool_metadata."""
+    f = static_dir / "tool-metadata.html"
+    if f.exists():
+        return FileResponse(str(f), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Tool metadata admin page not found")
 
 
 @app.get("/prompt-builder")

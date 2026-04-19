@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import PlainTextResponse
 
 from app.core.database import execute_query
 from app.schemas.roadmap import (
@@ -59,101 +59,6 @@ def _project_done_counts() -> dict:
         }
         for row in rows
     }
-
-
-# ============================================
-# CSV EXPORT — BUG-062: Restore REQ-039 / BUG-029 / BUG-030 / BUG-031
-# ============================================
-
-@router.get("/roadmap/export/csv")
-async def export_requirements_csv(
-    project: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
-    priority: Optional[str] = Query(None),
-    type: Optional[str] = Query(None),
-    search: Optional[str] = Query(None),
-    include_closed: bool = Query(False),
-):
-    """Export filtered requirements as CSV."""
-    import io
-    import csv as csv_mod
-
-    # Normalize project filter — proj-mp → MP, mp → MP
-    project_code = None
-    if project:
-        project_code = project.upper().replace('PROJ-', '')
-
-    where_clauses = []
-    params = []
-
-    if project_code:
-        where_clauses.append("p.code = ?")
-        params.append(project_code)
-
-    if status:
-        where_clauses.append("r.status = ?")
-        params.append(status)
-    elif not include_closed:
-        where_clauses.append("r.status NOT IN ('done', 'closed')")
-
-    if priority:
-        where_clauses.append("r.priority = ?")
-        params.append(priority)
-
-    if type:
-        where_clauses.append("r.type = ?")
-        params.append(type)
-
-    if search:
-        where_clauses.append("(r.title LIKE ? OR r.description LIKE ? OR r.code LIKE ?)")
-        like = f"%{search}%"
-        params.extend([like, like, like])
-
-    where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
-
-    results = execute_query(f"""
-        SELECT r.code, p.name AS project_name, r.title, r.type, r.priority,
-               r.status, r.pth, r.description, r.sprint_id, r.created_at, r.updated_at
-        FROM roadmap_requirements r
-        JOIN roadmap_projects p ON r.project_id = p.id
-        WHERE {where_sql}
-        ORDER BY
-            CASE r.priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 END,
-            r.created_at DESC
-    """, tuple(params) if params else None, fetch="all") or []
-
-    output = io.StringIO()
-    writer = csv_mod.writer(output, quoting=csv_mod.QUOTE_ALL)
-    writer.writerow(["Code", "Project", "Title", "Type", "Priority",
-                     "Status", "PTH", "Description", "Sprint", "CreatedAt", "UpdatedAt"])
-
-    for row in results:
-        created = row['created_at'].strftime('%Y-%m-%d %H:%M') if row.get('created_at') else ''
-        updated = row['updated_at'].strftime('%Y-%m-%d %H:%M') if row.get('updated_at') else ''
-        writer.writerow([
-            row.get('code', ''),
-            row.get('project_name', ''),
-            row.get('title', ''),
-            row.get('type', ''),
-            row.get('priority', ''),
-            row.get('status', ''),
-            row.get('pth', '') or '',
-            row.get('description', '') or '',
-            row.get('sprint_id', '') or '',
-            created,
-            updated,
-        ])
-
-    now = datetime.utcnow()
-    label = project_code if project_code else 'all'
-    filename = f"metapm-export-{label}-{now.strftime('%Y-%m-%d-%H%M')}.csv"
-
-    output.seek(0)
-    return StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
 
 
 # ============================================
@@ -649,6 +554,60 @@ async def list_requirements(
         return RequirementListResponse(requirements=requirements, total=total)
     except Exception as e:
         logger.error(f"Error listing requirements: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/roadmap/requirements/by-code/{code}")
+async def get_requirement_by_code(code: str):
+    """MP47 REQ-084: Resolve a requirement code to its row so the dashboard can
+    open the Edit Drawer via `/dashboard#REQ-084`. Case-insensitive. When the
+    code collides across projects, returns the first match with `ambiguous: true`.
+    """
+    code_normalized = (code or "").strip().upper()
+    if not code_normalized:
+        raise HTTPException(status_code=400, detail="code required")
+    try:
+        rows = execute_query("""
+            SELECT TOP 5 r.id, r.project_id, r.code, r.title, r.description,
+                   r.type, r.priority, r.status, r.target_version,
+                   r.sprint_id, r.handoff_id, r.uat_id, r.uat_url, r.pth,
+                   r.created_at, r.updated_at,
+                   p.code as project_code, p.name as project_name, p.emoji as project_emoji
+            FROM roadmap_requirements r
+            JOIN roadmap_projects p ON r.project_id = p.id
+            WHERE UPPER(r.code) = ?
+            ORDER BY r.updated_at DESC
+        """, (code_normalized,), fetch="all") or []
+
+        if not rows:
+            raise HTTPException(status_code=404, detail=f"Requirement {code_normalized} not found")
+
+        first = rows[0]
+        return {
+            "id": str(first["id"]),
+            "project_id": first["project_id"],
+            "project_code": first["project_code"],
+            "project_name": first["project_name"],
+            "project_emoji": first["project_emoji"],
+            "code": first["code"],
+            "title": first["title"],
+            "description": first["description"],
+            "type": first["type"],
+            "priority": first["priority"],
+            "status": first["status"],
+            "target_version": first["target_version"],
+            "sprint_id": first["sprint_id"],
+            "handoff_id": str(first["handoff_id"]) if first["handoff_id"] else None,
+            "uat_id": str(first["uat_id"]) if first["uat_id"] else None,
+            "uat_url": first.get("uat_url"),
+            "pth": first.get("pth"),
+            "ambiguous": len(rows) > 1,
+            "match_count": len(rows),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"by-code lookup failed for {code_normalized}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1727,7 +1686,7 @@ VALID_TRANSITIONS = {
     "uat_ready":       ["uat_pass", "uat_fail"],
     "uat_pass":        ["done"],
     "uat_fail":        ["cc_prompt_ready", "rework"],
-    "done":            ["closed", "rework"],
+    "done":            ["rework"],
     "rework":          ["cc_prompt_ready"],
     # Legacy: allow any transition
     "backlog": None,
@@ -1875,7 +1834,7 @@ LIFECYCLE_VALID_TRANSITIONS = {
     "uat_ready":       ["uat_pass", "uat_fail"],
     "uat_pass":        ["done"],
     "uat_fail":        ["cc_prompt_ready", "rework"],
-    "done":            ["closed", "rework"],
+    "done":            ["rework"],
     "rework":          ["cc_prompt_ready"],
     "backlog": None,   # legacy: allow any transition
     "executing": None,
@@ -1973,128 +1932,6 @@ async def get_requirement_history(requirement_id: str):
     except Exception as e:
         logger.error(f"Error getting history: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/api/roadmap/requirements/{req_identifier}/quality-history")
-@router.get("/roadmap/requirements/{req_identifier}/quality-history")
-async def get_requirement_quality_history(req_identifier: str):
-    """Get quality history for a requirement — all sprint attempts with UAT outcomes."""
-    import json as _json
-    from collections import Counter
-
-    req = execute_query(
-        "SELECT id, code, pth FROM roadmap_requirements WHERE id = ? OR code = ?",
-        (req_identifier, req_identifier.upper()), fetch="one"
-    )
-    if not req:
-        raise HTTPException(status_code=404, detail=f"Requirement not found: {req_identifier}")
-
-    prompts = execute_query("""
-        SELECT cp.pth, cp.sprint_id, cp.five_q_applied,
-               cp.created_at, cp.status, cp.parent_pth,
-               cp.attempt_number, cp.version_before, cp.version_after
-        FROM cc_prompts cp
-        INNER JOIN (
-            SELECT pth, MAX(created_at) AS max_created
-            FROM cc_prompts
-            WHERE requirement_id = ?
-            GROUP BY pth
-        ) latest ON cp.pth = latest.pth AND cp.created_at = latest.max_created
-        WHERE cp.requirement_id = ?
-        ORDER BY cp.created_at ASC
-    """, (req['id'], req['id']), fetch="all") or []
-
-    history = []
-    for p in prompts:
-        pth = p['pth']
-
-        uat = execute_query(
-            """SELECT id, status, attempt_number, pl_submitted_at, general_notes
-               FROM uat_pages WHERE pth = ?
-               ORDER BY created_at DESC""",
-            (pth,), fetch="one"
-        )
-
-        bv_stats = {'pl_pass': 0, 'pl_fail': 0, 'pl_skip': 0,
-                    'machine_pass': 0, 'machine_fail': 0, 'failure_types': []}
-        if uat:
-            bv_rows = execute_query(
-                "SELECT bv_id, status, failure_type FROM uat_bv_items WHERE spec_id = ?",
-                (str(uat['id']),), fetch="all"
-            ) or []
-            for bv in bv_rows:
-                is_machine = (bv.get('bv_id', '') or '').startswith('M') or bv.get('bv_id') == 'CANARY'
-                s = bv.get('status', '')
-                if is_machine:
-                    if s == 'pass': bv_stats['machine_pass'] += 1
-                    else: bv_stats['machine_fail'] += 1
-                else:
-                    if s == 'pass': bv_stats['pl_pass'] += 1
-                    elif s == 'fail': bv_stats['pl_fail'] += 1
-                    elif s == 'skip': bv_stats['pl_skip'] += 1
-                if bv.get('failure_type') and s == 'fail':
-                    bv_stats['failure_types'].append(bv['failure_type'])
-            bv_stats['failure_types'] = list(set(bv_stats['failure_types']))
-
-        review = execute_query(
-            "SELECT assessment, notes FROM reviews WHERE prompt_pth = ?",
-            (pth,), fetch="one"
-        )
-
-        gn = []
-        if uat and uat.get('general_notes'):
-            try:
-                parsed = _json.loads(uat['general_notes'])
-                if isinstance(parsed, list):
-                    gn = [e for e in parsed if e.get('text', '').strip()]
-            except Exception:
-                pass
-
-        history.append({
-            'pth': pth,
-            'sprint_id': p.get('sprint_id'),
-            'attempt_number': p.get('attempt_number'),
-            'parent_pth': p.get('parent_pth'),
-            'five_q_applied': bool(p.get('five_q_applied')),
-            'created_at': p['created_at'].isoformat() if p.get('created_at') else None,
-            'uat_status': uat['status'] if uat else None,
-            'pl_submitted_at': uat['pl_submitted_at'].isoformat() if uat and uat.get('pl_submitted_at') else None,
-            'pl_pass': bv_stats['pl_pass'],
-            'pl_fail': bv_stats['pl_fail'],
-            'pl_skip': bv_stats['pl_skip'],
-            'machine_pass': bv_stats['machine_pass'],
-            'machine_fail': bv_stats['machine_fail'],
-            'failure_types': bv_stats['failure_types'],
-            'general_notes': gn,
-            'cai_assessment': review['assessment'] if review else None,
-            'cai_notes': review['notes'] if review else None,
-        })
-
-    all_ft = [ft for h in history for ft in h['failure_types']]
-    top_ft = Counter(all_ft).most_common(1)
-
-    return {
-        'requirement_code': req['code'],
-        'requirement_id': req['id'],
-        'total_attempts': len(history),
-        'pl_pass_attempts': sum(1 for h in history if h['uat_status'] == 'passed'),
-        'top_failure_type': top_ft[0][0] if top_ft else None,
-        'attempts': history
-    }
-
-
-@router.get("/api/config/uat-classifications")
-@router.get("/config/uat-classifications")
-async def get_uat_classifications():
-    """Return active UAT classifications from DB."""
-    rows = execute_query(
-        """SELECT classification_code, display_label, help_text,
-                  applies_to_pass, requires_failure_type, sort_order
-           FROM uat_classifications WHERE is_active = 1
-           ORDER BY sort_order""",
-        fetch="all"
-    ) or []
-    return [dict(r) for r in rows]
 
 
 @router.get("/roadmap/wip")
