@@ -72,6 +72,14 @@ scripts/calendar_tokens.json
 scripts/oauth_credentials.json
 client_secret_*.json
 
+# OAuth client JSON downloads (never commit)
+client_secret*.json
+*apps.googleusercontent.com.json
+
+# Service account keys
+cc-deploy-key.json
+*-service-account-*.json
+
 # Claude temp files
 tmpclaude-*
 # Audit scratch files
