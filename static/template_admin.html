@@ -50,7 +50,7 @@
 <main>
   <div class="auth-row">
     <input id="apiKey" placeholder="MCP_API_KEY (paste to enable editing)" autocomplete="off">
-    <button class="secondary" onclick="saveKey()">Save key</button>
+    <button id="saveKeyBtn" class="secondary">Save key</button>
   </div>
   <div id="status" class="status"></div>
   <table>
@@ -61,7 +61,7 @@
   </table>
 </main>
 
-<div id="modal" class="modal-backdrop" onclick="if(event.target===this) closeModal()">
+<div id="modal" class="modal-backdrop">
   <div class="modal">
     <h2 id="mTitle">Edit template</h2>
     <div class="meta" id="mMeta"></div>
@@ -74,8 +74,8 @@
       <textarea id="mQuestions" class="questions"></textarea>
     </div>
     <div class="actions">
-      <button class="secondary" onclick="closeModal()">Cancel</button>
-      <button onclick="saveTemplate()">Save &amp; bump version</button>
+      <button id="cancelBtn" class="secondary">Cancel</button>
+      <button id="saveBtn">Save &amp; bump version</button>
     </div>
   </div>
 </div>
@@ -112,8 +112,13 @@ async function load() {
       <td><code>${t.id}</code></td>
       <td>${escapeHtml(t.name)}</td>
       <td class="version">${t.version}</td>
-      <td><button onclick="openModal('${t.id}')">Edit</button></td>
+      <td><button class="editBtn" data-template-id="${t.id}">Edit</button></td>
     </tr>`).join("");
+
+  // Wire up edit buttons
+  document.querySelectorAll(".editBtn").forEach(btn => {
+    btn.addEventListener("click", () => openModal(btn.dataset.templateId));
+  });
 }
 
 function escapeHtml(s) {
@@ -172,6 +177,16 @@ async function saveTemplate() {
   closeModal();
   load();
 }
+
+// Wire up main button handlers
+document.getElementById("saveKeyBtn").addEventListener("click", saveKey);
+document.getElementById("cancelBtn").addEventListener("click", closeModal);
+document.getElementById("saveBtn").addEventListener("click", saveTemplate);
+
+// Wire up modal backdrop to close when clicking outside the modal
+document.getElementById("modal").addEventListener("click", (event) => {
+  if (event.target === document.getElementById("modal")) closeModal();
+});
 
 load();
 </script>
