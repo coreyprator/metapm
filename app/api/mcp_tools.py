@@ -1705,6 +1705,21 @@ def _jsonrpc_result(req_id: Any, result: Any) -> dict:
     return {"jsonrpc": "2.0", "id": req_id, "result": result}
 
 
+@router.get("/mcp-tools")
+async def mcp_server_info():
+    """MCP server info — for client discovery/health checks."""
+    return JSONResponse({
+        "name": "metapm-mcp",
+        "version": Settings().VERSION,
+        "protocolVersion": "2024-11-05",
+        "capabilities": {"tools": {}},
+        "endpoints": {
+            "jsonrpc": "POST /mcp-tools",
+            "info": "GET /mcp-tools"
+        }
+    })
+
+
 @router.post("/mcp-tools")
 async def mcp_jsonrpc(request: Request):
     """MCP JSON-RPC 2.0 endpoint — no auth (Claude.ai cannot send custom headers)."""
