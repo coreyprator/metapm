@@ -1,0 +1,20 @@
+{
+  "1": {
+    "status": 401,
+    "statusText": "Unauthorized",
+    "bodyPreview": "{\"detail\":\"API key required\"}",
+    "success": false
+  },
+  "2": {
+    "status": 401,
+    "statusText": "Unauthorized",
+    "bodyPreview": "{\"detail\":\"API key required\"}",
+    "success": false
+  },
+  "5": {
+    "status": 401,
+    "statusText": "Unauthorized",
+    "bodyPreview": "{\"detail\":\"API key required\"}",
+    "success": false
+  }
+}

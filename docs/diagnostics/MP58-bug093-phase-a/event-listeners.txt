@@ -1,0 +1,5 @@
+{
+  "hasOnclickProperty": false,
+  "onclickValue": null,
+  "allEventAttributes": []
+}

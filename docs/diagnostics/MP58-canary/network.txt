@@ -1,0 +1,13 @@
+200  https://metapm.rentyourcio.com/static/dashboard.html
+200  https://metapm.rentyourcio.com/health
+200  https://metapm.rentyourcio.com/api/roadmap/requirements?limit=500&offset=0
+200  https://metapm.rentyourcio.com/api/roadmap/sprints?limit=200&offset=0
+200  https://metapm.rentyourcio.com/api/roadmap/categories
+200  https://metapm.rentyourcio.com/api/roadmap/projects?limit=200&offset=0
+200  https://metapm.rentyourcio.com/api/lessons/stats
+200  https://metapm.rentyourcio.com/favicon.ico
+200  https://metapm.rentyourcio.com/api/roadmap/tasks?limit=500
+200  https://metapm.rentyourcio.com/api/prompts/jobs/status
+200  https://metapm.rentyourcio.com/api/prompts?status=draft&limit=20
+200  https://metapm.rentyourcio.com/api/prompts?status=approved&limit=10
+200  https://metapm.rentyourcio.com/api/roadmap/requirements?status=uat_ready&limit=20

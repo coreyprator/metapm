@@ -1,0 +1,21 @@
+Save Button DOM Analysis
+========================
+
+Button HTML:
+<button id="saveBtn">Save & bump version</button>
+
+Button Properties:
+- Found: YES
+- Element ID: saveBtn
+- Text: Save & bump version
+- onclick attribute: NO
+- onclick property: NO
+- Computed display: block
+- Computed pointer-events: auto (not disabled)
+- Computed cursor: pointer (suggests clickable styling)
+- Button disabled state: false
+
+Root Cause Evidence:
+The Save button element exists in the DOM, is visible, and stylistically appears clickable.
+However, there is NO event listener attached to it (onclick attribute not present in HTML,
+onclick property is null on the element object).
