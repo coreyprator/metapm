@@ -11,7 +11,7 @@ import re
 import uuid
 from datetime import datetime
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Header, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, Response, Request
 from fastapi.security import APIKeyHeader
 
 from app.core.config import settings
@@ -63,6 +63,30 @@ async def verify_api_key(
         raise HTTPException(status_code=403, detail="Invalid API key")
 
     return True
+
+
+async def verify_api_key_or_pl_session(
+    x_api_key: Optional[str] = Depends(api_key_header),
+    authorization: Optional[str] = Header(None),
+    request: Request = None,
+) -> bool:
+    """
+    Accepts EITHER MCP_API_KEY (programmatic) OR PL OAuth session (admin UI).
+    Returns True if either validates. Raises 401 only if both fail.
+    """
+    # Path 1: MCP_API_KEY check (existing logic)
+    api_key = x_api_key or (authorization[7:] if authorization and authorization.startswith("Bearer ") else None)
+    expected_key = settings.MCP_API_KEY or settings.API_KEY
+    if api_key and expected_key and api_key == expected_key:
+        return True
+
+    # Path 2: PL OAuth session check
+    from app.api.auth import get_session_email
+    session_email = get_session_email(request)
+    if session_email and session_email == settings.PL_EMAIL:
+        return True
+
+    raise HTTPException(status_code=401, detail="Authentication required (API key or PL session)")
 
 
 def _parse_json_field(value: Optional[str]) -> Optional[dict]:

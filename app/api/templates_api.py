@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from app.api.mcp import verify_api_key
+from app.api.mcp import verify_api_key, verify_api_key_or_pl_session
 from app.core.database import execute_query
 
 logger = logging.getLogger(__name__)
@@ -103,7 +103,7 @@ def _bump_version(current: str) -> str:
 async def update_template(
     template_id: str,
     body: TemplateUpdate,
-    _auth: bool = Depends(verify_api_key),
+    _auth: bool = Depends(verify_api_key_or_pl_session),
 ):
     """Admin PUT — replace content_md / questions_json and auto-bump version.
 

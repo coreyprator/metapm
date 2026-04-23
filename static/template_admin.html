@@ -24,8 +24,6 @@
   button.secondary { background:transparent; color:var(--muted); border:1px solid var(--border); }
   button:hover { filter:brightness(1.1); }
   .version { font-family:ui-monospace,monospace; color:var(--accent); font-weight:600; }
-  .auth-row { display:flex; gap:8px; margin-bottom:16px; }
-  .auth-row input { flex:1; background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius:6px; font-family:ui-monospace,monospace; }
   .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:none; align-items:center; justify-content:center; z-index:1000; }
   .modal-backdrop.open { display:flex; }
   .modal { background:var(--bg2); border:1px solid var(--border); border-radius:12px; width:min(960px,95vw); max-height:90vh; overflow:auto; padding:20px; }
@@ -48,10 +46,6 @@
   <span class="sub">REQ-086 &middot; PUT /api/templates/&#123;id&#125;</span>
 </header>
 <main>
-  <div class="auth-row">
-    <input id="apiKey" placeholder="MCP_API_KEY (paste to enable editing)" autocomplete="off">
-    <button id="saveKeyBtn" class="secondary">Save key</button>
-  </div>
   <div id="status" class="status"></div>
   <table>
     <thead>
@@ -81,15 +75,7 @@
 </div>
 
 <script>
-const KEY_STORAGE = "metapm_admin_key";
 let currentTemplate = null;
-
-function apiKey() { return document.getElementById("apiKey").value.trim(); }
-
-function saveKey() {
-  localStorage.setItem(KEY_STORAGE, apiKey());
-  setStatus("Key stored in localStorage", "ok");
-}
 
 function setStatus(msg, cls) {
   const el = document.getElementById("status");
@@ -99,9 +85,6 @@ function setStatus(msg, cls) {
 }
 
 async function load() {
-  const stored = localStorage.getItem(KEY_STORAGE);
-  if (stored) document.getElementById("apiKey").value = stored;
-
   const resp = await fetch("/api/templates");
   if (!resp.ok) { setStatus("Failed to load templates: " + resp.status, "err"); return; }
   const templates = await resp.json();
@@ -145,8 +128,6 @@ function closeModal() {
 
 async function saveTemplate() {
   if (!currentTemplate) return;
-  const key = apiKey();
-  if (!key) { setStatus("Paste your MCP_API_KEY above first.", "err"); return; }
 
   let parsedQuestions;
   const raw = document.getElementById("mQuestions").value.trim();
@@ -164,7 +145,7 @@ async function saveTemplate() {
 
   const resp = await fetch("/api/templates/" + encodeURIComponent(currentTemplate.id), {
     method: "PUT",
-    headers: { "Content-Type": "application/json", "X-API-Key": key },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   if (!resp.ok) {
@@ -179,7 +160,6 @@ async function saveTemplate() {
 }
 
 // Wire up main button handlers
-document.getElementById("saveKeyBtn").addEventListener("click", saveKey);
 document.getElementById("cancelBtn").addEventListener("click", closeModal);
 document.getElementById("saveBtn").addEventListener("click", saveTemplate);
 
