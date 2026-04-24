@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "3.2.0"  # MP58B: Dual-auth (verify_api_key_or_pl_session), template amendments, BUG-096 GET handler
+    VERSION: str = "3.3.0"  # MP53B: Data model cleanup - ERD, views, JSON extraction, orphan audit, bug_chains schema, proposal views
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

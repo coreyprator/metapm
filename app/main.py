@@ -14,7 +14,7 @@ from fastapi.responses import RedirectResponse, JSONResponse, FileResponse, HTML
 from fastapi.exceptions import RequestValidationError
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor, rag, lessons, uat_gen, governance, seed, auth, uat_spec, prompts, reviews, radar, challenge, intelligence, verify, quality, prompt_builder, templates_api, tool_inventory, code_status
+from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor, rag, lessons, uat_gen, governance, seed, auth, uat_spec, prompts, reviews, radar, challenge, intelligence, verify, quality, prompt_builder, templates_api, tool_inventory, code_status, erd
 from app.core.config import settings
 from app.core.migrations import run_migrations
 from app.schemas.mcp import UATDirectSubmit, UATDirectSubmitResponse
@@ -155,6 +155,7 @@ app.include_router(prompt_builder.router, prefix="/api/ai", tags=["Prompt Builde
 app.include_router(templates_api.router, tags=["Templates"])
 app.include_router(tool_inventory.router, tags=["Tool Inventory"])
 app.include_router(code_status.router, tags=["Code Files"])
+app.include_router(erd.router, tags=["ERD"])
 
 
 # Define static_dir early for use in routes
