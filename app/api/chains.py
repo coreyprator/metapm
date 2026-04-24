@@ -111,7 +111,7 @@ async def chains_misclassified(request: Request):
 @router.get("/chains/unclassified", response_class=HTMLResponse, include_in_schema=False)
 async def chains_unclassified(request: Request):
     rows = execute_query(
-        "SELECT code, title, failure_type "
+        "SELECT code, title "
         "FROM vw_bug_chain_unclassified ORDER BY code"
     ) or []
 
