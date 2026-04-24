@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ chain.chain_label }}{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="/chains">&#8592; Chains</a> / {{ chain.chain_label }}</div>
+<h1>{{ chain.chain_label }}</h1>
+<table class="meta-table">
+  <tr><th>Total Occurrences</th><td>{{ chain.total_occurrences }}</td></tr>
+  <tr><th>Age</th><td>{{ chain.age_days }} days</td></tr>
+  <tr><th>Expected Outcome</th><td>{{ chain.expected_outcome }}</td></tr>
+  <tr><th>Missing Signal</th><td>{{ chain.missing_signal }}</td></tr>
+</table>
+
+<h2>Members</h2>
+{% if members %}
+<table>
+  <thead>
+    <tr>
+      <th>Code</th>
+      <th>Title</th>
+      <th>Status</th>
+      <th>Priority</th>
+      <th>Type</th>
+      <th>Description Preview</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for m in members %}
+    <tr>
+      <td><a href="/bug/{{ m.code }}">{{ m.code }}</a></td>
+      <td>{{ m.title }}</td>
+      <td>{{ m.status }}</td>
+      <td>{{ m.priority }}</td>
+      <td>{{ m.type }}</td>
+      <td class="preview">{{ m.description_preview }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No members found.</p>
+{% endif %}
+
+<hr>
+
+<h2>Inductive Proposals <span class="label-pending">Pending &#8212; not yet committed to chain</span></h2>
+{% if inductive %}
+<table>
+  <thead>
+    <tr>
+      <th>Code</th>
+      <th>Title</th>
+      <th>Match Rule</th>
+      <th>Recurrence</th>
+      <th>Diagnostic Present</th>
+      <th>Description Preview</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in inductive %}
+    <tr>
+      <td><a href="/bug/{{ p.proposed_member_code }}">{{ p.proposed_member_code }}</a></td>
+      <td>{{ p.proposed_member_title }}</td>
+      <td>{{ p.match_rule }}</td>
+      <td>{{ p.recurrence_count }}</td>
+      <td>{{ p.diagnostic_present }}</td>
+      <td class="preview">{{ p.description_preview }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No inductive proposals for this chain.</p>
+{% endif %}
+{% endblock %}

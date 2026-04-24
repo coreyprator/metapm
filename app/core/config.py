@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "3.3.0"  # MP53B: Data model cleanup - ERD, views, JSON extraction, orphan audit, bug_chains schema, proposal views
+    VERSION: str = "3.4.0"  # MP54: Chain proposal browse UI - 6 read-only routes /chains, /bug/{code}
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Misclassified BVs{% endblock %}
+{% block content %}
+<h1>Misclassified BVs</h1>
+<p class="sub">BV items classified under a chain whose failure type conflicts with chain membership.</p>
+{% if rows %}
+<table>
+  <thead>
+    <tr>
+      <th>Chain</th>
+      <th>Bug Code</th>
+      <th>Bug Title</th>
+      <th>BV ID</th>
+      <th>BV Title</th>
+      <th>BV Status</th>
+      <th>Failure Type</th>
+      <th>Misclassification Reason</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td><a href="/chains/{{ r.chain_label }}">{{ r.chain_label }}</a></td>
+      <td><a href="/bug/{{ r.member_requirement_code }}">{{ r.member_requirement_code }}</a></td>
+      <td>{{ r.bug_title or '—' }}</td>
+      <td>{{ r.bv_id }}</td>
+      <td>{{ r.bv_title }}</td>
+      <td>{{ r.bv_status }}</td>
+      <td>{{ r.failure_type or '—' }}</td>
+      <td>{{ r.misclassification_reason }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No misclassified BVs at this time.</p>
+{% endif %}
+{% endblock %}

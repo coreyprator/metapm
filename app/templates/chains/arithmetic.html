@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Chain Arithmetic{% endblock %}
+{% block content %}
+<h1>Chain Arithmetic</h1>
+<p class="sub">Residue integrity check. Seeded + Inductive + Unclassified should equal Total Bugs.</p>
+<table class="meta-table arith">
+  <thead>
+    <tr><th>Component</th><th>Count</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Seeded chain members</td><td>{{ seeded }}</td></tr>
+    <tr><td>Inductive proposals</td><td>{{ inductive }}</td></tr>
+    <tr><td>Unclassified residue</td><td>{{ unclassified }}</td></tr>
+    <tr class="sum-row"><td><strong>Chain Sum</strong></td><td><strong>{{ chain_sum }}</strong></td></tr>
+    <tr><td>Total bugs in system</td><td>{{ total_bugs }}</td></tr>
+    <tr class="{{ 'ok-row' if discrepancy == 0 else 'warn-row' }}">
+      <td><strong>Discrepancy</strong></td>
+      <td><strong>{{ discrepancy }}</strong></td>
+    </tr>
+  </tbody>
+</table>
+{% endblock %}

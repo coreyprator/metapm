@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Chain Proposals{% endblock %} — MetaPM</title>
+  <link rel="stylesheet" href="/static/css/chains.css">
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="/chains">Chains</a>
+    <a href="/chains/misclassified">Misclassified <span class="badge">{{ misclassified_count }}</span></a>
+    <a href="/chains/unclassified">Unclassified <span class="badge">{{ unclassified_count }}</span></a>
+    <a href="/chains/arithmetic">Arithmetic</a>
+    <a href="/erd">ERD</a>
+  </nav>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Unclassified Bugs{% endblock %}
+{% block content %}
+<h1>Unclassified Bugs</h1>
+<p class="sub">Bugs not yet assigned to any chain. Use the filter to narrow results.</p>
+<input type="text" id="filter" placeholder="Filter by title…" autocomplete="off">
+<p class="row-count" id="row-count">{{ rows | length }} row{{ 's' if rows | length != 1 else '' }}</p>
+{% if rows %}
+<table>
+  <thead>
+    <tr>
+      <th>Code</th>
+      <th>Title</th>
+      <th>Failure Type</th>
+    </tr>
+  </thead>
+  <tbody id="bug-tbody">
+    {% for r in rows %}
+    <tr>
+      <td><a href="/bug/{{ r.code }}">{{ r.code }}</a></td>
+      <td class="title-cell">{{ r.title }}</td>
+      <td>{{ r.failure_type or '—' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No unclassified bugs found.</p>
+{% endif %}
+<script>
+(function () {
+  var filterEl = document.getElementById('filter');
+  var counterEl = document.getElementById('row-count');
+  var rows = document.querySelectorAll('#bug-tbody tr');
+  if (!filterEl) return;
+  filterEl.addEventListener('input', function () {
+    var q = filterEl.value.toLowerCase();
+    var visible = 0;
+    rows.forEach(function (row) {
+      var titleCell = row.querySelector('.title-cell');
+      var show = titleCell && titleCell.textContent.toLowerCase().indexOf(q) !== -1;
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    counterEl.textContent = visible + ' row' + (visible !== 1 ? 's' : '');
+  });
+}());
+</script>
+{% endblock %}

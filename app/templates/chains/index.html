@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Chain Proposals{% endblock %}
+{% block content %}
+<h1>Bug Chain Proposals</h1>
+<p class="sub">Seeded chains from MP53B. Review before committing in MP53C.</p>
+{% if chains %}
+<table>
+  <thead>
+    <tr>
+      <th>Chain Label</th>
+      <th>Occurrences</th>
+      <th>Expected Outcome</th>
+      <th>Missing Signal</th>
+      <th>Age (days)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in chains %}
+    <tr>
+      <td><a href="/chains/{{ c.chain_label }}">{{ c.chain_label }}</a></td>
+      <td>{{ c.total_occurrences }}</td>
+      <td>{{ c.expected_outcome }}</td>
+      <td>{{ c.missing_signal }}</td>
+      <td>{{ c.age_days }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No seeded chain proposals found.</p>
+{% endif %}
+{% endblock %}

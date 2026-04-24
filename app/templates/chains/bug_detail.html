@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}{{ bug.code }}{% endblock %}
+{% block content %}
+<div class="breadcrumb">
+  <a href="/chains">&#8592; Chains</a>
+  {% if bug.bug_chain_id %}
+  / <a href="/chains/{{ bug.bug_chain_id }}">{{ bug.bug_chain_id }}</a>
+  {% endif %}
+  / {{ bug.code }}
+</div>
+
+<h1>{{ bug.code }} &#8212; {{ bug.title }}</h1>
+<div class="description">{{ bug.description }}</div>
+
+<h2>Metadata</h2>
+<table class="meta-table">
+  <tr><th>Status</th><td>{{ bug.status }}</td></tr>
+  <tr><th>Priority</th><td>{{ bug.priority }}</td></tr>
+  <tr><th>Type</th><td>{{ bug.type }}</td></tr>
+  <tr><th>Failure Type</th><td>{{ bug.failure_type or '—' }}</td></tr>
+  <tr><th>Target Version</th><td>{{ bug.target_version or '—' }}</td></tr>
+  <tr><th>Created At</th><td>{{ bug.created_at }}</td></tr>
+  <tr><th>Updated At</th><td>{{ bug.updated_at }}</td></tr>
+  <tr><th>Failure Class Hash</th><td>{{ bug.failure_class_hash or '—' }}</td></tr>
+  <tr><th>Bug Chain ID</th><td>{{ bug.bug_chain_id or '—' }}</td></tr>
+</table>
+
+<h2>State History</h2>
+{% if history %}
+<table>
+  <thead>
+    <tr>
+      <th>Changed At</th>
+      <th>Changed By</th>
+      <th>Field</th>
+      <th>Old Value</th>
+      <th>New Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for h in history %}
+    <tr>
+      <td>{{ h.changed_at }}</td>
+      <td>{{ h.changed_by }}</td>
+      <td>{{ h.field_name }}</td>
+      <td>{{ h.old_value }}</td>
+      <td>{{ h.new_value }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No history recorded.</p>
+{% endif %}
+
+<h2>Failed / Skipped BVs</h2>
+{% if bvs %}
+<table>
+  <thead>
+    <tr>
+      <th>PTH</th>
+      <th>BV ID</th>
+      <th>BV Title</th>
+      <th>BV Status</th>
+      <th>Failure Type</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for b in bvs %}
+    <tr>
+      <td>{{ b.pth }}</td>
+      <td>{{ b.bv_id }}</td>
+      <td>{{ b.bv_title }}</td>
+      <td>{{ b.bv_status }}</td>
+      <td>{{ b.failure_type or '—' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No failed or skipped BVs linked to this bug.</p>
+{% endif %}
+{% endblock %}
