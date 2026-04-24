@@ -31,3 +31,6 @@ docs/
 # MM18: Explicitly include static HTML files (override any implicit gcloud HTML filter)
 !static/
 !static/*.html
+# MP54: Include Jinja2 templates
+!app/templates/
+!app/templates/**
