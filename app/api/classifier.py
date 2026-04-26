@@ -324,13 +324,14 @@ async def load_bugs_with_context() -> List[Dict[str, Any]]:
                         "created_by": r.get("created_by"),
                     })
 
-        # Get status history
+        # Get status history from requirement_history (MP56-PATCH: use old_value/new_value not old_status/new_status)
         history = execute_query(
             """
             SELECT
-                id, old_status, new_status, changed_at, changed_by, note
+                id, old_value AS old_status, new_value AS new_status, changed_at, changed_by, notes AS note
             FROM requirement_history
             WHERE requirement_id = ?
+              AND field_name = 'status'
             ORDER BY changed_at ASC
             """,
             (bug_req_id,)
