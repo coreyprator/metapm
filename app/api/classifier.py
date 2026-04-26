@@ -180,14 +180,14 @@ async def load_bugs_with_context() -> List[Dict[str, Any]]:
         walks = execute_query(
             """
             SELECT
-                u.id, u.pth, cp.sprint_id, u.uat_status,
-                u.submitted_at, u.submitted_by, u.general_notes,
+                u.id, u.pth, cp.sprint_id, u.status,
+                u.pl_submitted_at, u.general_notes,
                 u.version_before, u.version_after
             FROM pth_registry pr
             JOIN uat_pages u ON u.pth = pr.pth
             LEFT JOIN cc_prompts cp ON cp.pth = u.pth
             WHERE pr.requirement_id = ?
-            ORDER BY u.submitted_at DESC
+            ORDER BY u.pl_submitted_at DESC
             """,
             (bug_req_id,)
         ) or []
@@ -215,9 +215,8 @@ async def load_bugs_with_context() -> List[Dict[str, Any]]:
                 "id": walk["id"],
                 "pth": walk["pth"],
                 "sprint_id": walk["sprint_id"],
-                "uat_status": walk["uat_status"],
-                "submitted_at": str(walk["submitted_at"]) if walk.get("submitted_at") else None,
-                "submitted_by": walk.get("submitted_by"),
+                "uat_status": walk["status"],  # Map status → uat_status for frontend
+                "submitted_at": str(walk["pl_submitted_at"]) if walk.get("pl_submitted_at") else None,
                 "general_notes": walk.get("general_notes"),
                 "version": f"{walk.get('version_before')} → {walk.get('version_after')}",
                 "bvs": [dict(bv) for bv in bvs],
