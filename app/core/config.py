@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "3.4.0"  # MP54: Chain proposal browse UI - 6 read-only routes /chains, /bug/{code}
+    VERSION: str = "3.5.0"  # MP56: Bug Classifier Inspector - Schema migration, API endpoints, UI integration
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database

@@ -14,7 +14,7 @@ from fastapi.responses import RedirectResponse, JSONResponse, FileResponse, HTML
 from fastapi.exceptions import RequestValidationError
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor, rag, lessons, uat_gen, governance, seed, auth, uat_spec, prompts, reviews, radar, challenge, intelligence, verify, quality, prompt_builder, templates_api, tool_inventory, code_status, erd, chains
+from app.api import tasks, projects, categories, methodology, capture, calendar, themes, backlog, mcp, roadmap, handoff_lifecycle, conductor, rag, lessons, uat_gen, governance, seed, auth, uat_spec, prompts, reviews, radar, challenge, intelligence, verify, quality, prompt_builder, templates_api, tool_inventory, code_status, erd, chains, classifier
 from app.core.config import settings
 from app.core.migrations import run_migrations
 from app.schemas.mcp import UATDirectSubmit, UATDirectSubmitResponse
@@ -157,6 +157,7 @@ app.include_router(tool_inventory.router, tags=["Tool Inventory"])
 app.include_router(code_status.router, tags=["Code Files"])
 app.include_router(erd.router, tags=["ERD"])
 app.include_router(chains.router, tags=["Chains"])
+app.include_router(classifier.router, tags=["Classifier"])
 
 
 # Define static_dir early for use in routes
@@ -452,6 +453,16 @@ async def templates_deep_link(template_id: str):
         return FileResponse(str(templates_file), media_type="text/html")
     from fastapi import HTTPException
     raise HTTPException(status_code=404, detail="Templates page not found")
+
+
+@app.get("/classifier")
+async def classifier_page():
+    """MP56 Bug Classifier Inspector — PL triage UI for bug classification and chain management."""
+    classifier_file = static_dir / "classifier" / "index.html"
+    if classifier_file.exists():
+        return FileResponse(str(classifier_file), media_type="text/html")
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Classifier page not found")
 
 
 @app.get("/tool-inventory")

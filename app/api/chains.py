@@ -260,7 +260,7 @@ async def bug_detail(request: Request, code: str):
 
     bvs = execute_query(
         "SELECT u.pth, u.status AS page_status, b.bv_id, b.title AS bv_title, "
-        "b.status AS bv_status, b.failure_type "
+        "b.status AS bv_status, b.classification AS failure_type "
         "FROM uat_pages u "
         "JOIN uat_bv_items b ON b.spec_id = u.id "
         "WHERE u.pth IN (SELECT pth FROM pth_registry WHERE requirement_id = ?) "

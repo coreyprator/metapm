@@ -83,10 +83,10 @@ class UATSpecResponse(BaseModel):
 
 
 def get_allowed_failure_types() -> set:
-    """MP27: Load allowed failure types from DB at validation time (not module load)."""
+    """MP56: Load allowed classifications from DB (table renamed from failure_types to classifications)."""
     try:
         rows = execute_query(
-            "SELECT type_code FROM failure_types WHERE is_active = 1",
+            "SELECT code AS type_code FROM classifications WHERE active = 1",
             fetch="all"
         )
         if rows:
@@ -499,16 +499,8 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
         WHERE id = ?
     """, (json.dumps(existing_cases), new_status, gn_value, attempt_number, spec_id), fetch="none")
 
-    # MP23 REQ-048: Write sprint-level failure_type to uat_results
-    if sprint_failure_type:
-        try:
-            handoff_id = row.get("handoff_id")
-            if handoff_id:
-                execute_query("""
-                    UPDATE uat_results SET failure_type = ? WHERE handoff_id = ?
-                """, (sprint_failure_type, str(handoff_id)), fetch="none")
-        except Exception as e:
-            logger.warning(f"uat_results failure_type update failed: {e}")
+    # MP56: Sprint-level failure_type removed; BV-level classifications are now primary
+    # (sprint_failure_type logic kept for conditional_pass validation but not persisted to uat_results)
 
     logger.info(f"PL submitted results for spec {spec_id}: {passed}P/{failed}F/{skipped}S, status={new_status}")
 
@@ -573,25 +565,27 @@ async def submit_pl_results(spec_id: str, body: PLResultsSubmit, request: Reques
     elif new_status == "in_progress":
         logger.info(f"UAT {spec_id} incomplete: {failed} fail, {total - passed - skipped} pending — no auto-advance")
 
-    # MF01: persist individual BV items to uat_bv_items table (MP23: +failure_type)
+    # MF01: persist individual BV items to uat_bv_items table (MP56: classification column holds former failure_type values)
     title_lookup = {c["id"]: c.get("title", "") for c in real_cases}
     for tc in body.test_cases:
         try:
             bv_title = title_lookup.get(tc.id, "")
+            # MP56: Use failure_type value for classification column (merged in schema)
+            classification_value = tc.failure_type or tc.classification
             execute_query("""
                 IF EXISTS (SELECT 1 FROM uat_bv_items WHERE spec_id=? AND bv_id=?)
                     UPDATE uat_bv_items
-                    SET status=?, notes=?, classification=?, failure_type=?, updated_at=GETUTCDATE()
+                    SET status=?, notes=?, classification=?, updated_at=GETUTCDATE()
                     WHERE spec_id=? AND bv_id=?
                 ELSE
-                    INSERT INTO uat_bv_items (spec_id, bv_id, title, status, notes, classification, failure_type)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO uat_bv_items (spec_id, bv_id, title, status, notes, classification)
+                    VALUES (?, ?, ?, ?, ?, ?)
             """, (
                 spec_id, tc.id,                                                          # EXISTS check
-                tc.status or 'pending', tc.notes or '', tc.classification, tc.failure_type,  # UPDATE SET
+                tc.status or 'pending', tc.notes or '', classification_value,             # UPDATE SET
                 spec_id, tc.id,                                                          # UPDATE WHERE
                 spec_id, tc.id, bv_title,                                                # INSERT
-                tc.status or 'pending', tc.notes or '', tc.classification, tc.failure_type,  # INSERT values
+                tc.status or 'pending', tc.notes or '', classification_value,             # INSERT values
             ), fetch="none")
         except Exception as bv_err:
             logger.warning(f"BV item upsert failed for {tc.id}: {bv_err}")
