@@ -861,12 +861,12 @@ async def run_seed():
             table_check = execute_query("""
                 SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.TABLES
                 WHERE TABLE_NAME IN ('bug_chains', 'bug_classifications', 'bug_chain_members')
-            """)
-            if not table_check or table_check[0]["cnt"] < 2:
+            """, fetch="one")
+            if not table_check or table_check["cnt"] < 2:
                 return {
                     "error": "Required tables not found",
                     "message": "Run MP56 schema migration first to create bug_classifications and bug_chain_members tables.",
-                    "found_tables": table_check[0]["cnt"] if table_check else 0,
+                    "found_tables": table_check["cnt"] if table_check else 0,
                     "required_tables": "bug_classifications, bug_chain_members"
                 }
         except Exception as e:
