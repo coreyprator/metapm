@@ -856,14 +856,23 @@ async def run_seed():
             "warning": None,
         }
 
-        # Check if bug_chains table exists
+        # Check if required tables exist (created by MP56 migration)
         try:
-            execute_query("SELECT TOP 1 id FROM bug_chains")
+            table_check = execute_query("""
+                SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_NAME IN ('bug_chains', 'bug_classifications', 'bug_chain_members')
+            """)
+            if not table_check or table_check[0]["cnt"] < 2:
+                return {
+                    "error": "Required tables not found",
+                    "message": "Run MP56 schema migration first to create bug_classifications and bug_chain_members tables.",
+                    "found_tables": table_check[0]["cnt"] if table_check else 0,
+                    "required_tables": "bug_classifications, bug_chain_members"
+                }
         except Exception as e:
             return {
-                "error": "bug_chains table not found or inaccessible",
-                "detail": str(e),
-                "message": "Run MP56 schema migration first to create bug_chains, bug_classifications, and bug_chain_members tables."
+                "error": "Database schema check failed",
+                "detail": str(e)
             }
 
         # Phase 1: Skip chain seeding - bug_chains schema unknown until migration runs
