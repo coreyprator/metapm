@@ -175,123 +175,120 @@ async def load_bugs_with_context() -> List[Dict[str, Any]]:
         ) or []
         bug_chain_ids = [r["chain_id"] for r in bug_chains]
 
-        # Get UAT walks via pth_registry
+        # Get UAT walks via pth_registry (MP56-PATCH: fixed uat_page_id error)
         uat_walks = []
-        if bug.get("pth"):
-            walks = execute_query(
+        walks = execute_query(
+            """
+            SELECT
+                u.id, u.pth, u.sprint_id, u.uat_status,
+                u.submitted_at, u.submitted_by, u.general_notes,
+                u.version_before, u.version_after
+            FROM pth_registry pr
+            JOIN uat_pages u ON u.pth = pr.pth
+            WHERE pr.requirement_id = ?
+            ORDER BY u.submitted_at DESC
+            """,
+            (bug_req_id,)
+        ) or []
+
+        for walk in walks:
+            # Get BVs for this UAT walk
+            bvs = execute_query(
                 """
                 SELECT
-                    u.id, u.pth, u.sprint_id, u.uat_status,
-                    u.submitted_at, u.submitted_by, u.general_notes,
-                    u.version_before, u.version_after
-                FROM uat_pages u
-                JOIN pth_registry pr ON pr.uat_page_id = u.id
-                WHERE pr.pth = ?
-                ORDER BY u.submitted_at DESC
+                    bv_id, title, bv_type, status, classification,
+                    notes, cc_evidence, cc_result
+                FROM uat_bv_items
+                WHERE spec_id = ?
+                ORDER BY bv_id
                 """,
-                (bug["pth"],)
+                (walk["id"],)
             ) or []
 
-            for walk in walks:
-                # Get BVs for this UAT walk
-                bvs = execute_query(
-                    """
-                    SELECT
-                        bv_id, title, bv_type, status, classification,
-                        notes, cc_evidence
-                    FROM uat_bv_items
-                    WHERE uat_page_id = ?
-                    ORDER BY bv_id
-                    """,
-                    (walk["id"],)
-                ) or []
+            # Per API.md: BV classification is singular in DB but we return as array for forward-compat
+            for bv in bvs:
+                bv["classifications"] = [bv["classification"]] if bv.get("classification") else []
+                del bv["classification"]  # Remove singular field
 
-                # Per API.md: BV classification is singular in DB but we return as array for forward-compat
-                for bv in bvs:
-                    bv["classifications"] = [bv["classification"]] if bv.get("classification") else []
-                    del bv["classification"]  # Remove singular field
+            uat_walks.append({
+                "id": walk["id"],
+                "pth": walk["pth"],
+                "sprint_id": walk["sprint_id"],
+                "uat_status": walk["uat_status"],
+                "submitted_at": str(walk["submitted_at"]) if walk.get("submitted_at") else None,
+                "submitted_by": walk.get("submitted_by"),
+                "general_notes": walk.get("general_notes"),
+                "version": f"{walk.get('version_before')} → {walk.get('version_after')}",
+                "bvs": [dict(bv) for bv in bvs],
+            })
 
-                uat_walks.append({
-                    "id": walk["id"],
-                    "pth": walk["pth"],
-                    "sprint_id": walk["sprint_id"],
-                    "uat_status": walk["uat_status"],
-                    "submitted_at": str(walk["submitted_at"]) if walk.get("submitted_at") else None,
-                    "submitted_by": walk.get("submitted_by"),
-                    "general_notes": walk.get("general_notes"),
-                    "version": f"{walk.get('version_before')} → {walk.get('version_after')}",
-                    "bvs": [dict(bv) for bv in bvs],
-                })
-
-        # Get sprint history via cc_prompts and also_closes
+        # Get sprint history via cc_prompts (MP56-PATCH: use requirement_id not pth)
         sprints = []
-        if bug.get("pth"):
-            sprint_rows = execute_query(
-                """
-                SELECT
-                    id, sprint_id, pth, status, session_outcome,
-                    approved_at, approved_by, also_closes,
-                    session_started_at, session_ended_at, session_stop_reason,
-                    content
-                FROM cc_prompts
-                WHERE pth = ?
-                ORDER BY created_at DESC
-                """,
-                (bug["pth"],)
-            ) or []
+        sprint_rows = execute_query(
+            """
+            SELECT
+                id, sprint_id, pth, status, session_outcome,
+                approved_at, approved_by, also_closes,
+                session_started_at, session_ended_at, session_stop_reason,
+                content
+            FROM cc_prompts
+            WHERE requirement_id = ?
+            ORDER BY created_at DESC
+            """,
+            (bug_req_id,)
+        ) or []
 
-            for s in sprint_rows:
-                also_closes = []
-                if s.get("also_closes"):
-                    try:
-                        also_closes = json.loads(s["also_closes"]) if isinstance(s["also_closes"], str) else s["also_closes"]
-                    except:
-                        also_closes = []
+        for s in sprint_rows:
+            also_closes = []
+            if s.get("also_closes"):
+                try:
+                    also_closes = json.loads(s["also_closes"]) if isinstance(s["also_closes"], str) else s["also_closes"]
+                except:
+                    also_closes = []
 
-                sprints.append({
-                    "id": s["id"],
-                    "sprint_id": s["sprint_id"],
-                    "pth": s["pth"],
-                    "status": s["status"],
-                    "session_outcome": s.get("session_outcome"),
-                    "approved_at": str(s["approved_at"]) if s.get("approved_at") else None,
-                    "approved_by": s.get("approved_by"),
-                    "also_closes": also_closes,
-                    "content": s.get("content", "")[:500],  # Truncate for response size
-                    "session_started_at": str(s["session_started_at"]) if s.get("session_started_at") else None,
-                    "session_ended_at": str(s["session_ended_at"]) if s.get("session_ended_at") else None,
-                    "session_stop_reason": s.get("session_stop_reason"),
-                })
+            sprints.append({
+                "id": s["id"],
+                "sprint_id": s["sprint_id"],
+                "pth": s["pth"],
+                "status": s["status"],
+                "session_outcome": s.get("session_outcome"),
+                "approved_at": str(s["approved_at"]) if s.get("approved_at") else None,
+                "approved_by": s.get("approved_by"),
+                "also_closes": also_closes,
+                "content": s.get("content", "")[:500],  # Truncate for response size
+                "session_started_at": str(s["session_started_at"]) if s.get("session_started_at") else None,
+                "session_ended_at": str(s["session_ended_at"]) if s.get("session_ended_at") else None,
+                "session_stop_reason": s.get("session_stop_reason"),
+            })
 
-        # Get handoffs
+        # Get handoffs (MP56-PATCH: use pth_registry)
         handoffs = []
-        if bug.get("pth"):
-            handoff_rows = execute_query(
-                """
-                SELECT
-                    id, pth, direction, description, evidence_json
-                FROM mcp_handoffs
-                WHERE pth = ?
-                ORDER BY created_at DESC
-                """,
-                (bug["pth"],)
-            ) or []
+        handoff_rows = execute_query(
+            """
+            SELECT
+                h.id, h.pth, h.direction, h.description, h.evidence_json
+            FROM mcp_handoffs h
+            WHERE h.pth IN (SELECT pth FROM pth_registry WHERE requirement_id = ?)
+            ORDER BY h.created_at DESC
+            """,
+            (bug_req_id,)
+        ) or []
 
-            for h in handoff_rows:
-                evidence = {}
-                if h.get("evidence_json"):
-                    try:
-                        evidence = json.loads(h["evidence_json"]) if isinstance(h["evidence_json"], str) else h["evidence_json"]
-                    except:
-                        evidence = {}
+        for h in handoff_rows:
+            evidence = {}
+            if h.get("evidence_json"):
+                try:
+                    evidence = json.loads(h["evidence_json"]) if isinstance(h["evidence_json"], str) else h["evidence_json"]
+                except:
+                    evidence = {}
 
-                handoffs.append({
-                    "id": h["id"],
-                    "pth": h["pth"],
-                    "direction": h["direction"],
-                    "description": h.get("description", ""),
-                    "evidence_json": evidence,
-                })
+            handoffs.append({
+                "id": h["id"],
+                "pth": h["pth"],
+                "direction": h["direction"],
+                "description": h.get("description", ""),
+                "evidence_json": evidence,
+            })
 
         # Get reviews
         reviews = []
@@ -824,3 +821,147 @@ async def merge_chains(source_id: str, merge: BugChainMerge):
     except Exception as exc:
         logger.error(f"merge_chains failed: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Admin — POST /api/classifier/seed (MP56-PATCH Gap 1)
+# ---------------------------------------------------------------------------
+
+@router.post("/api/classifier/seed")
+async def run_seed():
+    """
+    MP56-PATCH: Admin endpoint to seed bug_chains, bug_classifications, bug_chain_members.
+    Loads from app/handoffs/MP56_bug_classifier/metapm-classifier-export-2026-04-25.json
+    """
+    try:
+        from pathlib import Path
+        import json
+
+        # Load export JSON
+        json_path = Path(__file__).parent.parent / "handoffs" / "MP56_bug_classifier" / "metapm-classifier-export-2026-04-25.json"
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        results = {
+            "chains_inserted": 0,
+            "chains_skipped": 0,
+            "bug_classifications_inserted": 0,
+            "bug_classifications_skipped": 0,
+            "bug_chain_members_inserted": 0,
+            "bug_chain_members_skipped": 0,
+            "skipped_bug_codes": [],
+        }
+
+        # Phase 1: Seed chains
+        for chain in data["chains"]:
+            chain_id = chain["id"]
+            existing = execute_query("SELECT id FROM bug_chains WHERE id = ?", (chain_id,))
+            if existing:
+                results["chains_skipped"] += 1
+                continue
+
+            member_codes_json = json.dumps(chain.get("member_requirement_codes", []))
+            tokens_json = json.dumps(chain.get("tokens", []))
+
+            execute_query(
+                """
+                INSERT INTO bug_chains (
+                    id, pattern_label, expected_outcome, missing_signal,
+                    tokens, member_requirement_codes, total_occurrences,
+                    status, failure_class_hash, first_occurrence_requirement_code,
+                    first_occurrence_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    chain_id,
+                    chain.get("pattern_label", chain_id),
+                    chain.get("expected_outcome", ""),
+                    chain.get("missing_signal", ""),
+                    tokens_json,
+                    member_codes_json,
+                    chain.get("total_occurrences", 0),
+                    chain.get("status", "active"),
+                    chain.get("failure_class_hash"),
+                    chain.get("first_occurrence_requirement_code"),
+                    chain.get("first_occurrence_at"),
+                )
+            )
+            results["chains_inserted"] += 1
+
+        # Phase 2: Seed bug_classifications
+        cls_rows = execute_query("SELECT code, name FROM classifications")
+        cls_mapping = {row["name"].lower(): row["code"] for row in cls_rows}
+
+        for bug in data["bugs"]:
+            bug_code = bug["code"]
+            bug_rows = execute_query(
+                "SELECT id FROM roadmap_requirements WHERE code = ? AND type = 'bug'",
+                (bug_code,)
+            )
+            if not bug_rows:
+                results["skipped_bug_codes"].append(bug_code)
+                continue
+
+            bug_req_id = bug_rows[0]["id"]
+
+            for cls_name in bug.get("classifications", []):
+                cls_code = cls_mapping.get(cls_name.lower())
+                if not cls_code:
+                    # Try normalizing name to code
+                    cls_code = cls_name.lower().replace(" ", "_").replace("—", "_").replace("/", "_")
+                    if cls_code not in [row["code"] for row in cls_rows]:
+                        continue
+
+                existing = execute_query(
+                    "SELECT id FROM bug_classifications WHERE bug_requirement_id = ? AND classification_code = ?",
+                    (bug_req_id, cls_code)
+                )
+                if existing:
+                    results["bug_classifications_skipped"] += 1
+                    continue
+
+                execute_query(
+                    "INSERT INTO bug_classifications (bug_requirement_id, classification_code, created_by) VALUES (?, ?, 'seed')",
+                    (bug_req_id, cls_code)
+                )
+                results["bug_classifications_inserted"] += 1
+
+        # Phase 3: Seed bug_chain_members
+        for bug in data["bugs"]:
+            bug_code = bug["code"]
+            bug_rows = execute_query(
+                "SELECT id FROM roadmap_requirements WHERE code = ? AND type = 'bug'",
+                (bug_code,)
+            )
+            if not bug_rows:
+                continue
+
+            bug_req_id = bug_rows[0]["id"]
+            chain_id = bug.get("bug_chain_id")
+            if not chain_id:
+                continue
+
+            existing = execute_query(
+                "SELECT id FROM bug_chain_members WHERE bug_requirement_id = ? AND chain_id = ?",
+                (bug_req_id, chain_id)
+            )
+            if existing:
+                results["bug_chain_members_skipped"] += 1
+                continue
+
+            try:
+                execute_query(
+                    "INSERT INTO bug_chain_members (bug_requirement_id, chain_id, created_by) VALUES (?, ?, 'seed')",
+                    (bug_req_id, chain_id)
+                )
+                results["bug_chain_members_inserted"] += 1
+            except Exception as e:
+                logger.warning(f"Failed to insert chain member {bug_code} → {chain_id}: {e}")
+
+        return results
+
+    except Exception as exc:
+        logger.error(f"run_seed failed: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
