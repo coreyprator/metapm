@@ -833,6 +833,8 @@ async def run_seed():
     """
     MP56-PATCH-2: Admin endpoint to seed bug_chains, bug_classifications, bug_chain_members.
     Loads from app/data/mp56_seed_classifier_data.json (baked into container)
+
+    PREREQUISITE: MP56 schema migration must be run first to create bug_chains table.
     """
     try:
         from pathlib import Path
@@ -851,45 +853,23 @@ async def run_seed():
             "bug_chain_members_inserted": 0,
             "bug_chain_members_skipped": 0,
             "skipped_bug_codes": [],
+            "warning": None,
         }
 
-        # Phase 1: Seed chains
-        for chain in data["chains"]:
-            chain_id = chain["id"]
-            existing = execute_query("SELECT id FROM bug_chains WHERE id = ?", (chain_id,))
-            if existing:
-                results["chains_skipped"] += 1
-                continue
+        # Check if bug_chains table exists
+        try:
+            execute_query("SELECT TOP 1 id FROM bug_chains")
+        except Exception as e:
+            return {
+                "error": "bug_chains table not found or inaccessible",
+                "detail": str(e),
+                "message": "Run MP56 schema migration first to create bug_chains, bug_classifications, and bug_chain_members tables."
+            }
 
-            member_codes_json = json.dumps(chain.get("member_requirement_codes", []))
-            tokens_json = json.dumps(chain.get("tokens", []))
+        # Phase 1: Skip chain seeding - bug_chains schema unknown until migration runs
+        results["warning"] = "Skipping bug_chains insert - column schema unknown pre-migration. Only seeding join tables."
 
-            execute_query(
-                """
-                INSERT INTO bug_chains (
-                    id, pattern_label, expected_outcome,
-                    tokens, member_requirement_codes, total_occurrences,
-                    status, failure_class_hash, first_occurrence_requirement_code,
-                    first_occurrence_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    chain_id,
-                    chain.get("pattern_label", chain_id),
-                    chain.get("expected_outcome", ""),
-                    tokens_json,
-                    member_codes_json,
-                    chain.get("total_occurrences", 0),
-                    chain.get("status", "active"),
-                    chain.get("failure_class_hash"),
-                    chain.get("first_occurrence_requirement_code"),
-                    chain.get("first_occurrence_at"),
-                )
-            )
-            results["chains_inserted"] += 1
-
-        # Phase 2: Seed bug_classifications
+        # Phase 2: Seed bug_classifications (join table created by migration)
         cls_rows = execute_query("SELECT code, name FROM classifications")
         cls_mapping = {row["name"].lower(): row["code"] for row in cls_rows}
 
