@@ -180,11 +180,12 @@ async def load_bugs_with_context() -> List[Dict[str, Any]]:
         walks = execute_query(
             """
             SELECT
-                u.id, u.pth, u.sprint_id, u.uat_status,
+                u.id, u.pth, cp.sprint_id, u.uat_status,
                 u.submitted_at, u.submitted_by, u.general_notes,
                 u.version_before, u.version_after
             FROM pth_registry pr
             JOIN uat_pages u ON u.pth = pr.pth
+            LEFT JOIN cc_prompts cp ON cp.pth = u.pth
             WHERE pr.requirement_id = ?
             ORDER BY u.submitted_at DESC
             """,
