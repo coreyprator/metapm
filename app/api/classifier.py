@@ -135,12 +135,12 @@ async def load_bugs_with_context() -> List[Dict[str, Any]]:
     - Reviews
     - Status history
     """
-    # Get all bugs
+    # Get all bugs (MP56-PATCH: sprint_id removed - not in roadmap_requirements table)
     bugs = execute_query(
         """
         SELECT
             id, code, title, description, status, priority, type,
-            sprint_id, pth, failure_class_hash, created_at, updated_at,
+            pth, failure_class_hash, created_at, updated_at,
             project_id
         FROM roadmap_requirements
         WHERE type = 'bug'
@@ -361,7 +361,7 @@ async def load_bugs_with_context() -> List[Dict[str, Any]]:
             except:
                 age_days = 0
 
-        # Build final bug object
+        # Build final bug object (MP56-PATCH: sprint_id removed - bugs have many sprints)
         result.append({
             "code": bug_code,
             "title": bug["title"],
@@ -371,7 +371,6 @@ async def load_bugs_with_context() -> List[Dict[str, Any]]:
             "type": bug["type"],
             "layer": "unknown",  # TODO: Add layer field to schema or derive
             "prefix": bug_code.split("-")[0] if "-" in bug_code else bug_code[:3],
-            "sprint_id": bug.get("sprint_id"),
             "pth": bug.get("pth"),
             "failure_class_hash": bug.get("failure_class_hash"),
             "bug_chain_ids": bug_chain_ids,  # M:N array
