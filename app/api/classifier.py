@@ -289,7 +289,7 @@ async def load_bugs_with_context() -> List[Dict[str, Any]]:
                 "evidence_json": evidence,
             })
 
-        # Get reviews (MP56-PATCH: column is prompt_pth not pth)
+        # Get reviews (MP56-PATCH: column is prompt_pth not pth, no created_by)
         reviews = []
         if handoffs:
             for handoff in handoffs:
@@ -297,7 +297,7 @@ async def load_bugs_with_context() -> List[Dict[str, Any]]:
                     """
                     SELECT
                         id, prompt_pth, handoff_id, assessment, notes,
-                        lesson_candidates, created_at, created_by
+                        lesson_candidates, created_at
                     FROM reviews
                     WHERE handoff_id = ?
                     ORDER BY created_at DESC
@@ -321,7 +321,6 @@ async def load_bugs_with_context() -> List[Dict[str, Any]]:
                         "notes": r.get("notes", ""),
                         "lesson_candidates": lesson_cand,
                         "created_at": str(r["created_at"]) if r.get("created_at") else None,
-                        "created_by": r.get("created_by"),
                     })
 
         # Get status history from requirement_history (MP56-PATCH: use old_value/new_value not old_status/new_status)
