@@ -856,30 +856,19 @@ async def run_seed():
             "warning": None,
         }
 
-        # Check if required tables exist (created by MP56 migration)
-        try:
-            table_check = execute_query("""
-                SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.TABLES
-                WHERE TABLE_NAME IN ('bug_chains', 'bug_classifications', 'bug_chain_members')
-            """, fetch="one")
-            if not table_check or table_check["cnt"] < 2:
-                return {
-                    "error": "Required tables not found",
-                    "message": "Run MP56 schema migration first to create bug_classifications and bug_chain_members tables.",
-                    "found_tables": table_check["cnt"] if table_check else 0,
-                    "required_tables": "bug_classifications, bug_chain_members"
-                }
-        except Exception as e:
-            return {
-                "error": "Database schema check failed",
-                "detail": str(e)
-            }
-
-        # Phase 1: Skip chain seeding - bug_chains schema unknown until migration runs
-        results["warning"] = "Skipping bug_chains insert - column schema unknown pre-migration. Only seeding join tables."
+        # Skip table check - migrations haven't been run yet. Try seeding and handle errors.
+        results["warning"] = "Skipping bug_chains insert - schema unknown pre-migration. Seeding join tables only."
 
         # Phase 2: Seed bug_classifications (join table created by migration)
-        cls_rows = execute_query("SELECT code, name FROM classifications")
+        try:
+            cls_rows = execute_query("SELECT code, name FROM classifications")
+        except Exception as e:
+            return {
+                "error": "classifications table not found",
+                "detail": str(e),
+                "message": "Rename failure_types to classifications first (MP56 migration Phase A.3)"
+            }
+
         cls_mapping = {row["name"].lower(): row["code"] for row in cls_rows}
 
         for bug in data["bugs"]:
