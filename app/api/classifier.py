@@ -70,25 +70,28 @@ async def load_classifications() -> List[Dict[str, Any]]:
 
 
 async def load_chains() -> List[Dict[str, Any]]:
-    """Load all bug chains with their members."""
-    chains = execute_query(
-        """
-        SELECT
-            id,
-            pattern_label,
-            expected_outcome,
-            missing_signal,
-            tokens,
-            member_requirement_codes,
-            total_occurrences,
-            status,
-            failure_class_hash,
-            first_occurrence_requirement_code,
-            first_occurrence_at
-        FROM bug_chains
-        ORDER BY total_occurrences DESC
-        """
-    ) or []
+    """Load all bug chains with their members. Returns empty if table doesn't exist yet."""
+    try:
+        chains = execute_query(
+            """
+            SELECT
+                id,
+                pattern_label,
+                expected_outcome,
+                tokens,
+                member_requirement_codes,
+                total_occurrences,
+                status,
+                failure_class_hash,
+                first_occurrence_requirement_code,
+                first_occurrence_at
+            FROM bug_chains
+            ORDER BY total_occurrences DESC
+            """
+        ) or []
+    except Exception as e:
+        logger.warning(f"bug_chains query failed (table may not exist yet): {e}")
+        return []
 
     result = []
     for c in chains:
