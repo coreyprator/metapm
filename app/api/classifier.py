@@ -181,8 +181,7 @@ async def load_bugs_with_context() -> List[Dict[str, Any]]:
             """
             SELECT
                 u.id, u.pth, cp.sprint_id, u.status,
-                u.pl_submitted_at, u.general_notes,
-                u.version_before, u.version_after
+                u.pl_submitted_at, u.general_notes, u.version
             FROM pth_registry pr
             JOIN uat_pages u ON u.pth = pr.pth
             LEFT JOIN cc_prompts cp ON cp.pth = u.pth
@@ -218,7 +217,7 @@ async def load_bugs_with_context() -> List[Dict[str, Any]]:
                 "uat_status": walk["status"],  # Map status → uat_status for frontend
                 "submitted_at": str(walk["pl_submitted_at"]) if walk.get("pl_submitted_at") else None,
                 "general_notes": walk.get("general_notes"),
-                "version": f"{walk.get('version_before')} → {walk.get('version_after')}",
+                "version": walk.get("version", ""),
                 "bvs": [dict(bv) for bv in bvs],
             })
 
