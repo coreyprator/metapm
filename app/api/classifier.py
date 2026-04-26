@@ -831,15 +831,15 @@ async def merge_chains(source_id: str, merge: BugChainMerge):
 @router.post("/api/classifier/seed")
 async def run_seed():
     """
-    MP56-PATCH: Admin endpoint to seed bug_chains, bug_classifications, bug_chain_members.
-    Loads from app/handoffs/MP56_bug_classifier/metapm-classifier-export-2026-04-25.json
+    MP56-PATCH-2: Admin endpoint to seed bug_chains, bug_classifications, bug_chain_members.
+    Loads from app/data/mp56_seed_classifier_data.json (baked into container)
     """
     try:
         from pathlib import Path
         import json
 
-        # Load export JSON
-        json_path = Path(__file__).parent.parent / "handoffs" / "MP56_bug_classifier" / "metapm-classifier-export-2026-04-25.json"
+        # Load export JSON (MP56-PATCH-2: moved to app/data for container deploy)
+        json_path = Path(__file__).parent.parent / "data" / "mp56_seed_classifier_data.json"
         with open(json_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
@@ -867,18 +867,17 @@ async def run_seed():
             execute_query(
                 """
                 INSERT INTO bug_chains (
-                    id, pattern_label, expected_outcome, missing_signal,
+                    id, pattern_label, expected_outcome,
                     tokens, member_requirement_codes, total_occurrences,
                     status, failure_class_hash, first_occurrence_requirement_code,
                     first_occurrence_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     chain_id,
                     chain.get("pattern_label", chain_id),
                     chain.get("expected_outcome", ""),
-                    chain.get("missing_signal", ""),
                     tokens_json,
                     member_codes_json,
                     chain.get("total_occurrences", 0),

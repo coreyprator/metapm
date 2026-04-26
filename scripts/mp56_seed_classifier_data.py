@@ -6,7 +6,7 @@ Populates:
 2. bug_classifications join table (M:N bug→classifications)
 3. bug_chain_members join table (M:N bug→chains)
 
-Input: app/handoffs/MP56_bug_classifier/metapm-classifier-export-2026-04-25.json
+Input: app/data/mp56_seed_classifier_data.json (MP56-PATCH-2: moved for container deploy)
 """
 
 import json
@@ -21,7 +21,7 @@ from app.core.database import execute_query
 
 def load_export():
     """Load the prototype export JSON."""
-    json_path = Path(__file__).parent.parent / "app" / "handoffs" / "MP56_bug_classifier" / "metapm-classifier-export-2026-04-25.json"
+    json_path = Path(__file__).parent.parent / "app" / "data" / "mp56_seed_classifier_data.json"
     with open(json_path, "r", encoding="utf-8") as f:
         return json.load(f)
 

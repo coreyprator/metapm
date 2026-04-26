@@ -1,0 +1,1265 @@
+{
+  "_exportedAt": "2026-04-25T20:15:04.886Z",
+  "_schema_version": 2,
+  "bugs": [
+    {
+      "id": "req_BUG-085",
+      "project_id": "proj_metapm",
+      "code": "BUG-085",
+      "title": "Notes textarea still absent from UAT BV cards after MP43B fix — partial fix missed rendering branch, 4th recurrence",
+      "description": "After MP43B shipped, the notes textarea remains absent on the pl_visual BV card branch in render_bv_card(). MP43B's patch covered only the cc_machine branch. DevTools confirms textarea[name=notes] returns null on every pl_visual card on /uat/{spec_id}. PL cannot write notes for failing BVs, blocking submission flow. Fourth occurrence of the BC-NOTES-TEXTAREA-DROPPED chain.",
+      "status": "open",
+      "priority": "P1",
+      "type": "bug",
+      "sprint_id": "MP44",
+      "pth": "PTH-MP44",
+      "failure_class_hash": "h_88a2e0",
+      "bug_chain_id": "BC-NOTES-TEXTAREA-DROPPED",
+      "classifications": [
+        "Regression — same root",
+        "Incomplete handoff",
+        "Render / Template"
+      ],
+      "created_at": "2026-04-20T11:14:00.000Z",
+      "updated_at": "2026-04-23T16:20:00.000Z",
+      "age": 4,
+      "tokens": [
+        "notes",
+        "textarea",
+        "render",
+        "bv",
+        "card",
+        "regression",
+        "pl_visual",
+        "plvisual",
+        "null",
+        "missing",
+        "fourth"
+      ],
+      "signals": [
+        "uat",
+        "form",
+        "render"
+      ],
+      "layer": "frontend",
+      "prefix": "BUG",
+      "uat_walks": [
+        {
+          "id": "uat_MP43_uat",
+          "pth": "PTH-MP43",
+          "sprint_id": "MP43",
+          "version": "v3.2.8",
+          "uat_status": "rejected",
+          "submitted_at": "2026-04-19T15:22:00.000Z",
+          "submitted_by": "PL",
+          "general_notes": "Could not write notes on B3 — textarea missing. Tried scrolling, refreshing, hard reload. Same on B7. Submitted with minimal notes.",
+          "cai_review_json": {
+            "assessment": "fail",
+            "summary": "Notes textarea absent on pl_visual BVs; this is the third recurrence of the same defect.",
+            "actionable": [
+              "Audit render_bv_card() for both bv_type branches",
+              "Add unit test that asserts every BV card has a textarea[name=notes]"
+            ]
+          },
+          "bvs": [
+            {
+              "bv_id": "B1",
+              "title": "Login screen renders without 503",
+              "bv_type": "pl_visual",
+              "status": "pass",
+              "classifications": [],
+              "notes": "Logged in cleanly; no console errors visible.",
+              "cc_evidence": null
+            },
+            {
+              "bv_id": "B2",
+              "title": "Dashboard query returns 200 for /api/dashboard",
+              "bv_type": "cc_machine",
+              "status": "pass",
+              "classifications": [],
+              "notes": null,
+              "cc_evidence": "curl -i https://metapm-v2.app/api/dashboard → HTTP/1.1 200 OK; payload validated against schema."
+            },
+            {
+              "bv_id": "B3",
+              "title": "BV card renders notes textarea on pl_visual cards",
+              "bv_type": "pl_visual",
+              "status": "fail",
+              "classifications": [
+                "Regression — same root",
+                "Render / Template"
+              ],
+              "notes": "(textarea was absent so I couldn't write here — typed in general_notes instead)",
+              "cc_evidence": null
+            },
+            {
+              "bv_id": "B7",
+              "title": "Failure type cascade preserves notes textarea",
+              "bv_type": "pl_visual",
+              "status": "fail",
+              "classifications": [
+                "Regression — same root",
+                "Render / Template"
+              ],
+              "notes": "(absent — see general_notes)",
+              "cc_evidence": null
+            }
+          ]
+        },
+        {
+          "id": "uat_MP43B_uat",
+          "pth": "PTH-MP43B",
+          "sprint_id": "MP43B",
+          "version": "v3.2.9",
+          "uat_status": "rejected",
+          "submitted_at": "2026-04-21T10:08:00.000Z",
+          "submitted_by": "PL",
+          "general_notes": "Better — cc_machine cards now show the read-only notes panel. But pl_visual B3 STILL has no textarea. Fourth time. Filing as BUG-085.",
+          "cai_review_json": {
+            "assessment": "fail",
+            "summary": "MP43B patch covered cc_machine branch only; pl_visual branch still missing textarea.",
+            "actionable": [
+              "Cover both bv_type branches in render_bv_card()",
+              "Lift notes textarea outside the cascade JS sibling-traversal"
+            ]
+          },
+          "bvs": [
+            {
+              "bv_id": "B1",
+              "title": "cc_machine cards have read-only notes panel",
+              "bv_type": "cc_machine",
+              "status": "pass",
+              "classifications": [],
+              "notes": null,
+              "cc_evidence": "DOM scan: 6/6 cc_machine cards have data-role='notes-readonly' div present."
+            },
+            {
+              "bv_id": "B3",
+              "title": "pl_visual cards have editable notes textarea",
+              "bv_type": "pl_visual",
+              "status": "fail",
+              "classifications": [
+                "Regression — same root",
+                "Render / Template"
+              ],
+              "notes": "Still absent — opened DevTools, document.querySelectorAll('[data-role=notes]').length === 0 on pl_visual cards.",
+              "cc_evidence": null
+            }
+          ]
+        },
+        {
+          "id": "uat_MP44_uat",
+          "pth": "PTH-MP44",
+          "sprint_id": "MP44",
+          "version": "v3.3.0",
+          "uat_status": "submitted",
+          "submitted_at": null,
+          "submitted_by": null,
+          "general_notes": "(in progress)",
+          "cai_review_json": null,
+          "bvs": [
+            {
+              "bv_id": "B1",
+              "title": "render_bv_card pl_visual branch outputs textarea",
+              "bv_type": "cc_machine",
+              "status": "pending",
+              "classifications": [],
+              "notes": null,
+              "cc_evidence": null
+            },
+            {
+              "bv_id": "B2",
+              "title": "Cascade JS targets data-role not siblings",
+              "bv_type": "cc_machine",
+              "status": "pending",
+              "classifications": [],
+              "notes": null,
+              "cc_evidence": null
+            },
+            {
+              "bv_id": "B3",
+              "title": "PL writes notes on a failing BV and submits",
+              "bv_type": "pl_visual",
+              "status": "pending",
+              "classifications": [],
+              "notes": null,
+              "cc_evidence": null
+            }
+          ]
+        }
+      ],
+      "sprints": [
+        {
+          "id": 4301,
+          "sprint_id": "MP43",
+          "pth": "PTH-MP43",
+          "status": "closed",
+          "session_outcome": "fail",
+          "approved_at": "2026-04-18T14:00:00.000Z",
+          "approved_by": "CAI",
+          "version_before": "v3.2.7",
+          "version_after": "v3.2.8",
+          "also_closes": [
+            "BUG-083",
+            "BUG-084"
+          ],
+          "content": "Restore notes textarea on UAT BV cards. Apply data-role='notes' on a single shared block; ensure it survives cascade state changes. Add DevTools check: querySelectorAll('[data-role=notes]').length === bv_count.",
+          "session_started_at": "2026-04-18T14:30:00.000Z",
+          "session_ended_at": "2026-04-19T11:45:00.000Z",
+          "session_stop_reason": "UAT failed — pl_visual branch still missing textarea",
+          "handoff_id": 9101
+        },
+        {
+          "id": 4310,
+          "sprint_id": "MP43B",
+          "pth": "PTH-MP43B",
+          "status": "closed",
+          "session_outcome": "fail",
+          "approved_at": "2026-04-20T13:00:00.000Z",
+          "approved_by": "CAI",
+          "version_before": "v3.2.8",
+          "version_after": "v3.2.9",
+          "also_closes": [
+            "BUG-083",
+            "BUG-084",
+            "BUG-085-prelim"
+          ],
+          "content": "Patch render_bv_card() — cover BOTH bv_type branches with the textarea block. Verify with the existing DevTools harness.",
+          "session_started_at": "2026-04-20T13:15:00.000Z",
+          "session_ended_at": "2026-04-21T09:50:00.000Z",
+          "session_stop_reason": "UAT failed — pl_visual branch STILL missing textarea (4th occurrence)",
+          "handoff_id": 9120
+        },
+        {
+          "id": 4318,
+          "sprint_id": "MP44",
+          "pth": "PTH-MP44",
+          "status": "executing",
+          "session_outcome": null,
+          "approved_at": "2026-04-23T08:30:00.000Z",
+          "approved_by": "CAI",
+          "version_before": "v3.2.9",
+          "version_after": null,
+          "also_closes": [
+            "BUG-085",
+            "BUG-086"
+          ],
+          "content": "Architectural fix: extract notes textarea into render_notes_block() called unconditionally from render_bv_card() for every bv_type. Add a unit test asserting the count. Add an integration test that exercises the cascade JS and re-asserts.",
+          "session_started_at": "2026-04-23T09:00:00.000Z",
+          "session_ended_at": null,
+          "session_stop_reason": null,
+          "handoff_id": null
+        }
+      ],
+      "handoffs": [
+        {
+          "id": 9101,
+          "pth": "PTH-MP43",
+          "direction": "cc_to_pl",
+          "description": "MP43 fix complete — notes textarea restored.",
+          "evidence_json": {
+            "tests_run": [
+              "pytest test_uat_renderer.py::test_textarea_present"
+            ],
+            "tests_passed": 12,
+            "tests_failed": 0,
+            "dom_scan": "querySelectorAll('[data-role=notes]').length === bv_count // 11/11 cc_machine ✓",
+            "gaps_acknowledged": [
+              "pl_visual branch was assumed identical to cc_machine; not directly verified."
+            ]
+          }
+        },
+        {
+          "id": 9120,
+          "pth": "PTH-MP43B",
+          "direction": "cc_to_pl",
+          "description": "MP43B fix complete — both bv_type branches now render notes textarea.",
+          "evidence_json": {
+            "tests_run": [
+              "pytest test_uat_renderer.py::test_textarea_present_all_branches"
+            ],
+            "tests_passed": 14,
+            "tests_failed": 0,
+            "dom_scan": "11/11 cc_machine cards ✓; pl_visual not directly checked because DOM harness only scanned via cc_machine selector",
+            "gaps_acknowledged": [],
+            "note": "(post-failure CAI review identified the gap: harness selector was scoped to cc_machine cards only)"
+          }
+        }
+      ],
+      "reviews": [
+        {
+          "id": 5503,
+          "pth": "PTH-MP43",
+          "handoff_id": 9101,
+          "assessment": "fail",
+          "notes": "Handoff claimed coverage of both branches but the DOM scan only proved cc_machine. Selector was '[data-bv-type=cc_machine] [data-role=notes]'.",
+          "lesson_candidates": {
+            "target": "CC handoff discipline",
+            "severity": "high",
+            "lesson": "When a fix targets a function with branched output, the verification harness must independently exercise each branch. A query that scopes to one branch cannot verify the other."
+          },
+          "created_at": "2026-04-19T16:00:00.000Z",
+          "created_by": "CAI"
+        },
+        {
+          "id": 5512,
+          "pth": "PTH-MP43B",
+          "handoff_id": 9120,
+          "assessment": "fail",
+          "notes": "Same gap as PTH-MP43. Harness still scoped to cc_machine. Recommend extracting render_notes_block() so the function under test is the same on both paths.",
+          "lesson_candidates": {
+            "target": "Test design",
+            "severity": "high",
+            "lesson": "If two branches must produce the same output, factor that output into a single function and test it once. Branch-specific tests should focus on what differs."
+          },
+          "created_at": "2026-04-21T11:30:00.000Z",
+          "created_by": "CAI"
+        }
+      ],
+      "history": [
+        {
+          "id": 30001,
+          "old_status": null,
+          "new_status": "open",
+          "changed_at": "2026-04-20T11:14:00.000Z",
+          "changed_by": "PL",
+          "note": "Filed after MP43B UAT failure."
+        },
+        {
+          "id": 30005,
+          "old_status": "open",
+          "new_status": "cc_assigned",
+          "changed_at": "2026-04-20T13:00:00.000Z",
+          "changed_by": "CAI",
+          "note": "Assigned to MP43C; cancelled — superseded by MP44."
+        },
+        {
+          "id": 30009,
+          "old_status": "cc_assigned",
+          "new_status": "open",
+          "changed_at": "2026-04-22T09:00:00.000Z",
+          "changed_by": "CAI",
+          "note": "Reverted; rolling into architectural sprint."
+        },
+        {
+          "id": 30012,
+          "old_status": "open",
+          "new_status": "cc_executing",
+          "changed_at": "2026-04-23T09:00:00.000Z",
+          "changed_by": "CC",
+          "note": "MP44 sprint started."
+        }
+      ]
+    },
+    {
+      "id": "req_BUG-077",
+      "project_id": "proj_metapm",
+      "code": "BUG-077",
+      "title": "OAuth scope collision — shared client ID between UAT login and Gmail/Calendar MCP causes 'Scope has changed' on PL authentication",
+      "description": "Single Google OAuth client ID is used for MetaPM UAT login AND the Gmail/Calendar MCP. The two flows request different scope sets. Google's consent flow rejects with 'Scope has changed' when the second flow runs after the first.",
+      "status": "open",
+      "priority": "P1",
+      "type": "bug",
+      "sprint_id": "MP51",
+      "pth": "PTH-MP51",
+      "failure_class_hash": "h_3d7711",
+      "bug_chain_id": "BC-SCOPE-COLLISION",
+      "classifications": [
+        "Incomplete spec",
+        "Config / Secrets"
+      ],
+      "created_at": "2026-04-15T08:45:00.000Z",
+      "updated_at": "2026-04-22T14:00:00.000Z",
+      "age": 8,
+      "tokens": [
+        "oauth",
+        "scope",
+        "collision",
+        "clientid",
+        "gmail",
+        "calendar",
+        "login"
+      ],
+      "signals": [
+        "auth",
+        "config"
+      ],
+      "layer": "infra",
+      "prefix": "BUG",
+      "uat_walks": [
+        {
+          "id": "uat_MP51_uat",
+          "pth": "PTH-MP51",
+          "sprint_id": "MP51",
+          "version": "v3.2.5",
+          "uat_status": "rejected",
+          "submitted_at": "2026-04-15T17:30:00.000Z",
+          "submitted_by": "PL",
+          "general_notes": "Cannot reproduce login success with Gmail MCP also enabled. Disabled Gmail MCP and login works.",
+          "cai_review_json": {
+            "assessment": "fail",
+            "summary": "OAuth client must be split per-service.",
+            "actionable": [
+              "Create per-service GOOGLE_CLIENT_ID secrets",
+              "Migrate UAT login to its own client"
+            ]
+          },
+          "bvs": [
+            {
+              "bv_id": "B1",
+              "title": "PL logs in via Google OAuth without scope error",
+              "bv_type": "pl_visual",
+              "status": "fail",
+              "classifications": [
+                "Incomplete spec",
+                "Config / Secrets"
+              ],
+              "notes": "Got 'Scope has changed from XYZ to ABC' on second attempt. First attempt worked.",
+              "cc_evidence": null
+            },
+            {
+              "bv_id": "B2",
+              "title": "GET /login returns 200 for unauthenticated user",
+              "bv_type": "cc_machine",
+              "status": "pass",
+              "classifications": [],
+              "notes": null,
+              "cc_evidence": "curl /login → 200; HTML contains form."
+            }
+          ]
+        }
+      ],
+      "sprints": [
+        {
+          "id": 5101,
+          "sprint_id": "MP51",
+          "pth": "PTH-MP51",
+          "status": "closed",
+          "session_outcome": "fail",
+          "approved_at": "2026-04-14T10:00:00.000Z",
+          "approved_by": "CAI",
+          "version_before": "v3.2.4",
+          "version_after": "v3.2.5",
+          "also_closes": [
+            "BUG-076"
+          ],
+          "content": "Restore MetaPM login. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on Cloud Run. Verify /login returns non-503.",
+          "session_started_at": "2026-04-14T11:00:00.000Z",
+          "session_ended_at": "2026-04-15T08:00:00.000Z",
+          "session_stop_reason": "Login fixed but introduced scope-collision regression with Gmail MCP",
+          "handoff_id": 9051
+        }
+      ],
+      "handoffs": [
+        {
+          "id": 9051,
+          "pth": "PTH-MP51",
+          "direction": "cc_to_pl",
+          "description": "MP51 — login restored.",
+          "evidence_json": {
+            "tests_run": [
+              "GET /login → 200",
+              "OAuth round-trip with PL test account"
+            ],
+            "gaps_acknowledged": [
+              "Did not test interaction with concurrent Gmail MCP OAuth flow."
+            ]
+          }
+        }
+      ],
+      "reviews": [
+        {
+          "id": 5601,
+          "pth": "PTH-MP51",
+          "handoff_id": 9051,
+          "assessment": "conditional_pass",
+          "notes": "Login works in isolation. PL flagged scope collision when Gmail MCP also active — filing as BUG-077.",
+          "lesson_candidates": {
+            "target": "Auth design",
+            "severity": "high",
+            "lesson": "Shared OAuth clients across products with diverging scopes will collide on consent. Default to per-product clients."
+          },
+          "created_at": "2026-04-15T08:30:00.000Z",
+          "created_by": "CAI"
+        }
+      ],
+      "history": [
+        {
+          "id": 31001,
+          "old_status": null,
+          "new_status": "open",
+          "changed_at": "2026-04-15T08:45:00.000Z",
+          "changed_by": "PL",
+          "note": "Filed after MP51 UAT review."
+        },
+        {
+          "id": 31004,
+          "old_status": "open",
+          "new_status": "cc_assigned",
+          "changed_at": "2026-04-22T13:00:00.000Z",
+          "changed_by": "CAI",
+          "note": "Rolled into MP55 OAuth namespacing sprint with BUG-095 / BUG-098."
+        }
+      ]
+    },
+    {
+      "id": "req_BUG-018",
+      "project_id": "proj_metapm",
+      "code": "BUG-018",
+      "title": "CAI spec error — BV type cc_machine vs pl_visual must be correctly assigned at write time",
+      "description": "CAI wrote the SF01 UAT spec with all BVs as pl_visual type. All 6 BVs were infrastructure/API checks verifiable programmatically by CC — none required PL browser interaction. Correct type for these is cc_machine.",
+      "status": "closed",
+      "priority": "P2",
+      "type": "bug",
+      "sprint_id": "SF01",
+      "pth": "PTH-SF01",
+      "failure_class_hash": "h_71be4d",
+      "bug_chain_id": null,
+      "classifications": [
+        "Incomplete spec",
+        "API Contract"
+      ],
+      "created_at": "2026-02-19T09:02:00.000Z",
+      "updated_at": "2026-02-23T11:00:00.000Z",
+      "age": 64,
+      "tokens": [
+        "bv",
+        "type",
+        "cc_machine",
+        "pl_visual",
+        "spec",
+        "cai",
+        "write",
+        "time"
+      ],
+      "signals": [
+        "uat",
+        "spec"
+      ],
+      "layer": "process",
+      "prefix": "BUG",
+      "uat_walks": [
+        {
+          "id": "uat_SF01_uat",
+          "pth": "PTH-SF01",
+          "sprint_id": "SF01",
+          "version": "v2.1.0",
+          "uat_status": "rejected",
+          "submitted_at": "2026-02-19T15:00:00.000Z",
+          "submitted_by": "PL",
+          "general_notes": "All 6 BVs are API checks — none need me to open a browser. Why am I being asked to verify these?",
+          "cai_review_json": {
+            "assessment": "fail",
+            "summary": "Spec mistyped all BVs as pl_visual.",
+            "actionable": [
+              "Re-type as cc_machine",
+              "Add spec-time discipline checklist"
+            ]
+          },
+          "bvs": [
+            {
+              "bv_id": "M1",
+              "title": "GET /api/sf/cards returns 200",
+              "bv_type": "pl_visual",
+              "status": "fail",
+              "classifications": [
+                "Incomplete spec",
+                "API Contract"
+              ],
+              "notes": "This is a curl check, not a PL check.",
+              "cc_evidence": null
+            }
+          ]
+        }
+      ],
+      "sprints": [
+        {
+          "id": 1801,
+          "sprint_id": "SF01",
+          "pth": "PTH-SF01",
+          "status": "closed",
+          "session_outcome": "pass",
+          "approved_at": "2026-02-18T10:00:00.000Z",
+          "approved_by": "CAI",
+          "version_before": "v2.0.9",
+          "version_after": "v2.1.0",
+          "also_closes": [],
+          "content": "Ship SF01.",
+          "session_started_at": "2026-02-18T11:00:00.000Z",
+          "session_ended_at": "2026-02-19T08:30:00.000Z",
+          "session_stop_reason": null,
+          "handoff_id": 9001
+        }
+      ],
+      "handoffs": [
+        {
+          "id": 9001,
+          "pth": "PTH-SF01",
+          "direction": "cc_to_pl",
+          "description": "SF01 — all BVs ready for PL UAT.",
+          "evidence_json": {
+            "tests_run": [
+              "api smoke 6/6 pass"
+            ],
+            "gaps_acknowledged": []
+          }
+        }
+      ],
+      "reviews": [
+        {
+          "id": 5101,
+          "pth": "PTH-SF01",
+          "handoff_id": 9001,
+          "assessment": "fail",
+          "notes": "Spec error — bv_type mistyped on all 6 BVs.",
+          "lesson_candidates": {
+            "target": "Spec discipline",
+            "severity": "high",
+            "lesson": "BV type is determined by who can verify: API/SQL/curl ⇒ cc_machine; visual UI ⇒ pl_visual."
+          },
+          "created_at": "2026-02-19T16:00:00.000Z",
+          "created_by": "CAI"
+        }
+      ],
+      "history": [
+        {
+          "id": 32001,
+          "old_status": null,
+          "new_status": "open",
+          "changed_at": "2026-02-19T09:02:00.000Z",
+          "changed_by": "PL",
+          "note": "Filed."
+        },
+        {
+          "id": 32002,
+          "old_status": "open",
+          "new_status": "closed",
+          "changed_at": "2026-02-23T11:00:00.000Z",
+          "changed_by": "CAI",
+          "note": "Closed with HM40; spec-time checklist added to template."
+        }
+      ]
+    },
+    {
+      "id": "req_BUG-074",
+      "project_id": "proj_metapm",
+      "code": "BUG-074",
+      "title": "Theme toggle — form elements have hardcoded dark backgrounds that ignore CSS variable theme switch on UAT form",
+      "description": "Several form controls in uat_renderer.py emit inline style background:#222 instead of consuming --bg-input. Light theme keeps showing dark fields.",
+      "status": "open",
+      "priority": "P2",
+      "type": "bug",
+      "sprint_id": null,
+      "pth": null,
+      "failure_class_hash": null,
+      "bug_chain_id": null,
+      "classifications": [],
+      "created_at": "2026-04-15T10:00:00.000Z",
+      "updated_at": "2026-04-15T10:00:00.000Z",
+      "age": 9,
+      "tokens": [
+        "theme",
+        "toggle",
+        "dark",
+        "css",
+        "variable",
+        "uat",
+        "form",
+        "hardcoded",
+        "background"
+      ],
+      "signals": [
+        "uat",
+        "form",
+        "theme"
+      ],
+      "layer": "frontend",
+      "prefix": "BUG",
+      "uat_walks": [],
+      "sprints": [],
+      "handoffs": [],
+      "reviews": [],
+      "history": [
+        {
+          "id": 33001,
+          "old_status": null,
+          "new_status": "open",
+          "changed_at": "2026-04-15T10:00:00.000Z",
+          "changed_by": "PL",
+          "note": "Filed from PL screenshot."
+        }
+      ]
+    },
+    {
+      "id": "req_BUG-035",
+      "project_id": "proj_metapm",
+      "code": "BUG-035",
+      "title": "post_prompt does not link PTH to requirement — cc_prompt_ready auto-advance broken, uat_ready gate permanently blocked",
+      "description": "post_prompt fails to set requirement_code FK on cc_prompts row. The lifecycle auto-advance never finds the prompt; uat_ready is unreachable; PL cannot run UAT.",
+      "status": "open",
+      "priority": "P1",
+      "type": "bug",
+      "sprint_id": "MP30",
+      "pth": "PTH-MP30",
+      "failure_class_hash": "h_b91207",
+      "bug_chain_id": null,
+      "classifications": [
+        "Incomplete handoff",
+        "State Machine"
+      ],
+      "created_at": "2026-04-09T13:30:00.000Z",
+      "updated_at": "2026-04-22T11:00:00.000Z",
+      "age": 15,
+      "tokens": [
+        "postprompt",
+        "pth",
+        "link",
+        "requirement",
+        "autoadvance",
+        "uatready",
+        "gate",
+        "statemachine"
+      ],
+      "signals": [
+        "state-machine",
+        "mcp"
+      ],
+      "layer": "backend",
+      "prefix": "BUG",
+      "uat_walks": [
+        {
+          "id": "uat_MP30_uat",
+          "pth": "PTH-MP30",
+          "sprint_id": "MP30",
+          "version": "v3.0.5",
+          "uat_status": "rejected",
+          "submitted_at": "2026-04-09T16:00:00.000Z",
+          "submitted_by": "PL",
+          "general_notes": "Could not start UAT — gate is stuck.",
+          "cai_review_json": {
+            "assessment": "fail",
+            "summary": "post_prompt missing requirement_code FK.",
+            "actionable": [
+              "Add column write to insert",
+              "Backfill historical rows"
+            ]
+          },
+          "bvs": [
+            {
+              "bv_id": "M1",
+              "title": "post_prompt writes requirement_code FK",
+              "bv_type": "cc_machine",
+              "status": "fail",
+              "classifications": [
+                "Incomplete handoff",
+                "State Machine"
+              ],
+              "notes": null,
+              "cc_evidence": "SELECT requirement_code FROM cc_prompts WHERE id=4501 → NULL"
+            }
+          ]
+        }
+      ],
+      "sprints": [
+        {
+          "id": 3501,
+          "sprint_id": "MP30",
+          "pth": "PTH-MP30",
+          "status": "closed",
+          "session_outcome": "fail",
+          "approved_at": "2026-04-08T09:00:00.000Z",
+          "approved_by": "CAI",
+          "version_before": "v3.0.4",
+          "version_after": "v3.0.5",
+          "also_closes": [],
+          "content": "Wire post_prompt to write requirement_code FK on every insert.",
+          "session_started_at": "2026-04-08T10:00:00.000Z",
+          "session_ended_at": "2026-04-09T12:00:00.000Z",
+          "session_stop_reason": "REST writes the FK; MCP signature lacks requirement_code parameter.",
+          "handoff_id": 9201
+        }
+      ],
+      "handoffs": [
+        {
+          "id": 9201,
+          "pth": "PTH-MP30",
+          "direction": "cc_to_pl",
+          "description": "MP30 — post_prompt now writes requirement_code FK.",
+          "evidence_json": {
+            "tests_run": [
+              "REST POST /prompts with code=BUG-035 → row has requirement_code"
+            ],
+            "gaps_acknowledged": [
+              "MCP signature does not yet accept requirement_code; only REST callers benefit."
+            ]
+          }
+        }
+      ],
+      "reviews": [
+        {
+          "id": 5201,
+          "pth": "PTH-MP30",
+          "handoff_id": 9201,
+          "assessment": "conditional_pass",
+          "notes": "REST path good; MCP path still broken — filing BUG-037 as follow-up.",
+          "lesson_candidates": {
+            "target": "MCP/REST parity",
+            "severity": "medium",
+            "lesson": "Signature changes must land on both REST and MCP in the same sprint."
+          },
+          "created_at": "2026-04-09T13:00:00.000Z",
+          "created_by": "CAI"
+        }
+      ],
+      "history": [
+        {
+          "id": 34001,
+          "old_status": null,
+          "new_status": "open",
+          "changed_at": "2026-04-09T13:30:00.000Z",
+          "changed_by": "PL",
+          "note": "Filed."
+        },
+        {
+          "id": 34003,
+          "old_status": "open",
+          "new_status": "cc_assigned",
+          "changed_at": "2026-04-15T09:00:00.000Z",
+          "changed_by": "CAI",
+          "note": "Assigned to MP38."
+        }
+      ]
+    },
+    {
+      "id": "req_BUG-052",
+      "project_id": "proj_metapm",
+      "code": "BUG-052",
+      "title": "Add menu button does not open — overflow:hidden on .header-content clips absolute-positioned dropdown",
+      "description": "Header has overflow:hidden; the absolute-positioned dropdown is rendered as a child and gets clipped. Move dropdown to a portal, or remove overflow.",
+      "status": "open",
+      "priority": "P2",
+      "type": "bug",
+      "sprint_id": null,
+      "pth": null,
+      "failure_class_hash": null,
+      "bug_chain_id": null,
+      "classifications": [],
+      "created_at": "2026-04-13T16:30:00.000Z",
+      "updated_at": "2026-04-13T16:30:00.000Z",
+      "age": 11,
+      "tokens": [
+        "add",
+        "menu",
+        "dropdown",
+        "overflow",
+        "clip",
+        "header",
+        "absolute"
+      ],
+      "signals": [
+        "chrome",
+        "dropdown"
+      ],
+      "layer": "frontend",
+      "prefix": "BUG",
+      "uat_walks": [],
+      "sprints": [],
+      "handoffs": [],
+      "reviews": [],
+      "history": [
+        {
+          "id": 35001,
+          "old_status": null,
+          "new_status": "open",
+          "changed_at": "2026-04-13T16:30:00.000Z",
+          "changed_by": "PL",
+          "note": "Filed."
+        }
+      ]
+    },
+    {
+      "id": "req_MP-038",
+      "project_id": "proj_metapm",
+      "code": "MP-038",
+      "title": "UAT submit fails when note field exceeds 2000 characters",
+      "description": "VARCHAR(2000) DB column truncates; submit returns 400 from the validator. PL must paste shorter notes or break across BVs.",
+      "status": "open",
+      "priority": "P2",
+      "type": "bug",
+      "sprint_id": null,
+      "pth": null,
+      "failure_class_hash": null,
+      "bug_chain_id": null,
+      "classifications": [
+        "Data Mapping"
+      ],
+      "created_at": "2026-04-03T12:00:00.000Z",
+      "updated_at": "2026-04-03T12:00:00.000Z",
+      "age": 21,
+      "tokens": [
+        "uat",
+        "note",
+        "2000",
+        "exceed",
+        "truncate",
+        "validator"
+      ],
+      "signals": [
+        "uat",
+        "form"
+      ],
+      "layer": "backend",
+      "prefix": "MP",
+      "uat_walks": [],
+      "sprints": [],
+      "handoffs": [],
+      "reviews": [],
+      "history": [
+        {
+          "id": 36001,
+          "old_status": null,
+          "new_status": "open",
+          "changed_at": "2026-04-03T12:00:00.000Z",
+          "changed_by": "PL",
+          "note": "Filed."
+        }
+      ]
+    },
+    {
+      "id": "req_AF-041",
+      "project_id": "proj_assemblyfix",
+      "code": "AF-041",
+      "title": "Save button no-op on Story page — artifacts lost on navigation",
+      "description": "Save button onclick='saveStory()' but saveStory was renamed to persistStory in the new bundle. Click logs nothing; artifacts are not POSTed.",
+      "status": "open",
+      "priority": "P1",
+      "type": "bug",
+      "sprint_id": null,
+      "pth": null,
+      "failure_class_hash": null,
+      "bug_chain_id": null,
+      "classifications": [
+        "Broken Interaction"
+      ],
+      "created_at": "2026-04-09T09:00:00.000Z",
+      "updated_at": "2026-04-09T09:00:00.000Z",
+      "age": 15,
+      "tokens": [
+        "save",
+        "button",
+        "noop",
+        "navigation",
+        "onclick",
+        "scope"
+      ],
+      "signals": [
+        "story",
+        "save"
+      ],
+      "layer": "frontend",
+      "prefix": "AF",
+      "uat_walks": [],
+      "sprints": [],
+      "handoffs": [],
+      "reviews": [],
+      "history": [
+        {
+          "id": 37001,
+          "old_status": null,
+          "new_status": "open",
+          "changed_at": "2026-04-09T09:00:00.000Z",
+          "changed_by": "PL",
+          "note": "Filed."
+        }
+      ]
+    },
+    {
+      "id": "req_HL-KEY-FIX-001",
+      "project_id": "proj_harmoniclanguage",
+      "code": "HL-KEY-FIX-001",
+      "title": "Key detection incorrect — shows G major for Corcovado",
+      "description": "Krumhansl-Schmuckler weights are skewed by the dominant pedal in the bridge of Corcovado, picking G major over the correct F major.",
+      "status": "open",
+      "priority": "P1",
+      "type": "bug",
+      "sprint_id": null,
+      "pth": null,
+      "failure_class_hash": null,
+      "bug_chain_id": null,
+      "classifications": [],
+      "created_at": "2026-03-20T09:00:00.000Z",
+      "updated_at": "2026-03-20T09:00:00.000Z",
+      "age": 35,
+      "tokens": [
+        "key",
+        "detection",
+        "incorrect",
+        "major",
+        "krumhansl",
+        "corcovado"
+      ],
+      "signals": [
+        "analysis"
+      ],
+      "layer": "algorithm",
+      "prefix": "HL",
+      "uat_walks": [],
+      "sprints": [],
+      "handoffs": [],
+      "reviews": [],
+      "history": [
+        {
+          "id": 38001,
+          "old_status": null,
+          "new_status": "open",
+          "changed_at": "2026-03-20T09:00:00.000Z",
+          "changed_by": "PL",
+          "note": "Filed."
+        }
+      ]
+    },
+    {
+      "id": "req_BUG-093",
+      "project_id": "proj_metapm",
+      "code": "BUG-093",
+      "title": "/template-admin Save button non-functional — saveTemplate function not on window",
+      "description": "saveTemplate() defined inside an IIFE; onclick='saveTemplate()' fails because window does not see it. Same root as BUG-020.",
+      "status": "open",
+      "priority": "P2",
+      "type": "bug",
+      "sprint_id": null,
+      "pth": null,
+      "failure_class_hash": null,
+      "bug_chain_id": null,
+      "classifications": [],
+      "created_at": "2026-04-22T15:00:00.000Z",
+      "updated_at": "2026-04-22T15:00:00.000Z",
+      "age": 2,
+      "tokens": [
+        "save",
+        "button",
+        "window",
+        "onclick",
+        "scope",
+        "iife",
+        "template"
+      ],
+      "signals": [
+        "form"
+      ],
+      "layer": "frontend",
+      "prefix": "BUG",
+      "uat_walks": [],
+      "sprints": [],
+      "handoffs": [],
+      "reviews": [],
+      "history": [
+        {
+          "id": 39001,
+          "old_status": null,
+          "new_status": "open",
+          "changed_at": "2026-04-22T15:00:00.000Z",
+          "changed_by": "PL",
+          "note": "Filed."
+        }
+      ]
+    },
+    {
+      "id": "req_BUG-079",
+      "project_id": "proj_metapm",
+      "code": "BUG-079",
+      "title": "Dashboard description truncated at 200 chars — rowHtml() substring(0,200) hardcoded cap",
+      "description": "JS substring(0,200) at insertion time. Full text in DB but never reaches DOM. Same shape as BUG-058, BUG-059.",
+      "status": "open",
+      "priority": "P2",
+      "type": "bug",
+      "sprint_id": null,
+      "pth": null,
+      "failure_class_hash": null,
+      "bug_chain_id": null,
+      "classifications": [],
+      "created_at": "2026-04-17T10:00:00.000Z",
+      "updated_at": "2026-04-17T10:00:00.000Z",
+      "age": 7,
+      "tokens": [
+        "description",
+        "truncation",
+        "200",
+        "substring",
+        "rowhtml",
+        "dashboard"
+      ],
+      "signals": [
+        "dashboard",
+        "display"
+      ],
+      "layer": "frontend",
+      "prefix": "BUG",
+      "uat_walks": [],
+      "sprints": [],
+      "handoffs": [],
+      "reviews": [],
+      "history": [
+        {
+          "id": 40001,
+          "old_status": null,
+          "new_status": "open",
+          "changed_at": "2026-04-17T10:00:00.000Z",
+          "changed_by": "PL",
+          "note": "Filed."
+        }
+      ]
+    }
+  ],
+  "classifications": [
+    {
+      "id": "cls-1",
+      "name": "Machine test sent to PL",
+      "description": "cc_machine BV reached the PL submission form (BA32 violation).",
+      "display_order": 1,
+      "active": true
+    },
+    {
+      "id": "cls-2",
+      "name": "No 5Q applied",
+      "description": "5-question diagnostic discipline was skipped before fix attempt.",
+      "display_order": 2,
+      "active": true
+    },
+    {
+      "id": "cls-3",
+      "name": "Incomplete spec",
+      "description": "UAT spec missed a BV that should have caught the defect.",
+      "display_order": 3,
+      "active": true
+    },
+    {
+      "id": "cls-4",
+      "name": "Incomplete handoff",
+      "description": "CC handoff lacked the evidence needed to verify the fix.",
+      "display_order": 4,
+      "active": true
+    },
+    {
+      "id": "cls-5",
+      "name": "Regression — same root",
+      "description": "Same defect resurfaced because the patch did not address root cause.",
+      "display_order": 5,
+      "active": true
+    },
+    {
+      "id": "cls-6",
+      "name": "Frontend not updated",
+      "description": "Server-side change shipped without the matching frontend update.",
+      "display_order": 6,
+      "active": true
+    },
+    {
+      "id": "cls-7",
+      "name": "API Contract",
+      "description": "Mismatch between client expectation and server response shape.",
+      "display_order": 7,
+      "active": true
+    },
+    {
+      "id": "cls-8",
+      "name": "Broken Interaction",
+      "description": "UI element renders but doesn't respond as expected.",
+      "display_order": 8,
+      "active": true
+    },
+    {
+      "id": "cls-9",
+      "name": "Data Mapping",
+      "description": "Field name/type drift between layers.",
+      "display_order": 9,
+      "active": true
+    },
+    {
+      "id": "cls-10",
+      "name": "State Machine",
+      "description": "Status transition doesn't fire or fires incorrectly.",
+      "display_order": 10,
+      "active": true
+    },
+    {
+      "id": "cls-11",
+      "name": "Config / Secrets",
+      "description": "Env var or secret misconfigured in deploy environment.",
+      "display_order": 11,
+      "active": true
+    },
+    {
+      "id": "cls-12",
+      "name": "Render / Template",
+      "description": "Server-rendered template missing or wrong block.",
+      "display_order": 12,
+      "active": true
+    }
+  ],
+  "chains": [
+    {
+      "id": "BC-MACHINE-TEST-IN-PL-FORM",
+      "pattern_label": "BC-MACHINE-TEST-IN-PL-FORM",
+      "failure_class_hash": "h_a3f9c1",
+      "expected_outcome": "cc_machine BVs are excluded from the PL UAT submission form. Only pl_visual BVs require PL classification at submit.",
+      "missing_signal": "PL submission form contains BV cards with data-type='cc_machine'; or server-side validator returns 'Classification required' for a cc_machine BV.",
+      "first_occurrence_requirement_code": "BUG-039",
+      "first_occurrence_at": "2026-03-04T12:14:00Z",
+      "member_requirement_codes": [
+        "BUG-018",
+        "BUG-039",
+        "BUG-051",
+        "BUG-061",
+        "BUG-067",
+        "BUG-078",
+        "BUG-080"
+      ],
+      "total_occurrences": 7,
+      "status": "active",
+      "diagnostic_pth": "PTH-MP41",
+      "resolution_pth": null,
+      "resolved_at": null
+    },
+    {
+      "id": "BC-NOTES-TEXTAREA-DROPPED",
+      "pattern_label": "BC-NOTES-TEXTAREA-DROPPED",
+      "failure_class_hash": "h_88a2e0",
+      "expected_outcome": "Every UAT BV card renders a notes textarea regardless of bv_type or cascade state. PL can write notes on any BV.",
+      "missing_signal": "DOM querySelector('textarea[name=notes]') returns null on at least one BV card after render or after a state change.",
+      "first_occurrence_requirement_code": "BUG-083",
+      "first_occurrence_at": "2026-04-18T14:30:00Z",
+      "member_requirement_codes": [
+        "BUG-083",
+        "BUG-084",
+        "BUG-085",
+        "BUG-086"
+      ],
+      "total_occurrences": 4,
+      "status": "active",
+      "diagnostic_pth": "PTH-MP43",
+      "resolution_pth": null,
+      "resolved_at": null
+    },
+    {
+      "id": "BC-SCOPE-COLLISION",
+      "pattern_label": "BC-SCOPE-COLLISION",
+      "failure_class_hash": "h_3d7711",
+      "expected_outcome": "Each service has its own OAuth client + secret; rotation in one does not break another.",
+      "missing_signal": "Login returns 503; 'Scope has changed' rejection from Google; secret rotation in one service breaks others.",
+      "first_occurrence_requirement_code": "BUG-077",
+      "first_occurrence_at": "2026-04-15T08:45:00Z",
+      "member_requirement_codes": [
+        "BUG-076",
+        "BUG-077",
+        "BUG-095",
+        "BUG-098"
+      ],
+      "total_occurrences": 4,
+      "status": "active",
+      "diagnostic_pth": "PTH-DIAG-005",
+      "resolution_pth": null,
+      "resolved_at": null
+    }
+  ]
+}
