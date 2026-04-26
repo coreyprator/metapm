@@ -289,14 +289,14 @@ async def load_bugs_with_context() -> List[Dict[str, Any]]:
                 "evidence_json": evidence,
             })
 
-        # Get reviews
+        # Get reviews (MP56-PATCH: column is prompt_pth not pth)
         reviews = []
         if handoffs:
             for handoff in handoffs:
                 review_rows = execute_query(
                     """
                     SELECT
-                        id, pth, handoff_id, assessment, notes,
+                        id, prompt_pth, handoff_id, assessment, notes,
                         lesson_candidates, created_at, created_by
                     FROM reviews
                     WHERE handoff_id = ?
@@ -315,7 +315,7 @@ async def load_bugs_with_context() -> List[Dict[str, Any]]:
 
                     reviews.append({
                         "id": r["id"],
-                        "pth": r["pth"],
+                        "pth": r["prompt_pth"],  # Map prompt_pth → pth for frontend
                         "handoff_id": r["handoff_id"],
                         "assessment": r["assessment"],
                         "notes": r.get("notes", ""),
