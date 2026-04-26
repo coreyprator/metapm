@@ -192,11 +192,11 @@ async def load_bugs_with_context() -> List[Dict[str, Any]]:
         ) or []
 
         for walk in walks:
-            # Get BVs for this UAT walk
+            # Get BVs for this UAT walk (MP56-PATCH: removed bv_type - not in table)
             bvs = execute_query(
                 """
                 SELECT
-                    bv_id, title, bv_type, status, classification,
+                    bv_id, title, status, classification,
                     notes, cc_evidence, cc_result
                 FROM uat_bv_items
                 WHERE spec_id = ?
