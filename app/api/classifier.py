@@ -860,8 +860,52 @@ async def run_seed():
             "warning": None,
         }
 
-        # Skip table check - migrations haven't been run yet. Try seeding and handle errors.
-        results["warning"] = "Skipping bug_chains insert - schema unknown pre-migration. Seeding join tables only."
+        # Phase 1: Seed bug_chains
+        logger.info("[SEED] Phase 1: Seeding bug_chains")
+        for chain in data.get("chains", []):
+            chain_id = chain["id"]
+
+            # Check if already exists
+            existing = execute_query("SELECT id FROM bug_chains WHERE id = ?", (chain_id,))
+            if existing:
+                logger.info(f"[SEED] Chain {chain_id} already exists, skipping")
+                results["chains_skipped"] += 1
+                continue
+
+            # Insert chain
+            member_codes_json = json.dumps(chain.get("member_requirement_codes", []))
+
+            try:
+                execute_query(
+                    """
+                    INSERT INTO bug_chains (
+                        id, pattern_label, expected_outcome,
+                        member_requirement_codes, total_occurrences,
+                        status, failure_class_hash, first_occurrence_requirement_code,
+                        first_occurrence_at, diagnostic_pth, resolution_pth, resolved_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        chain_id,
+                        chain.get("pattern_label", chain_id),
+                        chain.get("expected_outcome", ""),
+                        member_codes_json,
+                        chain.get("total_occurrences", 0),
+                        chain.get("status", "active"),
+                        chain.get("failure_class_hash"),
+                        chain.get("first_occurrence_requirement_code"),
+                        chain.get("first_occurrence_at"),
+                        chain.get("diagnostic_pth"),
+                        chain.get("resolution_pth"),
+                        chain.get("resolved_at"),
+                    ),
+                    fetch="none"
+                )
+                logger.info(f"[SEED] Inserted chain {chain_id}")
+                results["chains_inserted"] += 1
+            except Exception as e:
+                logger.error(f"[SEED] Failed to insert chain {chain_id}: {e}")
 
         # Phase 2: Seed bug_classifications (join table created by migration)
         try:
