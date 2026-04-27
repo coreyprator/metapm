@@ -901,7 +901,8 @@ async def run_seed():
 
                 execute_query(
                     "INSERT INTO bug_classifications (bug_requirement_id, classification_code, created_by) VALUES (?, ?, 'seed')",
-                    (bug_req_id, cls_code)
+                    (bug_req_id, cls_code),
+                    fetch="none"
                 )
                 results["bug_classifications_inserted"] += 1
 
@@ -931,7 +932,8 @@ async def run_seed():
             try:
                 execute_query(
                     "INSERT INTO bug_chain_members (bug_requirement_id, chain_id, created_by) VALUES (?, ?, 'seed')",
-                    (bug_req_id, chain_id)
+                    (bug_req_id, chain_id),
+                    fetch="none"
                 )
                 results["bug_chain_members_inserted"] += 1
             except Exception as e:
