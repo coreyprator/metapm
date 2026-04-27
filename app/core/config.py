@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Application Version
-    VERSION: str = "3.5.0"  # MP56: Bug Classifier Inspector - Schema migration, API endpoints, UI integration
+    VERSION: str = "3.5.1"  # MP56-PATCH-2: Seed classifier data (3 chains, 8 bug_classifications, 12 bug_chain_members)
     BUILD: str = os.getenv("COMMIT_SHA", os.getenv("BUILD_ID", "unknown"))
     
     # Database
