@@ -857,6 +857,7 @@ async def run_seed():
             "bug_chain_members_inserted": 0,
             "bug_chain_members_skipped": 0,
             "skipped_bug_codes": [],
+            "chain_errors": [],  # MP56-PATCH-2: Track chain insert failures
             "warning": None,
         }
 
@@ -941,7 +942,9 @@ async def run_seed():
                         logger.warning(f"[SEED] Failed to link bug {member_code} → chain {chain_id}: {e}")
 
             except Exception as e:
+                error_msg = f"Chain {chain_id}: {type(e).__name__}: {str(e)}"
                 logger.error(f"[SEED] Failed to insert chain {chain_id}: {e}")
+                results["chain_errors"].append(error_msg)
 
         # Phase 2: Seed bug_classifications (join table created by migration)
         try:
