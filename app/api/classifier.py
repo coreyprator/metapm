@@ -999,6 +999,20 @@ async def run_seed():
             except Exception as e:
                 logger.warning(f"Failed to insert chain member {bug_code} → {chain_id}: {e}")
 
+        # Verification: Query actual counts in database
+        try:
+            chain_count = execute_query("SELECT COUNT(*) as count FROM bug_chains", fetch="one")
+            bc_count = execute_query("SELECT COUNT(*) as count FROM bug_classifications", fetch="one")
+            bcm_count = execute_query("SELECT COUNT(*) as count FROM bug_chain_members", fetch="one")
+
+            results["verification"] = {
+                "bug_chains_count": chain_count["count"] if chain_count else 0,
+                "bug_classifications_count": bc_count["count"] if bc_count else 0,
+                "bug_chain_members_count": bcm_count["count"] if bcm_count else 0
+            }
+        except Exception as e:
+            logger.error(f"[SEED] Failed to query verification counts: {e}")
+
         logger.info(f"[SEED] ===== Seed complete. Results: {results} =====")
         return results
 
