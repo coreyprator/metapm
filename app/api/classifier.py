@@ -836,14 +836,18 @@ async def run_seed():
 
     PREREQUISITE: MP56 schema migration must be run first to create bug_chains table.
     """
+    logger.info("[SEED] ===== Starting seed endpoint =====")
     try:
         from pathlib import Path
         import json
 
         # Load export JSON (MP56-PATCH-2: moved to app/data for container deploy)
         json_path = Path(__file__).parent.parent / "data" / "mp56_seed_classifier_data.json"
+        logger.info(f"[SEED] Loading JSON from {json_path}")
         with open(json_path, "r", encoding="utf-8") as f:
             data = json.load(f)
+
+        logger.info(f"[SEED] Loaded {len(data['bugs'])} bugs, {len(data.get('chains', []))} chains")
 
         results = {
             "chains_inserted": 0,
@@ -861,8 +865,11 @@ async def run_seed():
 
         # Phase 2: Seed bug_classifications (join table created by migration)
         try:
+            logger.info("[SEED] Phase 2: Querying classifications table")
             cls_rows = execute_query("SELECT code, name FROM classifications")
+            logger.info(f"[SEED] Got {len(cls_rows)} classification rows")
         except Exception as e:
+            logger.error(f"[SEED] Failed to query classifications: {e}")
             return {
                 "error": "classifications table not found",
                 "detail": str(e),
@@ -873,12 +880,14 @@ async def run_seed():
 
         for bug in data["bugs"]:
             bug_code = bug["code"]
+            logger.info(f"[SEED] Processing bug {bug_code}")
             bug_rows = execute_query(
                 "SELECT id FROM roadmap_requirements WHERE code = ? AND type = 'bug'",
                 (bug_code,)
             )
             if not bug_rows:
                 results["skipped_bug_codes"].append(bug_code)
+                logger.info(f"[SEED] Bug {bug_code} not found in DB, skipping")
                 continue
 
             bug_req_id = bug_rows[0]["id"]
@@ -891,6 +900,7 @@ async def run_seed():
                     if cls_code not in [row["code"] for row in cls_rows]:
                         continue
 
+                logger.info(f"[SEED] Checking existing: bug {bug_code} → cls {cls_code}")
                 existing = execute_query(
                     "SELECT id FROM bug_classifications WHERE bug_requirement_id = ? AND classification_code = ?",
                     (bug_req_id, cls_code)
@@ -899,14 +909,17 @@ async def run_seed():
                     results["bug_classifications_skipped"] += 1
                     continue
 
+                logger.info(f"[SEED] Inserting bug_classification: bug {bug_code} → cls {cls_code}, fetch=none")
                 execute_query(
                     "INSERT INTO bug_classifications (bug_requirement_id, classification_code, created_by) VALUES (?, ?, 'seed')",
                     (bug_req_id, cls_code),
                     fetch="none"
                 )
+                logger.info(f"[SEED] Insert successful")
                 results["bug_classifications_inserted"] += 1
 
         # Phase 3: Seed bug_chain_members
+        logger.info("[SEED] Phase 3: Seeding bug_chain_members")
         for bug in data["bugs"]:
             bug_code = bug["code"]
             bug_rows = execute_query(
@@ -921,6 +934,7 @@ async def run_seed():
             if not chain_id:
                 continue
 
+            logger.info(f"[SEED] Checking existing chain member: bug {bug_code} → chain {chain_id}")
             existing = execute_query(
                 "SELECT id FROM bug_chain_members WHERE bug_requirement_id = ? AND chain_id = ?",
                 (bug_req_id, chain_id)
@@ -930,15 +944,18 @@ async def run_seed():
                 continue
 
             try:
+                logger.info(f"[SEED] Inserting bug_chain_member: bug {bug_code} → chain {chain_id}, fetch=none")
                 execute_query(
                     "INSERT INTO bug_chain_members (bug_requirement_id, chain_id, created_by) VALUES (?, ?, 'seed')",
                     (bug_req_id, chain_id),
                     fetch="none"
                 )
+                logger.info(f"[SEED] Insert successful")
                 results["bug_chain_members_inserted"] += 1
             except Exception as e:
                 logger.warning(f"Failed to insert chain member {bug_code} → {chain_id}: {e}")
 
+        logger.info(f"[SEED] ===== Seed complete. Results: {results} =====")
         return results
 
     except Exception as exc:
