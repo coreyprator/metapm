@@ -904,6 +904,42 @@ async def run_seed():
                 )
                 logger.info(f"[SEED] Inserted chain {chain_id}")
                 results["chains_inserted"] += 1
+
+                # MP56-PATCH-2 FIX: Also create bug_chain_members from chain's member_requirement_codes
+                member_codes = chain.get("member_requirement_codes", [])
+                for member_code in member_codes:
+                    # Get bug requirement ID
+                    bug_rows = execute_query(
+                        "SELECT id FROM roadmap_requirements WHERE code = ? AND type = 'bug'",
+                        (member_code,)
+                    )
+                    if not bug_rows:
+                        logger.warning(f"[SEED] Member bug {member_code} not found for chain {chain_id}")
+                        continue
+
+                    bug_req_id = bug_rows[0]["id"]
+
+                    # Check if already exists
+                    existing = execute_query(
+                        "SELECT id FROM bug_chain_members WHERE bug_requirement_id = ? AND chain_id = ?",
+                        (bug_req_id, chain_id)
+                    )
+                    if existing:
+                        results["bug_chain_members_skipped"] += 1
+                        continue
+
+                    # Insert bug_chain_member
+                    try:
+                        execute_query(
+                            "INSERT INTO bug_chain_members (bug_requirement_id, chain_id, created_by) VALUES (?, ?, 'seed')",
+                            (bug_req_id, chain_id),
+                            fetch="none"
+                        )
+                        logger.info(f"[SEED] Linked bug {member_code} → chain {chain_id}")
+                        results["bug_chain_members_inserted"] += 1
+                    except Exception as e:
+                        logger.warning(f"[SEED] Failed to link bug {member_code} → chain {chain_id}: {e}")
+
             except Exception as e:
                 logger.error(f"[SEED] Failed to insert chain {chain_id}: {e}")
 
