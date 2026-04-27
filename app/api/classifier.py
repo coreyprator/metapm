@@ -861,15 +861,27 @@ async def run_seed():
             "warning": None,
         }
 
-        # MP56-PATCH-2 SCHEMA FIX: Expand bug_chains.id column from nvarchar(20) to nvarchar(50)
+        # MP56-PATCH-2 SCHEMA FIX: Expand bug_chains.id and bug_chain_members.chain_id to nvarchar(50)
         # Required because JSON has chains like BC-MACHINE-TEST-IN-PL-FORM (27 chars)
         try:
-            logger.info("[SEED] Checking bug_chains.id column length...")
-            execute_query("ALTER TABLE bug_chains ALTER COLUMN id nvarchar(50) NOT NULL", fetch="none")
-            logger.info("[SEED] Expanded bug_chains.id to nvarchar(50)")
+            logger.info("[SEED] Expanding bug_chains.id column...")
+
+            # Step 1: Drop FK constraint from bug_chain_members
+            execute_query("ALTER TABLE bug_chain_members DROP CONSTRAINT IF EXISTS fk_bcm_chain", fetch="none")
+
+            # Step 2: Expand both columns
+            execute_query("ALTER TABLE bug_chain_members ALTER COLUMN chain_id NVARCHAR(50) NOT NULL", fetch="none")
+            execute_query("ALTER TABLE bug_chains ALTER COLUMN id NVARCHAR(50) NOT NULL", fetch="none")
+
+            # Step 3: Recreate FK constraint
+            execute_query(
+                "ALTER TABLE bug_chain_members ADD CONSTRAINT fk_bcm_chain FOREIGN KEY (chain_id) REFERENCES bug_chains(id)",
+                fetch="none"
+            )
+
+            logger.info("[SEED] Expanded bug_chains.id and bug_chain_members.chain_id to nvarchar(50)")
         except Exception as e:
-            # Might fail if column is already nvarchar(50) or larger
-            logger.info(f"[SEED] ALTER TABLE note: {e}")
+            logger.warning(f"[SEED] ALTER TABLE note: {e}")
 
         # Phase 1: Seed bug_chains
         logger.info("[SEED] Phase 1: Seeding bug_chains")
