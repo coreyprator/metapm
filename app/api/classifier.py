@@ -861,6 +861,16 @@ async def run_seed():
             "warning": None,
         }
 
+        # MP56-PATCH-2 SCHEMA FIX: Expand bug_chains.id column from nvarchar(20) to nvarchar(50)
+        # Required because JSON has chains like BC-MACHINE-TEST-IN-PL-FORM (27 chars)
+        try:
+            logger.info("[SEED] Checking bug_chains.id column length...")
+            execute_query("ALTER TABLE bug_chains ALTER COLUMN id nvarchar(50) NOT NULL", fetch="none")
+            logger.info("[SEED] Expanded bug_chains.id to nvarchar(50)")
+        except Exception as e:
+            # Might fail if column is already nvarchar(50) or larger
+            logger.info(f"[SEED] ALTER TABLE note: {e}")
+
         # Phase 1: Seed bug_chains
         logger.info("[SEED] Phase 1: Seeding bug_chains")
         for chain in data.get("chains", []):
